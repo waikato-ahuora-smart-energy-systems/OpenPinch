@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import inspect
+import io
 import json
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from OpenPinch.application._problem.accessors.target import (
     _AllPeriodsTargetAccessor,
     _TargetAccessor,
 )
+from OpenPinch.application._problem.targeting.catalog import METHOD_CATALOG
 from OpenPinch.application.workspace import (
     CaseBatchResult,
     _CaseBatch,
@@ -59,7 +61,8 @@ TARGET_TUTORIALS = {
     "mvr_heat_pump": 11,
     "cogeneration": 12,
     "sun_smith_cogeneration": 12,
-    "varbanov_cogeneration": 12,
+    "varbanov_small_turbine_cogeneration": 12,
+    "varbanov_large_turbine_cogeneration": 12,
     "isentropic_cogeneration": 12,
     "energy_transfer": 14,
     "all_periods": 6,
@@ -81,7 +84,8 @@ ALL_PERIOD_TUTORIALS = {
     "mvr_heat_pump": 10,
     "cogeneration": 13,
     "sun_smith_cogeneration": 13,
-    "varbanov_cogeneration": 13,
+    "varbanov_small_turbine_cogeneration": 13,
+    "varbanov_large_turbine_cogeneration": 13,
     "isentropic_cogeneration": 13,
     "utility_placement": 19,
 }
@@ -155,28 +159,90 @@ def _classification(value: object) -> str:
     return "accessor"
 
 
-def _mode(name: str, classification: str) -> str:
-    if name in {"export", "export_gallery", "export_excel", "show_dashboard"}:
-        return "explicit side effect"
-    if classification in {"property", "accessor"} or name in {
-        "catalog",
-        "data",
-        "metrics",
-        "report",
-        "summary_frame",
-        "validation_report",
-    }:
-        return "cached observation"
-    if name in {
+SIDE_EFFECT_OPERATIONS = frozenset(
+    {"export", "export_gallery", "export_excel", "save_bundle", "show_dashboard"}
+)
+PREPARATION_OPERATIONS = frozenset(
+    {
+        "activate",
+        "add",
+        "deactivate",
+        "from_bundle",
         "load",
         "load_bundle",
-        "from_bundle",
+        "residual_utility",
         "scenario",
         "set_case_input",
+        "set_dt_cont_multiplier",
         "update_options",
-    }:
+        "use_case",
+        "with_utilities_from",
+    }
+)
+# Read state without running an analysis. Plots and design-result views are
+# observations by owner; a plot raises on an unsolved problem rather than
+# running anything.
+OBSERVATION_OPERATIONS = frozenset(
+    {
+        "case",
+        "cases",
+        "catalog",
+        "compare_cases",
+        "compare_to",
+        "data",
+        "list_cases",
+        "metrics",
+        "reports",
+        "report",
+        "summary_frame",
+        "summary_frames",
+        "to_bundle",
+        "to_problem_json",
+        "validate",
+        "validation_report",
+        "work_for_zone",
+    }
+)
+OBSERVATION_OWNERS = frozenset({"Plot", "Design result"})
+
+
+def _mode(owner_name: str, name: str, classification: str) -> str:
+    if name in SIDE_EFFECT_OPERATIONS:
+        return "explicit side effect"
+    if name in PREPARATION_OPERATIONS:
         return "preparation"
+    if (
+        classification in {"property", "accessor"}
+        or name in OBSERVATION_OPERATIONS
+        or owner_name in OBSERVATION_OWNERS
+    ):
+        return "cached observation"
     return "explicit execution"
+
+
+def _optional_dependency(owner_name: str, name: str) -> str:
+    """Return the extras an operation needs beyond the base install."""
+    if owner_name == "Plot":
+        return "none" if name in {"catalog", "data"} else "notebook"
+    if name == "export_excel":
+        return "notebook"
+    if name == "show_dashboard":
+        return "dashboard"
+    if owner_name in {"Design", "Batch design", "Design result"}:
+        return "synthesis"
+    spec = METHOD_CATALOG.get(f"target.{name}")
+    if spec is not None and spec.optional_dependencies:
+        return "; ".join(spec.optional_dependencies)
+    return "none"
+
+
+def _profile_evidence(profile: str) -> str:
+    """Return how CI runs the notebook behind a profile."""
+    if profile == "slow-hpr":
+        return "routine notebooks-hpr CI execution"
+    if profile == "solver":
+        return "main-bound solver CI execution"
+    return "routine pytest execution"
 
 
 def _dimensions(
@@ -227,10 +293,12 @@ def _dimensions(
             else "n/a"
         ),
         "period_scope": "all periods"
-        if "period" in owner_name.lower()
+        if "period" in owner_name.lower() or operation == "design result.views"
         else "selected period",
         "aggregation": (
-            "per-period;weighted average"
+            "per-period"
+            if operation == "design result.views"
+            else "per-period;weighted average"
             if tutorial_number in {6, 10, 13, 17}
             else "single result"
         ),
@@ -259,7 +327,7 @@ def _dimensions(
             "guarded TESPy and routine fake pytest execution"
             if name == "hpr_performance_map"
             else "documented independent replay; related shared-design scalar "
-            "optimization in opt-in slow-hpr execution"
+            "optimization in routine notebooks-hpr CI execution"
             if owner_name == "All-period target"
             and name in DOCUMENTED_ALL_PERIOD_HPR_METHODS
             else "detached observation contract; routine pytest execution"
@@ -275,16 +343,9 @@ def _dimensions(
             }
             else "retained-period chaining; routine pytest execution"
             if owner_name == "All-period target" and name == "exergy"
-            else "batch delegation contract; "
-            + (
-                "routine pytest execution"
-                if profile == "base"
-                else f"opt-in executable profile: {profile}"
-            )
+            else "batch delegation contract; " + _profile_evidence(profile)
             if owner_name.startswith("Batch") or owner_name == "Case batch"
-            else "routine pytest execution"
-            if profile == "base"
-            else f"opt-in executable profile: {profile}"
+            else _profile_evidence(profile)
         ),
     }
 
@@ -310,7 +371,13 @@ def _problem_tutorial(name: str) -> int:
         "master_zone",
     }:
         return 3
-    if name in {"target", "validate", "validation_report", "project_name"}:
+    if name in {
+        "target",
+        "validate",
+        "validation_report",
+        "source_validation_report",
+        "project_name",
+    }:
         return 1
     return 18
 
@@ -372,7 +439,7 @@ def _rows() -> list[dict[str, str]]:
             "Design result",
             HeatExchangerNetworkDesignView,
             "design_result",
-            lambda _name: 15,
+            lambda name: 17 if name == "views" else 15,
         ),
         ("Plot", _PlotAccessor, "problem.plot", PLOT_TUTORIALS.__getitem__),
         (
@@ -441,7 +508,7 @@ def _rows() -> list[dict[str, str]]:
                     "owner": owner_name,
                     "operation": f"{prefix}.{name}",
                     "classification": classification,
-                    "semantic_mode": _mode(name, classification),
+                    "semantic_mode": _mode(owner_name, name, classification),
                     "primary_tutorial": NOTEBOOKS[tutorial_number],
                     "secondary_tutorials": (
                         NOTEBOOKS[4]
@@ -449,12 +516,7 @@ def _rows() -> list[dict[str, str]]:
                         else ""
                     ),
                     "execution_profile": profile,
-                    "optional_dependency": {
-                        "base": "none",
-                        "slow-hpr": "hpr",
-                        "solver": "hen",
-                        "interactive": "plot;excel;dashboard",
-                    }[profile],
+                    "optional_dependency": _optional_dependency(owner_name, name),
                     "coverage_status": (
                         "mapped; documented independent replay"
                         if owner_name == "All-period target"
@@ -479,7 +541,7 @@ def _under_development_row(
         "owner": owner_name,
         "operation": f"{prefix}.{name}",
         "classification": classification,
-        "semantic_mode": _mode(name, classification),
+        "semantic_mode": _mode(owner_name, name, classification),
         "primary_tutorial": "",
         "secondary_tutorials": "",
         "execution_profile": "n/a",
@@ -490,17 +552,19 @@ def _under_development_row(
     }
 
 
-def main() -> None:
+def render_manifest() -> str:
+    """Return the manifest CSV text generated from the live public surface."""
     rows = _rows()
+    stream = io.StringIO(newline="")
+    writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return stream.getvalue()
+
+
+def main() -> None:
     DESTINATION.parent.mkdir(parents=True, exist_ok=True)
-    with DESTINATION.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(
-            stream,
-            fieldnames=list(rows[0]),
-            lineterminator="\n",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+    DESTINATION.write_text(render_manifest(), encoding="utf-8", newline="")
 
 
 if __name__ == "__main__":

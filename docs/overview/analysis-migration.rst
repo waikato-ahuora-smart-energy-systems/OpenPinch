@@ -15,9 +15,14 @@ read-only mappings. Editing them does not edit a problem. Replace input through
 temperature multipliers through ``set_dt_cont_multiplier``. Keep component
 handles returned by ``components.add_process_mvr`` and use their explicit
 ``activate`` and ``deactivate`` methods. The component inventory mapping cannot
-be edited to register or remove a component. Input rebuilding (including
-``update_options`` and ``set_dt_cont_multiplier``) continues to discard memory-only
-component registrations; recreate components on the rebuilt input before solving.
+be edited to register or remove a component. ``update_options`` and
+``set_dt_cont_multiplier`` keep components: each one is re-solved on the rebuilt
+input and its handle stays valid. Explicit efficiencies stay as given, and
+efficiencies left unset take the new option values. If a component cannot be
+re-solved, the call raises and the problem is unchanged. ``to_problem_json``,
+workspace bundles and ``scenario`` carry components as the ``process_components``
+input field, and loading that input re-solves them. ``load`` replaces the
+components with those of the new source.
 
 Input, configuration, zone, and component changes invalidate scalar outputs,
 prepared period states, graphs, and design/placement caches together. A failed
@@ -36,8 +41,9 @@ One current prepared state per canonical period is retained in memory. For
 example, ``target.all_periods.direct_heat_integration()`` followed by
 ``target.all_periods.exergy()`` reuses compatible thermal prerequisites. State
 is replaced when superseded and is not serialized as run history. A scalar
-mutation supersedes the published all-period report; run the desired all-period
-workflow again to publish a complete batch.
+target run leaves the published all-period report in place; only an input
+change discards it, and the desired all-period workflow must then be run again
+to publish a complete batch.
 
 Published rows and graphs belong to the selected zone and, when requested,
 its descendants. Switching between sibling zones does not include the earlier

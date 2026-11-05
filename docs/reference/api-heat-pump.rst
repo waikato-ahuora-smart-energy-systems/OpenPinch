@@ -12,8 +12,8 @@ to screen direct and indirect integration opportunities.
 Where To Start
 --------------
 
-Repository developers can begin with the parent-owned internal surfaces
-documented in :doc:`api-core`:
+Repository developers can begin with the parent-owned surfaces on
+``PinchProblem`` listed in :doc:`../api/pinchproblem`:
 
 - ``problem.target.carnot_heat_pump(...)``
 - ``problem.target.carnot_refrigeration(...)``
@@ -63,7 +63,8 @@ Public Targeting Reliability Contract
 The scalar Carnot, vapour-compression, and VC+MVR target methods accept bounded
 search controls through ``maximum_restarts``, ``maximum_iterations``, and
 ``maximum_evaluations``. Vapour-compression methods additionally accept
-explicit condenser, evaporator, backend, and refrigerant selections;
+explicit backend and refrigerant selections. The Carnot, vapour-compression, and
+``mvr_heat_pump`` methods accept explicit condenser and evaporator selections;
 ``mvr_heat_pump`` accepts explicit MVR fluids and stage count. A successful
 target exposes ``hpr_success``, ``hpr_load`` where scalar load evidence exists,
 and detached ``hpr_details``.
@@ -86,6 +87,13 @@ Direct process MVR is a component workflow through
 per-period stage results, compressor work, affected zones, and active state are
 separate from the optimized ``problem.target.mvr_heat_pump(...)`` VC+MVR
 service.
+
+A source with a vapour target must stay vapour: a stage target below the
+saturation temperature at that stage's outlet pressure raises
+``DirectGasMVRPhaseError``, a ``ValueError``. A saturated vapour source may
+condense, in one stage only, because a later stage would start from liquid; with
+``n_stages`` above 1 it raises the same error. Multi-stage MVR of a condensing
+stream is not modelled.
 
 .. automodule:: OpenPinch.contracts.hpr_performance_map
    :members:

@@ -5,7 +5,8 @@ from __future__ import annotations
 import math
 import warnings
 from collections.abc import Mapping
-from typing import Any, Optional
+from copy import deepcopy
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -18,8 +19,18 @@ from .enums import FluidPhase
 from .fluids import validate_coolprop_fluid_name
 from .value import Value
 
+if TYPE_CHECKING:
+    from ._stream.segment import StreamSegment as _StreamSegment
+
 _TEMPERATURE_EQUAL_TOL = 1e-12
 MaybeVU = Any
+
+
+def _segment_type() -> type["_StreamSegment"]:
+    """Return the segment class, which subclasses ``Stream`` and imports it here."""
+    from ._stream.segment import StreamSegment
+
+    return StreamSegment
 
 
 class _ValueField(property):
@@ -235,6 +246,15 @@ class Stream:
                 f"Stream has no attribute {name!r}; use the descriptive runtime name."
             )
         super().__setattr__(name, value)
+
+    def __deepcopy__(self, memo) -> Stream:
+        """Copy the stored state directly, without re-deriving any property."""
+        copied = object.__new__(type(self))
+        memo[id(self)] = copied
+        copied.__dict__ = {
+            name: deepcopy(value, memo) for name, value in self.__dict__.items()
+        }
+        return copied
 
     def __init__(
         self,
@@ -742,7 +762,7 @@ class Stream:
 
     def replace_segments(self, segments) -> None:
         """Normalize and atomically replace the piecewise profile."""
-        _stream_segments.replace(self, segments, segment_type=_StreamSegment)
+        _stream_segments.replace(self, segments, segment_type=_segment_type())
 
     def update_segment(self, index: int, **changes) -> None:
         """Apply one segment update transactionally and revalidate the profile."""
@@ -792,8 +812,9 @@ class Stream:
             )
             if key in common
         }
+        segment_type = _segment_type()
         segments = [
-            _StreamSegment(
+            segment_type(
                 name=spec.name,
                 supply_temperature=spec.t_supply,
                 target_temperature=spec.t_target,
@@ -807,7 +828,7 @@ class Stream:
 
     @staticmethod
     def _detached_segment(segment: "_StreamSegment") -> "_StreamSegment":
-        return _stream_segments.detached(segment, segment_type=_StreamSegment)
+        return _stream_segments.detached(segment, segment_type=_segment_type())
 
     def _validate_segments(self, segments: tuple["_StreamSegment", ...]) -> None:
         _stream_segments.validate(self, segments)
@@ -896,7 +917,5 @@ class Stream:
             expected_len=expected_len,
         )
 
-
-from ._stream.segment import StreamSegment as _StreamSegment  # noqa: E402
 
 __all__ = ["Stream"]

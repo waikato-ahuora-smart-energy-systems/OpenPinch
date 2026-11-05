@@ -216,12 +216,12 @@ def test_requires_python_matches_python_version_files_and_ci():
         return tuple(int(part) for part in version.split("."))
 
     # .python-version pins the development interpreter; requires-python is the
-    # oldest supported one. CI runs the unit lane on every minor in between.
+    # oldest supported one. Release lanes run the unit tests on every minor in between.
     assert as_tuple(minimum_version) <= as_tuple(development_version)
     ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text())
     lane_pythons = {
         row["python"]
-        for row in ci["jobs"]["tests"]["strategy"]["matrix"]["include"]
+        for row in ci["jobs"]["compat"]["strategy"]["matrix"]["include"]
         if "python" in row
     }
     lowest_minor, development_minor = (
@@ -318,7 +318,7 @@ def test_bumpversion_updates_lockfile_project_version():
 def test_ci_measures_branch_coverage_with_the_documented_hypothesis_seed():
     for workflow in [REPO_ROOT / ".github/workflows/ci.yml"]:
         text = workflow.read_text(encoding="utf-8")
-        assert "coverage run --branch --source=OpenPinch" in text
+        assert "--cov=OpenPinch --cov-branch" in text
         assert 'HYPOTHESIS_SEED: "20260715"' in text
         assert "coverage report --fail-under=95" in text
 

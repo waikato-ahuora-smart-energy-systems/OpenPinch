@@ -2,7 +2,9 @@
 
 import csv
 import pickle
+from copy import deepcopy
 from types import SimpleNamespace
+from unittest import mock
 from uuid import uuid4
 
 import numpy as np
@@ -409,6 +411,44 @@ def test_get_cold_streams_includes_process_and_utility_when_enabled():
     assert set(cold_streams._streams.keys()) == {"C_PRO", "C_UT"}
 
 
+def test_inverting_a_segmented_utility_copy_keeps_the_original_segments_owned():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="C_UT",
+            is_process_stream=False,
+            segments=[
+                {
+                    "name": "S1",
+                    "supply_temperature": 60.0,
+                    "target_temperature": 100.0,
+                    "heat_flow": 40.0,
+                },
+                {
+                    "name": "S2",
+                    "supply_temperature": 100.0,
+                    "target_temperature": 140.0,
+                    "heat_flow": 80.0,
+                },
+            ],
+        )
+    )
+    original = sc["C_UT"]
+    original_segments = original.segments
+
+    hot = sc.get_hot_streams(
+        include_process_streams=False,
+        include_utility_streams=True,
+        invert_utility=True,
+    )
+
+    assert hot["C_UT"].supply_temperature == 140.0
+    assert [segment.parent for segment in original.segments] == [original] * 2
+    assert original.segments == original_segments
+    assert original.supply_temperature == 60.0
+    assert original.target_temperature == 140.0
+
+
 def test_get_cold_streams_can_invert_utility_without_mutating_original_streams():
     sc = StreamCollection()
     sc.add(
@@ -708,7 +748,8 @@ def test_state_context_is_preserved_on_copy_and_subset():
     np.testing.assert_allclose(hot_streams.weights, np.array([0.25, 0.75]))
 
 
-def test_export_to_csv(sample_streams):
+def test_export_to_csv(sample_streams, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     sc = StreamCollection()
     for stream in sample_streams:
         sc.add(stream)
@@ -718,6 +759,7 @@ def test_export_to_csv(sample_streams):
 
     try:
         assert output_path.exists()
+        assert output_path.parent == tmp_path
         with output_path.open(newline="", encoding="utf-8") as csvfile:
             rows = list(csv.DictReader(csvfile))
 
@@ -904,3 +946,16 @@ def test_stream_collection_subset_sort_and_inverted_utility_edges():
     assert inverted_hot_utilities["CU"].stream_type == StreamType.Hot.value
     assert set(inverted_cold_utilities._streams) == {"HU"}
     assert inverted_cold_utilities["HU"].stream_type == StreamType.Cold.value
+
+
+def test_deepcopy_skips_generic_reconstruction_and_stale_sort_signature(sample_streams):
+    collection = StreamCollection(list(sample_streams))
+    names = [stream.name for stream in collection]
+
+    with mock.patch("copy._reconstruct", side_effect=AssertionError("generic copy")):
+        copied = deepcopy(collection)
+
+    assert copied._sort_signature is None
+    assert [stream.name for stream in copied] == names
+    assert copied["A"] is not collection["A"]
+    assert copied[0] is copied[names[0]]

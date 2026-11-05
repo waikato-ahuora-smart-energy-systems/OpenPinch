@@ -112,6 +112,7 @@ def unit_object(registry, unit: str):
     return registry.Unit(unit)
 
 
+@lru_cache(maxsize=256)
 def format_units(units) -> str:
     """Format units for display using stable OpenPinch spellings."""
     return clean_unit_text(format(units, "~"))
@@ -119,7 +120,7 @@ def format_units(units) -> str:
 
 def serialise_units(units) -> str:
     """Format units for stable serialized output."""
-    return clean_unit_text(format(units, "~"))
+    return format_units(units)
 
 
 def unit_from_normalised(registry, unit: str):

@@ -15,28 +15,29 @@ What Each Layer Does
 
 ``TargetInput`` and related schemas
    Define the request format for process streams, utilities, the optional
-   zone tree, and an optional serialized heat exchanger network.
+   zone tree, an optional serialized heat exchanger network, and the
+   ``residual_basis`` and ``plant_profile_data`` fields.
 
 ``TargetOutput`` and target/result schemas
    Define the structured response returned by the top-level service boundary.
 
 ``Configuration``
    Stores numerical and engineering defaults for heat pumps, utilities,
-   costing, turbines, and solvers. It does not select core methods. Each prepared
-   :class:`~OpenPinch.domain.zone.Zone` owns one config object.
+   costing, turbines, and solvers. Its method selectors are not user-settable.
+   Each prepared :class:`~OpenPinch.domain.zone.Zone` owns one config object.
 
 Discovering Options
 -------------------
 
-Use ``config_options()`` or ``Configuration.options_catalog()`` to inspect the
+Use ``configuration_options()`` to inspect the
 supported flat ``TargetInput.options`` keys, their groups, runtime status,
 enum choices, numeric bounds, and config paths:
 
 .. code-block:: python
 
-   from OpenPinch.presentation.configuration import configuration_options as config_options
+   from OpenPinch.presentation.configuration import configuration_options
 
-   options = config_options()
+   options = configuration_options()
    hpr_options = [field for field in options if field.group == "hpr"]
 
 Common options include ``THERMAL_DT_CONT`` for minimum contribution
@@ -71,8 +72,10 @@ Streams that share a name within a zone are renamed with a numeric suffix
 ``REPORTING_DEBUG_ENABLED`` is true; it is off by default because published
 data often gives one stream as several same-named segments.
 
-Configuration does not contain target-method selectors; the descriptive ``problem.target.*`` or
-``problem.design.*`` callable selects the analysis.
+Target-method selectors such as ``HPR_TYPE``, ``ORC_MODEL`` and
+``POWER_TURB_MODEL`` are not user-settable: passing one in ``options`` raises a
+``ValueError``. The descriptive ``problem.target.*`` or ``problem.design.*``
+callable selects the analysis and sets the selector for that run.
 
 Configuration
 -------------
@@ -175,24 +178,46 @@ stored at ``problem.results.design``. Serialize it explicitly:
    design = problem.design.heat_exchanger_network()
    payload = design.result.model_dump(mode="json")
 
-The result's ``ranked_networks``, ``manifest``, diagnostics, task metadata,
-``design_method``, and task ``method`` remain available through
+The result's ``ranked_networks``, ``manifest``, ``diagnostic_references``,
+task metadata, ``design_method``, and task ``method`` remain available through
 ``design.result``. The design view does not forward unknown attributes and is
 not itself a Pydantic model.
 
 The
 :class:`~OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod` enum is the
 single method identity used for dispatch and result metadata.
-``design.result.manifest.method_sequence`` records the executed task sequence.
+``design.result.manifest.method_sequence`` records the executed task sequence:
+a stage that the tier leaves out, or that could not run because Couenne is
+missing, is not listed.
 For tiered OpenHENS runs, the manifest also records the synthesis quality tier,
 selected pathway, and protected-fallback status.
 
 ``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field with a
-default of tier 1 for prepared-problem workflows. User code should prefer
+default of tier 1 for prepared-problem workflows. If the problem's options set
+it, ``problem.design.heat_exchanger_network()``, its multiperiod form and
+``problem.design.enhanced_heat_exchanger_network()`` run that tier. If they do
+not, those methods run their own defaults, tiers 0 and 2, even though the
+configuration still reads 1; the key in ``problem.to_problem_json()["options"]``
+is what counts as set. ``problem.design.open_hens()`` always runs tier 1. The
+tier that ran is in ``design.result.manifest.synthesis_quality_tier`` and in the
+``HENS_SYNTHESIS_QUALITY_TIER`` value of ``design.result.provenance``. User
+code should prefer
 ``problem.design.enhanced_heat_exchanger_network(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the
-loaded problem configuration. Runtime ``options`` passed to design accessors are
-reserved for runtime context and do not accept persistent ``HENS_*`` overrides.
+loaded problem configuration. That argument wins over a tier in the call's
+``options``, which wins over the stored option for that call only. Runtime
+``options`` passed to design accessors accept other ``HENS_*`` overrides the same
+way: they apply to that call only and do not change the stored configuration.
+
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` set the network evolution
+breadth of every route when they are set, including the tier 0 and tier 1 routes that
+tiers 2 to 5 run as protected routes, and including ``problem.design.open_hens()``.
+With either option above 1, the tier 1 route is no longer the original search. When
+they are not set, tier 0 and tier 1 routes use a breadth of 1 in any tier, while tiers
+4 and 5 use 2 on their expanded routes. ``manifest.evm_n_ad_branches`` and
+``manifest.evm_n_rm_branches`` report the widest of these, so at tier 4 or 5 a
+protected route can be selected at a narrower breadth than the manifest shows: check
+``manifest.selected_protected_pathway``.
 
 Method-level inputs and outputs are Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,
@@ -349,4 +374,4 @@ Design Notes
 The schema layer should be the source of truth for external input contracts.
 The configuration layer should be the source of truth for runtime toggles and
 per-zone behavior. Keeping those roles distinct is what makes the package
-predictable when used from notebooks, services, and the CLI.
+predictable when used from notebooks and services.

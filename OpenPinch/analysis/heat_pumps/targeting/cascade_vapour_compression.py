@@ -35,6 +35,7 @@ from ..common.shared import (
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
+    limit_cascade_pressure_ratios,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
@@ -117,7 +118,9 @@ def _optimise_tespy_cascade_heat_pump_placement(
     prepared: PreparedTespyHprTargeting,
 ) -> HPRBackendResult:
     """Run one scalar placement with a call-owned TESPy evaluator session."""
-    x0_ls, bnds = _get_cascade_hp_opt_setup(None, args)
+    init_res = initialise_hpr_seed(optimise_cascade_carnot_heat_pump_placement, args)
+    args.refrigerant_ls = [prepared.working_fluid.source_spec]
+    x0_ls, bnds = _get_cascade_hp_opt_setup(init_res, args)
     coordinator = HprTargetEvaluatorCoordinator(get_hpr_target_evaluator(prepared))
     coordinator.open()
     try:
@@ -190,7 +193,7 @@ def _get_cascade_hp_opt_setup(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
-    init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[:n_heat]
+    init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[1:]
     init_cool = init_res.Q_evap[:n_cool] if is_heat_pumping else init_res.Q_evap
     x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
     pack_kwargs = {
@@ -253,11 +256,16 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
-    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
+    T_cond, T_evap = limit_cascade_pressure_ratios(T_cond, T_evap, args)
+    dT_subcool = map_x_arr_to_DT_arr(
+        x_subcool,
+        T_cond,
+        _condenser_stage_evaporating_temperatures(T_cond, T_evap, args),
+    )
     Q_heat_available = (
         limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(
-                T_cond if is_heat_pumping else T_cond[:n_heat],
+                T_cond if is_heat_pumping else T_cond[1:],
                 args.T_cold,
                 args.H_cold,
                 is_cond=True,
@@ -305,6 +313,16 @@ def _parse_cascade_hp_state_variables(
         Q_heat_available=Q_heat_available,
         Q_cool_available=Q_cool_available,
     )
+
+
+def _condenser_stage_evaporating_temperatures(
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
+    """Evaporating temperature of each process condenser's own stage."""
+    dt_cascade_hx = float(getattr(args, "dt_cascade_hx", 0.0))
+    return np.concatenate([T_cond[1:] - dt_cascade_hx, T_evap[:1]])
 
 
 def _cascade_process_control_counts(
@@ -376,6 +394,8 @@ def _build_and_solve_cascade_cycle(
         dt_cascade_hx=args.dt_cascade_hx,
         is_heat_pump=is_heat_pumping,
     )
+    if hp.solved:
+        state_vars.dT_subcool = hp.dT_subcool[: state_vars.dT_subcool.size]
     return hp
 
 

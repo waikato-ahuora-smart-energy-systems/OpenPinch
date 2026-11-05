@@ -24,6 +24,7 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["OpenPinch"]
+exclude = ["/OpenPinch/**/README.md"]
 [project]
 name = "OpenPinch"
 # Floors are the oldest releases with Python 3.14 wheels that pass the test
@@ -36,7 +37,7 @@ dependencies=[
   "pydantic>=2.12,<3",
   "scipy>=1.16.1,<2",
 ]
-version = "0.7.6"
+version = "0.8.0"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -136,6 +137,8 @@ dev = [
     "graphviz>=0.21",
     "idaes-pse>=2.11.0",
     "coverage>=7.14.3",
+    "pytest-xdist>=3.8.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [tool.black]

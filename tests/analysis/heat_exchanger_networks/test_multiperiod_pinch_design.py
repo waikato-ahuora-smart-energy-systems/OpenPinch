@@ -22,14 +22,21 @@ from OpenPinch.application.problem import PinchProblem
 CRUDE_MULTIPERIOD = "crude_preheat_train_multiperiod.json"
 
 
-def _require_couenne() -> None:
+def _couenne_available() -> bool:
     try:
         require_solver_binary("couenne", purpose="multiperiod PDM regression")
-    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
-        pytest.skip(str(exc))
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
 
 
 @pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif(
+    "not _couenne_available()",
+    reason="needs the couenne binary",
+)
 @pytest.mark.parametrize("d_tmin", [5.0, 10.0, 20.0])
 def test_crude_multiperiod_pinch_design_solves(d_tmin):
     from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
@@ -45,7 +52,6 @@ def test_crude_multiperiod_pinch_design_solves(d_tmin):
         execute_pinch_design_method_stage,
     )
 
-    _require_couenne()
     problem = PinchProblem(CRUDE_MULTIPERIOD)
     problem.target.all_heat_integration()
     settings = replace(

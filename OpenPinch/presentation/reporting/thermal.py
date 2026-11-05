@@ -28,6 +28,9 @@ def direct_result(target, *, is_total=False):
                 target,
                 "turbine_efficiency_target",
             ),
+            "turbine_converged": target.turbine_converged,
+            "turbine_diagnostics": list(target.turbine_diagnostics),
+            "turbine_result": _turbine_result(target),
             "area": _metric(target, "area"),
             "num_units": target.num_units,
             "capital_cost": _metric(target, "capital_cost"),
@@ -45,6 +48,9 @@ def indirect_result(target, *, is_total=False):
                 target,
                 "turbine_efficiency_target",
             ),
+            "turbine_converged": target.turbine_converged,
+            "turbine_diagnostics": list(target.turbine_diagnostics),
+            "turbine_result": _turbine_result(target),
         }
     )
 
@@ -58,6 +64,9 @@ def hpr_result(target, *, is_total=False):
                 target,
                 "turbine_efficiency_target",
             ),
+            "turbine_converged": target.turbine_converged,
+            "turbine_diagnostics": list(target.turbine_diagnostics),
+            "turbine_result": _turbine_result(target),
             "hpr_cycle": target.hpr_cycle,
             "hpr_simulation_backend": target.hpr_simulation_backend,
             "hpr_target_simulation_record": _target_simulation_record(target),
@@ -103,6 +112,12 @@ def hpr_result(target, *, is_total=False):
             "hpr_cold_streams": target.hpr_cold_streams,
         }
     )
+
+
+def _turbine_result(target):
+    """Copy the solve record so a result row does not alias the runtime target."""
+    result = target.turbine_result
+    return None if result is None else result.model_copy(deep=True)
 
 
 def _hpr_summary_values(target: HeatPumpTargetBase) -> dict:

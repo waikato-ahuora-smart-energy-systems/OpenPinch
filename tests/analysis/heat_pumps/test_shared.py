@@ -694,6 +694,23 @@ def test_condensing_caps_reuse_the_cached_mixture_critical_point():
     assert (info.misses, info.hits) == (1, 1)
 
 
+def test_tespy_condensing_search_range_has_the_coolprop_ceiling():
+    tespy = SimpleNamespace(
+        T_cold=np.array([200.0, 60.0]),
+        refrigerant_ls=["ammonia"],
+        simulation_backend="tespy",
+    )
+    coolprop = SimpleNamespace(
+        T_cold=np.array([200.0, 60.0]),
+        refrigerant_ls=["ammonia"],
+        simulation_backend="coolprop",
+    )
+    assert hp_shared.condensing_temperature_search_range(
+        tespy
+    ) == hp_shared.condensing_temperature_search_range(coolprop)
+    assert hp_shared.condensing_temperature_search_range(tespy)[0] < 200.0
+
+
 def test_condensing_search_range_is_unchanged_when_no_cap_applies():
     within = SimpleNamespace(T_cold=np.array([120.0, 60.0]), refrigerant_ls=["water"])
     assert hp_shared.condensing_temperature_search_range(within) == (120.0, 60.0)
@@ -704,10 +721,33 @@ def test_condensing_search_range_is_unchanged_when_no_cap_applies():
         T_cold=np.array([300.0, 250.0]), refrigerant_ls=["ammonia"]
     )
     assert hp_shared.condensing_temperature_search_range(cold_sink) == (300.0, 250.0)
-    # TESPy solves its own cycle states, so its search keeps the full range.
-    tespy = SimpleNamespace(
-        T_cold=np.array([200.0, 60.0]),
-        refrigerant_ls=["ammonia"],
-        simulation_backend="tespy",
+
+
+def test_carnot_evaporator_cascade_gets_the_utility_bands(monkeypatch):
+    args = _base_args()
+    backgrounds = []
+    real_duties = hp_shared._cascade_air_duties
+
+    def recording_duties(*call_args, **kwargs):
+        backgrounds.append(kwargs.get("T_background"))
+        return real_duties(*call_args, **kwargs)
+
+    monkeypatch.setattr(hp_shared, "_cascade_air_duties", recording_duties)
+
+    hp_shared.evaluate_carnot_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            T_cond=np.array([100.0]),
+            T_evap=np.array([60.0]),
+        ),
+        w_net=10.0,
+        w_hpr=np.array([10.0]),
+        Q_cond_total=np.array([40.0]),
+        Q_evap_total=np.array([30.0]),
     )
-    assert hp_shared.condensing_temperature_search_range(tespy) == (200.0, 60.0)
+
+    condenser, evaporator = backgrounds
+    np.testing.assert_allclose(condenser, args.T_cold)
+    np.testing.assert_allclose(evaporator, args.T_hot)

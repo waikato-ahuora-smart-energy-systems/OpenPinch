@@ -201,7 +201,7 @@ def test_turbine_core_helpers_cover_limit_and_model_branches():
     )
     assert (
         turbine_mod._predict_stage_work(
-            model=turbine_mod.TurbineModel.VARBANOV.value,
+            model=turbine_mod.TurbineModel.VARBANOV_SMALL.value,
             pressure_in=10.0,
             enthalpy_in=3_000.0,
             pressure_out=5.0,

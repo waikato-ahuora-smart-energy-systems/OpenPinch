@@ -23,6 +23,10 @@ _SATURATION_QUALITY_TOL = 1e-9
 __all__ = ["VapourCompressionCycle"]
 
 
+# More IHX in a re-solve only moves the applied subcooling this little, by rounding.
+SUBCOOLING_SETTLED_K = 1e-6
+
+
 class VapourCompressionCycle:
     """Single vapour-compression heat pump cycle.
 
@@ -734,7 +738,14 @@ class VapourCompressionCycle:
             T=min(self._T_cond_sat_liq, self._t_crit - 0.1) - self._dT_subcool,
             phase=0,
         ).hmass()
-        h_cond_out = max(h_cond_out_min, h_cond_out_tar)
+        h_cond_out_cascade = (
+            self._coldest_outlet_serving_cascade_heat(P_hi, state1.hmass())
+            if is_heat_pump
+            else self._coldest_outlet_serving_cascade_heat_given_cooling(
+                P_hi, h_ihx_out
+            )
+        )
+        h_cond_out = max(h_cond_out_min, h_cond_out_tar, h_cond_out_cascade)
         state2 = self._compute_state_from_pressure_enthalpy(
             P=P_hi,
             h=h_cond_out,
@@ -743,6 +754,28 @@ class VapourCompressionCycle:
             self._T_cond_sat_liq - state2.T()
         )  # Actual subcooling possible
         self._save_cycle_state(state2, 2)
+
+        if (
+            dT_ihx_gas_side > self._ihx_gas_dt
+            and h_cond_out_cascade > max(h_cond_out_min, h_cond_out_tar)
+            and dT_subcool - self._dT_subcool > SUBCOOLING_SETTLED_K
+        ):
+            # The IHX was limited by subcooling this stage cannot have.
+            return self.solve(
+                T_evap=T_evap,
+                T_cond=T_cond,
+                dtcont=dtcont,
+                dT_superheat=dT_superheat,
+                dT_subcool=float(self._dT_subcool),
+                eta_comp=eta_comp,
+                refrigerant=refrigerant,
+                dT_ihx_gas_side=dT_ihx_gas_side,
+                Q_heat=Q_heat,
+                Q_cas_heat=Q_cas_heat,
+                Q_cool=Q_cool,
+                Q_cas_cool=Q_cas_cool,
+                is_heat_pump=is_heat_pump,
+            )
 
         if h_cond_out_min > h_cond_out_tar:
             # Penalise excessive subcooling beyond the maximum allowed
@@ -888,6 +921,37 @@ class VapourCompressionCycle:
                 is_condenser=False,
             )
         return streams
+
+    def _coldest_outlet_serving_cascade_heat(self, P_hi: float, h_in: float) -> float:
+        """Lowest condenser outlet enthalpy that keeps cascade heat above saturation.
+
+        The cascade exchanger takes the hottest of the condenser's heat and the
+        process duty the coldest. The exchanger's evaporator is colder than
+        condensation by only the cascade gap, so subcooled liquid cannot heat it:
+        subcooling heat must all fit in the process duty.
+        """
+        if self._Q_cas_heat <= tol:
+            return -np.inf
+        h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
+        q_subcool_max = (h_in - h_sat_liq) * max(self._Q_heat, 0.0) / self._Q_cas_heat
+        return h_sat_liq - q_subcool_max
+
+    def _coldest_outlet_serving_cascade_heat_given_cooling(
+        self, P_hi: float, h_comp_in: float
+    ) -> float:
+        """The same subcooling limit when evaporator duty sets the flow.
+
+        Refrigeration fixes the evaporator duty, so the outlet also moves the
+        flow. With ``q_evap = h_comp_in - h_out``, requiring the subcooling heat
+        to fit in the process duty is linear in ``h_out``.
+        """
+        if self._Q_heat is None or np.isnan(self._Q_heat) or self._Q_evap <= tol:
+            return -np.inf
+        share = max(self._Q_heat, 0.0) / self._Q_evap
+        if share >= 1.0:
+            return -np.inf
+        h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
+        return (h_sat_liq - share * h_comp_in) / (1.0 - share)
 
     def _build_condenser_profile(self) -> np.ndarray:
         """

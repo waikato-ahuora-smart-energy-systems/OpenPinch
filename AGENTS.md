@@ -17,6 +17,9 @@ Python package published to PyPI; documentation on Read the Docs.
   example, a solver binary or optional extra missing) is allowed.
 - Every user-visible change gets an entry in `docs/release-notes.rst` under
   "Unreleased".
+- Each directory's `README.md` under `OpenPinch/` and `scripts/` is its contract.
+  When a change alters a directory's interface, invariants or side effects,
+  update the README in the same commit.
 
 ## Layout
 
@@ -69,6 +72,8 @@ Python package published to PyPI; documentation on Read the Docs.
 - Values carry units (`{"value": ..., "unit": ...}`); multiperiod values use
   `{"values": [...], "unit": ...}`. Configuration keys are defined in
   `OpenPinch/domain/configuration_fields.py`.
+- Tests run optimisation tasks serially (`tests/conftest.py`); mark a test
+  `process_pools` when it needs real worker processes.
 - Numerical tolerances are explicit in tests; do not loosen one to make a
   test pass without recording why.
 - No emojis in documentation.

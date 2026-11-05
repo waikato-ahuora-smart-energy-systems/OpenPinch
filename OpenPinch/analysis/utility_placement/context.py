@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -70,8 +70,8 @@ class ProcessEntropySlice(_FrozenContext):
         mode="before",
     )
     @classmethod
-    def _validate_number(cls, value: object) -> float:
-        return _finite(value)  # type: ignore[arg-type]
+    def _validate_number(cls, value: Any) -> float:
+        return _finite(value)
 
     @model_validator(mode="after")
     def _validate_physical_values(self) -> Self:
@@ -107,8 +107,8 @@ class PlacementTargetSnapshot(_FrozenContext):
         mode="before",
     )
     @classmethod
-    def _validate_vector(cls, value: object) -> tuple[float, ...]:
-        return tuple(_finite(item) for item in value)  # type: ignore[arg-type]
+    def _validate_vector(cls, value: Any) -> tuple[float, ...]:
+        return tuple(_finite(item) for item in value)
 
     @field_validator("hot_pinch_index", "cold_pinch_index", mode="before")
     @classmethod
@@ -178,8 +178,8 @@ class PlacementPeriodInput(_FrozenContext):
         mode="before",
     )
     @classmethod
-    def _validate_scalar(cls, value: object) -> float:
-        return _finite(value)  # type: ignore[arg-type]
+    def _validate_scalar(cls, value: Any) -> float:
+        return _finite(value)
 
     @model_validator(mode="after")
     def _validate_values(self) -> Self:

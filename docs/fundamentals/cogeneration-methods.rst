@@ -12,7 +12,7 @@ steam extraction levels in a multistage turbine train. The workflow estimates:
 
 - turbine work target
 - turbine efficiency target
-- stage-level extraction details
+- stage-level extraction details, as ``turbine_result``
 
 This is a thermodynamic screening and targeting workflow, not a full plant
 equipment design package.
@@ -20,23 +20,31 @@ equipment design package.
 Below Pinch Logic
 -----------------
 
-Below Pinch cogeneration interprets suitable thermal loads against an
+Below Pinch cogeneration would interpret suitable thermal loads against an
 environmental sink as a condensing turbine opportunity. It answers a different
 question from the above Pinch extraction path, even though the same turbine
-solver family is reused.
+solver family is reused. The solver function exists, but the public
+``problem.target.*cogeneration`` methods do not call it; they run the above
+Pinch path only.
 
 Important Configuration Ideas
 -----------------------------
 
-The main turbine inputs are grouped on `zone.config`, including:
+The main turbine inputs are the option keys below. They are read at runtime
+from ``zone.config.power`` (for example ``zone.config.power.turb_t_in``):
 
-- `TURB_T_IN`
-- `TURB_P_IN`
-- `MIN_EFF`
-- `LOAD_FRACTION`
-- `ETA_MECH`
-- `TURB_MODEL`
-- `IS_HIGH_P_COND_FLASH`
+- ``POWER_TURB_T_IN``
+- ``POWER_TURB_P_IN``
+- ``POWER_MIN_EFF``
+- ``POWER_LOAD_FRACTION``
+- ``POWER_ETA_MECH``
+- ``POWER_HIGH_P_COND_FLASH_ENABLED``
+
+The turbine model is selected by the target method name, not by an option. The
+Varbanov et al. (2004) correlation is offered as two methods, one for each of its
+size bands, ``varbanov_small_turbine_cogeneration`` (stage work at or below
+2000 kW) and ``varbanov_large_turbine_cogeneration`` (above 2000 kW). Using one
+outside its band gives a warning; see :doc:`../guides/cogeneration-workflows`.
 
 This keeps the turbine workflow aligned with the rest of the package model:
 configuration lives on the prepared zone, not in workbook-style side channels.
@@ -52,7 +60,6 @@ Recommended order:
 1. understand the base thermal target
 2. confirm the utility levels are meaningful for turbine screening
 3. inspect cogeneration work and efficiency targets
-4. use the stage details only after the high-level answer looks promising
 
 Recommended Follow-On Pages
 ---------------------------

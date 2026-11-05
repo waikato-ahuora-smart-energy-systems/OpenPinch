@@ -12,6 +12,7 @@ from ..domain.stream_collection import StreamCollection
 from ..domain.value import Value
 from .hpr import HprTargetSimulationRecord
 from .report_metrics import report_field
+from .turbine import TurbineSolveResult
 from .units import coerce_output_value
 from .workspace import ValidationReport
 
@@ -129,6 +130,18 @@ class TargetResults(_ReportModel):
     )
     turbine_efficiency_target: Value | None = report_field(
         "turbine_efficiency_target", "derived", None, representation="quantity"
+    )
+    turbine_converged: Optional[bool] = report_field(
+        "turbine_converged", "derived", None, representation="structured"
+    )
+    turbine_diagnostics: List[str] = report_field(
+        "turbine_diagnostics",
+        "derived",
+        default_factory=list,
+        representation="structured",
+    )
+    turbine_result: TurbineSolveResult | None = report_field(
+        "turbine_result", "exclude", None, representation="structured"
     )
     area: Value | None = report_field(
         "area", "maximum", None, representation="quantity"

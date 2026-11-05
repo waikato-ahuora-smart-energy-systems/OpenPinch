@@ -450,15 +450,17 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_EVM_N_AD_BRANCHES": FieldText(
         "Network evolution add branches", None,
         (
-            "Match-adding candidates explored per network evolution step. None uses the"
-            " quality tier's default."
+            "Match-adding candidates explored per network evolution step on every "
+            "route, including the standard OpenHENS route. None uses the quality "
+            "tier's default, and 1 on tier 0 and 1 routes."
         ),
     ),
     "HENS_EVM_N_RM_BRANCHES": FieldText(
         "Network evolution remove branches", None,
         (
-            "Match-removing candidates explored per network evolution step. None uses "
-            "the quality tier's default."
+            "Match-removing candidates explored per network evolution step on every "
+            "route, including the standard OpenHENS route. None uses the quality "
+            "tier's default, and 1 on tier 0 and 1 routes."
         ),
     ),
     "HENS_EVM_BEAM_WIDTH": FieldText(
@@ -618,6 +620,13 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Only checked by TESPy targeting, which rejects a nonzero value; no other "
             "HPR model reads it."
+        ),
+    ),
+    "HPR_MAX_PRESSURE_RATIO": FieldText(
+        "HPR compressor pressure ratio limit", None,
+        (
+            "Largest ratio of condensing to evaporating pressure across one "
+            "vapour-compression compressor."
         ),
     ),
     "HPR_DT_CASCADE_HX": FieldText(

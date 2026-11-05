@@ -10,7 +10,7 @@ from typing import Any
 from ....domain.configuration_fields import USER_CONFIG_FIELD_SPECS
 from ....domain.enums import ZoneType
 
-PROCESS_SCOPES = (ZoneType.S.value, ZoneType.P.value, ZoneType.O.value)
+PROCESS_SCOPES = (ZoneType.S.value, ZoneType.P.value, ZoneType.UO.value)
 AGGREGATE_SCOPES = (
     ZoneType.R.value,
     ZoneType.C.value,
@@ -60,7 +60,7 @@ METHOD_CATALOG = MappingProxyType(
             scopes=(ZoneType.S.value,), prerequisites=("direct_heat_integration",)
         ),
         "target.all_heat_integration": _spec(
-            scopes=AGGREGATE_SCOPES + (ZoneType.O.value,)
+            scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,)
         ),
         "target.heat_exchanger_area_and_cost": _spec(
             prerequisites=("direct_heat_integration",)
@@ -70,7 +70,7 @@ METHOD_CATALOG = MappingProxyType(
         ),
         **{
             f"target.{name}": _spec(
-                scopes=AGGREGATE_SCOPES + (ZoneType.O.value,),
+                scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),
                 prerequisites=("direct_heat_integration", "indirect_heat_integration"),
                 dependencies=("tespy (explicit backend only)",)
                 if "vapour" in name
@@ -94,20 +94,21 @@ METHOD_CATALOG = MappingProxyType(
         },
         **{
             f"target.{name}": _spec(
-                scopes=AGGREGATE_SCOPES + (ZoneType.O.value,),
+                scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),
                 prerequisites=("compatible_thermal_target",),
             )
             for name in (
                 "cogeneration",
                 "sun_smith_cogeneration",
-                "varbanov_cogeneration",
+                "varbanov_small_turbine_cogeneration",
+                "varbanov_large_turbine_cogeneration",
                 "isentropic_cogeneration",
                 "exergy",
                 "energy_transfer",
             )
         },
         "target.utility_placement": _spec(
-            scopes=AGGREGATE_SCOPES + (ZoneType.O.value,),
+            scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),
             periods="shared",
             prerequisites=("direct_heat_integration",),
             adapter="placement",

@@ -4,6 +4,355 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.8.0 (2026-11-05)
+------------------
+
+Behaviour changes
+~~~~~~~~~~~~~~~~~
+
+- Optimisation searches no longer pay for worker processes they do not need under
+  the spawn and forkserver start methods (macOS, Windows, and Linux from Python 3.14),
+  where each worker imports OpenPinch first. A batch of tasks now runs in the calling
+  process, a pool starts only if the batch is still running after one second, and a
+  worker gets a task only once it has finished importing. A two-stream
+  ``carnot_orc(stages=2, maximum_iterations=50)`` drops from about 9 s to 0.3 s under
+  spawn, as fast as running serially. Searches long enough to use the pool keep their
+  speed-up and can take about one second longer per batch. Results do not change, and
+  the fork start method (Linux before Python 3.14) behaves as before.
+- ``components.add_process_mvr`` and ``solve_direct_gas_mvr_stream`` now raise
+  ``DirectGasMVRPhaseError``, a ``ValueError``, instead of returning a result when
+  a stage would cross into liquid. The message names the stage, temperatures and
+  pressure. Condensing multi-stage MVR now raises: on a saturated vapour source
+  (100 to 99.5 degC) ``n_stages=2`` used to compress the liquid from stage 1, up to
+  1159 bar at the default lift. One condensing stage still solves. A source with
+  a vapour target now raises when its target is below saturation at a stage outlet:
+  100 kW of steam from 120 to 100 degC at 101.325 kPa and pressure ratio 1.5 used
+  to report 5881 kW released, 94% of it latent heat outside the source duty. A saved case with such
+  a component no longer loads, and an option change that causes it fails and keeps
+  the earlier state. Other MVR results do not change.
+- ``DirectGasMVRPhaseError`` now also covers a stage at or above the critical pressure
+  whose target or inlet is below the critical temperature, which used to be accepted:
+  steam from 500 to 350 degC at 15 MPa and pressure ratio 2 left the stage at 30 MPa
+  as a compressed liquid. The error's ``above_critical_pressure`` is true, its
+  ``t_saturation`` is the critical temperature and its message says so.
+- Indirect Carnot heat pump and refrigeration targets now treat a source-side utility
+  band on the ambient air or cooling water limit as at that limit, as the vapour
+  compression targets do. Previously its whole duty could be charged to refrigeration,
+  so these targets can change on a utility background.
+- ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now apply to the tier 0
+  and tier 1 routes when set, including ``design.open_hens()`` and the protected
+  routes of tiers 2 to 5. These routes used to ignore the options and run at a
+  breadth of 1, although the manifest reported the option's value. A run with
+  either option above 1 now searches more of these routes, takes longer and can
+  return a different network, and those tasks get new IDs. Runs that do not set the
+  options are unchanged.
+- ``target.varbanov_cogeneration()`` and ``TurbineModel.VARBANOV`` are removed.
+  They are replaced by ``target.varbanov_small_turbine_cogeneration()`` and
+  ``target.varbanov_large_turbine_cogeneration()``, with
+  ``TurbineModel.VARBANOV_SMALL`` and ``TurbineModel.VARBANOV_LARGE``, also through
+  ``all_periods`` and workspace batches. The old method switched coefficients at
+  2000 kW inside the model, which also changed the turbine type, so from 7200 to
+  7700 kW on one test case its mass balance never settled. Each new model uses one
+  size band and does not switch. Work targets change from the old method wherever
+  it would have used the other band.
+- A cogeneration target re-run with no usable turbine stage, with or without
+  ``base_target``, no longer keeps its earlier values. ``work_target``,
+  ``turbine_efficiency_target``, ``turbine_converged`` and ``turbine_result`` are
+  now ``None`` and ``turbine_diagnostics`` is empty, as for a run from a thermal
+  target. Process-component work, if any, still fills ``work_target``. Previously
+  the old work stayed on the target and its result row, so it looked valid.
+- If a stage's work is outside the chosen band, the target reports the number and
+  a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
+  ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
+  duties both models warn.
+- The grid layout's ``stream_temperatures`` now cover every exchanger a match merges,
+  so a stream's supply and target temperatures are its hottest and coldest ends.
+  Previously only the first parallel exchanger's temperatures counted. Each match's
+  own temperatures and the drawn grid do not change.
+
+Input and validation
+~~~~~~~~~~~~~~~~~~~~
+
+- ``active: false`` on a process stream given by ``t_supply``, ``t_target`` and
+  ``heat_flow`` was ignored, so the stream stayed in the targets. It now applies
+  as it already did for streams given by ``segments`` or ``profile``. Inactive
+  streams of any form also no longer set the default utility temperatures. Results
+  change only for inputs that set ``active: false`` on a process stream.
+- A failed ``update_options`` or other input replacement now keeps retained heat
+  pump targets valid, as the rest of the problem's state already was.
+- ``ZoneType.UO`` is the new name of the unit operation zone type. ``ZoneType.O``
+  and ``ZoneType["O"]`` still work and give the same member, but its ``.name``
+  is now ``UO``.
+- A legacy ``.xls`` workbook is now rejected with a ``ValueError`` that asks
+  for a ``.xlsx`` save. It was accepted as a source suffix but failed with
+  ``ImportError: Import xlrd failed``, because no install extra provides
+  ``xlrd``.
+- Opening a workbook without its Excel reader still raises ``ImportError``, but
+  the message now names the missing package and the ``dashboard`` and
+  ``notebook`` extras that provide it. ``.xls`` content in a renamed file gets a
+  message asking for a ``.xlsx`` save.
+- New ``PinchProblem.source_validation_report(source)`` returns a
+  ``ValidationReport`` for any source the constructor takes, without raising for
+  bad input of any format. ``valid`` is true only if the constructor accepts the
+  source. ``problem.validation_report()`` could never report invalid input,
+  because the constructor raises first; its docstring and the input guide now say
+  so. The ``validate`` command uses the new report, so inline input is checked
+  after the same normalisation as loading: for example, a stream entry that is
+  not a record is now reported as the loader sees it.
+
+- After ``problem.project_name = "New"``, ``update_options`` and
+  ``set_dt_cont_multiplier`` no longer put a root zone named by ``zone_tree`` back
+  to its old name, also through ``PinchWorkspace``. The root zone,
+  ``to_problem_json``, stored case inputs and results keyed by root zone keep the
+  new name, so ``zone_name="New/Area"`` is the path to use. Setting
+  ``workspace.project_name`` now renames the live cases and drops their cached
+  results; before, it reached only cases built afterwards.
+
+- ``PinchWorkspace.load`` with input that fails while the case is prepared, such
+  as an unknown zone type in ``zone_tree``, now stores the case and returns
+  ``None``, as it does for other bad input. It stored the case, then raised
+  ``ValueError`` from ``self.case(name)``, and ``validation_report(name).valid``
+  said ``True``. ``workspace.validation_report`` now uses
+  ``PinchProblem.source_validation_report``, so it reports that input as
+  invalid. Loading valid input prepares it once more for the check.
+
+Documentation
+~~~~~~~~~~~~~
+
+- The tutorial coverage manifest is generated and checked against the committed
+  file. Plots, design-result views and read-only calls are now marked
+  ``cached observation``, ``optional_dependency`` names real extras
+  (``notebook``, ``dashboard``, ``synthesis``, ``tespy``), ``interactive`` and ``slow-hpr``
+  notebooks are described as routine CI runs, and ``design_result.views`` maps
+  to the multiperiod HEN notebook.
+- Corrected the documentation against the code, including examples that raised,
+  retired option and notebook names, and the ``openpinch schema`` command. The
+  page on adding an analysis method is now a followable checklist.
+- Each package directory now has a ``README.md`` stating its interface,
+  invariants and side effects. These stay out of the wheel, and a test checks
+  that what they cite still exists.
+- ``openpinch --help`` now says the command also writes the JSON Schema of each
+  public contract.
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``add_process_mvr`` on a multiperiod case no longer fails with "Profile heat
+  coordinates must be strictly monotonic" when periods share a stage profile
+  breakpoint that differs only by rounding. It failed with or without liquid
+  injection. Multiperiod structured stream profiles use the same alignment.
+  Single-period results do not change.
+- **Behaviour change:** Cascade vapour-compression heat pump targets with one
+  condenser and several evaporators no longer deliver the condenser's duty again
+  from every lower stage. Those stages condense into the evaporator above and
+  have no process condenser, yet each one added the same process heat at its own
+  low temperature, so the heat pump moved heat it never needed to and counted it
+  in the COP. Targets with ``condensers=1, evaporators>1`` change: on
+  ``chocolate_factory`` with ammonia at a 0.25 load and a short search, work goes
+  from 55.5 to 42.1 kW, COP from 9.75 to 6.42 and cold utility from 409.6 to
+  666.8 kW, with hot utility unchanged at 811.9 kW. ``process_mvr``, which found
+  no design at that budget, now finds one. Other topologies are unaffected. In
+  ``CascadeVapourCompressionCycle.solve``, a scalar or one-element ``Q_heat`` now
+  applies to each process condenser, and lower stages deliver none, where it
+  applied to every stage. Calling ``solve`` without ``Q_heat`` follows the same
+  rule, using its default of 1.
+- **Behaviour change:** In heat pump mode, ``CascadeVapourCompressionCycle.solve``
+  now applies a scalar or one-element ``Q_cool`` to each process evaporator except
+  the coldest, and the coldest stage takes the remaining cooling. It used to apply
+  to every stage, which also fixed the coldest stage's cooling, so the energy
+  balance did not close: with ``Q_heat=100, Q_cool=10``, an 80 C condenser and
+  24 C and 5 C evaporators on ammonia, ``Q_cool`` plus work came to 52.95 against
+  100 delivered. A scalar now gives the same result as ``[10, None]``. With one
+  evaporator the value has no effect, because that evaporator balances the cycle.
+  Heat pump targets do not use this path and are unchanged, and neither is
+  refrigeration mode.
+- **Behaviour change:** Multi-stage cascade refrigeration now passes heat from
+  each stage's condenser up to the evaporator of the warmer stage. It used to
+  pass heat down, from the warm stage's condenser into the cold stage's
+  evaporator, and rejected nearly everything at the coldest condenser. With
+  several process evaporators, heat from the colder stages was dropped from the
+  balance altogether. A single evaporator's ``Q_cool`` is no longer applied to
+  every stage, and the top stage now takes the remaining heat, so ``Q_heat``
+  values for refrigeration run ``[nan, ...]`` rather than ``[..., nan]``.
+  Multi-stage refrigeration targets change: with ammonia, 100 kW of cooling at
+  -20 C with condensers at 40 C and 10 C now takes 43.9 kW of work, where the old
+  model reported 63.1 kW for 200 kW of cooling. Single-stage refrigeration
+  targets are unaffected. Subcooling heat on these stages must also fit in the
+  stage's own process duty.
+- Cascade and vapour-compression plus MVR targets no longer credit a stage's
+  subcooling heat to the evaporator above it, which is too warm to take it. That
+  gave the stage impossible COPs, up to about 90% of the Carnot limit. Subcooling
+  heat must now fit in the stage's own process duty, so a stage that only passes
+  heat up does not subcool. Multi-stage targets rise where this applied, by up to
+  about 20% in tests.
+- Cascade targets now scale each condenser's subcooling variable by the lift to
+  that stage's own evaporator, not the coldest in the cascade. Much of the old
+  range was only penalised. The internal heat exchanger's limit also now follows
+  the subcooling a stage can apply. Multi-stage targets can change as a result.
+- **Behaviour change:** ``update_options`` and ``set_dt_cont_multiplier``, on
+  ``PinchProblem`` and ``PinchWorkspace``, now keep components added with
+  ``components.add_process_mvr``. These calls used to discard them silently, so
+  later targets ran without the MVR. Each component is now re-solved on the
+  rebuilt input and its handle stays valid, with its active state kept. Remove
+  any code that adds a component again after these calls, as the repeat call now
+  adds a second MVR or fails because the source stream is inactive. Efficiencies
+  passed explicitly stay as given; efficiencies left unset take the new
+  ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
+  options can change a kept component's work. If a component cannot be re-solved,
+  the call raises and the problem and its components are unchanged.
+- Deactivating one of two process components on the same source no longer turns the
+  source back on while the other is still active, which counted the stream twice.
+- **Behaviour change:** process components now survive ``to_problem_json``, workspace
+  bundles and ``PinchWorkspace.scenario``. They used to be lost with no warning, so a
+  saved or copied case targeted different utilities from the original. The input has
+  a new optional ``process_components`` field holding each ``add_process_mvr`` call
+  and its active state, and loading it re-solves the component. A load fails if a
+  saved source stream is gone. Files and bundles without components load as before,
+  their export does not gain the field, and the bundle ``schema_version`` stays "3".
+  A file that holds components cannot be read by an older OpenPinch, which rejects the
+  unknown field. Utility placement on a case with components now places utilities for
+  the case with the MVR, not without it, so its utility levels change, and the
+  returned case keeps the components.
+- Vapour-compression targets now limit each compressor's pressure ratio, with
+  the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
+  limit evaporates warmer, or in a cascade raises its lower levels, so targets
+  with a large lift in one compressor can change or find no design. Raise the
+  option to relax the limit. TESPy targets and the Carnot models are not
+  limited.
+- A single-period vapour-compression refrigeration target whose best design
+  still carries a feasibility penalty, such as unserved cooling, now raises
+  ``HPRTargetingError``. It previously returned that design with the penalty in
+  its objective. With a small search budget, raise the budget before relaxing a
+  limit: the design may exist.
+- Single-stage and cascade vapour-compression targets can now subcool the
+  condensate down to the coldest evaporating temperature, the same limit as
+  parallel machines. The limit was previously the gap to the top of the sink
+  profile, about 10 K when the condenser sits at the top of its load. Targets
+  can fall, by up to several percent where subcooling was at that limit.
+- A utility level that sits on an air or cooling-water limit can now use that
+  service, on utility placement only. A level's band, of up to 0.1 K, ended just
+  past the limit, so the whole duty was priced as refrigeration. For example, with ``HPR_DT_CONT`` of 5 a 25 C
+  level sits on the 15 C air limit. Utility placement targets with such a level
+  can fall by about half: one 25% load test case went from 836.6 to 427.3 k$/y.
+- A TESPy heat pump target without the optional ``tespy`` package now raises
+  an ``ImportError`` that names the ``openpinch[tespy]`` extra, as the docs
+  advise handling. It is still an ``HprTargetCompatibilityError`` (a
+  ``ValueError``) with code ``dependency_unavailable``, so existing handlers
+  and the command layer's error response are unchanged.
+- TESPy vapour-compression targets and performance maps now solve a cycle with
+  no subcooling or no superheat. CoolProp refused the saturated state as the
+  adapter specified it, so a candidate at the zero-subcooling bound always
+  failed, and with a small search budget that could be the only candidate
+  reached, raising ``HPRTargetingError``.
+- TESPy vapour-compression targets now start their search from the Carnot seed,
+  as CoolProp targets do, and honour ``HPR_INITIALISE_SIMULATED_CYCLE``. The
+  unseeded first restart could stall where the allocated duty is zero, so with
+  a small search budget a target such as R245fa on ``basic_pinch.json`` raised
+  ``HPRTargetingError``. TESPy target values can change.
+- TESPy vapour-compression targets now keep condensing at least 2 K below the
+  refrigerant's critical temperature, the same limit as CoolProp targets. A
+  TESPy design could previously sit just below the critical point, where
+  CoolProp targets cannot go, so its cost was not comparable. TESPy targets for
+  a refrigerant near that limit can cost more.
+
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``HeatExchangerNetworkGridDiagram.save`` to an image file without Kaleido now
+  raises ``MissingSynthesisDependencyError``, an ``ImportError``, with the
+  ``openpinch[synthesis]`` install command. It used to pass on Plotly's own
+  error, which names no OpenPinch extra. Other export errors,
+  such as a bad file extension, are unchanged.
+- ``design.heat_exchanger_network()``, its multiperiod form and
+  ``design.enhanced_heat_exchanger_network()`` now run
+  ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they
+  ignored it before. Only problems that set the option see a change: without it
+  the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
+  ``design.open_hens()`` stays at tier 1.
+- ``result.manifest.method_sequence`` now lists the stages that ran. It always
+  listed all three methods, including ``thermal_derivative_method`` on tier 0,
+  which leaves it out, and stages that could not run without Couenne.
+- ``result.provenance`` now shows the ``HENS_SYNTHESIS_QUALITY_TIER`` that ran,
+  matching the manifest. It showed the configured value, for example 1 on a
+  default tier 0 run, or 3 on a ``design.open_hens()`` run. The change does not
+  affect ``input_fingerprint``.
+- Network evolution tasks with no pathway metadata now use the branch breadth of
+  the tier that ran, as the manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` report. These are the tasks that run when Couenne is
+  missing. They read the tier stored in the options, so a stored tier of 4 gave
+  a tier 0 or tier 1 run a breadth of 2 and a stored tier of 1 gave a tier 4 run
+  a breadth of 1. Their task IDs change, because a task ID includes its settings.
+
+Cogeneration
+~~~~~~~~~~~~
+
+- A cogeneration target now says whether its turbine solve converged. Targets and
+  result rows carry ``turbine_converged`` and ``turbine_diagnostics``, a solve
+  that did not converge or reports a diagnostic raises a ``UserWarning``,
+  ``problem.report().warnings`` lists the messages, and the Excel summary has a
+  ``Turbine Converged`` column. A weighted-average row is flagged if any period
+  did not converge and names the period of each message. These were previously
+  dropped, so the mass balance could fail unseen: the Varbanov correlation steps
+  at 2 MW, and a duty that puts the first stage near that step alternates
+  between the two branches for all 50 iterations. Numeric targets are unchanged;
+  a run that did not converge still reports its last iteration.
+- Cogeneration targets and their result rows now carry the turbine's stage
+  records as ``turbine_result``, a ``TurbineSolveResult`` in fixed units (kW,
+  degC, bar, kJ/kg, kg/s). Each period row has its own record, and a
+  weighted-average row has none. The Excel summary is unchanged. A stage's
+  ``source_index`` now gives its position in the target's ``hot_utilities``; it
+  was a position in the list left after skipping unusable utilities.
+
+Streams
+~~~~~~~
+
+- Inverting a utility copy no longer detaches the original's segments. For a
+  segmented utility, ``get_hot_streams`` and ``get_cold_streams`` with
+  ``invert_utility=True`` left the original's segments without a parent
+  (``segment.parent`` was ``None``).
+
+Values
+~~~~~~
+
+- Building and copying ``Value``, ``Stream`` and ``StreamCollection`` objects costs
+  less. A ``Value`` given in its target unit now builds at most two Pint quantities
+  rather than four, and copies share read-only magnitudes, so ``deepcopy`` of a
+  ``Stream`` took about 14 us rather than 198 us. Four test modules heavy in targeting
+  and optimisation used 38% less CPU (183 s to 113 s) in serial runs. Results do
+  not change.
+
+- A direct ``Value`` call with a ``period_ids`` key (for example
+  ``Value({"values": [10, 20], "period_ids": ["b", "a"]})``) now raises
+  ``ValueError``, with the same guidance as a domain ``Stream``. ``Value`` holds
+  magnitudes in order and has no period identity, so it dropped the ids and
+  gave the first period 10 whatever its id. Give the values in the problem's
+  period order. A utility's ``maximum_heat_flow`` and utility placement
+  ``maximum_duties``, which key values by period id on purpose, still take it.
+
+Exergy
+~~~~~~
+
+- ``problem.target.exergy()`` no longer raises ``AttributeError`` after a heat
+  pump or refrigeration target, with or without ``base_target``. The check that
+  a selected target has not been modified assumed every graph was a table, but
+  exergy adds its curves as plain mappings. Those derived curves are now left
+  out of that check, and the enriched target can be selected as a base target.
+
+Reporting
+~~~~~~~~~
+
+- ``export_stream_collection`` writes to the working directory when no
+  ``output_dir`` is given, as ``export_problem_table`` does. It previously
+  wrote to a ``results`` folder beside the package, which is inside
+  ``site-packages`` for an installed copy.
+
+Plots
+~~~~~
+
+- The hover label of a merged exchanger match in the network grid diagram
+  shows the summed area of its exchangers. It previously showed the area of
+  the first exchanger only.
+
 0.7.6 (2026-11-02)
 ------------------
 
@@ -115,6 +464,15 @@ Testing and CI
 - CI runs the Pyodide runner's own regression test (a failed run prints its
   traceback) in the Pyodide job, where its Node packages are installed. It
   used to skip in every lane, so the behaviour had no CI coverage.
+
+- CI smoke-tests the ``full`` extra on Ubuntu, so every published extra now has
+  an installation check, and a test requires the smoke matrix to match the extras
+  in ``pyproject.toml``. Nine fast tests that need GEKKO or Kaleido now carry the
+  ``synthesis`` marker.
+
+- The nine-stream live solver benchmark, which pytest always skipped, is now
+  ``scripts/benchmark_nine_stream.py``, run by hand. It can take hours and has
+  no CI use.
 
 0.7.2 (2026-10-20)
 ------------------

@@ -13,11 +13,15 @@ import pytest
 from tests.support.paths import REPOSITORY_ROOT
 
 
-@pytest.mark.docs
-def test_sphinx_build_smoke(tmp_path: Path):
-    if find_spec("sphinx") is None and which("uv") is None:
-        pytest.skip("docs build requires sphinx or uv")
+def _docs_toolchain_available() -> bool:
+    return find_spec("sphinx") is not None or which("uv") is not None
 
+
+@pytest.mark.docs
+@pytest.mark.skipif(
+    "not _docs_toolchain_available()", reason="docs build requires sphinx or uv"
+)
+def test_sphinx_build_smoke(tmp_path: Path):
     repo_root = REPOSITORY_ROOT
     build_dir = tmp_path / "html"
     proc = subprocess.run(

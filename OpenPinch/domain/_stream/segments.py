@@ -188,7 +188,9 @@ def replace(parent, segments, *, segment_type: type) -> None:
     previous = parent._segments
     try:
         for segment in previous:
-            segment._owner = None
+            # A shallow copy shares its original's segments; leave them owned.
+            if segment._owner is parent:
+                segment._owner = None
         parent._segments = candidates
         for index, segment in enumerate(parent._segments):
             segment._owner = parent
@@ -210,8 +212,9 @@ def replace(parent, segments, *, segment_type: type) -> None:
             segment._owner = None
         parent._segments = previous
         for index, segment in enumerate(previous):
-            segment._owner = parent
-            segment._segment_index = index
+            if segment._owner is None:
+                segment._owner = parent
+                segment._segment_index = index
         raise
 
 

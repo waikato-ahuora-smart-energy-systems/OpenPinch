@@ -1,19 +1,18 @@
 """Real and classified-failure tests for TESPy nominal target evaluation."""
 
-# ruff: noqa: E402 - optional dependency gate precedes concrete imports.
-
 from __future__ import annotations
 
 import gc
 import math
 import time
 import weakref
+from dataclasses import replace
 
 import numpy as np
 import pytest
+from CoolProp.CoolProp import PropsSI
 
 pytest.importorskip("tespy")
-pytestmark = pytest.mark.tespy
 
 import OpenPinch.analysis.heat_pumps.performance_maps.adapters.tespy as adapter
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as cascade
@@ -36,6 +35,8 @@ from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from tests.analysis.heat_pumps.test_hpr_target_evaluator_contracts import _request
 from tests.analysis.heat_pumps.test_hpr_targeting_preflight import _target_args
 from tests.analysis.heat_pumps.test_hpr_tespy_targeting_integration import _candidate
+
+pytestmark = pytest.mark.tespy
 
 
 def _coordinator(*, mode="heat_pump", refrigerant="R134a"):
@@ -333,7 +334,7 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     def bounded_candidate_search(*, f_obj, x0_ls, bnds, args):
         # One condenser and one evaporator: [x_cond, x_evap, x_subcool,
         # x_heat_split, x_ihx].
-        point = np.array([0.35, 0.20, 0.02, 0.50, 0.0])
+        point = np.array([0.20, 0.20, 0.02, 0.50, 0.0])
         result = f_obj(point, args)
         assert result.success is True
         return translate_hpr_result(result, ambient_args=args)
@@ -390,3 +391,105 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     )
     assert all(point.cop > 0.0 for point in performance_map.points)
     assert total_elapsed < 300.0
+
+
+def test_real_tespy_target_starts_from_the_carnot_seed_on_a_tight_budget() -> None:
+    # The unseeded first restart stalls in a flat zero-duty region and this
+    # budget has no other restart, so the search found no target.
+    target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
+        simulation_backend="tespy",
+        condensers=1,
+        evaporators=1,
+        refrigerants=["R245fa"],
+        allow_integrated_expander=False,
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    assert target.hpr_success is True
+    assert target.hpr_details.target_simulation_record.simulation_backend == "tespy"
+
+
+def test_real_tespy_target_stays_below_the_critical_margin_on_a_tight_budget() -> None:
+    # R245fa's critical temperature is 153.86 C, so the ceiling is 151.86 C.
+    target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
+        simulation_backend="tespy",
+        condensers=1,
+        evaporators=1,
+        refrigerants=["R245fa"],
+        allow_integrated_expander=False,
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    record = target.hpr_details.target_simulation_record
+    assert record.nominal_condensing_temperature <= 151.86 + 0.01
+
+
+@pytest.mark.parametrize(
+    ("refrigerant", "evaporating", "condensing"),
+    [("R134a", 5.0, 55.0), ("water", 100.0, 170.0)],
+)
+@pytest.mark.parametrize(
+    ("superheat", "subcooling"),
+    [(5.0, 0.0), (0.0, 5.0), (0.0, 0.0)],
+)
+def test_target_candidate_solves_at_saturation_ends(
+    refrigerant: str,
+    evaporating: float,
+    condensing: float,
+    superheat: float,
+    subcooling: float,
+) -> None:
+    """No superheat or subcooling is a valid state on the saturation line."""
+    _evaluator, coordinator, _metadata, request = _coordinator(refrigerant=refrigerant)
+
+    result = coordinator.evaluate(
+        replace(
+            request,
+            evaporating_temperature=evaporating,
+            condensing_temperature=condensing,
+            superheat=superheat,
+            subcooling=subcooling,
+        )
+    )
+    coordinator.close()
+
+    def saturated(temperature: float, quality: float) -> tuple[float, float]:
+        kelvin = temperature + 273.15
+        return (
+            PropsSI("P", "T", kelvin, "Q", quality, refrigerant),
+            PropsSI("H", "T", kelvin, "Q", quality, refrigerant),
+        )
+
+    assert isinstance(result, HprTargetThermodynamicResult)
+    p_low, h_vapour = saturated(evaporating, 1.0)
+    p_high, h_liquid = saturated(condensing, 0.0)
+    h_in = (
+        h_vapour
+        if superheat == 0.0
+        else PropsSI(
+            "H", "P", p_low, "T", evaporating + superheat + 273.15, refrigerant
+        )
+    )
+    s_in = (
+        PropsSI("S", "T", evaporating + 273.15, "Q", 1.0, refrigerant)
+        if superheat == 0.0
+        else PropsSI(
+            "S", "P", p_low, "T", evaporating + superheat + 273.15, refrigerant
+        )
+    )
+    h_out_ideal = PropsSI("H", "P", p_high, "S", s_in, refrigerant)
+    h_out = h_in + (h_out_ideal - h_in) / request.compressor_isentropic_efficiency
+    h_condensate = (
+        h_liquid
+        if subcooling == 0.0
+        else PropsSI(
+            "H", "P", p_high, "T", condensing - subcooling + 273.15, refrigerant
+        )
+    )
+    assert result.cop == pytest.approx(
+        (h_out - h_condensate) / (h_out - h_in), rel=1e-4
+    )

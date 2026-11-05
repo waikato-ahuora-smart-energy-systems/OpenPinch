@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from .problem import PinchProblem
 
 _SUPPORTED_ZONE_TYPES = frozenset(
-    {ZoneType.S.value, ZoneType.P.value, ZoneType.O.value}
+    {ZoneType.S.value, ZoneType.P.value, ZoneType.UO.value}
 )
 _SERIALIZED_SCALAR_KEYS = frozenset({"value", "unit"})
 

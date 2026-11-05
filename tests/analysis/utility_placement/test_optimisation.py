@@ -388,6 +388,7 @@ def _run_dual_annealing(monkeypatch, *, pooled: bool):
     return session, outcome
 
 
+@pytest.mark.process_pools
 def test_evaluation_limit_is_global_across_runs_and_workers(monkeypatch) -> None:
     session, outcome = _run_dual_annealing(monkeypatch, pooled=True)
     limit = session.request.options.evaluation_limit
@@ -402,6 +403,7 @@ def test_evaluation_limit_is_global_across_runs_and_workers(monkeypatch) -> None
     assert outcome.termination.evaluation_limit == limit
 
 
+@pytest.mark.process_pools
 def test_pooled_and_serial_runs_spend_the_same_budget(monkeypatch) -> None:
     pooled_session, pooled = _run_dual_annealing(monkeypatch, pooled=True)
     serial_session, serial = _run_dual_annealing(monkeypatch, pooled=False)

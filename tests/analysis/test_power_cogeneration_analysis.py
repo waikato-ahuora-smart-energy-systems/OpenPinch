@@ -171,6 +171,23 @@ def test_get_power_cogeneration_above_pinch_updates_zone_targets(monkeypatch):
     assert out.turbine_efficiency_target >= cfg.power.min_eff
 
 
+def test_stage_source_index_points_at_the_hot_utility_when_one_is_skipped():
+    cfg = _make_zone_config()
+    utilities = StreamCollection()
+    utilities.add(_steam_utility("Oil", t_supply=400.0, t_target=399.5, q=500.0))
+    utilities.add(_steam_utility("LP", t_supply=120.0, t_target=119.5, q=80.0))
+    utilities.add(_steam_utility("MP", t_supply=150.0, t_target=149.5, q=120.0))
+    zone = _make_zone(cfg, utilities)
+
+    out = pca.get_power_cogeneration_above_pinch(zone)
+
+    named = [
+        (list(utilities)[stage.source_index].name, stage.process_duty)
+        for stage in out.turbine_result.stages
+    ]
+    assert named == [("MP", pytest.approx(120.0)), ("LP", pytest.approx(80.0))]
+
+
 def test_get_power_cogeneration_above_pinch_accepts_heat_pump_targets(monkeypatch):
     _patch_steam_properties(monkeypatch)
 
@@ -219,8 +236,8 @@ def test_get_power_cogeneration_above_pinch_returns_zone_when_no_viable_stage(
 
     out = pca.get_power_cogeneration_above_pinch(zone)
     assert out is zone
-    assert out.work_target == 0.0
-    assert out.turbine_efficiency_target == 0.0
+    assert out.work_target is None
+    assert out.turbine_efficiency_target is None
 
 
 def test_get_power_cogeneration_below_pinch_uses_environment_default(monkeypatch):

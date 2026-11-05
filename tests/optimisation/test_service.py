@@ -79,6 +79,7 @@ def test_each_backend_minimises_a_non_hpr_scalar_problem(
     assert tuple(result.candidates) == tuple(sorted(result.candidates))
 
 
+@pytest.mark.process_pools
 def test_method_run_is_reproducible_for_a_fixed_seed() -> None:
     problem = OptimisationProblem(
         objective=_convex_objective,

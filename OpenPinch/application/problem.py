@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, Optional
 import pandas as pd
 from pydantic import ValidationError
 
-from ..contracts.input import TargetInput
+from ..contracts.input import ProcessComponentSchema, TargetInput
 from ..contracts.output import TargetOutput
 from ..contracts.reporting import ProblemReport, ReportMetric
 from ..contracts.workspace import ValidationReport
@@ -23,7 +23,10 @@ from ._problem.accessors.design import _DesignAccessorDescriptor
 from ._problem.accessors.plot import _PlotAccessorDescriptor
 from ._problem.accessors.target import _TargetAccessorDescriptor
 from ._problem.input import loading as _input_loading
-from ._problem.input.canonicalization import canonical_problem_inputs
+from ._problem.input.canonicalization import (
+    canonical_problem_inputs,
+    rename_canonical_root,
+)
 from ._problem.input.loading import (
     JsonDict,
     PathLike,
@@ -32,6 +35,7 @@ from ._problem.input.loading import (
 )
 from ._problem.input.validation import (
     build_validation_report,
+    load_failure_report,
 )
 from ._problem.input.validation import (
     format_schema_validation_error as _format_schema_validation_error,
@@ -112,6 +116,7 @@ class PinchProblem:
         self._validated_data = None
         self._master_zone = None
         self._process_components = {}
+        self._retained_hpr_targets = {}
         self._last_target_run_spec = None
         self._suspend_target_run_recording = False
         self._period_results = {}
@@ -333,10 +338,19 @@ class PinchProblem:
             input_data,
             context=self._validation_context or {},
         )
+        if self._process_components:
+            input_data.process_components = self._process_component_records()
         return input_data
 
+    def _process_component_records(self) -> list[ProcessComponentSchema]:
+        return [c._to_record() for c in self._process_components.values()]
+
     def validation_report(self) -> ValidationReport:
-        """Return structured validation results without raising for bad inputs."""
+        """Return the validation results of the loaded input, warnings included.
+
+        Loading rejects invalid input, so this report never holds an error. Use
+        ``source_validation_report`` to get a report on input that may be invalid.
+        """
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
         return build_validation_report(
@@ -344,6 +358,42 @@ class PinchProblem:
             context=self._validation_context or {},
             source_kind=self._input_source_kind or "target_input",
         )
+
+    @classmethod
+    def source_validation_report(
+        cls,
+        source: TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike],
+    ) -> ValidationReport:
+        """Return the validation report of a source without raising for bad input.
+
+        Takes any source the constructor takes. ``valid`` is true only if the
+        constructor accepts the source, so input that passes the checks is also
+        prepared once and discarded. A source that cannot be read or prepared is
+        reported as one error issue with an empty path. Warnings are emitted as
+        the constructor emits them.
+        """
+        problem = cls()
+        # Whatever a bad source raises while loading or preparing, in any format,
+        # is a finding about that source.
+        try:
+            loaded_source = load_problem_source(
+                source,
+                current_project_name=problem.project_name,
+            )
+            report = build_validation_report(
+                loaded_source.input_data,
+                context=loaded_source.validation_context,
+                source_kind=loaded_source.source_kind,
+            )
+            if report.valid:
+                _input_loading.replace_loaded_source(
+                    problem,
+                    loaded_source,
+                    rebuild=problem._rebuild_problem_state,
+                )
+        except Exception as error:
+            return load_failure_report(error)
+        return report
 
     def summary_frame(
         self,
@@ -488,8 +538,17 @@ class PinchProblem:
 
     @property
     def problem_data(self) -> Optional[TargetInput | JsonDict]:
-        """Return a detached snapshot of the loaded raw problem definition."""
-        return deepcopy(self._problem_data)
+        """Return a detached snapshot of the raw definition and its components."""
+        data = deepcopy(self._problem_data)
+        if self._process_components:
+            records = self._process_component_records()
+            if isinstance(data, TargetInput):
+                data.process_components = records
+            else:
+                data["process_components"] = [
+                    record.model_dump(mode="python") for record in records
+                ]
+        return data
 
     @property
     def results(self) -> Optional[TargetOutput]:
@@ -503,7 +562,7 @@ class PinchProblem:
 
     @property
     def process_components(self) -> dict[str, Any]:
-        """Memory-only process components applied to the prepared model."""
+        """Process components applied to the prepared model."""
         return MappingProxyType(dict(self._process_components))
 
     @property
@@ -537,12 +596,13 @@ class PinchProblem:
         changed = self._project_name != value
         self._project_name = value
         if isinstance(self._master_zone, Zone):
+            changed = changed or self._master_zone.name != value
             self._master_zone.name = value
             if changed:
                 self._invalidate_analysis()
 
     def to_problem_json(self) -> JsonDict:
-        """Return canonical JSON-compatible problem inputs."""
+        """Return canonical JSON-compatible problem inputs, with any components."""
         if self._problem_data is None:
             raise RuntimeError("No problem data is available. Call load(...) first.")
         return self._canonical_problem_inputs()
@@ -575,7 +635,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
     ) -> Zone:
-        """Update one zone-tree multiplier and rebuild the prepared analysis state."""
+        """Update one zone-tree multiplier, rebuild state and re-solve components."""
         if (
             self._validated_data is not None
             and self._validated_data.residual_basis is not None
@@ -608,7 +668,7 @@ class PinchProblem:
         *,
         replace: bool = False,
     ) -> Zone:
-        """Update the problem options in-place and rebuild the analysis state."""
+        """Update the options in-place, rebuild state and re-solve components."""
         if not isinstance(options, dict):
             raise TypeError("options must be provided as a dict.")
 
@@ -625,7 +685,13 @@ class PinchProblem:
     def _canonical_problem_inputs(self) -> JsonDict:
         """Return canonical mutable problem inputs with an explicit zone tree."""
         validated = self.validate()
-        return canonical_problem_inputs(validated, project_name=self.project_name)
+        problem_inputs = canonical_problem_inputs(
+            validated, project_name=self.project_name
+        )
+        # The source still holds its own root name after a rename; the live root wins.
+        if isinstance(self._master_zone, Zone):
+            rename_canonical_root(problem_inputs, self._master_zone.name)
+        return problem_inputs
 
     def __repr__(self) -> str:
         """Return a compact summary of the source and cached result state."""

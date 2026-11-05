@@ -8,7 +8,14 @@ import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
 import OpenPinch.analysis.heat_pumps.common.shared as hp_shared
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.targeting.cascade as target_cascade
-from OpenPinch.analysis.heat_pumps.common.encoding import decode_available_fractions
+from OpenPinch import PinchProblem
+from OpenPinch.analysis.heat_pumps.common._shared.streams import (
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
+)
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    decode_available_fractions,
+    limit_available_duty,
+)
 from OpenPinch.contracts.hpr import HPRParsedState, HPRTopologyIdentifier
 
 from .helpers import (
@@ -114,11 +121,21 @@ def test_cascade_refrigeration_uses_full_evaporator_duty_seed():
 
     np.testing.assert_allclose(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available),
-        np.minimum(init_res.Q_cond[:-1], vars.Q_heat_available),
+        np.minimum(init_res.Q_cond[1:], vars.Q_heat_available),
     )
     np.testing.assert_allclose(
         decode_available_fractions(vars.x_cool_split, vars.Q_cool_available),
         np.minimum(init_res.Q_evap, vars.Q_cool_available),
+    )
+    # Heat controls are the condensers below the top stage, which takes the rest.
+    np.testing.assert_allclose(
+        vars.Q_heat_available,
+        limit_available_duty(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                vars.T_cond[1:], args.T_cold, args.H_cold, is_cond=True
+            ),
+            args.Q_heat_max,
+        ),
     )
 
 
@@ -165,7 +182,11 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     )
     np.testing.assert_allclose(vars.T_cond, np.array([110.0, 78.0]))
     np.testing.assert_allclose(vars.T_evap, np.array([105.0, 70.0]))
-    np.testing.assert_allclose(vars.dT_subcool, np.array([0.2, 1.04]))
+    # Each condenser's lift to its own stage's evaporator: the stage below's
+    # condenser level less the 2 K cascade gap, then the first process evaporator.
+    np.testing.assert_allclose(
+        vars.dT_subcool, np.array([0.01 * (110.0 - 76.0), 0.02 * abs(78.0 - 105.0)])
+    )
     assert vars.Q_heat_base == pytest.approx(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available).sum()
     )
@@ -220,6 +241,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
         Q_cool = 70.0
         Q_heat_arr = np.array([120.0, 80.0])
         Q_cool_arr = np.array([50.0, 20.0])
+        dT_subcool = np.array([5.0, 5.0])
         penalty = 1.0
 
         def solve(self, **kwargs):
@@ -279,6 +301,7 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])
         Q_cool_arr = np.array([80.0])
+        dT_subcool = np.array([0.0])
         penalty = 0.0
 
         def solve(self, **kwargs):
@@ -372,6 +395,24 @@ def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):
     assert out.success is True
 
 
+def test_cascade_subcooling_scales_with_the_lift_to_the_coldest_evaporator():
+    args = _base_args(n_cond=1, n_evap=1)
+    args.refrigerant_ls = ["water"]
+    _, bnds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    x = np.zeros(len(bnds))
+    layout = hp_cascade.HPRoptVectorLayout(
+        n_cond=1, n_evap=1, n_subcool=1, n_heat_split=1, n_cool_split=0, n_ihx=1
+    )
+    x[layout.subcool_slice] = 0.5
+
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+
+    # The same limit as a parallel machine: the liquid can cool to the evaporator.
+    assert state.dT_subcool[0] == pytest.approx(
+        0.5 * (state.T_cond[0] - state.T_evap[0])
+    )
+
+
 def test_cascade_parse_floors_evaporation_at_the_refrigerant_minimum():
     args = _base_args(n_cond=1, n_evap=1)
     args.T_hot = np.array([30.0, 10.0, -20.0])
@@ -394,3 +435,150 @@ def test_cascade_process_evaporator_uses_the_bottom_stage_refrigerant_minimum():
 
     # The process evaporator belongs to the ammonia stage, not the water stage.
     assert state.T_evap[0] == pytest.approx(-20.0)
+
+
+def test_cascade_state_reports_the_subcooling_the_cycle_applied():
+    pytest.importorskip("CoolProp")
+    state = HPRParsedState.model_validate(
+        {
+            "T_cond": np.array([84.9, 84.8]),
+            "dT_subcool": np.array([0.0, 85.0]),
+            "T_evap": np.array([-0.2]),
+            "dT_ihx_gas_side": np.array([0.0, 0.0]),
+            "Q_heat_base": 250.0,
+            "x_heat_split": np.array([1.0, 0.0]),
+            "Q_heat_available": np.array([250.0, 250.0]),
+        }
+    )
+    args = SimpleNamespace(
+        dtcont_hp=5.0,
+        eta_comp=0.7,
+        refrigerant_ls=["Ammonia", "R1234ze(E)"],
+        dt_cascade_hx=5.0,
+    )
+
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
+
+    assert cycle.solved
+    assert state.dT_subcool == pytest.approx([0.0, 0.0], abs=1e-6)
+
+
+def test_cascade_subcooling_scales_with_each_stages_own_evaporator():
+    args = _base_args(n_cond=3, n_evap=2)
+    args.refrigerant_ls = ["water"]
+    args.dt_cascade_hx = 5.0
+    _, bnds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    x = np.full(len(bnds), 0.5)
+    layout = hp_cascade.HPRoptVectorLayout(
+        n_cond=3, n_evap=2, n_subcool=3, n_heat_split=3, n_cool_split=1, n_ihx=4
+    )
+    x[:5] = [0.1, 0.2, 0.3, 0.1, 0.05]
+    x[layout.subcool_slice] = [0.5, 0.25, 1.0]
+
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+
+    T_cond, T_evap = state.T_cond, state.T_evap
+    # The first two condensers pass heat to the stage below's condenser level;
+    # the last pairs with the warmest process evaporator.
+    assert state.dT_subcool == pytest.approx(
+        [
+            0.5 * (T_cond[0] - (T_cond[1] - 5.0)),
+            0.25 * (T_cond[1] - (T_cond[2] - 5.0)),
+            T_cond[2] - T_evap[0],
+        ]
+    )
+
+
+def test_cascade_refrigeration_heat_controls_sit_below_the_top_stage():
+    pytest.importorskip("CoolProp")
+    args = SimpleNamespace(
+        dtcont_hp=5.0,
+        eta_comp=0.7,
+        refrigerant_ls=["Ammonia", "Ammonia"],
+        dt_cascade_hx=5.0,
+    )
+    state = HPRParsedState.model_validate(
+        {
+            "T_cond": np.array([40.0, 10.0]),
+            "dT_subcool": np.array([0.0, 0.0]),
+            "T_evap": np.array([-20.0]),
+            "dT_ihx_gas_side": np.array([0.0, 0.0]),
+            "Q_heat_base": 50.0,
+            "x_heat_split": np.array([1.0]),
+            "Q_heat_available": np.array([50.0]),
+            "Q_cool_base": 100.0,
+            "x_cool_split": np.array([1.0]),
+            "Q_cool_available": np.array([100.0]),
+        }
+    )
+
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, False)
+
+    assert cycle.solved
+    warm, cold = cycle.subcycles
+    assert cold.T_cond == pytest.approx(10.0)
+    assert cold.Q_heat == pytest.approx(50.0)
+    assert cold.Q_cool == pytest.approx(100.0)
+    assert warm.Q_cool == pytest.approx(0.0)
+    assert warm.Q_heat == pytest.approx(warm.Q_cond)
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
+def test_cascade_one_condenser_delivers_its_duty_once_with_two_evaporators():
+    pytest.importorskip("CoolProp")
+    args = SimpleNamespace(
+        dtcont_hp=5.0,
+        eta_comp=0.7,
+        refrigerant_ls=["Ammonia", "Ammonia"],
+        dt_cascade_hx=1.0,
+    )
+    state = HPRParsedState.model_validate(
+        {
+            "T_cond": np.array([80.0]),
+            "dT_subcool": np.array([0.0]),
+            "T_evap": np.array([24.0, 5.0]),
+            "dT_ihx_gas_side": np.array([0.0, 0.0]),
+            "Q_heat_base": 100.0,
+            "x_heat_split": np.array([1.0]),
+            "Q_heat_available": np.array([100.0]),
+            "Q_cool_base": 50.0,
+            "x_cool_split": np.array([1.0]),
+            "Q_cool_available": np.array([50.0]),
+        }
+    )
+
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
+
+    assert cycle.solved
+    # The lower stage condenses at 25 degC into the upper stage's evaporator.
+    assert cycle.Q_heat_arr == pytest.approx([100.0, 0.0])
+    # The upper evaporator takes 50 from the process; the lower stage covers
+    # the rest of its evaporator through the cascade and balances the cooling.
+    upper, lower = cycle.subcycles
+    assert upper.Q_cool == pytest.approx(50.0)
+    assert lower.Q_cond == pytest.approx(upper.Q_cas_cool)
+    assert lower.Q_cool == pytest.approx(lower.Q_evap)
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
+def test_public_target_with_one_condenser_has_no_phantom_process_condensers():
+    pytest.importorskip("CoolProp")
+    # The Carnot seed gives a design straight away, so a very short search is
+    # enough. Keep it short: Pyodide runs this search far slower than CPython.
+    target = PinchProblem(
+        "OpenPinch/tutorials/sample_cases/chocolate_factory.json", project_name="m"
+    ).target.vapour_compression_heat_pump(
+        load_fraction=0.25,
+        condensers=1,
+        evaporators=2,
+        refrigerants=["Ammonia"],
+        initialize_from_carnot=True,
+        maximum_restarts=1,
+        maximum_iterations=5,
+        maximum_evaluations=10,
+    )
+
+    Q_heat = np.asarray(target.hpr_details.Q_heat, dtype=float)
+    assert Q_heat.size == 2
+    assert Q_heat[1] == pytest.approx(0.0)
+    assert target.hpr_cop == pytest.approx(Q_heat[0] / target.hpr_work, rel=1e-9)

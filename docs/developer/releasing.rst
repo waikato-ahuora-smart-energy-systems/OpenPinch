@@ -26,9 +26,9 @@ Validation profiles
    :header-rows: 1
 
    * - Change
-     - Lint, unit tests (95% branch coverage), docs, TESPy, performance, build, install smoke
-     - Solver tests (Couenne, IPOPT)
-     - Version-bump check
+     - Lint, unit tests (95% branch coverage), docs, TESPy, build, install smoke, Pyodide
+     - Solver tests (external Couenne and IPOPT solver binaries), unit tests on Python 3.12 and 3.13, floors, performance
+     - Version-bump check (the **Version bump** job in ``ci.yml``)
    * - PR into ``develop`` / push to ``develop``
      - yes
      - no
@@ -43,8 +43,9 @@ Validation profiles
      - no
 
 Install smoke tests install the built wheel, not the checkout: the core
-surface on Ubuntu, Windows and macOS, and every optional extra on Ubuntu.
-Tests use Hypothesis seed ``20260715``. Python comes from ``.python-version``.
+surface on Ubuntu, Windows and macOS, and every optional extra, including the aggregate ``full``, on Ubuntu.
+Tests use Hypothesis seed ``20260715``. Python comes from ``.python-version``, except the ``unit-py312`` and
+``unit-py313`` lanes, which pin their own version.
 
 Cutting a release
 -----------------
@@ -78,8 +79,8 @@ workflow runs. If a ``develop`` → ``main`` pull request is already open when
 the bump lands, close and reopen it (or push a commit) so its checks run on
 the bumped commit.
 
-A push to ``main`` whose version is already tagged runs CI only and publishes
-nothing.
+A push to ``main`` whose version is already fully released (the published
+GitHub release carries both files) runs CI only and publishes nothing.
 
 When a release fails
 --------------------

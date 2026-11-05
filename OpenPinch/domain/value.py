@@ -29,7 +29,7 @@ except PintError:  # pragma: no cover - Pint may already know this unit.
 # Every unit or quantity text Pint parses is held to a bounded grammar first.
 ureg.preprocessors.append(_value_units.check_unit_text)
 set_application_registry(ureg)
-Q_ = ureg.Quantity  # type: ignore
+Q_ = ureg.Quantity
 
 _SERIALIZED_SCALAR_KEYS = {"value", "unit"}
 _SERIALIZED_PERIOD_KEYS = {"values", "period_ids", "weights", "unit"}
@@ -44,8 +44,7 @@ class Value:
 
     def __init__(self, data=None, unit: str = None):
         """Create a scalar or multiperiod value from data and optional unit."""
-        quantity, weights = self._coerce_input(data, unit)
-        self._set_storage(quantity)
+        self._quantity, weights = self._coerce_input(data, unit)
         # Weights are kept as given (they are passive), but validated the same
         # way whatever the input form.
         self._weights = _value_units.validate_weights(
@@ -138,6 +137,10 @@ class Value:
         still does not convert to an offset temperature.
         """
         unit = self._normalise_unit_input(new_unit)
+        if unit is not None and self._quantity.units == self._unit_from_normalised(
+            unit
+        ):
+            return type(self)(self)
         try:
             quantity = self._quantity.to(unit)
         except DimensionalityError:
@@ -342,6 +345,19 @@ class Value:
         instance._read_only_reason = None
         return instance
 
+    def __deepcopy__(self, memo) -> "Value":
+        """Copy this value, sharing the quantity because storage is read-only."""
+        copied = type(self).__new__(type(self))
+        memo[id(self)] = copied
+        copied.__dict__.update(self.__dict__)
+        copied._weights = self.weights
+        return copied
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore a pickled value; pickle protocols below 5 lose the read-only flag."""
+        self.__dict__.update(state)
+        self._quantity.magnitude.flags.writeable = False
+
     def _make_read_only(self, reason: str) -> "Value":
         """Mark this value as an immutable domain-owned view."""
         self._read_only_reason = str(reason)
@@ -396,10 +412,9 @@ class Value:
         return len(self._quantity.magnitude) > 1
 
     def _set_storage(self, quantity) -> None:
-        magnitudes = np.array(quantity.magnitude, dtype=float, copy=True).reshape(-1)
-        if magnitudes.size == 0:
-            raise ValueError("Values cannot be empty.")
-        self._quantity = Q_(magnitudes, quantity.units)
+        self._quantity = Q_(
+            _value_coercion.frozen_magnitudes(quantity.magnitude), quantity.units
+        )
 
     def _summary_value(self, magnitude: float) -> "Value":
         return self._from_quantity(

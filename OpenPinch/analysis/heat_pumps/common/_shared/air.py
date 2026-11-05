@@ -10,6 +10,7 @@ of the cascade needs refrigeration.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,6 +21,7 @@ __all__ = [
     "ambient_source_temperature",
     "cascade_with_air",
     "cooling_water_sink_temperature",
+    "utility_bands",
 ]
 
 
@@ -73,6 +75,22 @@ class CascadeWithAir:
     Q_cooling_water: float = 0.0
 
 
+# Utility levels are modelled as narrow bands, usually 0.1 K. One on an air or
+# cooling-water level ends just past it, so it counts as at the level; otherwise
+# its width would move the whole duty to a dearer service.
+UTILITY_BAND_MAX_SPAN_K = 0.1 + 1e-6
+
+
+def utility_bands(T: np.ndarray) -> list[tuple[float, float]]:
+    """Return the narrow steps of a descending utility background profile."""
+    T = np.asarray(T, dtype=float)
+    return [
+        (float(hi), float(lo))
+        for hi, lo in zip(T[:-1], T[1:])
+        if 0.0 < hi - lo <= UTILITY_BAND_MAX_SPAN_K
+    ]
+
+
 def cascade_with_air(
     T: np.ndarray,
     H_net: np.ndarray,
@@ -80,6 +98,7 @@ def cascade_with_air(
     T_air_source: float,
     T_air_sink: float,
     T_cooling_water: float | None = None,
+    utility_bands: Sequence[tuple[float, float]] = (),
 ) -> CascadeWithAir:
     """Place free ambient air in a feasible cascade and return external duties.
 
@@ -93,13 +112,18 @@ def cascade_with_air(
     the cascade is never swapped for air. Air first supplies heat, which
     saves the dearer hot utility, then takes heat from what flows on.
     Cooling water at ``T_cooling_water`` then takes heat the same way from
-    what is left.
+    what is left. A level inside one of ``utility_bands``, each ``(upper, lower)``,
+    moves to the end of that band, so the band counts as at the level.
     """
     T = np.asarray(T, dtype=float)
     H_net = np.maximum(np.asarray(H_net, dtype=float), 0.0)
     if T.size == 0:
         return CascadeWithAir(0.0, 0.0, 0.0, 0.0)
 
+    T_air_source = _level_covering_band(T_air_source, utility_bands, is_source=True)
+    T_air_sink = _level_covering_band(T_air_sink, utility_bands)
+    if T_cooling_water is not None:
+        T_cooling_water = _level_covering_band(T_cooling_water, utility_bands)
     levels = (T_air_source, T_air_sink) + (
         () if T_cooling_water is None else (T_cooling_water,)
     )
@@ -131,6 +155,21 @@ def cascade_with_air(
         Q_air_sink=Q_air_sink,
         Q_cooling_water=Q_cooling_water,
     )
+
+
+def _level_covering_band(
+    level: float,
+    bands: Sequence[tuple[float, float]],
+    *,
+    is_source: bool = False,
+) -> float:
+    """Move ``level`` to the far end of the utility band it lies in, if any."""
+    for upper, lower in bands:
+        if is_source and lower <= level < upper:
+            return upper
+        if not is_source and lower < level <= upper:
+            return lower
+    return level
 
 
 def _at_or_above(T_grid: np.ndarray, level: float) -> np.ndarray:

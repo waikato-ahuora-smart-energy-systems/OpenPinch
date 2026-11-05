@@ -435,6 +435,8 @@ def _weighted_average_target(
             "orc_thermal_efficiency",
             "orc_total_annualized_cost_change",
             "turbine_efficiency_target",
+            "turbine_converged",
+            "turbine_diagnostics",
             "pinch_temp",
             "hot_utilities",
             "cold_utilities",
@@ -473,6 +475,19 @@ def _weighted_average_target(
         weights,
         basis_is_numerator=True,
     )
+    # A weighted row is not a solve of its own: it is flagged if any period was,
+    # and says which period each message came from.
+    solved = [
+        t.turbine_converged
+        for t in targets
+        if getattr(t, "turbine_converged", None) is not None
+    ]
+    data["turbine_converged"] = all(solved) if solved else None
+    data["turbine_diagnostics"] = [
+        f"Period {t.period_id}: {message}"
+        for t in targets
+        for message in getattr(t, "turbine_diagnostics", [])
+    ]
     data["orc_thermal_efficiency"] = _ratio_of_totals(
         targets,
         "orc_thermal_efficiency",

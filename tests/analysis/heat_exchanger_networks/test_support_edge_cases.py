@@ -134,6 +134,8 @@ def _settings(**overrides):
         "stage_selection": (1,),
         "evm_n_ad_branches": None,
         "evm_n_rm_branches": None,
+        "effective_evm_n_ad_branches": 1,
+        "effective_evm_n_rm_branches": 1,
         "tdm_solver": "couenne",
         "pdm_solver": "couenne",
     }

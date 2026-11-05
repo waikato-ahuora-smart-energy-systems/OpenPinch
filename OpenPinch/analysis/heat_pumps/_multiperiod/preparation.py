@@ -100,6 +100,7 @@ def build_multiperiod_hpr_cases(
                 debug=False,
                 simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
                 search_budget=_hpr_search_budget(args),
+                background_is_utility=not is_direct,
             ),
         )
         period_cases.append(

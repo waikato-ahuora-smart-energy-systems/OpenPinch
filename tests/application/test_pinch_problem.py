@@ -1,5 +1,6 @@
 """Regression tests for the pinch problem classes."""
 
+import base64
 import json
 
 # import types
@@ -43,7 +44,7 @@ from OpenPinch.presentation.graphs.problem import (
     _PlotAccessor,
     _slugify,
 )
-from OpenPinch.resources import copy_sample_case
+from OpenPinch.resources import copy_sample_case, read_sample_case
 from tests.strategies.problem_inputs import (
     nested_zone_multiplier_cases,
     transactional_problem_scenarios,
@@ -1145,25 +1146,135 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     assert detailed.iloc[0]["Scope"] == "Plant"
 
 
-def test_validation_report_returns_structured_errors_without_raising():
-    obj = PinchProblem()
-    obj._problem_data = {
-        "streams": [
-            {
-                "zone": "Zone A",
-                "name": "Hot Feed",
-                "t_supply": 150.0,
-                "heat_flow": 100.0,
-            }
-        ],
-        "utilities": [],
-        "options": {},
-    }
-
-    report = obj.validation_report()
+def test_source_validation_report_returns_structured_errors_without_raising():
+    report = PinchProblem.source_validation_report(
+        {
+            "streams": [
+                {
+                    "zone": "Zone A",
+                    "name": "Hot Feed",
+                    "t_supply": 150.0,
+                    "heat_flow": 100.0,
+                }
+            ],
+            "utilities": [],
+            "options": {},
+        }
+    )
 
     assert report.valid is False
     assert any(issue.path == "streams[0].t_target" for issue in report.issues)
+
+
+def _bad_source(kind, tmp_path, sample_problem):
+    """Return one invalid source of the given kind, as ``PinchProblem`` takes it."""
+    missing_target = deepcopy(sample_problem)
+    del missing_target["streams"][0]["t_target"]
+    if kind == "schema error":
+        return missing_target
+    if kind == "unbuildable zone":
+        return {**sample_problem, "zone_tree": {"name": "Site", "type": "Bogus"}}
+    if kind == "malformed streams":
+        return {"streams": [123], "utilities": []}
+    if kind == "not a source":
+        return 123
+    if kind == "no source":
+        return None
+    if kind == "missing file":
+        return tmp_path / "missing.json"
+    if kind == "invalid json file":
+        path = tmp_path / "invalid.json"
+        path.write_text(json.dumps(missing_target), encoding="utf-8")
+        return path
+    if kind == "unparseable json file":
+        path = tmp_path / "garbled.json"
+        path.write_text("{not json", encoding="utf-8")
+        return path
+    if kind == "unparseable workbook":
+        path = tmp_path / "garbled.xlsx"
+        path.write_bytes(b"not a workbook")
+        return path
+    if kind == "unsupported file":
+        path = tmp_path / "problem.txt"
+        path.write_text("streams", encoding="utf-8")
+        return path
+    if kind == "csv directory without files":
+        return tmp_path
+    assert kind == "unparseable csv pair"
+    streams, utilities = tmp_path / "streams.csv", tmp_path / "utilities.csv"
+    streams.write_text("a,b\n1,2\n", encoding="utf-8")
+    utilities.write_text("a,b\n1,2\n", encoding="utf-8")
+    return (streams, utilities)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "schema error",
+        "unbuildable zone",
+        "malformed streams",
+        "not a source",
+        "no source",
+        "missing file",
+        "invalid json file",
+        "unparseable json file",
+        "unparseable workbook",
+        "unsupported file",
+        "csv directory without files",
+        "unparseable csv pair",
+    ],
+)
+def test_source_validation_report_reports_every_bad_source_without_raising(
+    kind, tmp_path, sample_problem
+):
+    source = _bad_source(kind, tmp_path, sample_problem)
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert isinstance(report, ValidationReport)
+    assert report.valid is False
+    assert any(issue.severity == "error" for issue in report.issues)
+
+
+def test_source_validation_report_locates_issues_in_a_file(tmp_path, sample_problem):
+    source = _bad_source("invalid json file", tmp_path, sample_problem)
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert [issue.path for issue in report.issues] == ["streams[0].t_target"]
+
+
+def test_source_validation_report_explains_input_that_cannot_be_built(sample_problem):
+    source = _bad_source("unbuildable zone", None, sample_problem)
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert "Zone name and type" in report.issues[0].message
+    with pytest.raises(ValueError, match="Zone name and type"):
+        PinchProblem(source)
+
+
+@pytest.mark.parametrize("as_file", [False, True])
+def test_source_validation_report_passes_what_the_constructor_accepts(
+    as_file, tmp_path, sample_problem
+):
+    source = sample_problem
+    if as_file:
+        source = tmp_path / "valid.json"
+        source.write_text(json.dumps(sample_problem), encoding="utf-8")
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert report.valid is True
+    assert report == PinchProblem(source).validation_report()
+
+
+def test_source_validation_report_leaves_a_mapping_source_unchanged(sample_problem):
+    source = deepcopy(sample_problem)
+
+    PinchProblem.source_validation_report(source)
+
+    assert source == sample_problem
 
 
 def test_report_and_metrics_are_typed_and_do_not_require_exports(sample_problem):
@@ -3443,3 +3554,122 @@ def test_comparison_text_columns_keep_none_for_missing_values():
     assert result["unit"].dtype == object
     assert result["unit"].tolist() == ["kW", None]
     assert result["value"].dtype == float
+
+
+def test_xls_source_is_rejected_with_a_save_as_xlsx_message(tmp_path):
+    legacy = tmp_path / "problem.xls"
+    legacy.write_bytes(b"")
+
+    with pytest.raises(ValueError, match=r"\.xls.*\.xlsx"):
+        PinchProblem().load(legacy)
+
+
+def test_xls_file_import_is_rejected_with_a_save_as_xlsx_message():
+    files = [
+        {
+            "name": "problem.xls",
+            "role": "problem",
+            "content_base64": base64.b64encode(b"").decode(),
+        }
+    ]
+
+    with pytest.raises(ValueError, match=r"\.xls.*\.xlsx"):
+        source_adapter.load_problem_source_from_files(files)
+
+
+def _renamable_problem() -> PinchProblem:
+    payload = json.loads(read_sample_case("basic_pinch.json"))
+    payload["zone_tree"] = {
+        "name": "Plant",
+        "type": "Site",
+        "children": [{"name": "Area", "type": "Process Zone"}],
+    }
+    for stream in payload["streams"]:
+        stream["zone"] = "Plant/Area"
+    return PinchProblem(payload, project_name="Plant")
+
+
+@pytest.mark.parametrize(
+    "rebuild",
+    [
+        lambda problem: problem.update_options({"ENV_TEMPERATURE": 30.0}),
+        lambda problem: problem.set_dt_cont_multiplier(0.5),
+    ],
+    ids=["update_options", "set_dt_cont_multiplier"],
+)
+def test_rename_survives_a_rebuild_of_an_explicit_zone_tree(rebuild):
+    problem = _renamable_problem()
+    problem.project_name = "Renamed"
+
+    rebuild(problem)
+
+    assert problem.project_name == "Renamed"
+    assert problem.master_zone.name == "Renamed"
+    assert problem.master_zone.get_subzone("Area").address == "Renamed/Area"
+    inputs = problem.to_problem_json()
+    assert inputs["zone_tree"]["name"] == "Renamed"
+    assert {stream["zone"] for stream in inputs["streams"]} == {"Renamed/Area"}
+
+
+def test_rename_after_a_rebuild_reaches_the_next_rebuild():
+    problem = _renamable_problem()
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+    problem.project_name = "First"
+    problem.update_options({"ENV_TEMPERATURE": 25.0})
+    problem.project_name = "Second"
+
+    problem.set_dt_cont_multiplier(0.5, zone_name="Second/Area")
+
+    assert problem.master_zone.name == "Second"
+    assert problem.master_zone.get_subzone("Area").dt_cont_multiplier == 0.5
+
+
+def test_results_after_a_rename_and_rebuild_use_the_new_root_name():
+    problem = _renamable_problem()
+    problem.target.direct_heat_integration()
+    problem.project_name = "Renamed"
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+    problem.target.direct_heat_integration()
+
+    assert problem.results.name == "Renamed"
+    assert problem.results.targets
+    assert all(
+        target.scope.split("/")[0] == "Renamed" for target in problem.results.targets
+    )
+
+
+def test_rebuild_keeps_an_explicit_root_name_that_was_never_renamed():
+    payload = _renamable_problem().to_problem_json()
+    problem = PinchProblem(payload, project_name="Label")
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+
+    assert problem.project_name == "Label"
+    assert problem.master_zone.name == "Plant"
+
+
+def test_renaming_to_the_current_project_name_still_renames_the_root_and_results():
+    payload = _renamable_problem().to_problem_json()
+    problem = PinchProblem(payload, project_name="Label")
+    problem.target.direct_heat_integration()
+
+    problem.project_name = "Label"
+
+    assert problem.master_zone.name == "Label"
+    assert problem.results is None
+
+
+def test_rename_also_updates_an_explicit_top_zone_name_option():
+    source = PinchProblem("basic_pinch.json").to_problem_json()
+    source["options"] = {
+        **(source.get("options") or {}),
+        "PROBLEM_TOP_ZONE_NAME": source["zone_tree"]["name"],
+    }
+    problem = PinchProblem(source)
+    problem.project_name = "Renamed"
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+
+    assert problem.master_zone.name == "Renamed"
+    assert problem.to_problem_json()["options"]["PROBLEM_TOP_ZONE_NAME"] == "Renamed"

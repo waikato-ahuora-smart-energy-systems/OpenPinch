@@ -58,7 +58,7 @@ class Expr:
     def __neg__(self):
         return Expr(lambda x: -self(x))
 
-    def __eq__(self, other):  # type: ignore[override]
+    def __eq__(self, other):
         return Constraint("eq", self - _wrap(other))
 
     def __ge__(self, other):

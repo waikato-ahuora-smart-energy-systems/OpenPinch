@@ -20,6 +20,11 @@ def build_grid_layout(
 ) -> HeatExchangerNetworkGridLayout:
     """Return the grid model of ``network`` in one period as a contract."""
     model = build_grid_model(network, period_id=period_id)
+    grid_matches = (
+        *model.recovery_matches,
+        *model.hot_utility_matches,
+        *model.cold_utility_matches,
+    )
     matches = tuple(
         _match(kind, match)
         for kind, kind_matches in (
@@ -40,8 +45,8 @@ def build_grid_layout(
             for (stream, stage), count in model.branch_counts.items()
         ),
         stream_temperatures=(
-            *(_stream(stream, "hot", matches) for stream in model.hot_streams),
-            *(_stream(stream, "cold", matches) for stream in model.cold_streams),
+            *(_stream(stream, "hot", grid_matches) for stream in model.hot_streams),
+            *(_stream(stream, "cold", grid_matches) for stream in model.cold_streams),
         ),
     )
 
@@ -49,16 +54,17 @@ def build_grid_layout(
 def _stream(
     stream: str,
     side: str,
-    matches: tuple[HeatExchangerNetworkGridMatch, ...],
+    matches: tuple[GridDiagramMatch, ...],
 ) -> HeatExchangerNetworkGridStream:
     """A stream's supply and target: the ends of its exchangers' temperatures."""
     end = "source" if side == "hot" else "sink"
 
     def temperatures(which: str) -> list[float]:
         values = (
-            getattr(match, f"{end}_{which}_temperature")
+            getattr(state, f"{end}_{which}_temperature")
             for match in matches
             if getattr(match, f"{end}_stream") == stream
+            for state in (match.state, *match.merged_states)
         )
         return [value for value in values if value is not None]
 

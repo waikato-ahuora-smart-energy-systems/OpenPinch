@@ -97,20 +97,6 @@ BASELINE_EXPECTATIONS = {
     },
 }
 
-CURRENT_OPENHENS_LIVE_EXPECTATIONS = {
-    NINE_STREAM: {
-        "best_solution": 2905508.6335796523,
-        "best_dTmin": 18,
-        "total_cases_attempted": 1133,
-        "total_cases_solved_min": 840,
-        "solved_esm_count_min": 67,
-        "best_stages": 4,
-        "best_recovery_units": 11,
-        "best_cu_units": 3,
-        "best_hu_units": 2,
-    },
-}
-
 INTEGER_SUMMARY_FIELDS = (
     "solved_esm_count",
     "total_cases_attempted",
@@ -361,69 +347,6 @@ def test_default_design_removes_every_gekko_run_directory(
 @pytest.mark.parametrize("case_id", [FOUR_STREAM])
 def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None:
     _assert_live_solver_case_matches_checked_in_summary(case_id)
-
-
-@pytest.mark.solver
-@pytest.mark.skip(
-    reason="nine-stream live solver benchmark is excluded from normal testing"
-)
-def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -> None:
-    if not _live_solver_environment_available():
-        _assert_artifact_solver_case_matches_checked_in_summary(NINE_STREAM)
-        return
-
-    expected = CURRENT_OPENHENS_LIVE_EXPECTATIONS[NINE_STREAM]
-    problem = PinchProblem(source=FIXTURE_ROOT / f"{NINE_STREAM}.json")
-    problem.target.all_heat_integration()
-    settings = replace(
-        workflow_settings_from_problem(problem),
-        max_parallel=8,
-    )
-
-    workflow_result = execute_open_hens_method(
-        problem,
-        settings,
-        executor=LocalSynthesisExecutor(print_output=False),
-    )
-    design = workflow_result.accepted_result
-    network = design.network
-
-    _assert_close(
-        design.objective_values["total_annual_cost"],
-        expected["best_solution"],
-        abs_tol=TAC_ABS_TOL,
-        rel_tol=TAC_REL_TOL,
-    )
-    assert (
-        _weighted_solver_job_count(workflow_result.outcomes)
-        == expected["total_cases_attempted"]
-    )
-    assert (
-        _weighted_solver_job_count(
-            outcome
-            for outcome in workflow_result.outcomes
-            if outcome.status == "success"
-        )
-        >= expected["total_cases_solved_min"]
-    )
-    assert (
-        sum(
-            outcome.status == "success"
-            and outcome.task.method == "network_evolution_method"
-            for outcome in workflow_result.outcomes
-        )
-        >= expected["solved_esm_count_min"]
-    )
-    assert network.stage_count == expected["best_stages"]
-    assert network.summary_metrics["recovery_units"] == expected["best_recovery_units"]
-    assert network.summary_metrics["hot_utility_units"] == expected["best_hu_units"]
-    assert network.summary_metrics["cold_utility_units"] == expected["best_cu_units"]
-    _assert_live_design_satisfies_heat_and_cost_contract(
-        NINE_STREAM,
-        network,
-        expected_total=expected["best_solution"],
-        d_tmin=expected["best_dTmin"],
-    )
 
 
 def _assert_live_solver_case_matches_checked_in_summary(

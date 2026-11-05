@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from ...analysis.heat_exchanger_networks.results.selection import network_for_rank
+from ...analysis.heat_exchanger_networks.solver.dependencies import (
+    require_synthesis_dependency,
+)
 from ...contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .state import HeatExchangerNetworkGridModel
@@ -31,6 +34,7 @@ class HeatExchangerNetworkGridDiagram:
         if destination.suffix.lower() == ".html":
             self.fig.write_html(destination)
             return
+        require_synthesis_dependency("kaleido", purpose="static plot export")
         self.fig.write_image(destination)
 
 

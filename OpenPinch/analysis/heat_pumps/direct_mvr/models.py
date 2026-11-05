@@ -76,6 +76,10 @@ class DirectGasMVRFallbackDiagnostic:
         object.__setattr__(self, "fluid", _bounded_context(self.fluid))
 
 
+PHASE_TARGET_BELOW_SATURATION = "phase.target_below_saturation"
+PHASE_LIQUID_STAGE_INLET = "phase.liquid_stage_inlet"
+
+
 class DirectGasMVRStageError(ValueError):
     """A bounded required-state failure with direct-MVR stage context."""
 
@@ -116,8 +120,78 @@ class DirectGasMVRStageError(ValueError):
         )
 
 
+class DirectGasMVRPhaseError(DirectGasMVRStageError):
+    """A stage whose fluid would be liquid where the model needs vapour."""
+
+    def __init__(
+        self,
+        *,
+        reason_code: str,
+        source_stream: str,
+        period_index: int,
+        stage_index: int,
+        fluid: str,
+        t_target: float,
+        t_saturation: float,
+        pressure_kpa: float,
+        above_critical_pressure: bool = False,
+    ) -> None:
+        super().__init__(
+            reason_code=reason_code,
+            source_stream=source_stream,
+            period_index=period_index,
+            stage_index=stage_index,
+            fluid=fluid,
+        )
+        self.t_target = t_target
+        self.t_saturation = t_saturation
+        self.pressure_kpa = pressure_kpa
+        self.above_critical_pressure = above_critical_pressure
+        limit = "critical" if above_critical_pressure else "saturation"
+        context = (
+            f"Direct MVR stream {_bounded_context(source_stream)!r} "
+            f"({_bounded_context(fluid)}), period {period_index}, stage {stage_index}: "
+            f"target {t_target:.2f} degC is below the {limit} temperature "
+            f"{t_saturation:.2f} degC at {pressure_kpa:.2f} kPa"
+        )
+        if reason_code == PHASE_LIQUID_STAGE_INLET:
+            detail = (
+                "so the previous stage leaves liquid and this stage would start from "
+                "liquid. Multi-stage MVR of a condensing stream is not modelled; use "
+                "n_stages=1."
+            )
+        else:
+            detail = (
+                "so the stream would condense although its source target is vapour. "
+                "Raise t_target above that temperature or use a smaller stage lift."
+            )
+        self.args = (f"{context}, {detail}",)
+
+    def __reduce__(self):
+        return (
+            _restore_direct_mvr_phase_error,
+            (
+                dict(
+                    reason_code=self.reason_code,
+                    source_stream=self.source_stream,
+                    period_index=self.period_index,
+                    stage_index=self.stage_index,
+                    fluid=self.fluid,
+                    t_target=self.t_target,
+                    t_saturation=self.t_saturation,
+                    pressure_kpa=self.pressure_kpa,
+                    above_critical_pressure=self.above_critical_pressure,
+                ),
+            ),
+        )
+
+
 def _restore_direct_mvr_error(context):
     return DirectGasMVRStageError(**context)
+
+
+def _restore_direct_mvr_phase_error(context):
+    return DirectGasMVRPhaseError(**context)
 
 
 def _bounded_context(value: str, limit: int = 80) -> str:

@@ -1,7 +1,15 @@
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
-from OpenPinch.analysis.heat_pumps.common._shared.air import cascade_with_air
+from OpenPinch.analysis.heat_pumps.common._shared.air import (
+    cascade_with_air,
+    utility_bands,
+)
+from OpenPinch.analysis.heat_pumps.common.shared import _cascade_air_duties
+
+from .helpers import _sc, _stream
 
 
 def test_air_takes_surplus_rejected_above_its_sink_temperature():
@@ -112,3 +120,104 @@ def test_cooling_water_takes_heat_below_warmer_air():
     assert out.Q_air_sink == pytest.approx(20.0)
     assert out.Q_cooling_water == pytest.approx(20.0)
     assert out.Q_ext_bottom == pytest.approx(60.0)
+
+
+def test_air_takes_a_utility_band_that_sits_on_its_sink_temperature():
+    # A utility level is a 0.1 K band, so one at the air limit ends just below it.
+    T = np.array([20.0, 19.9])
+    H = np.array([0.0, 2000.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=0.0, T_air_sink=20.0, utility_bands=[(20.0, 19.9)]
+    )
+
+    assert out.Q_air_sink == pytest.approx(2000.0)
+    assert out.Q_ext_bottom == pytest.approx(0.0)
+
+
+def test_air_does_not_take_a_band_further_below_its_sink_temperature():
+    T = np.array([19.5, 19.4])
+    H = np.array([0.0, 2000.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=0.0, T_air_sink=20.0, utility_bands=[(19.5, 19.4)]
+    )
+
+    assert out.Q_air_sink == pytest.approx(0.0)
+    assert out.Q_ext_bottom == pytest.approx(2000.0)
+
+
+def test_air_does_not_take_ordinary_heat_just_below_its_sink_temperature():
+    # Without a utility band this heat is really below the limit.
+    T = np.array([20.0, 19.95])
+    H = np.array([0.0, 2000.0])
+
+    out = cascade_with_air(T, H, T_air_source=0.0, T_air_sink=20.0)
+
+    assert out.Q_air_sink == pytest.approx(0.0)
+    assert out.Q_ext_bottom == pytest.approx(2000.0)
+
+
+def test_cooling_water_takes_a_utility_band_that_sits_on_its_temperature():
+    T = np.array([25.0, 24.9])
+    H = np.array([0.0, 500.0])
+    bands = [(25.0, 24.9)]
+
+    out = cascade_with_air(
+        T,
+        H,
+        T_air_source=0.0,
+        T_air_sink=10.0,
+        T_cooling_water=25.0,
+        utility_bands=bands,
+    )
+
+    assert out.Q_air_sink == pytest.approx(500.0)
+
+    out = cascade_with_air(
+        T,
+        H,
+        T_air_source=0.0,
+        T_air_sink=30.0,
+        T_cooling_water=25.0,
+        utility_bands=bands,
+    )
+
+    assert out.Q_air_sink == pytest.approx(0.0)
+    assert out.Q_cooling_water == pytest.approx(500.0)
+
+
+def test_air_supplies_a_utility_band_that_sits_on_its_source_temperature():
+    # The same band at the air source: it needs heat just above the limit.
+    T = np.array([10.1, 10.0])
+    H = np.array([300.0, 0.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=10.0, T_air_sink=200.0, utility_bands=[(10.1, 10.0)]
+    )
+
+    assert out.Q_air_source == pytest.approx(300.0)
+    assert out.Q_ext_top == pytest.approx(0.0)
+
+
+def test_only_narrow_steps_of_a_utility_background_count_as_bands():
+    T = np.array([60.0, 59.9, 25.0, 20.0, 19.9])
+
+    assert utility_bands(T) == [(60.0, 59.9), (20.0, 19.9)]
+
+
+@pytest.mark.parametrize("is_utility, expected_air", [(True, 2000.0), (False, 0.0)])
+def test_air_duties_treat_only_a_utility_background_as_bands(is_utility, expected_air):
+    args = SimpleNamespace(period_idx=0, background_is_utility=is_utility)
+    hot = _sc(_stream("Bg", 20.0, 19.9, 2000.0, is_process_stream=False))
+
+    out = _cascade_air_duties(
+        hot,
+        _sc(),
+        args,
+        T_air_source=0.0,
+        T_air_sink=20.0,
+        T_background=np.array([20.0, 19.9]),
+    )
+
+    assert out.Q_air_sink == pytest.approx(expected_air)

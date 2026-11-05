@@ -37,6 +37,7 @@ _PROBLEM_STATE_FIELDS = (
     "_period_states",
     "_period_result_states",
     "_utility_placement_result",
+    "_retained_hpr_targets",
 )
 
 
@@ -70,11 +71,36 @@ def rebuild_problem_state(
     preprocessing: Callable[[], "Zone"],
 ) -> "Zone":
     """Revalidate, reconstruct domain state, and clear dependent caches."""
-    problem._validated_data = problem.validate()
-    problem._master_zone = preprocessing()
+    # Cleared first so validation reads the source's records, not the old case's.
     problem._process_components = {}
+    problem._validated_data = problem.validate()
+    records = _detach_process_components(problem)
+    problem._master_zone = preprocessing()
     problem._invalidate_analysis()
+    if records:
+        from ....analysis.heat_pumps.process_mvr import restore_process_components
+
+        restore_process_components(problem, records)
     return problem._master_zone
+
+
+def _detach_process_components(problem: "PinchProblem") -> list:
+    """Move saved components out of the inputs; the live components now own them."""
+    records = problem._validated_data.process_components
+    if not records:
+        return []
+    problem._validated_data.process_components = []
+    if isinstance(problem._problem_data, TargetInput):
+        problem._problem_data = problem._problem_data.model_copy(
+            update={"process_components": []}
+        )
+    else:
+        problem._problem_data = {
+            key: value
+            for key, value in problem._problem_data.items()
+            if key != "process_components"
+        }
+    return records
 
 
 def replace_loaded_source(
@@ -101,15 +127,27 @@ def replace_problem_inputs(
     problem: "PinchProblem",
     problem_inputs: JsonDict,
 ) -> "Zone":
-    """Replace canonical inputs while preserving external source identity."""
+    """Replace canonical inputs, keeping source identity and process components."""
+    # The live components are replayed below, so their handles stay valid.
     loaded_source = prepare_in_memory_problem_source(
-        problem_inputs,
+        {k: v for k, v in problem_inputs.items() if k != "process_components"},
         source_kind=problem._input_source_kind or "target_input",
     )
+    components = problem._process_components
+
+    def rebuild_with_components() -> "Zone":
+        root = problem._rebuild_problem_state()
+        if components:
+            from ....analysis.heat_pumps.process_mvr import replay_process_components
+
+            replay_process_components(components, root)
+            problem._process_components = components
+        return root
+
     return replace_loaded_source(
         problem,
         loaded_source,
-        rebuild=problem._rebuild_problem_state,
+        rebuild=rebuild_with_components,
         preserve_filepath=True,
     )
 

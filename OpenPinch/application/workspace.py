@@ -20,7 +20,6 @@ from ..contracts.workspace import (
     WorkspaceCaseBundleEntry,
     validate_workspace_case_name,
 )
-from ._problem.input.validation import build_validation_report
 from ._problem.targeting.catalog import install_catalog_forwarders
 from ._workspace import state as _workspace_state
 from ._workspace.case_inputs import (
@@ -228,9 +227,9 @@ class PinchWorkspace:
         baseline_name: str = "baseline",
     ) -> None:
         self.baseline_name = validate_workspace_case_name(baseline_name)
-        self.project_name = project_name
         self._case_inputs: dict[str, JsonDict] = {}
         self._case_cache: dict[str, PinchProblem] = {}
+        self.project_name = project_name
         self._active_case_name: Optional[str] = None
 
         if source is not None:
@@ -304,7 +303,7 @@ class PinchWorkspace:
         if activate or self._active_case_name is None:
             self._active_case_name = name
 
-        if build_validation_report(case_input).valid:
+        if PinchProblem.source_validation_report(case_input).valid:
             return self.case(name)
         return None
 
@@ -339,7 +338,7 @@ class PinchWorkspace:
 
     def validation_report(self, case_name: Optional[str] = None):
         """Return a structured validation report for one case input."""
-        return build_validation_report(
+        return PinchProblem.source_validation_report(
             self._get_case_input(self._resolve_case_name(case_name))
         )
 
@@ -647,6 +646,19 @@ class PinchWorkspace:
     def save_bundle(self, path: PathLike) -> Any:
         """Persist the current workspace, syncing any live case edits first."""
         return save_workspace_bundle(path, self.to_bundle())
+
+    @property
+    def project_name(self) -> Optional[str]:
+        """Return the project label applied to this workspace's cases."""
+        return self._project_name
+
+    @project_name.setter
+    def project_name(self, value: Optional[str]) -> None:
+        """Set the label and rename the live cases, dropping their cached results."""
+        self._project_name = value
+        if value:
+            for problem in self._case_cache.values():
+                problem.project_name = value
 
     def to_bundle(self) -> PinchWorkspaceBundle:
         """Return the current workspace as a bundle, syncing live case edits."""

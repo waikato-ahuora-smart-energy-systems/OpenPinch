@@ -3,17 +3,31 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
+import os
 import sys
+import threading
+import time
 import types
+from concurrent.futures import (
+    CancelledError,
+    Future,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+)
 from concurrent.futures.process import BrokenProcessPool
+from functools import partial
 
 import numpy as np
 import pytest
+from scipy.optimize import dual_annealing
 
 import OpenPinch.optimisation.candidates as candidates
 import OpenPinch.optimisation.execution as execution
 from OpenPinch.optimisation.models import OptimisationOptions, OptimisationProblem
 from OpenPinch.optimisation.service import run_multistart_minimisation
+
+pytestmark = pytest.mark.process_pools
 
 _CALLS: list[int] = []
 
@@ -289,17 +303,7 @@ def test_guarded_main_module_uses_worker_processes(
         tmp_path,
         'import OpenPinch\n\nif __name__ == "__main__":\n    run_placement()\n',
     )
-    started = []
-
-    class _RecordingPool(_InProcessPool):
-        def __init__(self, max_workers):
-            started.append(max_workers)
-
-    execution._collect_candidates_in_parallel(
-        _record_run, n_runs=2, pool_executor_cls=_RecordingPool
-    )
-
-    assert started == [2]
+    assert execution._pool_worker_count(2, 2) == 2
 
 
 def test_search_pool_is_capped_at_the_cpu_count(native_platform, monkeypatch):
@@ -316,3 +320,433 @@ def test_search_pool_is_capped_at_the_cpu_count(native_platform, monkeypatch):
 
     assert started == [2]
     assert fs.tolist() == [0.0, 1.0, 2.0, 3.0, 4.0]
+
+
+needs_threads = pytest.mark.skipif(
+    sys.platform == "emscripten", reason="Pyodide cannot start threads"
+)
+
+
+@pytest.fixture
+def importing_workers(native_platform, monkeypatch):
+    """Use a start method whose workers import OpenPinch before any task."""
+    monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "spawn")
+    monkeypatch.setattr(execution, "_main_module_reruns_in_workers", lambda: False)
+
+
+@needs_threads
+def test_quick_batch_never_starts_a_pool_that_must_import_openpinch(importing_workers):
+    xs, fs = execution._collect_candidates_in_parallel(
+        _record_run, n_runs=3, pool_executor_cls=_ForbiddenPool
+    )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0]
+    assert _CALLS == [0, 1, 2]
+
+
+_POOL_RAN_A_TASK = threading.Event()
+
+
+def _wait_for_the_pool(run):
+    """Parent's task: finish only once another task has run in the pool."""
+    if run == 0:
+        assert _POOL_RAN_A_TASK.wait(timeout=30)
+    else:
+        _POOL_RAN_A_TASK.set()
+    return [np.asarray([float(run)])], [float(run)]
+
+
+class _ThreadWorkers(ThreadPoolExecutor):
+    """Pool double with real concurrency and instantly ready workers."""
+
+
+@needs_threads
+def test_slow_batch_shares_its_remaining_tasks_with_a_pool(
+    importing_workers, monkeypatch
+):
+    _POOL_RAN_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _wait_for_the_pool, n_runs=3, pool_executor_cls=_ThreadWorkers
+    )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0]
+
+
+_POOL_CLAIMED_A_TASK = threading.Event()
+
+
+def _wait_for_a_claimed_task(run):
+    """Parent's task: finish only once the pool has claimed another task."""
+    if run == 0:
+        assert _POOL_CLAIMED_A_TASK.wait(timeout=30)
+    return [np.asarray([float(run)])], [float(run)]
+
+
+class _CancellingWorkers(ThreadPoolExecutor):
+    """Pool double that cancels claimed tasks, as a shutdown does before they start."""
+
+    def submit(self, fn, *args, **kwargs):
+        if fn is execution._worker_ready:
+            return super().submit(fn, *args, **kwargs)
+        future = Future()
+        future.cancel()
+        _POOL_CLAIMED_A_TASK.set()
+        return future
+
+
+@needs_threads
+def test_task_cancelled_in_the_pool_reruns_in_this_process(
+    importing_workers, monkeypatch
+):
+    _POOL_CLAIMED_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _wait_for_a_claimed_task, n_runs=3, pool_executor_cls=_CancellingWorkers
+    )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0]
+
+
+class _ObjectiveCancelledWorkers(ThreadPoolExecutor):
+    """Pool double whose tasks run but raise ``CancelledError`` themselves."""
+
+    def submit(self, fn, *args, **kwargs):
+        if fn is execution._worker_ready:
+            return super().submit(fn, *args, **kwargs)
+        future = Future()
+        future.set_exception(CancelledError("raised by the objective"))
+        _POOL_CLAIMED_A_TASK.set()
+        return future
+
+
+@needs_threads
+def test_cancelled_error_raised_by_an_objective_propagates(
+    importing_workers, monkeypatch
+):
+    _POOL_CLAIMED_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    with pytest.raises(CancelledError, match="raised by the objective"):
+        execution._collect_candidates_in_parallel(
+            _wait_for_a_claimed_task,
+            n_runs=3,
+            pool_executor_cls=_ObjectiveCancelledWorkers,
+        )
+
+
+class _StillImportingWorkers(ThreadPoolExecutor):
+    """Pool double whose workers never finish importing OpenPinch."""
+
+    instances: list = []
+
+    def __init__(self, max_workers):
+        super().__init__(max_workers=max_workers)
+        self.submitted = []
+        self.instances.append(self)
+
+    def submit(self, fn, *args, **kwargs):
+        self.submitted.append(fn)
+        if fn is execution._worker_ready:
+            return Future()
+        return super().submit(fn, *args, **kwargs)
+
+
+def _run_while_the_pool_starts(run):
+    # The parent gets past its first task only once the pool has been started,
+    # so the remaining tasks are still unclaimed when it starts.
+    if run == 0:
+        deadline = time.monotonic() + 30
+        while not _StillImportingWorkers.instances:
+            assert time.monotonic() < deadline
+            time.sleep(0.001)
+    return _record_run(run)
+
+
+@needs_threads
+def test_parent_keeps_tasks_from_workers_that_are_still_importing(
+    importing_workers, monkeypatch
+):
+    _StillImportingWorkers.instances = []
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _run_while_the_pool_starts,
+        n_runs=3,
+        pool_executor_cls=_StillImportingWorkers,
+    )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0]
+    assert _CALLS == [0, 1, 2]
+    assert (
+        _StillImportingWorkers.instances[0].submitted == [execution._worker_ready] * 2
+    )
+
+
+class _BrokenWorkers(ThreadPoolExecutor):
+    """Pool double whose workers die while running their first tasks."""
+
+    def submit(self, fn, *args, **kwargs):
+        future = Future()
+        if fn is execution._worker_ready:
+            future.set_result(None)
+        else:
+            future.set_exception(BrokenProcessPool("worker died"))
+        return future
+
+
+def _pause_for_the_pool(run):
+    if run == 0:
+        time.sleep(0.05)
+    return _record_run(run)
+
+
+@needs_threads
+def test_tasks_of_a_broken_late_pool_rerun_in_the_parent(
+    importing_workers, monkeypatch, caplog
+):
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        xs, fs = execution._collect_candidates_in_parallel(
+            _pause_for_the_pool, n_runs=4, pool_executor_cls=_BrokenWorkers
+        )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0, 3.0]
+    assert sorted(_CALLS) == [0, 1, 2, 3]
+    assert "running tasks serially" in caplog.text
+
+
+class _NoSemaphores:
+    def __init__(self, max_workers):
+        raise PermissionError("no semaphores")
+
+
+@needs_threads
+def test_late_pool_that_cannot_start_leaves_tasks_to_the_parent(
+    importing_workers, monkeypatch, caplog
+):
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        xs, fs = execution._collect_candidates_in_parallel(
+            _pause_for_the_pool, n_runs=3, pool_executor_cls=_NoSemaphores
+        )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0]
+    assert _CALLS == [0, 1, 2]
+    assert "running tasks serially" in caplog.text
+
+
+class _CountingObjective:
+    """Objective with state its tasks change, which is not task scoped."""
+
+    def __init__(self):
+        self.count = 0
+
+    def __call__(self, x):
+        return float(self.count)
+
+
+def _change_state_then_report_it(run, *, func):
+    if run == 0:
+        func.count = 99
+        assert _POOL_RAN_A_TASK.wait(timeout=30)
+        return [np.asarray([0.0])], [0.0]
+    seen = float(func.count)
+    _POOL_RAN_A_TASK.set()
+    return [np.asarray([seen])], [seen]
+
+
+@needs_threads
+def test_workers_see_the_objective_as_it_was_when_the_batch_began(
+    importing_workers, monkeypatch
+):
+    _POOL_RAN_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _change_state_then_report_it,
+        n_runs=2,
+        pool_executor_cls=_ThreadWorkers,
+        func=_CountingObjective(),
+    )
+
+    assert fs.tolist() == [0.0, 0.0]
+
+
+def _record_item(item):
+    _CALLS.append(item[0])
+    return item[0]
+
+
+@needs_threads
+def test_later_unpicklable_item_runs_the_batch_serially(importing_workers):
+    items = [(0, "picklable"), (1, lambda: None)]
+
+    results = execution._map_in_process_pool(
+        _record_item, items, max_workers=2, pool_executor_cls=_ForbiddenPool
+    )
+
+    assert results == [0, 1]
+
+
+def _search_once_a_worker_has_run(run, *, parent_pid, flag):
+    """One seeded search; the parent's task waits so a worker must take a task."""
+    if os.getpid() == parent_pid:
+        deadline = time.monotonic() + 120
+        while not flag.exists():
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+    else:
+        flag.touch()
+    found = dual_annealing(
+        _quadratic, bounds=[(0.0, 1.0)] * 2, seed=run, maxiter=5, no_local_search=True
+    )
+    return found.x.tolist(), float(found.fun), os.getpid()
+
+
+@pytest.mark.skipif(sys.platform == "emscripten", reason="Pyodide has no processes")
+@pytest.mark.parametrize(
+    "method",
+    [
+        method
+        for method in ("spawn", "forkserver")
+        if method in multiprocessing.get_all_start_methods()
+    ],
+)
+def test_real_late_pool_results_match_serial_results(method, monkeypatch, tmp_path):
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+    flag = tmp_path / "worker-ran"
+    task = partial(_search_once_a_worker_has_run, parent_pid=os.getpid(), flag=flag)
+
+    pooled = execution._map_with_late_pool(
+        task,
+        list(range(4)),
+        workers=3,
+        pool_executor_cls=partial(
+            ProcessPoolExecutor, mp_context=multiprocessing.get_context(method)
+        ),
+        broken_pool_exc=BrokenProcessPool,
+    )
+    serial = [task(run) for run in range(4)]
+
+    assert {pid for *_, pid in pooled} - {os.getpid()}
+    for (pooled_x, pooled_f, _), (serial_x, serial_f, _) in zip(pooled, serial):
+        np.testing.assert_array_equal(pooled_x, serial_x)
+        np.testing.assert_array_equal(pooled_f, serial_f)
+
+
+def _raise_in_worker(run):
+    if run == 0:
+        assert _POOL_RAN_A_TASK.wait(timeout=30)
+        return run
+    _POOL_RAN_A_TASK.set()
+    raise OSError("objective failed in a worker")
+
+
+@needs_threads
+def test_objective_error_in_a_worker_propagates_unchanged(
+    importing_workers, monkeypatch
+):
+    _POOL_RAN_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    with pytest.raises(OSError, match="objective failed in a worker"):
+        execution._map_in_process_pool(
+            _raise_in_worker,
+            [0, 1],
+            max_workers=2,
+            pool_executor_cls=_ThreadWorkers,
+        )
+
+
+@needs_threads
+def test_objective_error_in_the_parent_propagates_unchanged(importing_workers):
+    with pytest.raises(RuntimeError, match="objective failed"):
+        execution._collect_candidates_in_parallel(
+            _failing_run, n_runs=2, pool_executor_cls=_ForbiddenPool
+        )
+
+
+class _SlowToStartWorkers(ThreadPoolExecutor):
+    """Pool double whose first worker start blocks, as a new forkserver's does."""
+
+    instances: list = []
+
+    def __init__(self, max_workers):
+        super().__init__(max_workers=max_workers)
+        self.batch_returned = threading.Event()
+        self.returned_during_start = None
+        self.shut_down = threading.Event()
+        self.instances.append(self)
+
+    def submit(self, fn, *args, **kwargs):
+        self.returned_during_start = self.batch_returned.wait(timeout=5)
+        return Future()
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        self.shut_down.set()
+        super().shutdown(wait=wait, cancel_futures=cancel_futures)
+
+
+def _run_while_the_pool_blocks(run):
+    if run == 0:
+        deadline = time.monotonic() + 30
+        while not _SlowToStartWorkers.instances:
+            assert time.monotonic() < deadline
+            time.sleep(0.001)
+    return _record_run(run)
+
+
+@needs_threads
+def test_batch_returns_while_the_first_worker_is_still_starting(
+    importing_workers, monkeypatch
+):
+    _SlowToStartWorkers.instances = []
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _run_while_the_pool_blocks,
+        n_runs=2,
+        pool_executor_cls=_SlowToStartWorkers,
+    )
+    pool = _SlowToStartWorkers.instances[0]
+    pool.batch_returned.set()
+
+    assert fs.tolist() == [0.0, 1.0]
+    assert pool.shut_down.wait(timeout=30)
+    assert pool.returned_during_start is True
+
+
+def _die_in_a_worker(run, *, parent_pid, flag):
+    if os.getpid() != parent_pid:
+        flag.touch()
+        os._exit(1)
+    deadline = time.monotonic() + 120
+    while not flag.exists():
+        assert time.monotonic() < deadline
+        time.sleep(0.01)
+    return run * 2
+
+
+@pytest.mark.skipif(sys.platform == "emscripten", reason="Pyodide has no processes")
+def test_tasks_of_a_real_late_pool_whose_worker_dies_rerun_here(monkeypatch, tmp_path):
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+    task = partial(
+        _die_in_a_worker, parent_pid=os.getpid(), flag=tmp_path / "worker-died"
+    )
+
+    results = execution._map_with_late_pool(
+        task,
+        list(range(4)),
+        workers=3,
+        pool_executor_cls=partial(
+            ProcessPoolExecutor, mp_context=multiprocessing.get_context("spawn")
+        ),
+        broken_pool_exc=BrokenProcessPool,
+    )
+
+    assert results == [0, 2, 4, 6]

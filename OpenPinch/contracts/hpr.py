@@ -302,6 +302,8 @@ class HeatPumpTargetInputs(BaseModel):
     allow_integrated_expander: bool
     bckgrd_hot_streams: StreamCollection
     bckgrd_cold_streams: StreamCollection
+    # True when the background is the utility levels, not the process.
+    background_is_utility: bool = False
     # Refrigeration only: the cooling warmer than the targeted coldest
     # Q_hpr_target, and the default refrigeration it needs on its own.
     untargeted_cooling_streams: StreamCollection | None = None
@@ -310,6 +312,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_penalty: float
     rho_penalty: float
     period_idx: int = 0
+    max_pressure_ratio: float | None = None
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool
 
@@ -457,6 +460,9 @@ class HPRThermoArtifacts(BaseModel):
 
 
 ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
+INFEASIBLE_REFRIGERATION_REASON = (
+    "Refrigeration candidate carries a feasibility penalty, such as unserved cooling."
+)
 """Final-evaluation failure reason for a design equivalent to no heat pump.
 
 During the search a zero-duty design is valid: it carries no penalty and its

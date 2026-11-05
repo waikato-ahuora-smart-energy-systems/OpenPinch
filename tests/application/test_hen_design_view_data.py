@@ -207,3 +207,40 @@ def test_grid_layout_gives_each_match_the_area_of_its_exchangers(design):
     assert recovery
     for match in recovery:
         assert match.area == pytest.approx(areas[match.exchanger_id], rel=1e-12)
+
+
+def test_grid_layout_stream_ends_cover_every_exchanger_one_match_merges():
+    # Parallel parts of one match, listed so the first has neither stream's end.
+    network = HeatExchangerNetwork(
+        stage_count=1,
+        exchangers=(
+            _exchanger(
+                "E1a",
+                HeatExchangerKind.RECOVERY,
+                "H1",
+                "C1",
+                1,
+                60.0,
+                (650.0, 500.0, 360.0, 480.0),
+            ),
+            _exchanger(
+                "E1b",
+                HeatExchangerKind.RECOVERY,
+                "H1",
+                "C1",
+                1,
+                40.0,
+                (700.0, 450.0, 350.0, 520.0),
+            ),
+        ),
+    )
+
+    layout = build_grid_layout(network, period_id="0")
+
+    assert [
+        (row.stream, row.supply_temperature, row.target_temperature)
+        for row in layout.stream_temperatures
+    ] == [("H1", 700.0, 450.0), ("C1", 350.0, 520.0)]
+    match = layout.matches[0]
+    assert match.source_inlet_temperature == 650.0
+    assert match.duty == pytest.approx(100.0)

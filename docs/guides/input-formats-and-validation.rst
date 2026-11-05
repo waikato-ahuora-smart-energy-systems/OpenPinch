@@ -34,6 +34,17 @@ Wrapper-based validation:
    validation = problem.validation_report()
    input_data = problem.validate()
 
+The constructor raises ``ValueError`` on invalid input, so ``validation_report``
+on a problem only reports warnings. To check input that may be invalid, ask for
+the report without building a problem. It takes every source the constructor
+takes and does not raise for bad input:
+
+.. code-block:: python
+
+   report = PinchProblem.source_validation_report("basic_pinch.json")
+   for issue in report.issues:
+       print(issue.severity, issue.path, issue.message)
+
 Schema-first validation:
 
 .. code-block:: python
@@ -46,9 +57,13 @@ Schema-first validation:
 Expected Output
 ---------------
 
-Validation returns typed input data or a structured validation report before
-the runtime ``Zone`` hierarchy is prepared. Input data can be structurally
-valid and still produce warnings about unusual thermal assumptions.
+``validate`` returns typed input data and ``TargetInput.model_validate`` does so
+before any ``Zone`` hierarchy is prepared. ``source_validation_report`` returns a
+structured report whose ``valid`` is true only if the constructor accepts the
+source, so input that passes the checks is also prepared once and discarded.
+A source that cannot be read or prepared is one error issue with an empty path.
+Input data can be structurally valid and still produce warnings about unusual
+thermal assumptions.
 
 Supported Source Shapes
 -----------------------
@@ -57,7 +72,8 @@ Supported Source Shapes
 
 - packaged sample-case names such as ``basic_pinch.json``
 - JSON files
-- Excel workbooks such as ``.xlsx``, ``.xls``, ``.xlsb``, and ``.xlsm``
+- Excel workbooks (``.xlsx``, ``.xlsb`` and ``.xlsm``); a legacy ``.xls``
+  workbook is rejected, so save it as ``.xlsx`` first
 - CSV directories containing ``streams.csv`` and ``utilities.csv``
 - ``(streams_csv, utilities_csv)`` tuples
 - ``TargetInput`` instances
@@ -79,7 +95,7 @@ are ignored:
 - ``heat_flow`` (``ΔH``, ``Duty``), ``heat_capacity_flowrate`` (``CP``,
   streams only, used for the heat flow when it is not given), ``dt_cont``
   (``ΔTcont``), ``htc`` and
-  ``price``.
+  ``price`` (utilities only).
 
 A column with an unrecognised header is ignored with a warning, and two
 columns for the same field are an error. A header row with no recognised name
@@ -229,7 +245,9 @@ Choose the source shape by ownership:
 
 Configuration belongs in ``TargetInput.options`` and is materialized as a
 runtime ``Configuration`` object on prepared zones. Use
-``config_options()`` to discover supported option keys.
+``configuration_options()`` (``from OpenPinch.presentation.configuration import
+configuration_options``) to discover
+supported option keys.
 
 Consuming HPR Performance Maps
 ------------------------------

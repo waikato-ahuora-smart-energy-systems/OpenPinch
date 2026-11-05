@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import inspect
+import tomllib
 from pathlib import Path
 
 from OpenPinch import PinchProblem, PinchWorkspace
@@ -186,3 +187,80 @@ def test_rtd_coverage_summary_matches_manifest_denominator() -> None:
 
     assert f"**{count} operations**" in summary
     assert f"**{mapped}/{count} operations are mapped**" in summary
+
+
+def test_committed_manifest_matches_generator_output() -> None:
+    from scripts.generate_tutorial_coverage import render_manifest
+
+    assert MANIFEST.read_text(encoding="utf-8") == render_manifest()
+
+
+def test_observation_operations_are_not_explicit_execution() -> None:
+    modes = {row["operation"]: row["semantic_mode"] for row in _rows()}
+
+    observations = {
+        "PinchProblem.validate",
+        "PinchProblem.compare_to",
+        "PinchProblem.to_problem_json",
+        "PinchWorkspace.compare_cases",
+        "PinchWorkspace.list_cases",
+        "PinchWorkspace.to_bundle",
+        "batch.reports",
+        "batch.summary_frames",
+        "design_result.views",
+        "mvr.work_for_zone",
+    }
+    assert {modes[name] for name in observations} == {"cached observation"}
+    plots = {
+        row["semantic_mode"]
+        for row in _rows()
+        if row["owner"] == "Plot"
+        and row["operation"]
+        not in {"problem.plot.export", "problem.plot.export_gallery"}
+    }
+    assert plots == {"cached observation"}
+    assert modes["PinchWorkspace.save_bundle"] == "explicit side effect"
+    assert modes["problem.target.direct_heat_integration"] == "explicit execution"
+    assert modes["problem.design.heat_exchanger_network"] == "explicit execution"
+
+
+def test_optional_dependencies_name_real_extras() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    extras = set(pyproject["project"]["optional-dependencies"])
+    rows = _rows()
+
+    for row in rows:
+        value = row["optional_dependency"].split(" (")[0]
+        assert value in extras | {"none", "n/a"}, row["operation"]
+    by_operation = {row["operation"]: row["optional_dependency"] for row in rows}
+    assert by_operation["problem.plot.composite_curve"] == "notebook"
+    assert by_operation["problem.plot.export"] == "notebook"
+    assert by_operation["problem.plot.catalog"] == "none"
+    assert by_operation["problem.design.heat_exchanger_network"] == "synthesis"
+    assert by_operation["problem.target.vapour_compression_heat_pump"].startswith(
+        "tespy"
+    )
+    assert by_operation["problem.target.hpr_performance_map"].startswith("tespy")
+    assert by_operation["problem.components.add_process_mvr"] == "none"
+    assert by_operation["problem.target.carnot_heat_pump"] == "none"
+
+
+def test_execution_evidence_matches_ci_gating() -> None:
+    evidence = {row["execution_profile"]: set() for row in _rows()}
+    for row in _rows():
+        evidence[row["execution_profile"]].add(row["execution_evidence"])
+    text = "\n".join(row["execution_evidence"] for row in _rows())
+
+    assert "opt-in executable profile: interactive" not in text
+    assert "opt-in executable profile: slow-hpr" not in text
+    assert "opt-in slow-hpr" not in text
+    assert "routine pytest execution" in evidence["interactive"]
+    assert "main-bound solver CI execution" in evidence["solver"]
+
+
+def test_design_views_row_describes_every_period_without_an_average():
+    row = next(row for row in _rows() if row["operation"] == "design_result.views")
+
+    assert row["primary_tutorial"] == "17_multiperiod_hen_synthesis.ipynb"
+    assert row["period_scope"] == "all periods"
+    assert row["aggregation"] == "per-period"

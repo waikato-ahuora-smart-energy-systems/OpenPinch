@@ -175,6 +175,9 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     total_cost: Optional[float] = None
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
+    turbine_converged: Optional[bool] = None
+    turbine_diagnostics: list[str] = Field(default_factory=list)
+    turbine_result: Any = None
 
 
 class ResidualUtilityTarget(DirectIntegrationTarget):
@@ -204,6 +207,9 @@ class IndirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     pt: ProblemTable
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
+    turbine_converged: Optional[bool] = None
+    turbine_diagnostics: list[str] = Field(default_factory=list)
+    turbine_result: Any = None
 
 
 class EnergyTransferTarget(GraphBackedTarget, UtilitySummaryTarget):
@@ -246,6 +252,9 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     cold_pinch: Optional[float] = None
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
+    turbine_converged: Optional[bool] = None
+    turbine_diagnostics: list[str] = Field(default_factory=list)
+    turbine_result: Any = None
     hpr_cycle: str
     hpr_simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     hpr_utility_total: Any

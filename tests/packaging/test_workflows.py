@@ -2,9 +2,11 @@
 
 import json
 import re
+import tomllib
 
 import yaml
 
+from scripts import optional_install_smoke
 from tests.support.paths import REPOSITORY_ROOT
 
 WORKFLOW_DIR = REPOSITORY_ROOT / ".github" / "workflows"
@@ -51,6 +53,7 @@ def test_ci_triggers_and_single_required_check():
     assert gate["if"] == "${{ always() }}"
     assert set(gate["needs"]) == set(ci["jobs"]) - {"ci-ok"}
     assert '"solver"' in runs(gate) and '"version"' in runs(gate)
+    assert '"solver","compat"' in runs(gate).replace(", ", ",")
     (required,) = re.findall(r"^required='(.*)'$", runs(gate), re.MULTILINE)
     # audit stays informational; every other always-on lane blocks a merge.
     assert json.loads(required) == ["lint", "tests", "build", "smoke", "pyodide"]
@@ -60,6 +63,7 @@ def test_main_only_lanes():
     jobs = workflow("ci.yml")["jobs"]
     assert "refs/heads/main" in jobs["solver"]["if"]
     assert "github.base_ref == 'main'" in jobs["solver"]["if"]
+    assert jobs["compat"]["if"] == jobs["solver"]["if"]
     assert jobs["version"]["if"] == (
         "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
     )
@@ -68,31 +72,35 @@ def test_main_only_lanes():
 
 def test_every_ci_lane_is_present():
     jobs = workflow("ci.yml")["jobs"]
-    lanes = {row["lane"] for row in jobs["tests"]["strategy"]["matrix"]["include"]}
-    assert lanes == {
+    include = jobs["tests"]["strategy"]["matrix"]["include"]
+    # One Python on every change; the rest of the matrix is for release.
+    assert {row["lane"] for row in include} == {
         "unit",
-        "unit-py312",
-        "unit-py313",
-        "floors",
         "docs",
         "tespy",
         "notebooks-hpr",
+    }
+    markers = {row["lane"]: row["markers"] for row in include}
+    compat = jobs["compat"]["strategy"]["matrix"]["include"]
+    assert {row["lane"] for row in compat} == {
+        "unit-py312",
+        "unit-py313",
+        "floors",
         "performance",
     }
-    markers = {
-        row["lane"]: row["markers"]
-        for row in jobs["tests"]["strategy"]["matrix"]["include"]
-    }
+    compat_markers = {row["lane"]: row["markers"] for row in compat}
     # Every supported Python minor version runs the unit selection.
-    pythons = {
-        row["lane"]: row.get("python")
-        for row in jobs["tests"]["strategy"]["matrix"]["include"]
-    }
+    pythons = {row["lane"]: row.get("python") for row in compat}
     assert pythons["unit-py312"] == "3.12"
     assert pythons["unit-py313"] == "3.13"
-    assert markers["unit-py312"] == markers["unit-py313"] == markers["unit"]
+    assert compat_markers["unit-py312"] == markers["unit"]
+    assert compat_markers["unit-py313"] == markers["unit"]
     # The floors lane runs the unit selection at the lowest allowed versions.
-    assert markers["floors"] == markers["unit"]
+    assert compat_markers["floors"] == markers["unit"]
+    # The release lanes keep the worker processes the other lanes skip.
+    assert jobs["compat"]["env"]["OPENPINCH_TEST_REAL_POOLS"] == "1"
+    # The unit lane shares the runner's cores between test workers.
+    assert "-n auto" in runs(jobs["tests"])
     # HPR tutorial notebooks run once, in their own long-timeout lane.
     assert markers["tespy"] == "tespy and not tutorial_profile"
     assert markers["notebooks-hpr"] == "tespy and tutorial_profile"
@@ -104,15 +112,56 @@ def test_every_ci_lane_is_present():
         "brayton_cycle",
         "tespy",
         "synthesis",
+        "full",
     }
     assert {row["os"] for row in smoke["include"]} == {"windows-latest", "macos-latest"}
     assert "SOURCE_DATE_EPOCH" in runs(jobs["build"])
+
+
+def test_every_extra_has_a_smoke_surface_the_script_accepts():
+    jobs = workflow("ci.yml")["jobs"]
+    surfaces = set(jobs["smoke"]["strategy"]["matrix"]["surface"])
+    pyproject = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())
+    assert surfaces == {"core", *pyproject["project"]["optional-dependencies"]}
+    parser = optional_install_smoke.build_parser()
+    for surface in surfaces:
+        assert parser.parse_args([surface]).surface == surface
+    # full contains the tespy extra, so its wheel runs the tespy artifact path.
+    assert (
+        "full) uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy"
+        in runs(jobs["smoke"])
+    )
+
+
+def test_full_smoke_runs_every_other_optional_surface(monkeypatch):
+    checked = []
+    surfaces = ("dashboard", "notebook", "brayton_cycle", "tespy", "synthesis")
+    for surface in surfaces:
+        monkeypatch.setattr(
+            optional_install_smoke,
+            f"_check_{surface}_surface",
+            lambda surface=surface: checked.append(surface),
+        )
+    assert optional_install_smoke.main(["full"]) == 0
+    assert sorted(checked) == sorted(surfaces)
 
 
 def test_pyodide_shards_cover_the_presentation_tests():
     matrix = workflow("ci.yml")["jobs"]["pyodide"]["strategy"]["matrix"]
     shards = {row["shard"]: row["paths"].split() for row in matrix["include"]}
     assert "tests/presentation" in shards["core"]
+
+
+def test_pyodide_heat_pump_shards_cover_the_directory_between_them():
+    matrix = workflow("ci.yml")["jobs"]["pyodide"]["strategy"]["matrix"]
+    shards = {row["shard"]: row["paths"].split() for row in matrix["include"]}
+    targets = shards["heat-pump-targets"]
+    assert targets
+    assert all((REPOSITORY_ROOT / path).is_file() for path in targets)
+    assert shards["heat-pumps"] == [
+        "tests/analysis/heat_pumps",
+        *(f"--ignore={path}" for path in targets),
+    ]
 
 
 def test_pyodide_job_runs_the_runner_test_once_its_node_packages_are_installed():
@@ -183,6 +232,13 @@ def test_version_bump_runs_once_per_release_cycle():
     assert ".bumpversion.toml" in script
     assert "check_lockfile_version.py" in script
     assert "git push origin HEAD:develop" in script
+
+
+def test_version_bump_hint_uses_a_tool_a_synced_checkout_can_run():
+    # bump-my-version is in no dependency group, so `uv run` cannot find it.
+    script = runs(workflow("ci.yml")["jobs"]["version"])
+    assert "uvx bump-my-version bump patch" in script
+    assert "uv run bump-my-version" not in script
 
 
 def test_dependabot_watches_actions_and_the_uv_lock():
