@@ -210,6 +210,9 @@ def _map_with_late_pool(
             try:
                 results[index] = future.result()
             except CancelledError:
+                # An objective's own CancelledError is not a cancelled future.
+                if not future.cancelled():
+                    raise
                 # run_pool shut the pool down before this task started.
                 continue
             except broken_pool_exc as exc:

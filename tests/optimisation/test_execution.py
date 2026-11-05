@@ -9,7 +9,12 @@ import sys
 import threading
 import time
 import types
-from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import (
+    CancelledError,
+    Future,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+)
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 
@@ -403,6 +408,33 @@ def test_task_cancelled_in_the_pool_reruns_in_this_process(
     )
 
     assert fs.tolist() == [0.0, 1.0, 2.0]
+
+
+class _ObjectiveCancelledWorkers(ThreadPoolExecutor):
+    """Pool double whose tasks run but raise ``CancelledError`` themselves."""
+
+    def submit(self, fn, *args, **kwargs):
+        if fn is execution._worker_ready:
+            return super().submit(fn, *args, **kwargs)
+        future = Future()
+        future.set_exception(CancelledError("raised by the objective"))
+        _POOL_CLAIMED_A_TASK.set()
+        return future
+
+
+@needs_threads
+def test_cancelled_error_raised_by_an_objective_propagates(
+    importing_workers, monkeypatch
+):
+    _POOL_CLAIMED_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    with pytest.raises(CancelledError, match="raised by the objective"):
+        execution._collect_candidates_in_parallel(
+            _wait_for_a_claimed_task,
+            n_runs=3,
+            pool_executor_cls=_ObjectiveCancelledWorkers,
+        )
 
 
 class _StillImportingWorkers(ThreadPoolExecutor):
