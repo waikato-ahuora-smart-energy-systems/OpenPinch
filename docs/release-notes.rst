@@ -15,6 +15,14 @@ Heat exchanger network synthesis
   from 64.123456789 to 90 degC that sets the pinch, the pinch design used to raise
   ``WorkflowContractError`` and now returns a network. Streams that reach more
   than 1e-6 K past the pinch are split as before.
+- Network evolution in ``design.heat_exchanger_network()`` no longer returns the
+  unevolved network when its starting solve did not converge (#299). IPOPT
+  stopping at its iteration limit was reported as a success, and the starting
+  model's total annual cost, which can be far below that of any real network,
+  was the benchmark every candidate had to beat. Evolution now adopts its best
+  verified candidate in that case, and the final ranking compares it with the
+  seed network on verified costs. Such solves are logged as ``[Unconverged]``
+  warnings instead of ``[Success]``.
 
 0.8.1 (2026-11-06)
 ------------------

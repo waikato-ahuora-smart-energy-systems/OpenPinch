@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import nullcontext
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -34,6 +35,10 @@ from OpenPinch.analysis.heat_exchanger_networks.models._base.parameters import (
     _normalise_state_arrays,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 
 
 class _Harness(base.BaseHeatExchangerNetworkModel):
@@ -621,6 +626,69 @@ def test_cleanup_gekko_model_is_idempotent_and_allows_a_resolve(tmp_path):
     cleaned = []
     backend.cleanup_gekko_model(SimpleNamespace(cleanup=lambda: cleaned.append(1)))
     assert cleaned == [1]
+
+
+def _ipopt_available() -> bool:
+    try:
+        backend.require_solver_backend("ipopt-pyomo")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif(
+    "not _ipopt_available()",
+    reason="needs the ipopt binary and the gekko and pyomo packages",
+)
+@pytest.mark.parametrize(
+    ("solver_options", "termination_condition", "converged"),
+    [({}, "optimal", True), ({"max_iter": 1}, "maxIterations", False)],
+)
+def test_pyomo_solve_records_whether_the_solver_converged(
+    solver_options, termination_condition: str, converged: bool
+):
+    model = backend.create_gekko_model()
+    try:
+        x = model.Var(value=5.0)
+        y = model.Var(value=-3.0)
+        model.Equation(x**2 + y**2 >= 2)
+        model.Minimize((x - 1) ** 4 + (y - 2) ** 4 + x * y)
+        backend.configure_gekko_solver(
+            model, "ipopt-pyomo", solver_options=solver_options
+        )
+        run = backend.solve_gekko_model(model, solver_name="ipopt-pyomo")
+    finally:
+        backend.cleanup_gekko_model(model)
+
+    # GEKKO reports both solves as successful.
+    assert run.status == 1
+    assert run.failure_reason is None
+    assert run.termination_condition == termination_condition
+    assert run.converged is converged
+
+
+def test_optimise_warns_when_the_solver_stopped_before_converging(monkeypatch, caplog):
+    model = _model()
+    model.m = _FakeModel(solve_status=1, objective=1.0)
+    model.get_post_process = lambda: None
+    monkeypatch.setattr(
+        base_execution.backend,
+        "solve_gekko_model",
+        lambda *args, **kwargs: replace(
+            _solver_run(), termination_condition="maxIterations"
+        ),
+    )
+
+    with caplog.at_level("INFO", logger=base_execution.logger.name):
+        model.optimise(print_output=False)
+
+    # The solution is kept, but not reported as a converged success.
+    assert model.mSuccess == 1
+    assert "[Success]" not in caplog.text
+    assert "maxIterations" in caplog.text
 
 
 def test_output_to_cmd_line_logs_successful_solve(caplog):

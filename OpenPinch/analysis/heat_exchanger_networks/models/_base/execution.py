@@ -96,6 +96,16 @@ def _solve_and_post_process(model, print_output: bool) -> None:
                 model.name,
                 model.m._path,
             )
+        elif not model.solver_run.converged:
+            # The values are kept (evolution can start from them), but the
+            # objective is not a converged optimum to compare against.
+            model.mSuccess = model.m.options.SOLVESTATUS
+            logger.warning(
+                "[Unconverged] [model: %s] [path: %s] [termination: %s]",
+                model.name,
+                model.m._path,
+                model.solver_run.termination_condition,
+            )
         else:
             model.mSuccess = model.m.options.SOLVESTATUS
             logger.info(

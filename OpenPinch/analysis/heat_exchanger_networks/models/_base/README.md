@@ -31,6 +31,7 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 ## Side Effects
 - Creates a local (non-remote) GEKKO model and configures its solver. [execution.py:setup_model]
 - `optimise` always removes the GEKKO run directory afterwards; `cleanup_model` is safe to repeat. [execution.py:optimise] [execution.py:cleanup_model]
+- A solve that stopped before converging (`solver_run.converged` false) keeps `mSuccess` and its values, but is logged as a warning (`[Unconverged]`) rather than `[Success]`. [execution.py:_solve_and_post_process]
 - `get_alpha_values` builds and solves a second GEKKO model and cleans it up. [alpha.py:get_alpha_values]
 - Writes solver results, logs and many attributes onto the model passed in (`mSuccess`, `solver_run`, `area_*`, `LMTD_*`, `z_allowed`). [execution.py:_solve_and_post_process] [area.py:set_utility_lmtd_and_areas]
 - Lazy imports of `OpenPinch.analysis.heat_exchanger_networks.solver.piecewise` inside segmented-stream branches. [area.py:_apply_segment_recovery_areas] [piecewise.py:_utility_cost_expression]
