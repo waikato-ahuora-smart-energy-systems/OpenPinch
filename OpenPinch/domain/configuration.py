@@ -192,6 +192,7 @@ class HensConfig:
     approach_temperatures: list[float]
     dt_cont_multipliers: list[float] | None
     derivative_thresholds: list[float]
+    min_exchanger_approach_share: float
     synthesis_quality_tier: int
     pdm_stage_pair_limit: int | None
     tdm_parent_limit: int | None

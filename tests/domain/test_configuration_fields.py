@@ -310,3 +310,21 @@ def test_generic_annotation_coercion_fallbacks_cover_custom_metadata_specs():
 
     with pytest.raises(ValueError, match="must be provided as a dict"):
         meta._coerce_annotation_value("CUSTOM_DICT", [], dict_spec)
+
+
+def test_min_exchanger_approach_share_is_a_share_below_one():
+    spec = meta.CONFIG_FIELD_SPECS["HENS_MIN_EXCHANGER_APPROACH_SHARE"]
+    assert spec.default == 0.0
+    assert (
+        meta.validate_configuration_option_value(
+            "HENS_MIN_EXCHANGER_APPROACH_SHARE", 0.5
+        )
+        == 0.5
+    )
+    # At 1.0 evolution cannot start from a pinch design network whose
+    # exchangers sit at the requested approach.
+    for value in (1.0, -0.1, True):
+        with pytest.raises(ValueError, match="HENS_MIN_EXCHANGER_APPROACH_SHARE"):
+            meta.validate_configuration_option_value(
+                "HENS_MIN_EXCHANGER_APPROACH_SHARE", value
+            )

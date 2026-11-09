@@ -340,6 +340,12 @@ class _DesignAccessor:
         """Run the default HEN synthesis workflow.
 
         It runs quality tier 0 unless ``HENS_SYNTHESIS_QUALITY_TIER`` is set.
+
+        ``approach_temperatures`` sets the pinch design step's approach. The
+        later thermal derivative and evolution steps choose each exchanger's
+        approach by total annual cost, down to 0.1 K, or down to
+        ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times the
+        requested approach if that is larger.
         """
         from ....analysis.heat_exchanger_networks.service import (
             _heat_exchanger_network_enhanced_synthesis_method_service,
