@@ -170,6 +170,21 @@ def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
     assert args.refrigerant_ls == ["WATER", "R134A"]
     assert args.mvr_fluid_ls == ["Water", "R245FA"]
     assert args.eta_ii_he_carnot == pytest.approx(0.42)
+    assert args.ambient_air_enabled is True
+
+
+def test_construct_hpr_target_inputs_carries_the_ambient_air_option():
+    config = Configuration(options={"HPR_AMBIENT_AIR_ENABLED": False})
+
+    args = hp_pre.construct_HPRTargetInputs(
+        Q_hpr_target=50.0,
+        T_vals=np.array([120.0, 80.0, 40.0]),
+        H_hot=np.array([0.0, -50.0, -100.0]),
+        H_cold=np.array([100.0, 50.0, 0.0]),
+        config=config,
+    )
+
+    assert args.ambient_air_enabled is False
 
 
 def test_add_t_amb_interval_aligns_profile_to_ambient_breakpoints():

@@ -4,6 +4,15 @@ Pre-Release Notes
 Unreleased
 ----------
 
+New features
+~~~~~~~~~~~~
+
+- New ``HPR_AMBIENT_AIR_ENABLED`` option (default ``True``). Set it to ``False`` to
+  stop heat pump and refrigeration targets from using ambient air as a free heat
+  source or sink. No air is placed, the Carnot search offers no air availability,
+  results report zero ambient duty and add no ``AIR`` streams, and cooling water
+  still applies.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

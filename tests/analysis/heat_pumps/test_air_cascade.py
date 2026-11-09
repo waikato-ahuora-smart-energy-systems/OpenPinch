@@ -3,11 +3,15 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_pumps.common._shared.air import (
     cascade_with_air,
     utility_bands,
 )
 from OpenPinch.analysis.heat_pumps.common.shared import _cascade_air_duties
+from OpenPinch.analysis.heat_pumps.targeting._carnot_common import (
+    parse_carnot_state_variables,
+)
 
 from .helpers import _sc, _stream
 
@@ -221,3 +225,89 @@ def test_air_duties_treat_only_a_utility_background_as_bands(is_utility, expecte
     )
 
     assert out.Q_air_sink == pytest.approx(expected_air)
+
+
+def test_disabled_air_takes_nothing_and_leaves_cooling_water_in_place():
+    # As above, air at a 40 C sink would take 100 kW. Without air, cooling
+    # water at 20 C takes the 130 kW crossing 20 C and 30 kW stays external.
+    T = np.array([150.0, 50.0, 30.0, 10.0])
+    H = np.array([0.0, 100.0, 100.0, 160.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=200.0, T_air_sink=40.0, T_cooling_water=20.0, air=False
+    )
+
+    assert (out.Q_air_source, out.Q_air_sink) == (0.0, 0.0)
+    assert out.Q_cooling_water == pytest.approx(130.0)
+    assert out.Q_ext_bottom == pytest.approx(30.0)
+    assert out.Q_ext_top == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("enabled, expected_air", [(True, 2000.0), (False, 0.0)])
+def test_air_duties_follow_the_ambient_air_option(enabled, expected_air):
+    args = SimpleNamespace(period_idx=0, ambient_air_enabled=enabled)
+    hot = _sc(_stream("Bg", 30.0, 25.0, 2000.0))
+
+    out = _cascade_air_duties(hot, _sc(), args, T_air_source=0.0, T_air_sink=20.0)
+
+    assert out.Q_air_sink == pytest.approx(expected_air)
+    assert out.Q_ext_bottom == pytest.approx(2000.0 - expected_air)
+
+
+def test_carnot_search_offers_no_air_availability_when_air_is_off():
+    # The heat pump's evaporators may draw on air below ambient; without air
+    # only the background's own heat is available, as if no level were ambient.
+    def parse(z_amb_hot, enabled):
+        args = SimpleNamespace(
+            n_cond=1,
+            n_evap=1,
+            is_heat_pumping=True,
+            Q_heat_max=100.0,
+            Q_cool_max=80.0,
+            T_cold=np.array([120.0, 80.0]),
+            H_cold=np.array([100.0, 0.0]),
+            T_hot=np.array([60.0, 30.0, 10.0]),
+            H_hot=np.array([0.0, -50.0, -80.0]),
+            z_amb_hot=z_amb_hot,
+            z_amb_cold=np.zeros(2),
+            ambient_air_enabled=enabled,
+        )
+        # The evaporator sits at 15 C, inside the ambient levels below 30 C.
+        return parse_carnot_state_variables(np.array([0.5, 0.1, 1.0]), args)
+
+    ambient_below_30 = np.array([0.0, 0.0, -1.0])
+    with_air = parse(ambient_below_30, True)
+    without_air = parse(ambient_below_30, False)
+    no_ambient_levels = parse(np.zeros(3), True)
+
+    assert no_ambient_levels.Q_cool_available.sum() == pytest.approx(72.5)
+    assert with_air.Q_cool_available.sum() == pytest.approx(207.5)
+    np.testing.assert_allclose(
+        without_air.Q_cool_available, no_ambient_levels.Q_cool_available
+    )
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_refrigeration_target_uses_air_only_when_the_option_allows(enabled):
+    # With ambient at 60 C, air is a sink for heat the refrigerator rejects.
+    problem = PinchProblem(
+        "OpenPinch/tutorials/sample_cases/basic_pinch.json", project_name="Air"
+    )
+    problem.update_options(
+        {"HPR_AMBIENT_AIR_ENABLED": enabled, "ENV_TEMPERATURE": 60.0}
+    )
+
+    target = problem.target.carnot_refrigeration(
+        condensers=1,
+        evaporators=1,
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    assert target.hpr_success
+    assert target.hpr_ambient_hot == 0.0
+    if enabled:
+        assert target.hpr_ambient_cold > 0.0
+    else:
+        assert target.hpr_ambient_cold == 0.0

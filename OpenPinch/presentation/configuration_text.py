@@ -646,6 +646,13 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "cycle's evaporator in cascades."
         ),
     ),
+    "HPR_AMBIENT_AIR_ENABLED": FieldText(
+        "HPR ambient air", None,
+        (
+            "Whether ambient air may act as a free heat source or sink in HPR "
+            "targeting. When off, no air is placed and no AIR streams are added."
+        ),
+    ),
     "HPR_DT_ENV_CONT": FieldText(
         "Ambient air contribution temperature difference", "delta_degC",
         "dt_cont of ambient air when it acts as a heat pump source or sink.",
