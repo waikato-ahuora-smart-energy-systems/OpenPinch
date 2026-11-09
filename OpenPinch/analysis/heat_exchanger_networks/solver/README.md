@@ -20,6 +20,7 @@ Everything between a prepared problem and the equation models: solver arrays bui
 - Exchanger duty beyond a profile raises, except for solver noise within a relative allowance that is dropped [piecewise.py:duty_aligned_area_contributions].
 - The PDM decomposition works on a deep copy of the master zone, and its stage boundary count satisfies `K = S + 1` [pinch_design_decomposition.py:_zone_with_hen_dt_contribution, PinchDesignDecomposition].
 - Shifted pinch temperature is the selected pinch (cold pinch when the hot utility target is zero, otherwise hot pinch) in K [pinch_design_decomposition.py:_shifted_pinch_temperature].
+- A stream is active on a side of the pinch only if it reaches more than `tol` past its pinch temperature, so a stream that starts or ends at the pinch is not kept on the far side as a sliver [pinch_design_decomposition.py:_clip_stream_temperatures].
 - Solver names must be in `PYOMO_SOLVERS | GEKKO_SOLVERS`; solver options are validated [backend.py:require_solver_backend, _normalise_solver_options].
 - Pyomo solves that need an option file are serialised by a process-wide lock [backend.py:_solver_working_directory].
 

@@ -4,6 +4,18 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.pinch_design()`` and the synthesis routes that start from it, such as
+  ``design.heat_exchanger_network()``, no longer fail when the stream that sets
+  the pinch has a supply or target temperature with many decimal places (#297).
+  The pinch is rounded to 1e-6 K, so such a stream was kept as a sliver on the far
+  side of the pinch, and Pyomo could not build its heat balance. With a cold stream
+  from 64.123456789 to 90 degC that sets the pinch, the pinch design used to raise
+  ``WorkflowContractError`` and now returns a network. Streams that reach more
+  than 1e-6 K past the pinch are split as before.
+
 0.8.1 (2026-11-06)
 ------------------
 
