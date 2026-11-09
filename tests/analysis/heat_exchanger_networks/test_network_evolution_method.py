@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+    LocalSynthesisExecutor,
     _task_model_approach_temperature,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
@@ -11,11 +14,13 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
 from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
     build_seeded_network_evolution_method_tasks,
 )
+from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.domain.enums import HeatExchangerKind, StreamID
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+from tests.support.paths import FIXTURES_ROOT
 
 
 def test_network_evolution_method_builds_retrofit_seeded_tasks() -> None:
@@ -73,6 +78,46 @@ def test_task_model_approach_temperature_matches_equation_layer_behavior() -> No
     assert _task_model_approach_temperature(pdm_task) == 14.0
     assert _task_model_approach_temperature(tdm_task) == 0.1
     assert _task_model_approach_temperature(evm_task) == 0.1
+
+
+def test_min_exchanger_approach_share_raises_the_cost_driven_floor() -> None:
+    pdm_task = HeatExchangerNetworkSynthesisTask(
+        run_id="method-test",
+        method="pinch_design_method",
+        approach_temperature=14.0,
+        stage_count=1,
+    )
+    tdm_task = pdm_task.model_copy(update={"method": "thermal_derivative_method"})
+    evm_task = pdm_task.model_copy(update={"method": "network_evolution_method"})
+
+    assert _task_model_approach_temperature(pdm_task, min_approach_share=0.5) == 14.0
+    assert _task_model_approach_temperature(tdm_task, min_approach_share=0.5) == 7.0
+    assert _task_model_approach_temperature(evm_task, min_approach_share=0.5) == 7.0
+    # The 0.1 K floor still applies to a smaller share.
+    assert _task_model_approach_temperature(evm_task, min_approach_share=0.001) == 0.1
+
+
+def test_build_problem_reads_the_min_exchanger_approach_share() -> None:
+    payload = json.loads(
+        (
+            FIXTURES_ROOT / "openhens" / "Four-stream-Yee-and-Grossmann-1990-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    payload["options"]["HENS_MIN_EXCHANGER_APPROACH_SHARE"] = 0.5
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="method-test",
+        method="network_evolution_method",
+        approach_temperature=10.0,
+        stage_count=1,
+    )
+
+    internal = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task,
+        problem=PinchProblem(source=payload),
+        parent_outcomes={},
+    )
+
+    assert internal.dTmin == 5.0
 
 
 def test_quality_seeded_network_evolution_uses_canonical_topology() -> None:

@@ -15,6 +15,14 @@ Heat exchanger network synthesis
   from 64.123456789 to 90 degC that sets the pinch, the pinch design used to raise
   ``WorkflowContractError`` and now returns a network. Streams that reach more
   than 1e-6 K past the pinch are split as before.
+- New option ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (#298). The thermal
+  derivative and network evolution steps of heat exchanger network synthesis
+  choose exchanger approaches by cost, down to 0.1 K, so exchangers could close
+  far below the requested ``approach_temperatures``, which only applies to the
+  pinch design step. The new option sets a floor as a share of the requested
+  approach: at 0.5, a 10 K design keeps every exchanger at 5 K or more. It
+  defaults to 0, which keeps the 0.1 K floor and today's results, and must be
+  below 1. The HEN synthesis guide now explains how approaches are chosen.
 - Network evolution in ``design.heat_exchanger_network()`` no longer returns the
   unevolved network when its starting solve did not converge (#299). IPOPT
   stopping at its iteration limit was reported as a success, and the starting

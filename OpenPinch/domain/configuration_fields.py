@@ -153,6 +153,13 @@ def _positive_float(name: str, value: Any) -> float:
     return numeric_value
 
 
+def _share_below_one(name: str, value: Any) -> float:
+    numeric_value = _float(name, value)
+    if not 0.0 <= numeric_value < 1.0:
+        raise ValueError(f"{name} must be at least 0 and less than 1.")
+    return numeric_value
+
+
 def _positive_int(name: str, value: Any) -> int:
     numeric_value = _int(name, value)
     if numeric_value <= 0:
@@ -355,6 +362,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_optional_positive_float_grid),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
+    "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),
     "HENS_SYNTHESIS_QUALITY_TIER": _spec(int, 1, "hens", "synthesis_quality_tier", numeric_min=0.0, numeric_max=5.0),
     "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),

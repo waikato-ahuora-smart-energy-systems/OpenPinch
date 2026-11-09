@@ -380,6 +380,16 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "run per value."
         ),
     ),
+    "HENS_MIN_EXCHANGER_APPROACH_SHARE": FieldText(
+        "Minimum exchanger approach share", None,
+        (
+            "Smallest exchanger approach the thermal derivative and network evolution "
+            "steps may choose, as a share of the requested approach temperature, from "
+            "0 up to but not including 1. Those steps choose approaches by cost, "
+            "down to 0.1 K by default (0); at 0.5 a 10 K design keeps every "
+            "exchanger at 5 K or more."
+        ),
+    ),
     "HENS_SYNTHESIS_QUALITY_TIER": FieldText(
         "HEN synthesis quality tier", None,
         (

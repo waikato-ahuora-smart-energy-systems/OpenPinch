@@ -178,6 +178,7 @@ def problem_to_solver_arrays(
                 "dt_cont_multipliers",
                 None,
             ),
+            "HENS_MIN_EXCHANGER_APPROACH_SHARE": hens.min_exchanger_approach_share,
             "HENS_SYNTHESIS_QUALITY_TIER": hens.synthesis_quality_tier,
             "HENS_PDM_STAGE_PAIR_LIMIT": hens.pdm_stage_pair_limit,
             "HENS_TDM_PARENT_LIMIT": hens.tdm_parent_limit,
