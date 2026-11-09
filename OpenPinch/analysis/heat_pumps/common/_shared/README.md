@@ -21,7 +21,7 @@ What the parent and siblings import from this package:
 ## Invariants
 - Air and cooling water never create a utility demand: the duties they take or give are limited by the smallest cascade flow on the affected side, and cannot be negative. [air.py:cascade_with_air]
 - The cascade is supplied with `T` descending and `H_net` clipped to non-negative before use. [air.py:cascade_with_air]
-- Air supplies heat before it takes heat, and cooling water acts only on what air leaves. [air.py:cascade_with_air]
+- Air supplies heat before it takes heat, and cooling water acts only on what air leaves. With `air=False` no air is placed and cooling water acts on the whole cascade. [air.py:cascade_with_air]
 - A sink at or above the top of the cascade takes no heat. [air.py:_sink_duty]
 - Ambient and cooling-water levels are shifted by `dt_env_cont`, `dt_cooling_water` and `dtcont_hp`, with `dtcont_hp` applied in the opposite sense on the source and sink sides. [air.py:ambient_source_temperature]
 - Carnot condenser and evaporator levels closer than `dt_phase_change` are merged and their duties summed before streams are built. [streams.py:_get_carnot_hpr_cycle_cascade_profile]

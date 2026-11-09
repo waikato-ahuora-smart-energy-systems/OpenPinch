@@ -241,6 +241,7 @@ class HprConfig:
     dt_cont: float
     dt_ihx: float
     dt_cascade_hx: float
+    ambient_air_enabled: bool
     dt_env_cont: float
     max_pressure_ratio: float
     max_multistart: int

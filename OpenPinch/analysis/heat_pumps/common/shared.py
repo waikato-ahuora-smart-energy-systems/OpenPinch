@@ -428,6 +428,7 @@ def _cascade_air_duties(
             and getattr(args, "background_is_utility", False)
             else ()
         ),
+        air=getattr(args, "ambient_air_enabled", True),
     )
 
 

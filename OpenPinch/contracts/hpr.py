@@ -293,6 +293,7 @@ class HeatPumpTargetInputs(BaseModel):
     max_multi_start: int
     T_env: float
     dt_env_cont: float
+    ambient_air_enabled: bool = True
     eta_ii_hpr_carnot: float
     eta_ii_he_carnot: float
     refrigerant_ls: List[str]
