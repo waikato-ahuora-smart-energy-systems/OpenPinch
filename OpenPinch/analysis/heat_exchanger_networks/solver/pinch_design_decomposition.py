@@ -474,13 +474,15 @@ def _clip_stream_temperatures(
 ) -> tuple[tuple[int, ...], tuple[int, ...]]:
     hot_thresholds = shifted_pinch_temperature + np.asarray(hot_contributions)
     cold_thresholds = shifted_pinch_temperature - np.asarray(cold_contributions)
+    # The problem table rounds the pinch to tol, so a stream that starts or ends
+    # at the pinch can look a sliver past it. It is not active on that side.
     if pinch_location == "above":
         z_i_active = tuple(
-            1 if value > threshold else 0
+            1 if value > threshold + tol else 0
             for value, threshold in zip(T_h_in, hot_thresholds)
         )
         z_j_active = tuple(
-            1 if value > threshold else 0
+            1 if value > threshold + tol else 0
             for value, threshold in zip(T_c_out, cold_thresholds)
         )
         for index, is_active in enumerate(z_i_active):
@@ -497,11 +499,11 @@ def _clip_stream_temperatures(
                 T_c_out[index] = 0.0
     else:
         z_i_active = tuple(
-            1 if value < threshold else 0
+            1 if value < threshold - tol else 0
             for value, threshold in zip(T_h_out, hot_thresholds)
         )
         z_j_active = tuple(
-            1 if value < threshold else 0
+            1 if value < threshold - tol else 0
             for value, threshold in zip(T_c_in, cold_thresholds)
         )
         for index, is_active in enumerate(z_i_active):
