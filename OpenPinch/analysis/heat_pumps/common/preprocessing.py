@@ -118,6 +118,7 @@ def construct_HPRTargetInputs(
         max_pressure_ratio=hpr.max_pressure_ratio,
         T_env=environment.temperature,
         dt_env_cont=hpr.dt_env_cont,
+        ambient_air_enabled=hpr.ambient_air_enabled,
         dt_phase_change=thermal.dt_phase_change,
         eta_penalty=hpr.eta_penalty,
         rho_penalty=hpr.rho_penalty,
