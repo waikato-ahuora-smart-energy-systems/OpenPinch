@@ -13,6 +13,7 @@ experiments; they are not broad compatibility promises.
    pinchworkspace
    service-layer
    schemas-and-config
+   configuration-options
    domain-model
    cli-and-resources
    generated-index

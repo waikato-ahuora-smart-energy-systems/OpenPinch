@@ -36,6 +36,8 @@ Developer tooling
 Generators
 - `generate_analysis_catalog.py` (`generate_analysis_catalog.py`): `render_catalog`, `DESTINATION`;
   writes `docs/_data/analysis-methods.csv` from `METHOD_CATALOG`.
+- `generate_configuration_reference.py` (`generate_configuration_reference.py`): `render_reference`,
+  `DESTINATION`; writes `docs/_data/configuration-options.inc` from `configuration_options()`.
 - `generate_tutorial_coverage.py` (`generate_tutorial_coverage.py`): writes
   `docs/_data/tutorial-coverage.csv` by introspecting the public accessors and notebook metadata.
 - `generate_hpr_performance_map_contract.py` (`generate_hpr_performance_map_contract.py`):

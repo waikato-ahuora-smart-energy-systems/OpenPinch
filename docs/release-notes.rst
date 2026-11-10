@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Documentation
+~~~~~~~~~~~~~
+
+- New Configuration Options page in the API reference lists every option with
+  its type, default, unit, limits and description, generated from
+  ``configuration_options()``. It includes options such as
+  ``HPR_AMBIENT_AIR_ENABLED`` that were only described in the release notes.
+
 0.8.2 (2026-11-10)
 ------------------
 

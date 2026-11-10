@@ -64,6 +64,10 @@ Docs Maintenance Expectations
 - The ``.ipynb`` files in ``OpenPinch/tutorials/notebooks`` are the source of
   truth: edit them directly in Jupyter, keep the ``cell-NN`` cell ids, and
   clear all outputs before committing. Ruff lints them like any other source.
+- A new or changed configuration option needs the generated reference
+  refreshed with
+  ``uv run --no-sync python scripts/generate_configuration_reference.py``;
+  ``tests/packaging/test_configuration_reference.py`` fails until it is.
 - New packaged notebooks or sample cases should be added to the examples pages.
 - New packaged notebooks or sample cases should update docs consistency tests
   that compare examples docs with ``OpenPinch.resources``.

@@ -40,6 +40,8 @@ enum choices, numeric bounds, and config paths:
    options = configuration_options()
    hpr_options = [field for field in options if field.group == "hpr"]
 
+The same metadata is tabulated on :doc:`configuration-options`.
+
 Common options include ``THERMAL_DT_CONT`` for minimum contribution
 temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical
 ``HPR_*`` fields for heat-pump and refrigeration workflows.
