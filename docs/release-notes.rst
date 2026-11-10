@@ -4,6 +4,24 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``problem.target.hpr_refrigerant_screen()`` screens working fluids as
+  single-stage cycles between the evaporating and condensing levels of a
+  Carnot heat pump or refrigeration target (``target=...``), or between
+  explicit ``T_evap`` and ``T_cond``. Each fluid gets its saturation
+  pressures, pressure ratio, suction volumetric heating capacity and a verdict:
+  above critical, below triple point, over ratio limit, deep vacuum suction,
+  near critical or practical. Practical fluids are ranked by suction
+  volumetric heating capacity. The candidates default to every CoolProp fluid;
+  ``refrigerants="natural"`` selects water, ammonia, CO2 and the
+  hydrocarbons. The result is a frozen ``HprRefrigerantScreenResult`` and the
+  problem is not changed. The Carnot tutorial notebook shows it.
+- New configuration options ``HPR_SCREEN_MIN_SUCTION_PRESSURE`` (0.5 bar) and
+  ``HPR_SCREEN_CRITICAL_MARGIN`` (15 K) set the screen's deep vacuum and
+  near-critical limits.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

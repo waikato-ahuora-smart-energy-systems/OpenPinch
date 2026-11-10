@@ -174,7 +174,7 @@ Adapter names
 -------------
 
 The catalog ``adapter`` string (``thermal``, ``inverse_dt_min``, ``placement``,
-``hpr_map``, ``hen``, ``residual``) is a label. It appears in
+``hpr_map``, ``refrigerant_screen``, ``hen``, ``residual``) is a label. It appears in
 ``docs/_data/analysis-methods.csv`` and nothing at runtime resolves it;
 reports are chosen by result class as in step 8.
 ``test_catalog_workspace_period_adapters_and_docs_remain_consistent`` in

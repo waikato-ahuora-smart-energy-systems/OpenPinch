@@ -63,6 +63,12 @@ Interaction Matrix
      - frozen result or ordered case result
      - source cases unchanged
      - base
+   * - active ``target.hpr_refrigerant_screen``
+     - Screen fluids between one Carnot target's levels or explicit levels; no
+       batch or ``all_periods`` mirror, since it takes one case's target
+     - frozen screening result
+     - source case unchanged
+     - base
    * - ``cases(names).summary_frames()``, ``metrics()``, and ``reports()``
      - Observe every selected solved case and preserve per-case failures
      - result and error mappings

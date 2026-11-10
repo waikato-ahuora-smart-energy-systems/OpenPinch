@@ -33,6 +33,12 @@ Capability Matrix
      - bounded targets, typed failure diagnostics, costs, graphs, and versioned
        plain maps
      - CoolProp default; optional TESPy through ``openpinch[tespy]``
+   * - Refrigerant screening
+     - ``problem.target.hpr_refrigerant_screen()`` on a Carnot target or
+       explicit levels
+     - non-mutating verdict, saturation pressures, pressure ratio and suction
+       volumetric heating capacity per fluid
+     - CoolProp
    * - Multiperiod HPR design
      - independent ``problem.target.all_periods`` replay or scalar targeting
        with ``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``
