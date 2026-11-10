@@ -8,12 +8,22 @@ from ....analysis.graphs.composite import clean_composite_curve
 from ....analysis.numerics import delta_vals, linear_interpolation
 from ....contracts.hpr import HeatPumpTargetInputs, HPRSearchBudget
 from ....domain.configuration import Configuration, tol
-from ....domain.enums import ProblemTableLabel
+from ....domain.enums import HeatPumpAndRefrigerationCycle, ProblemTableLabel
 from ....domain.problem_table import ProblemTable
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..performance_maps.targeting import normalize_hpr_simulation_backend
 from .compressor_efficiency import compressor_efficiency_model
+
+# Cycles whose CoolProp models apply a compressor efficiency model; Brayton
+# passes eta_comp to TESPy, which needs a number.
+_VAPOUR_CYCLES = frozenset(
+    {
+        HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+        HeatPumpAndRefrigerationCycle.ParallelVapourComp.value,
+        HeatPumpAndRefrigerationCycle.VapourCompMVR.value,
+    }
+)
 
 __all__ = [
     "construct_HPRTargetInputs",
@@ -107,7 +117,10 @@ def construct_HPRTargetInputs(
         refrigerant_ls=hpr.normalised_refrigerants,
         mvr_fluid_ls=hpr.normalised_mvr_fluids,
         do_refrigerant_sort=hpr.refrigerant_sort_enabled,
-        eta_comp=compressor_efficiency_model(hpr.compressor_model, hpr.eta_comp),
+        eta_comp=compressor_efficiency_model(
+            hpr.compressor_model if hpr.type in _VAPOUR_CYCLES else "constant",
+            hpr.eta_comp,
+        ),
         eta_mvr_comp=compressor_efficiency_model(
             hpr.mvr_compressor_model, hpr.mvr_eta_comp
         ),
