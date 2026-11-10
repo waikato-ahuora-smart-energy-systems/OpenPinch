@@ -4,6 +4,18 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis, such as
+  ``design.heat_exchanger_network()``, no longer crashes with
+  ``BrokenProcessPool`` when run from a script with no
+  ``if __name__ == "__main__":`` guard on macOS, Windows, or Linux on Python
+  3.14. Worker processes there import the main script again, so each one
+  re-ran the whole script. Synthesis now logs a warning and solves its tasks
+  serially in that case, as the optimisation backends already did. Put the
+  script's entry code under a main guard to use worker processes.
+
 Documentation
 ~~~~~~~~~~~~~
 
@@ -46,6 +58,15 @@ Documentation
   the application layer's allowed imports. The two stub reference pages and
   the completed October 2026 audit plan are no longer published, and the
   module appendix is renamed Contributor Module Reference.
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat pump and refrigeration targets now accept ``R1233zd(E)`` as a
+  refrigerant. Refrigerant names are still upper-cased, so lower-case input
+  such as ``r134a`` resolves, but a name is kept as given when CoolProp rejects
+  its upper-cased form. ``R1233zd(E)`` was the only CoolProp 8.0.0 fluid
+  affected; it raised ``HPRTargetingError`` in preflight.
 
 0.8.2 (2026-11-10)
 ------------------
