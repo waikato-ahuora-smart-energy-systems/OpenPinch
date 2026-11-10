@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal, Mapping, Sequence
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -248,6 +248,7 @@ class InternalHeatExchangerNetworkProblem:
             below_case=self.below,
             above_case=self.above,
         )
+        self._carry_unconverged_side_solve()
         self.case.get_post_process()
         if print_output:
             self.case.output_to_cmd_line()
@@ -258,6 +259,23 @@ class InternalHeatExchangerNetworkProblem:
                 "tol": self.tol,
             }
         )
+
+    def _carry_unconverged_side_solve(self) -> None:
+        # The amalgamated model is built, not solved, so its own solver run
+        # says nothing about the sides' convergence.
+        for side in (self.above, self.below):
+            side_run = getattr(side, "solver_run", None)
+            if side.side_required and not getattr(side_run, "converged", True):
+                case_run = getattr(self.case, "solver_run", None)
+                self.case.solver_run = (
+                    side_run
+                    if case_run is None
+                    else replace(
+                        case_run,
+                        termination_condition=side_run.termination_condition,
+                    )
+                )
+                return
 
     def remove_unused_stages(self, case) -> StageWiseModel:
         """Apply the source stage-utilisation reduction after PDM/TDM solves."""

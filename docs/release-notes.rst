@@ -37,9 +37,10 @@ Heat exchanger network synthesis
   stopping at its iteration limit was reported as a success, and the starting
   model's total annual cost, which can be far below that of any real network,
   was the benchmark every candidate had to beat. Evolution now adopts its best
-  verified candidate in that case, and the final ranking compares it with the
-  seed network on verified costs. Such solves are logged as ``[Unconverged]``
-  warnings instead of ``[Success]``.
+  verified, converged candidate in that case. A design step whose solve did not
+  converge is left out of the final ranking, though later steps still start
+  from it, so its objective can no longer win on cost. Such solves are logged as
+  ``[Unconverged]`` warnings instead of ``[Success]``.
 - ``design.heat_exchanger_network()`` works again when ``HENS_MAX_PARALLEL`` is
   above 1, as in the Yee and Grossmann (1990) sample case and tutorial 15. The
   GEKKO model that records solver termination conditions (#299) could not be

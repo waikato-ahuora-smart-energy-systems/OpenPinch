@@ -1073,6 +1073,39 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     assert target.alpha == []
 
 
+def test_evolution_skips_a_child_that_did_not_converge():
+    # Its TAC is not a converged optimum, so it can't replace any network.
+    candidate = _VerifiedCandidate(m_success=1)
+    candidate.solver_run = SimpleNamespace(converged=False)
+
+    assert stagewise_evolution._is_usable_evolution_candidate(candidate) is False
+
+
+def test_update_with_best_model_adopts_the_solver_run():
+    # The outcome is judged on the adopted network's solve, not the start's.
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.solver_run = SimpleNamespace(converged=False)
+    target.set_initial_values_for_variables = lambda best, brackets: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+        solver_run=SimpleNamespace(converged=True),
+    )
+
+    _update_with_best_model(target, best)
+
+    assert target.solver_run is best.solver_run
+
+
 @pytest.mark.parametrize(
     "kind",
     ["minus", "plus"],
