@@ -50,7 +50,7 @@ def _input_args(**overrides) -> HeatPumpTargetInputs:
     data = vars(_base_args(**overrides)).copy()
     data.setdefault("n_mvr", 1)
     data.setdefault("eta_mvr_comp", 0.7)
-    data.setdefault("eta_motor", 0.95)
+    data.setdefault("eta_mvr_motor", 0.95)
     data.setdefault("mvr_fluid_ls", ["Water"])
     return HeatPumpTargetInputs.model_validate(data)
 

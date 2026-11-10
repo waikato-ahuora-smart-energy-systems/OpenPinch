@@ -277,6 +277,7 @@ def _build_and_solve_parallel_cycles(
         dtcont=args.dtcont_hp,
         dT_subcool=state_vars.dT_subcool,
         eta_comp=args.eta_comp,
+        eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
         duty_allocation=DutyAllocationRequest.from_state(state_vars),

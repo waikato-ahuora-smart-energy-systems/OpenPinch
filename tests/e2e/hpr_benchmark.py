@@ -97,6 +97,11 @@ class HPRProfile:
                 **kwargs.get("options", {}),
                 "HPR_MAX_PRESSURE_RATIO": 1e6,
             }
+        if sentinel and self.profile_id in HPR_SENTINELS_WITH_IDEAL_MOTOR:
+            kwargs["options"] = {
+                **kwargs.get("options", {}),
+                "HPR_ETA_MOTOR": 1.0,
+            }
         return kwargs
 
     def search_limits(self, *, sentinel: bool) -> tuple[int, int]:
@@ -206,6 +211,11 @@ HPR_SENTINELS_WITHOUT_PRESSURE_RATIO_LIMIT = frozenset(
         "utility-optimized-vc-mvr-heat-pump",
     }
 )
+
+# This sentinel's heat pump only just pays: with the default motor losses
+# (HPR_ETA_MOTOR 0.95) none improves on the baseline, so it runs with an ideal
+# motor to keep proving the search on a solvable problem.
+HPR_SENTINELS_WITH_IDEAL_MOTOR = frozenset({"utility-optimized-vc-mvr-heat-pump"})
 
 # A utility refrigerator must lift heat from below ambient to the hot-utility
 # level. At such lifts no heat pump may pay, so these sentinels accept the

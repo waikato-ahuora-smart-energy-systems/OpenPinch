@@ -124,7 +124,8 @@ def construct_HPRTargetInputs(
         eta_mvr_comp=compressor_efficiency_model(
             hpr.mvr_compressor_model, hpr.mvr_eta_comp
         ),
-        eta_motor=hpr.mvr_eta_motor,
+        eta_motor=hpr.eta_motor,
+        eta_mvr_motor=hpr.mvr_eta_motor,
         eta_exp=hpr.eta_exp,
         eta_ii_hpr_carnot=hpr.eta_ii_carnot,
         eta_ii_he_carnot=hpr.effective_eta_ii_he_carnot,

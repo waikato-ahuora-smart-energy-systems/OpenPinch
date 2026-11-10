@@ -237,6 +237,7 @@ class HprConfig:
     n_cond: int
     n_evap: int
     eta_comp: float
+    eta_motor: float
     compressor_model: str
     eta_exp: float
     eta_ii_carnot: float
