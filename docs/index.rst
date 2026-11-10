@@ -24,7 +24,7 @@ Start Here
 I want to solve a case
    Start with :doc:`getting-started`, then use
    :doc:`guides/first-solve-python` for the main Python workflow or
-   :doc:`guides/notebooks-and-sample-cases` for packaged examples.
+   :doc:`examples/notebook-series` for packaged examples.
 
 I need to understand the method
    Start with :doc:`overview/what-is-openpinch`, then read
@@ -38,7 +38,7 @@ I know the required process heat recovery
 
 I am building a reusable study
    Start with :doc:`api/package-root` and :doc:`developer/architecture`.
-   The generated module appendix documents implementation owners for
+   The contributor reference in :doc:`api/index` documents implementation owners for
    contributors.
 
 What OpenPinch Covers
@@ -46,14 +46,17 @@ What OpenPinch Covers
 
 - direct process Pinch Analysis and indirect Total Site targeting
 - inverse global ``dt_min`` targeting from a specified process heat recovery
-- hierarchical zone modeling from unit operation to site scale
+- hierarchical zone modeling from unit operation through process zone and
+  site to community and region scale
 - Composite Curve, Grand Composite Curve, Total Site profile, and SUGCC graphs
 - JSON, Excel, CSV-bundle, schema-first, and packaged sample-case inputs
 - structured variable-heat-capacity streams with one physical parent identity
   and ordered piecewise thermal segments
 - Heat Pump and refrigeration screening, including simulated-cycle backends
 - direct gas/vapour MVR process-component studies
-- exergy and cogeneration post-processing on solved thermal targets
+- exergy, cogeneration and Organic Rankine Cycle targeting on solved thermal
+  targets
+- area, unit-count and capital cost targets, and energy-transfer analysis
 - balanced-composite thermodynamic utility placement optimisation
 - heat exchanger network synthesis through the ``problem.design`` accessor
 

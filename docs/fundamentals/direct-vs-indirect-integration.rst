@@ -74,8 +74,11 @@ Where The Methods Appear
 In user workflows, direct and indirect integration are usually reached through
 ``problem.target.all_heat_integration()`` for the default solve or through the explicit
 ``problem.target.direct_heat_integration(...)`` and
-``problem.target.indirect_heat_integration(...)`` accessors. The command-line
-surface does not run or graph these methods.
+``problem.target.indirect_heat_integration(...)`` accessors. For a Site zone,
+``problem.target.total_site_heat_integration(...)`` runs the same indirect
+calculation and rejects other zone types; use ``indirect_heat_integration``
+for Process Zone, Community or Region aggregates. The command-line surface
+does not run or graph these methods.
 
 Recommended Follow-On Pages
 ---------------------------

@@ -50,6 +50,7 @@ exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
+    "developer/audit-2026-10-fix-plan.rst",
 ]
 
 autodoc_default_options = {

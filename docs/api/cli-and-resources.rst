@@ -37,6 +37,10 @@ The main helpers are:
 - ``copy_sample_case()`` for local editable copies
 - ``list_notebooks()``, ``notebook_metadata()``, and ``copy_notebook()`` for
   the packaged notebook series
+- ``list_hpr_performance_map_contract_resources()``,
+  ``read_hpr_performance_map_contract_resource()``, and
+  ``load_hpr_performance_map_contract_resource()`` for the packaged HPR
+  performance-map schemas and examples
 
 The ``PinchProblem`` and ``PinchWorkspace`` classes also resolve
 packaged sample-case names such as ``basic_pinch.json`` directly when no local

@@ -34,9 +34,8 @@ Use the service layer when you need to:
 Main Service Surface
 --------------------
 
-.. automodule:: OpenPinch.application.targeting
-   :members:
-   :no-index:
+``OpenPinch.application.targeting`` holds the service functions; its members
+are documented in :doc:`../reference/api-analysis`.
 
 Inverse Heat-Recovery ``dt_min`` Service
 ----------------------------------------

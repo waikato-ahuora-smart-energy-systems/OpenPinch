@@ -90,19 +90,30 @@ Where These Surfaces Appear
 
 The main graph surfaces are:
 
-- `problem.plot.composite_curve()`
-- `problem.plot.shifted_composite_curve()`
-- `problem.plot.balanced_composite_curve()`
-- `problem.plot.grand_composite_curve()`
-- `problem.plot.grand_composite_curve_with_heat_pump()`
-- `problem.plot.net_load_profiles()`
-- `problem.plot.exergetic_grand_composite_curve()`
-- `problem.plot.exergetic_net_load_profiles()`
-- `problem.plot.export(...)`
+- ``problem.plot.composite_curve()``
+- ``problem.plot.shifted_composite_curve()``
+- ``problem.plot.balanced_composite_curve()``
+- ``problem.plot.grand_composite_curve()``
+- ``problem.plot.real_grand_composite_curve()``
+- ``problem.plot.net_load_profiles()``
+- ``problem.plot.grand_composite_curve_with_heat_pump()`` and
+  ``net_load_profiles_with_heat_pump()``
+- ``problem.plot.grand_composite_curve_with_refrigeration()`` and
+  ``net_load_profiles_with_refrigeration()``
+- ``problem.plot.grand_composite_curve_with_orc()`` and
+  ``net_load_profiles_with_orc()``
+- ``problem.plot.exergetic_grand_composite_curve()`` and
+  ``exergetic_net_load_profiles()``
+- ``problem.plot.total_site_profiles()`` and
+  ``site_utility_grand_composite_curve()``
+- ``problem.plot.energy_transfer_diagram()``
+- ``problem.plot.catalog()``, ``data()``, ``export(...)`` and
+  ``export_gallery(...)``
 
-After direct HPR targeting, the target-specific net load profile graph includes
-the Heat Pump condenser and evaporator overlays, and the dedicated GCC with
-Heat Pump view exposes the HPR cascade directly.
+After HPR targeting, ``net_load_profiles_with_heat_pump(target=...)`` and
+``grand_composite_curve_with_heat_pump(target=...)`` show the condenser and
+evaporator overlays and the HPR cascade. Plain ``net_load_profiles()`` has no
+HPR overlay. Refrigeration targets use the ``*_with_refrigeration`` pair.
 
 Recommended Follow-On Pages
 ---------------------------

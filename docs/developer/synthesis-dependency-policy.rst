@@ -12,8 +12,9 @@ Python Version Policy
 
 OpenPinch supports Python ``>=3.12``, the same floor as the OpenHENS source, and
 develops on the version in ``.python-version``. Synthesis dependencies must
-resolve and import on every supported Python; CI runs the unit tests on 3.12,
-3.13 and the development version.
+resolve and import on every supported Python; CI runs the unit tests on the
+development version for every change, and on 3.12 and 3.13 for pull requests
+into and pushes to ``main``.
 
 The synthesis dependency set is:
 
@@ -34,11 +35,12 @@ Install the synthesis runtime dependencies explicitly:
 
    python -m pip install "openpinch[synthesis]"
 
-Repository development should use uv:
+Repository development uses the locked ``dev`` group, which already includes
+the synthesis stack:
 
 .. code-block:: bash
 
-   uv sync --extra synthesis
+   uv sync --frozen --group dev
 
 The ``full`` extra includes the synthesis stack (Pyomo, GEKKO, Kaleido, wakepy,
 and IDAES) together with the dashboard, notebook, TESPy, and Brayton-cycle
@@ -55,21 +57,21 @@ which already contains the synthesis stack, and select tests with
 
 .. code-block:: bash
 
-   uv run pytest -m "not synthesis and not solver"
+   uv run --no-sync pytest -m "not synthesis and not solver"
 
 Use ``@pytest.mark.synthesis`` for tests that require
 ``openpinch[synthesis]`` but no external solver binary:
 
 .. code-block:: bash
 
-   uv run pytest -m synthesis
+   uv run --no-sync pytest -m synthesis
 
 Use ``@pytest.mark.solver`` for tests that require external solver binaries
 such as Couenne or IPOPT:
 
 .. code-block:: bash
 
-   uv run pytest -m solver
+   uv run --no-sync pytest -m solver
 
 Missing optional Python packages should raise
 ``MissingSynthesisDependencyError`` with the ``openpinch[synthesis]`` install

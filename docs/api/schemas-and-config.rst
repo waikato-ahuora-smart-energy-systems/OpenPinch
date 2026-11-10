@@ -14,9 +14,10 @@ What Each Layer Does
 --------------------
 
 ``TargetInput`` and related schemas
-   Define the request format for process streams, utilities, the optional
-   zone tree, an optional serialized heat exchanger network, and the
-   ``residual_basis`` and ``plant_profile_data`` fields.
+   Define the request format for process streams, utilities, flat
+   ``options``, the optional zone tree, an optional serialized heat exchanger
+   network, saved ``process_components``, and the ``residual_basis`` and
+   ``plant_profile_data`` fields.
 
 ``TargetOutput`` and target/result schemas
    Define the structured response returned by the top-level service boundary.

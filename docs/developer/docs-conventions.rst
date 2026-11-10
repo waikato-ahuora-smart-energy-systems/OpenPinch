@@ -36,7 +36,7 @@ Page Categories
    Task-oriented walkthroughs that answer one practical question.
 
 ``API``
-   The protected main contract first, unsupported module appendix second.
+   The protected main contract first, unsupported contributor module reference second.
 
 ``Examples``
    Packaged notebooks, sample cases, and decision-workflow mapping.
