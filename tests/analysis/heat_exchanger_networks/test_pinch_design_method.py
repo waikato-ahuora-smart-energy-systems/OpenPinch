@@ -276,6 +276,8 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
     monkeypatch.setattr(
         f"{executor_module}._main_module_reruns_in_workers", lambda: True
     )
+    # A platform with worker processes, so Pyodide reaches the pool too.
+    monkeypatch.setattr(sys, "platform", "linux")
 
     with caplog.at_level("WARNING"):
         outcomes = _two_prebuilt_successful_tasks(monkeypatch, _process_pool)
