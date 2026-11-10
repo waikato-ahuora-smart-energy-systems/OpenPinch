@@ -26,6 +26,7 @@ EXPECTED_TARGET_METHODS = {
     "heat_exchanger_area_and_cost",
     "heat_recovery_dt_min",
     "hpr_performance_map",
+    "hpr_refrigerant_screen",
     "indirect_heat_integration",
     "isentropic_cogeneration",
     "mvr_heat_pump",
