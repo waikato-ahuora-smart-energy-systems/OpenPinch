@@ -63,6 +63,12 @@ Interaction Matrix
      - frozen result or ordered case result
      - source cases unchanged
      - base
+   * - active ``target.hpr_refrigerant_screen``
+     - Screen fluids between one Carnot target's levels or explicit levels; no
+       batch or ``all_periods`` mirror, since it takes one case's target
+     - frozen screening result
+     - source case unchanged
+     - base
    * - active and batch ``target.hpr_load_kinks``
      - List the logical HPR load fractions for one or every canonical period
      - frozen result or ordered case result

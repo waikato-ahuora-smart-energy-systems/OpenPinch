@@ -77,6 +77,12 @@ Interaction Matrix
      - target output
      - targeted
      - base; TESPy for ``simulation_backend="tespy"``
+   * - ``target.hpr_refrigerant_screen``
+     - Screen fluids as single-stage cycles between a Carnot target's
+       saturation levels or explicit levels
+     - frozen screening result
+     - source unchanged
+     - base
    * - ``target.cogeneration`` and named turbine-model methods
      - Cogeneration screening
      - target output
@@ -212,6 +218,37 @@ The complete runnable workflow, validation matrix, unit behavior, workspace
 batch examples, and numerical interpretation are in
 :doc:`../guides/heat-recovery-dt-min`.
 
+Refrigerant Screening
+---------------------
+
+``problem.target.hpr_refrigerant_screen`` screens candidate working fluids as
+single-stage cycles between the evaporating and condensing levels of a
+successful Carnot heat pump or refrigeration target. The target must be the
+problem's current one: a target from another problem, or one superseded or made
+stale by later changes, is rejected. Pass the target, or both
+``T_evap`` and ``T_cond`` (one level or a list; degC or ``{"value", "unit"}``)
+instead. The result has one row per fluid and level pair. It does not change
+the problem.
+
+.. code-block:: python
+
+   heat_pump = problem.target.carnot_heat_pump(load_fraction=0.25)
+   screen = problem.target.hpr_refrigerant_screen(
+       target=heat_pump, refrigerants="natural"
+   )
+   [row.fluid for row in screen.practical]
+
+   problem.target.hpr_refrigerant_screen(T_evap=0.0, T_cond=85.0)
+
+``refrigerants`` defaults to every fluid in the installed CoolProp; pass
+``"natural"`` for water, ammonia, CO2 and the hydrocarbons, or a list of fluid
+names. See :doc:`../fundamentals/heat-pump-and-refrigeration-methods` for the
+verdicts and thresholds.
+
+.. autoclass:: OpenPinch.contracts.hpr_refrigerant_screen.HprRefrigerantScreenResult
+   :members:
+   :no-index:
+
 HPR Load Kinks
 --------------
 
@@ -320,7 +357,8 @@ Exergy, energy transfer and the five cogeneration methods retain their existing
 base-target capabilities and infer omitted scalar zone/period selections.
 Area/cost, new HPR targeting and aggregate integration do not gain new basis
 capabilities in this release. ``hpr_performance_map`` keeps its required
-``target=`` argument. See :doc:`../guides/heat-pump-workflows` for examples,
+``target=`` argument, and ``hpr_refrigerant_screen`` takes its Carnot target as
+``target=``. See :doc:`../guides/heat-pump-workflows` for examples,
 unsupported selections and ownership rules.
 
 Input JSON remains input-only. Reconstructing a solved placement case from

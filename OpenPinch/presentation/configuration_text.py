@@ -657,6 +657,20 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "vapour-compression compressor."
         ),
     ),
+    "HPR_SCREEN_MIN_SUCTION_PRESSURE": FieldText(
+        "Refrigerant screen suction pressure floor", "bar",
+        (
+            "Refrigerant screening flags a fluid whose evaporating saturation "
+            "pressure is below this as deep vacuum suction."
+        ),
+    ),
+    "HPR_SCREEN_CRITICAL_MARGIN": FieldText(
+        "Refrigerant screen critical margin", "delta_degC",
+        (
+            "Refrigerant screening flags a fluid that condenses within this of its "
+            "critical temperature as near critical."
+        ),
+    ),
     "HPR_DT_CASCADE_HX": FieldText(
         "HPR cascade heat exchanger approach", "delta_degC",
         (

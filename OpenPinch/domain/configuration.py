@@ -248,6 +248,8 @@ class HprConfig:
     ambient_air_enabled: bool
     dt_env_cont: float
     max_pressure_ratio: float
+    screen_min_suction_pressure: float
+    screen_critical_margin: float
     max_multistart: int
     eta_penalty: float
     rho_penalty: float

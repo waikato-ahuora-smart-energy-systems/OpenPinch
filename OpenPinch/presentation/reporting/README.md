@@ -7,7 +7,7 @@ Converts solved targets and tables into external forms: report contracts and JSO
 - `serialize_target`, `target_to_result` (`results.py`): serialise a target to a plain dictionary (`Value` objects become dictionaries), or return its reporting contract.
 - `adapt_analysis_result`, `RESULT_ADAPTERS` (`adapters.py`): choose the adapter for a target by walking its class hierarchy; `RESULT_ADAPTERS` is a read-only mapping.
 - `THERMAL_RESULT_ADAPTERS`, `direct_result`, `indirect_result`, `hpr_result`, `orc_result` (`thermal.py`): build `TargetResults` for utility-summary, direct, indirect, heat pump or refrigeration, and ORC targets.
-- `SPECIALIST_RESULT_ADAPTERS`, `specialist_result` (`specialist.py`): deep copies of heat recovery dt-min, HPR load kinks, HPR performance map, HEN synthesis and utility placement results.
+- `SPECIALIST_RESULT_ADAPTERS`, `specialist_result` (`specialist.py`): deep copies of heat recovery dt-min, HPR load kinks, HPR performance map, HPR refrigerant screen, HEN synthesis and utility placement results.
 - `export_target_summary_to_excel_with_units`, `build_summary_dataframe` (`workbook.py`): write the summary and problem-table workbook, or build the summary dataframe with value and unit columns.
 - `problem_table_frame`, `export_problem_table` (`problem_table.py`): detached dataframe view of a `ProblemTable`; write one to an `.xlsx` file.
 - `write_text_as_plain_strings`, `FORMULA_LEADING_CHARACTERS` (`excel_text.py`): store text cells as strings and quote-prefix formula-like text.

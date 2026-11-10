@@ -13,6 +13,7 @@ from ..domain.value import Value
 from .heat_recovery_dt_min import HeatRecoveryDtMinResult
 from .hpr_load_kinks import HprLoadKinksResult
 from .hpr_performance_map import HprPerformanceMap, HprPerformanceMapRequest
+from .hpr_refrigerant_screen import HprRefrigerantScreenResult
 from .input import TargetInput
 from .output import TargetOutput
 from .synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -154,6 +155,7 @@ CONTRACTS: dict[str, tuple[type[BaseModel], str]] = {
     "HprPerformanceMap": (HprPerformanceMap, "serialization"),
     "UtilityPlacementResult": (UtilityPlacementResult, "serialization"),
     "HeatRecoveryDtMinResult": (HeatRecoveryDtMinResult, "serialization"),
+    "HprRefrigerantScreenResult": (HprRefrigerantScreenResult, "serialization"),
     "HprLoadKinksResult": (HprLoadKinksResult, "serialization"),
     "HeatExchangerNetworkSynthesisResult": (
         HeatExchangerNetworkSynthesisResult,

@@ -27,6 +27,7 @@ EXPECTED_TARGET_METHODS = {
     "heat_recovery_dt_min",
     "hpr_load_kinks",
     "hpr_performance_map",
+    "hpr_refrigerant_screen",
     "indirect_heat_integration",
     "isentropic_cogeneration",
     "mvr_heat_pump",

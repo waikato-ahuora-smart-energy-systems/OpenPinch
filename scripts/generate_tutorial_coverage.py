@@ -54,6 +54,7 @@ TARGET_TUTORIALS = {
     "heat_recovery_dt_min": 2,
     "hpr_load_kinks": 8,
     "hpr_performance_map": 9,
+    "hpr_refrigerant_screen": 8,
     "exergy": 7,
     "carnot_heat_pump": 8,
     "carnot_refrigeration": 8,
