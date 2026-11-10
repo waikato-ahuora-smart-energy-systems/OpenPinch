@@ -453,6 +453,7 @@ def test_cascade_state_reports_the_subcooling_the_cycle_applied():
     args = SimpleNamespace(
         dtcont_hp=5.0,
         eta_comp=0.7,
+        eta_motor=1.0,
         refrigerant_ls=["Ammonia", "R1234ze(E)"],
         dt_cascade_hx=5.0,
     )
@@ -494,6 +495,7 @@ def test_cascade_refrigeration_heat_controls_sit_below_the_top_stage():
     args = SimpleNamespace(
         dtcont_hp=5.0,
         eta_comp=0.7,
+        eta_motor=1.0,
         refrigerant_ls=["Ammonia", "Ammonia"],
         dt_cascade_hx=5.0,
     )
@@ -529,6 +531,7 @@ def test_cascade_one_condenser_delivers_its_duty_once_with_two_evaporators():
     args = SimpleNamespace(
         dtcont_hp=5.0,
         eta_comp=0.7,
+        eta_motor=1.0,
         refrigerant_ls=["Ammonia", "Ammonia"],
         dt_cascade_hx=1.0,
     )

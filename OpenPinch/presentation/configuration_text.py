@@ -607,6 +607,13 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "Python API also takes a function of the compressor conditions."
         ),
     ),
+    "HPR_ETA_MOTOR": FieldText(
+        "HPR motor efficiency", None,
+        (
+            "Motor efficiency of the vapour compression compressors. The electrical "
+            "work is the shaft work divided by it; the losses leave the cycle."
+        ),
+    ),
     "HPR_ETA_EXP": FieldText(
         "HPR expander efficiency", None,
         "Isentropic efficiency of the expander in Brayton cycles.",

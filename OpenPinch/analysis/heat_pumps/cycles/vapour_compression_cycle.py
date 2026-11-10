@@ -53,6 +53,7 @@ class VapourCompressionCycle:
         self._dT_subcool: float = 0.0
         self._eta_comp: float = 1.0
         self._eta_comp_applied: float = 1.0
+        self._eta_motor: float = 1.0
         self._ihx_gas_dt: float = 0.0
         self._dtcont: float = 0.0
         # Default value used in piecewise approximation of non-linear T-h profiles.
@@ -320,6 +321,11 @@ class VapourCompressionCycle:
     def eta_comp(self) -> float:
         """Isentropic compressor efficiency applied in the last solve."""
         return self._eta_comp_applied
+
+    @property
+    def eta_motor(self) -> float:
+        """Compressor motor efficiency applied in the last solve."""
+        return self._eta_motor
 
     @property
     def dT_ihx_gas_side(self) -> float:
@@ -616,6 +622,7 @@ class VapourCompressionCycle:
         dT_superheat: float = 0.0,
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
+        eta_motor: float = 1.0,
         refrigerant: str = "water",
         dT_ihx_gas_side: float = 10.0,
         Q_heat: float = None,
@@ -641,6 +648,9 @@ class VapourCompressionCycle:
             Degree of subcooling after the condenser, heat delivered to the process [K].
         eta_comp : float, optional
             Isentropic efficiency of the compressor [-].
+        eta_motor : float, optional
+            Efficiency of the compressor motor [-]. Motor losses raise the
+            electrical work and leave the cycle duties unchanged.
         refrigerant : str, optional
             Cycle refrigerant; supports multi-component fluids.
         dT_ihx_gas_side : float, optional
@@ -663,7 +673,7 @@ class VapourCompressionCycle:
         Returns
         -------
         float
-            Compressor power requirement for the solved operating point [W].
+            Compressor electrical power for the solved operating point [W].
         """
         self._solved = False
         self.temperature_unit = "K"
@@ -692,6 +702,9 @@ class VapourCompressionCycle:
             self._Q_evap = self._Q_cool + self._Q_cas_cool
 
         self._eta_comp = eta_comp
+        if not 0.0 < float(eta_motor) <= 1.0:
+            raise ValueError("eta_motor must be in the interval (0, 1].")
+        self._eta_motor = float(eta_motor)
         self._ihx_gas_dt = max(
             min(
                 dT_ihx_gas_side,
@@ -831,7 +844,7 @@ class VapourCompressionCycle:
 
         self._q_evap = state0.hmass() - state3.hmass()
         self._q_cond = state1.hmass() - state2.hmass()
-        self._w_net = self._q_cond - self._q_evap
+        self._w_net = (self._q_cond - self._q_evap) / self._eta_motor
         if is_heat_pump:
             self._m_dot = self._Q_cond / self._q_cond
             self._Q_evap = self._m_dot * self._q_evap

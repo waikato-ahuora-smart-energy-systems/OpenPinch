@@ -7,6 +7,17 @@ Unreleased
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- New configuration option ``HPR_ETA_MOTOR`` (default 0.95) is the motor
+  efficiency of the vapour compression compressors, as ``HPR_MVR_ETA_MOTOR``
+  already is for MVR. The electrical work is the shaft work divided by it, and
+  the motor losses leave the cycle, so condenser and evaporator duties are
+  unchanged. It applies to single-stage, parallel and cascade cycles, the
+  vapour compression stages of vapour compression with MVR, and the TESPy
+  backend, and each simulation record stage carries its motor efficiency.
+  Vapour compression work and costs rise by about 5% at the default; set
+  ``HPR_ETA_MOTOR`` to 1.0 for the previous results, and with a compressor
+  model that gives overall efficiency, such as ``brendel``, since that already
+  includes the motor.
 - New ``problem.target.hpr_refrigerant_screen()`` screens working fluids as
   single-stage cycles between the evaporating and condensing levels of a
   Carnot heat pump or refrigeration target (``target=...``), or between

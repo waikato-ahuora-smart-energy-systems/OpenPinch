@@ -267,6 +267,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_comp: float | Callable[[Any], float]
     eta_mvr_comp: float | Callable[[Any], float]
     eta_motor: float
+    eta_mvr_motor: float
     eta_exp: float
     dtcont_hp: float
     dt_hp_ihx: float

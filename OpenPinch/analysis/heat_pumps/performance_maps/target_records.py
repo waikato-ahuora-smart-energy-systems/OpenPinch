@@ -171,7 +171,7 @@ def _build_coolprop_loops(
                 if is_mvr
                 else args.eta_comp
             ),
-            motor_efficiency=(float(args.eta_motor) if is_mvr else None),
+            motor_efficiency=float(args.eta_mvr_motor if is_mvr else args.eta_motor),
             useful_duty=duty,
             compressor_work=float(work[ordinal]),
             assumptions={"power_boundary": "compressor_only"},

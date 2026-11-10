@@ -419,6 +419,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_N_COND": _spec(int, 3, "hpr", "n_cond", numeric_min=0.0),
     "HPR_N_EVAP": _spec(int, 2, "hpr", "n_evap", numeric_min=0.0),
     "HPR_ETA_COMP": _spec(float, 0.7, "hpr", "eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "HPR_ETA_MOTOR": _spec(float, 0.95, "hpr", "eta_motor", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_COMPRESSOR_MODEL": _spec(str, "constant", "hpr", "compressor_model", validator=_compressor_model),
     "HPR_ETA_EXP": _spec(float, 0.7, "hpr", "eta_exp", numeric_min=0.0, numeric_max=1.0),
     "HPR_ETA_II_CARNOT": _spec(float, 0.5, "hpr", "eta_ii_carnot", numeric_min=0.0, numeric_max=1.0, positive=True),

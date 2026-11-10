@@ -75,6 +75,7 @@ def _base_args(**overrides):
         "n_cond": 2,
         "n_evap": 2,
         "eta_comp": 0.75,
+        "eta_motor": 1.0,
         "eta_exp": 0.7,
         "dtcont_hp": 5.0,
         "dt_hp_ihx": 3.0,

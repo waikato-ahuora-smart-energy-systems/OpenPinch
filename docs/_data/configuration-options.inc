@@ -180,6 +180,7 @@ Heat Pump and Refrigeration
    "``HPR_N_COND``","number","``3``","",">= 0","Number of condensing temperature levels in the heat pump or refrigeration cycle."
    "``HPR_N_EVAP``","number","``2``","",">= 0","Number of evaporating temperature levels in the heat pump or refrigeration cycle."
    "``HPR_ETA_COMP``","number","``0.7``","","> 0 to 1","Isentropic efficiency of the compressors in simulated vapour compression and Brayton cycles."
+   "``HPR_ETA_MOTOR``","number","``0.95``","","> 0 to 1","Motor efficiency of the vapour compression compressors. The electrical work is the shaft work divided by it; the losses leave the cycle."
    "``HPR_COMPRESSOR_MODEL``","string","``constant``","","","Isentropic efficiency model of the vapour compression compressors: constant (HPR_ETA_COMP), pareto_front (HeatPumpLab's best published efficiency against pressure ratio), wang_cleland (a polynomial in pressure ratio) or brendel (pressure ratio and suction pressure). The Python API also takes a function of the compressor conditions."
    "``HPR_ETA_EXP``","number","``0.7``","","0 to 1","Isentropic efficiency of the expander in Brayton cycles."
    "``HPR_ETA_II_CARNOT``","number","``0.5``","","> 0 to 1","Second-law efficiency of Carnot-model heat pumps and refrigeration: the fraction of the cooling Carnot COP, T_l/(T_h - T_l), they achieve. The heating COP follows from the energy balance, 1 + eta x T_l/(T_h - T_l)."

@@ -309,6 +309,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         dT_superheat: np.ndarray = 0.0,
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
+        eta_motor: float = 1.0,
         refrigerant: List[str] | str = "water",
         dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray = None,
@@ -334,6 +335,8 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             Degree of subcooling after the condenser, heat delivered to the process [K].
         eta_comp : float, optional
             Isentropic efficiency of the compressor [-].
+        eta_motor : float, optional
+            Efficiency of each compressor motor [-].
         refrigerant : List[str], optional
             Cycle refrigerant; supports multi-component fluids.
         dT_ihx_gas_side : np.ndarray | float, optional
@@ -451,6 +454,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 dT_superheat=dT_superheat_all[i],
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,
+                eta_motor=eta_motor,
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=ihx_gas_dt_all[i],
                 Q_heat=Q_heat_all[i],
