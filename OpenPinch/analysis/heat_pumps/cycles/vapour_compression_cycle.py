@@ -817,6 +817,7 @@ class VapourCompressionCycle:
                 dT_superheat=dT_superheat,
                 dT_subcool=float(self._dT_subcool),
                 eta_comp=eta_comp,
+                eta_motor=eta_motor,
                 refrigerant=refrigerant,
                 dT_ihx_gas_side=dT_ihx_gas_side,
                 Q_heat=Q_heat,
