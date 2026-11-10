@@ -4,6 +4,18 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis, such as
+  ``design.heat_exchanger_network()``, no longer crashes with
+  ``BrokenProcessPool`` when run from a script with no
+  ``if __name__ == "__main__":`` guard on macOS, Windows, or Linux on Python
+  3.14. Worker processes there import the main script again, so each one
+  re-ran the whole script. Synthesis now logs a warning and solves its tasks
+  serially in that case, as the optimisation backends already did. Put the
+  script's entry code under a main guard to use worker processes.
+
 Documentation
 ~~~~~~~~~~~~~
 

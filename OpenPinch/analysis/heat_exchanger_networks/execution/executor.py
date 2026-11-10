@@ -12,6 +12,7 @@ from ....contracts.synthesis.task import (
 )
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.progress import emit as emit_progress
+from ....optimisation.execution import _main_module_reruns_in_workers
 from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
@@ -23,7 +24,13 @@ logger = logging.getLogger(__name__)
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
     """Create solver workers with the interpreter's default process context."""
-
+    if _main_module_reruns_in_workers():
+        logger.warning(
+            "Solving HEN tasks serially: the main script has no main guard, "
+            "so every worker process would rerun it. Put the script's entry "
+            'code under `if __name__ == "__main__":` to use worker processes.'
+        )
+        raise NotImplementedError("the main script has no main guard")
     return ProcessPoolExecutor(max_workers=max_workers)
 
 
