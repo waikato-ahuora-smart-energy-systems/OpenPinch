@@ -21,7 +21,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
   - [targeting](./targeting/README.md): method orchestration and topology helpers.
 
 ## Invariants
-- Runtime options must be a dict or `None` and must not contain `HENS_` keys; persistent controls are loaded with the problem [context.py:normalise_runtime_options].
+- Runtime options reaching this package must be a dict or `None` and must not contain `HENS_` keys; persistent controls are loaded with the problem. The `problem.design` accessors move `HENS_` keys from a call's `options` into that call's configuration before this check, so users may pass them there [context.py:normalise_runtime_options].
 - Open-HENS and PDM reject `initial_networks`; `method=None` runs tier 0 and `OpenHENS` runs tier 1 [service.py:heat_exchanger_network_synthesis_service].
 - The call-local quality tier of the OpenHENS entry points must be an integer from 0 to 5; the standalone method services use the configured tier [service.py:_validate_quality_tier].
 - An accepted design is ranked, selected and verified; verification failures raise `RuntimeError` [context.py:finalise_design_result].

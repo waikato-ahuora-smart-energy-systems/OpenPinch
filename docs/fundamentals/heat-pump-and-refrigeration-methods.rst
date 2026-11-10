@@ -33,6 +33,18 @@ successive temperature lifts and is selected with ``is_cascade_cycle`` where
 the model supports it. MVR is a separate named workflow rather than a hidden
 cycle-string combination.
 
+In a cascade each lower stage condenses into the evaporator of the stage above
+it. With one condenser and several evaporators, only the top stage delivers
+process heat; the lower stages lift heat to the stage above. In multi-stage
+refrigeration each stage's condenser passes heat up to the evaporator of the
+warmer stage, and the top stage rejects the remainder. A stage's subcooling heat
+must fit in its own process duty, so a stage that only passes heat up does not
+subcool. Vapour-compression compressors are limited to a pressure ratio of
+``HPR_MAX_PRESSURE_RATIO`` (default 15).
+
+Ambient air is a free heat source for heat pumps and a free heat sink for
+refrigeration unless ``HPR_AMBIENT_AIR_ENABLED`` is ``False``.
+
 Bounded Search and Failure Evidence
 -----------------------------------
 

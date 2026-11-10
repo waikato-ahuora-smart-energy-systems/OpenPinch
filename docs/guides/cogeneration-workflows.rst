@@ -48,6 +48,8 @@ Turbine Models
 ``cogeneration`` uses Medina-Flores et al. (2010). ``sun_smith_cogeneration``,
 ``varbanov_small_turbine_cogeneration``, ``varbanov_large_turbine_cogeneration``
 and ``isentropic_cogeneration`` select the other models.
+``isentropic_cogeneration`` needs its fixed isentropic efficiency, greater than
+0 and at most 1, as ``isentropic_cogeneration(efficiency=0.75)``.
 
 The two Varbanov methods each use one size band of the Varbanov et al. (2004)
 coefficients: the small model for stage work at or below 2000 kW, and the large
@@ -56,8 +58,9 @@ of the turbine. Both change from a back-pressure to a condensing turbine when th
 exit would be wet.
 
 If a stage's work is outside the band, the target still reports the number. One
-message, naming the stages, is added to ``turbine_diagnostics``, and this alone
-does not set ``turbine_converged`` to ``False``. The test uses the steam's work
+message, naming the stages, is added to ``turbine_diagnostics``, raised as a
+``UserWarning`` and listed in ``problem.report().warnings``. This alone does not
+set ``turbine_converged`` to ``False``. The test uses the steam's work
 before ``POWER_ETA_MECH`` is applied.
 
 The two models can give very different work at the same duty, so for some duties

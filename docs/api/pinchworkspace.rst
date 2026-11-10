@@ -34,7 +34,8 @@ Interaction Matrix
      - Dependency
    * - construction, ``load``, ``case``, ``use_case``, ``list_cases``
      - Load, retrieve, select, and list named cases
-     - problem or names
+     - problem or names; ``load`` returns ``None`` for input that does not
+       validate, which is still stored as the case
      - prepare/select
      - base
    * - ``scenario``

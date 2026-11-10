@@ -79,7 +79,7 @@ Interaction Matrix
      - base
    * - ``target.organic_rankine_cycle``, ``carnot_orc``
      - Organic Rankine cycle screening
-     - target output
+     - target output, or ``None`` when there is no surplus below the pinch
      - targeted
      - base
    * - ``target.utility_placement``
@@ -110,6 +110,22 @@ Interaction Matrix
      - dataframe, mapping, report, or record
      - none
      - base
+   * - ``compare_to``
+     - Compare the numeric summary metrics of two solved problems
+     - dataframe
+     - none
+     - base
+   * - ``update_options``, ``set_dt_cont_multiplier``
+     - Change stored options or the temperature-approach contribution
+     - zone
+     - re-prepare; clears stale results
+     - base
+   * - ``residual_utility``, ``with_utilities_from``
+     - Derive a new unsolved problem from a residual HPR target or a donor's
+       utilities
+     - new problem
+     - source unchanged
+     - base
    * - ``plot.catalog``, ``plot.data``, and named plot methods
      - Inspect cached graph data or build a figure
      - catalog, mapping, or figure
@@ -130,9 +146,10 @@ corresponding global ``dt_min`` is unknown:
 
 .. code-block:: python
 
+   problem = PinchProblem("basic_pinch.json")
    result = problem.target.heat_recovery_dt_min(
        heat_recovery={"value": 4_000.0, "unit": "kW"},
-       zone="Site/Process",
+       zone="Site/Plant",
        period_id="0",
    )
 
@@ -163,9 +180,10 @@ IDs themselves are ``value`` and ``unit``:
 
 .. code-block:: python
 
+   problem = PinchProblem("crude_preheat_train_multiperiod.json")
    period_results = (
        problem.target.all_periods.heat_recovery_dt_min(
-           heat_recovery={"base": 4_000.0, "turndown": 3_200.0},
+           heat_recovery={"base": 4_000.0, "turndown": 3_200.0, "peak": 4_800.0},
            workers=2,
        )
    )

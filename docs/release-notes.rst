@@ -11,6 +11,21 @@ Documentation
   its type, default, unit, limits and description, generated from
   ``configuration_options()``. It includes options such as
   ``HPR_AMBIENT_AIR_ENABLED`` that were only described in the release notes.
+- The heat pump guide and methods page now explain ``HPR_AMBIENT_AIR_ENABLED``
+  and ``HPR_DT_ENV_CONT``, and how cascade stages pass heat and subcool since
+  the 0.8.0 cascade fixes. The HEN synthesis guide now gives each design
+  method's default quality tier and explains that unconverged solves
+  (``[Unconverged]`` warnings) are left out of the final ranking. The
+  cogeneration guide now gives ``isentropic_cogeneration``'s required
+  ``efficiency`` and says where band warnings appear.
+- Fixed examples that raised: the inverse ``dt_min`` examples on the
+  ``PinchProblem`` page named a zone and periods that no sample case has, and
+  the zonal guide asked a single-period case for its winter period.
+- The ``PinchProblem`` interaction table now lists ``compare_to``,
+  ``update_options``, ``set_dt_cont_multiplier``, ``residual_utility`` and
+  ``with_utilities_from``, and notes that the ORC methods return ``None``
+  without a surplus below the pinch. The ``PinchWorkspace`` table notes that
+  ``load`` returns ``None`` for input that does not validate.
 
 0.8.2 (2026-11-10)
 ------------------

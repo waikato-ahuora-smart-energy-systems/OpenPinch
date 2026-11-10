@@ -106,6 +106,28 @@ For multiple operating periods, call
 ``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
 all-period targeting.
 
+Quality Tiers and Convergence
+-----------------------------
+
+The quality tier sets how widely synthesis searches, from 0 to 5.
+``heat_exchanger_network()`` runs tier 0, which skips the thermal derivative
+step; ``enhanced_heat_exchanger_network()`` runs tier 2 unless
+``quality_tier`` is given; ``open_hens()`` always runs tier 1, the standard
+OpenHENS pinch design, thermal derivative and network evolution sequence. A
+``HENS_SYNTHESIS_QUALITY_TIER`` stored in the problem's options replaces the
+first two defaults. The tier that ran is in
+``design.result.manifest.synthesis_quality_tier``. The other ``HENS_*`` keys,
+such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument),
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_SOLVE_TOLERANCE``, are listed with
+their defaults in :doc:`../api/configuration-options`.
+
+A solve that stopped before converging, for example at the IPOPT iteration
+limit, is logged as an ``[Unconverged]`` warning. Its network still seeds the
+steps that follow, but it is left out of the final ranking, so a low objective
+from an unconverged model cannot win on cost. Networks that fail
+``verify_network_feasibility`` are left out in the same way. When no converged,
+feasible network remains, the design method raises ``WorkflowContractError``.
+
 Duty Allocation on a Fixed Network
 ----------------------------------
 
