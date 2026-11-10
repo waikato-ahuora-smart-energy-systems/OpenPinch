@@ -14,12 +14,16 @@ workflows are Python workflows.
 Prerequisites
 -------------
 
-Install the package and, if you plan to run notebooks, the notebook extra:
+Install the package and, if you plan to run notebooks, the notebook extra
+and a Jupyter front end (or open the notebooks in VS Code):
 
 .. code-block:: bash
 
    python -m pip install openpinch
-   python -m pip install "openpinch[notebook]"
+   python -m pip install "openpinch[notebook]" jupyterlab
+
+Notebooks 15 to 17 also need ``openpinch[synthesis]`` and notebook 18 needs
+``openpinch[dashboard]``; see :doc:`../examples/notebook-series`.
 
 Sample Asset
 ------------
@@ -43,6 +47,8 @@ Copy one notebook:
 .. code-block:: bash
 
    openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks/
+
+Add ``--force`` to overwrite notebooks already in the output directory.
 
 The packaged notebook series has nineteen notebooks, ``01_first_solve_and_core_curves.ipynb``
 through ``19_utility_placement_optimisation.ipynb``; see

@@ -27,6 +27,7 @@ Copy one tutorial:
 
    openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks/
 
+Add ``--force`` to overwrite notebooks already in the output directory.
 The nineteen tutorials are described in :doc:`../examples/notebook-series`.
 Their complete public-operation ownership is published in
 :doc:`../examples/tutorial-coverage-map`.

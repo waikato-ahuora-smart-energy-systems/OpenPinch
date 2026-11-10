@@ -26,6 +26,26 @@ Documentation
   ``with_utilities_from``, and notes that the ORC methods return ``None``
   without a surplus below the pinch. The ``PinchWorkspace`` table notes that
   ``load`` returns ``None`` for input that does not validate.
+- The capability matrix, stability levels and overview lists now include the
+  Organic Rankine Cycle, residual utility, area and cost, and utility
+  placement methods. The cogeneration methods page lists all five turbine
+  methods and says which target's hot utilities they use. The heat pump
+  methods page states that cascade topology is the default and which methods
+  take the utility-placement flags. The graphs page lists every
+  ``problem.plot`` method.
+- Fixed examples: the schema-first validation example used ``...``
+  placeholders, the HEN serialized-network example used undefined payloads,
+  and the utility placement examples now use a small search budget that runs
+  in about a second per call.
+- The guides now say which extra Excel input needs, that
+  ``show_dashboard()`` renders only under ``streamlit run``, that notebooks
+  need a Jupyter front end, and that ``openpinch notebook --force``
+  overwrites existing copies.
+- Developer pages corrected against CI: lanes and the dependency audit, where
+  ``OPENPINCH_TEST_REAL_POOLS`` is set, the development install command, and
+  the application layer's allowed imports. The two stub reference pages and
+  the completed October 2026 audit plan are no longer published, and the
+  module appendix is renamed Contributor Module Reference.
 
 0.8.2 (2026-11-10)
 ------------------

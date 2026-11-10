@@ -55,7 +55,18 @@ Capability Matrix
    * - Area/cost, exergy, and energy transfer
      - named ``problem.target`` enrichment methods
      - enriched target and graph families
-     - base; plotting for figures
+     - base; figures need plotly (``openpinch[notebook]`` or
+       ``openpinch[dashboard]``)
+   * - Organic Rankine Cycle
+     - ``problem.target.carnot_orc()``, ``organic_rankine_cycle()`` and
+       their ``all_periods`` mirrors
+     - ORC work target and GCC and net load graphs with the ORC
+     - base (CoolProp)
+   * - Residual utility
+     - ``problem.residual_utility(...)``, ``with_utilities_from(...)`` and
+       ``base_target=`` on the heat integration methods
+     - utility left after an earlier target is applied
+     - base
    * - Cogeneration
      - default and named turbine-model target methods
      - work and efficiency targets

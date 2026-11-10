@@ -32,7 +32,8 @@ Owner Responsibilities
      - analysis, contracts, domain, optimisation, and explicit adapter leaves
    * - ``application``
      - Use-case orchestration, caches, replay, workspaces, and coordination
-     - inward owners and presentation; optional presentation leaves load lazily
+     - adapters, analysis, application, contracts, domain, and presentation
+       (never optimisation); optional presentation leaves load lazily
    * - ``presentation``
      - Reports, tables, figures, dashboards, diagrams, and exports
      - presentation, analysis, adapters, contracts, and domain; never
@@ -70,6 +71,10 @@ The supported request follows this sequence:
    translate input formats, and reports, exports and plots are produced on
    request.
 5. ``PinchProblem`` caches the validated output contract for observation.
+
+``application.commands`` (``run_command`` and ``run_command_json``) exposes the
+same accessors as JSON-in, JSON-out commands for browser and backend engines,
+including the Pyodide build. It never reads host files.
 
 Optimisation Boundary
 ---------------------

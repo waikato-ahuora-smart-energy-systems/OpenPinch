@@ -136,6 +136,7 @@ OpenPinch allocate the duties. List recovery matches as
 ``(hot_stream, cold_stream, stage)`` with one-based stages, heaters by cold
 stream and coolers by hot stream. A ``HeatExchangerNetwork``, such as a
 previous design's ``selected_network``, is accepted in place of the mapping.
+The example uses the four-stream ``problem`` loaded under Ranked Synthesis.
 
 .. code-block:: python
 
@@ -226,17 +227,22 @@ Serialized Network Input
 ------------------------
 
 The supported bridge carries the exact JSON-visible runtime dump through
-``TargetInput.network``:
+``TargetInput.network``. Here ``network`` is the rank-1 network from Ranked
+Synthesis:
 
 .. code-block:: python
 
-   from OpenPinch.contracts.input import TargetInput
+   import json
 
+   from OpenPinch.contracts.input import TargetInput
+   from OpenPinch.resources import read_sample_case
+
+   case = json.loads(read_sample_case("Four-stream-Yee-and-Grossmann-1990-1.json"))
    network_payload = network.model_dump(mode="json")
    input_data = TargetInput.model_validate(
        {
-           "streams": stream_payloads,
-           "utilities": utility_payloads,
+           "streams": case["streams"],
+           "utilities": case["utilities"],
            "network": network_payload,
        }
    )

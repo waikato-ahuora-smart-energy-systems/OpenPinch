@@ -92,8 +92,8 @@ profile decides which CI lane runs it:
    Runs in the routine unit lane.
 
 ``slow-hpr``
-   Heat pump notebooks with a longer numerical run; notebook 09 needs the
-   ``tespy`` extra; executed in the dedicated ``notebooks-hpr`` lane.
+   Heat pump notebooks with a longer numerical run; notebook 09 uses the
+   ``tespy`` extra for one optional screen; executed in the dedicated ``notebooks-hpr`` lane.
 
 ``solver``
    Requires the HEN synthesis extras and an available solver; executed in the

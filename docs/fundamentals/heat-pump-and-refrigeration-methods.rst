@@ -25,12 +25,14 @@ Placement and Topology
 ----------------------
 
 Direct placement couples the HPR model to a process heat-integration target.
-Utility placement couples it to the site utility system. For Carnot methods,
-``is_utility_heat_pump`` or ``is_utility_refrigeration`` expresses that choice.
+Utility placement couples it to the site utility system.
+``is_utility_heat_pump`` (heat pump methods, including ``mvr_heat_pump``) or
+``is_utility_refrigeration`` (refrigeration methods) selects utility
+placement; the default ``False`` is direct placement.
 
-Parallel topology represents independent lifts. Cascade topology connects
-successive temperature lifts and is selected with ``is_cascade_cycle`` where
-the model supports it. MVR is a separate named workflow rather than a hidden
+Cascade topology, the default (``is_cascade_cycle=True``), connects successive
+temperature lifts. Pass ``is_cascade_cycle=False`` for parallel, independent
+lifts. The flag applies to the Carnot and vapour-compression methods. MVR is a separate named workflow rather than a hidden
 cycle-string combination.
 
 In a cascade each lower stage condenses into the evaporator of the stage above

@@ -58,7 +58,12 @@ Runnable Workflow
 -----------------
 
 Run Process-level placement against the ``Almond`` direct GCC with four
-isothermal and zero sensible levels on each side:
+isothermal and zero sensible levels on each side. The small search budget in
+``search_options`` keeps each call to about a second, as in notebook 19; the
+defaults (500 iterations, 5000 evaluations) take about a minute per call. Run
+the code from a script under ``if __name__ == "__main__":`` so worker
+processes are used; without the guard the search runs serially with a
+warning.
 
 .. code-block:: python
 
@@ -68,12 +73,19 @@ isothermal and zero sensible levels on each side:
        source="chocolate_factory.json", project_name="Site"
    )
    problem = workspace.use_case("baseline")
+   search_options = {
+       "iteration_limit": 5,
+       "evaluation_limit": 10,
+       "candidate_limit": 1,
+       "run_count": 1,
+   }
 
    process_case = problem.target.utility_placement(
        isothermal=4,
        sensible=0,
        zone="Almond",
        period_ids=("0",),
+       options=search_options,
    )
    process_evidence = process_case.utility_placement_result
 
@@ -142,6 +154,7 @@ Run Site-level placement separately. Because the master zone is a Site, no
        isothermal=4,
        sensible=0,
        period_ids=("0",),
+       options=search_options,
    )
    site_summary = site_case.summary_frame()
    site_tsp = site_case.plot.total_site_profiles()

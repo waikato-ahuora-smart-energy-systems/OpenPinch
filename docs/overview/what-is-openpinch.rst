@@ -3,8 +3,8 @@ What Is OpenPinch?
 
 OpenPinch is a process-engineering package for Pinch Analysis, inverse global
 ``dt_min`` targeting from a required process heat recovery, Total Site heat
-integration, multiperiod analysis, HPR and cogeneration screening, exergy and
-energy-transfer analysis, and heat exchanger network synthesis.
+integration, multiperiod analysis, HPR, Organic Rankine Cycle and cogeneration
+screening, area and cost targets, exergy and energy-transfer analysis, and heat exchanger network synthesis.
 
 The public application model has two classes:
 
