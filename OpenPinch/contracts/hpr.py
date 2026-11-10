@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum
 from typing import Any, List, Literal, Optional, Self
 
@@ -261,8 +262,10 @@ class HeatPumpTargetInputs(BaseModel):
     n_cond: int
     n_evap: int
     n_mvr: int
-    eta_comp: float
-    eta_mvr_comp: float
+    # A constant isentropic efficiency, or a function of the compressor
+    # conditions (analysis.heat_pumps.common.compressor_efficiency).
+    eta_comp: float | Callable[[Any], float]
+    eta_mvr_comp: float | Callable[[Any], float]
     eta_motor: float
     eta_exp: float
     dtcont_hp: float

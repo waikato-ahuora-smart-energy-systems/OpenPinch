@@ -15,6 +15,10 @@ from ....domain._stream.linearisation import (
 from ....domain.configuration import tol
 from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
+from ..common.compressor_efficiency import (
+    CompressorConditions,
+    evaluate_compressor_model,
+)
 
 # Qualities this close to 0 or 1 are saturated liquid or vapour; differences
 # below it are CoolProp round-off and must not change the cycle's path.
@@ -48,6 +52,7 @@ class VapourCompressionCycle:
         self._dT_superheat: float = 0.0
         self._dT_subcool: float = 0.0
         self._eta_comp: float = 1.0
+        self._eta_comp_applied: float = 1.0
         self._ihx_gas_dt: float = 0.0
         self._dtcont: float = 0.0
         # Default value used in piecewise approximation of non-linear T-h profiles.
@@ -313,8 +318,8 @@ class VapourCompressionCycle:
 
     @property
     def eta_comp(self) -> float:
-        """Isentropic compressor efficiency."""
-        return self._eta_comp
+        """Isentropic compressor efficiency applied in the last solve."""
+        return self._eta_comp_applied
 
     @property
     def dT_ihx_gas_side(self) -> float:
@@ -483,8 +488,30 @@ class VapourCompressionCycle:
         quality = float(state.Q()) if h_liquid < h < h_vapour else None
         return h, float(state.T()), quality
 
+    def _compressor_conditions(
+        self, suction: CoolProp.AbstractState, P_out: float
+    ) -> CompressorConditions:
+        P_in = float(suction.p())
+        evap_dew = self._compute_state_from_pressure_quality(P_in, 1.0)
+        cond_dew = self._compute_state_from_pressure_quality(P_out, 1.0)
+        return CompressorConditions(
+            refrigerant=self._refrigerant,
+            P_suction=P_in / 1000.0,
+            P_discharge=float(P_out) / 1000.0,
+            T_suction=self._convert_K_to_C(float(suction.T())),
+            T_evap_dew=self._convert_K_to_C(float(evap_dew.T())),
+            T_cond_dew=self._convert_K_to_C(float(cond_dew.T())),
+            rho_suction=float(suction.rhomass()),
+            rho_evap_dew=float(evap_dew.rhomass()),
+            rho_cond_dew=float(cond_dew.rhomass()),
+        )
+
     def _compute_compressor_outlet_state(
-        self, h_in: float, s_in: float, P_out: float
+        self,
+        h_in: float,
+        s_in: float,
+        P_out: float,
+        suction: CoolProp.AbstractState | None = None,
     ) -> CoolProp.AbstractState:
         s = self._get_fluid_state(self._refrigerant)
         try:
@@ -501,7 +528,13 @@ class VapourCompressionCycle:
             )
 
         h_out_isentropic = s.hmass()
-        h_out = h_in + (h_out_isentropic - h_in) / self._eta_comp
+        eta = self._eta_comp
+        if callable(eta):
+            eta = evaluate_compressor_model(
+                eta, self._compressor_conditions(suction, P_out)
+            )
+        self._eta_comp_applied = eta
+        h_out = h_in + (h_out_isentropic - h_in) / eta
         return self._compute_state_from_pressure_enthalpy(P=P_out, h=h_out)
 
     def _compute_state_from_pressure_enthalpy(
@@ -715,7 +748,10 @@ class VapourCompressionCycle:
 
         # 1 - Compressor discharge (real), compressing from the IHX outlet state
         state1 = self._compute_compressor_outlet_state(
-            h_in=h_ihx_out, s_in=state_ihx_out.smass(), P_out=P_hi
+            h_in=h_ihx_out,
+            s_in=state_ihx_out.smass(),
+            P_out=P_hi,
+            suction=state_ihx_out,
         )
         self._save_cycle_state(state1, 1)
 

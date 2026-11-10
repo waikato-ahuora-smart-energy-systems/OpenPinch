@@ -479,6 +479,12 @@ def preflight_tespy_hpr_targeting(
             "unsupported_model",
             "TESPy single-stage targeting does not include an internal heat exchanger.",
         )
+    if callable(args.eta_comp):
+        raise HprTargetCompatibilityError(
+            "unsupported_compressor_model",
+            "TESPy targeting takes only a constant compressor efficiency "
+            "(HPR_COMPRESSOR_MODEL 'constant').",
+        )
     if find_spec("tespy") is None:
         raise HprTargetDependencyError(
             "dependency_unavailable",

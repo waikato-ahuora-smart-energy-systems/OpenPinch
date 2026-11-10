@@ -232,10 +232,12 @@ class HprConfig:
     mvr_fluids: list[str]
     mvr_count: int
     mvr_eta_comp: float
+    mvr_compressor_model: str
     mvr_eta_motor: float
     n_cond: int
     n_evap: int
     eta_comp: float
+    compressor_model: str
     eta_exp: float
     eta_ii_carnot: float
     he_eta_ii_carnot: float

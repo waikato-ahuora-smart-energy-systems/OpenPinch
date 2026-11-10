@@ -67,6 +67,15 @@ def build_hpr_target_map_basis(target: object) -> HprTargetMapBasis:
             "Performance-map schema 1.0 requires a single-stage vapour cycle.",
         )
 
+    compressor_model = record.assumptions.get("compressor_model")
+    if compressor_model is not None:
+        _reject(
+            "compressor_model",
+            f"The HPR target's compressor efficiency follows the {compressor_model} "
+            "model; a performance map holds it constant, so it needs a target "
+            "with HPR_COMPRESSOR_MODEL 'constant'.",
+        )
+
     expected_mode = _target_mode(target)
     if (
         target.hpr_simulation_backend != record.simulation_backend

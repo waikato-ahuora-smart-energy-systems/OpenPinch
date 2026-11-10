@@ -807,7 +807,7 @@ def test_simple_cycle_property_getters_and_require_solution():
     hp._T_cond = 70.0
     hp._dT_superheat = 5.0
     hp._dT_subcool = 2.0
-    hp._eta_comp = 0.8
+    hp._eta_comp_applied = 0.8
     hp._ihx_gas_dt = 7.0
 
     assert hp.cycle_states == "cycle-states"
