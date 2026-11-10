@@ -223,7 +223,9 @@ Refrigerant Screening
 
 ``problem.target.hpr_refrigerant_screen`` screens candidate working fluids as
 single-stage cycles between the evaporating and condensing levels of a
-successful Carnot heat pump or refrigeration target. Pass the target, or both
+successful Carnot heat pump or refrigeration target. The target must be the
+problem's current one: a target from another problem, or one superseded or made
+stale by later changes, is rejected. Pass the target, or both
 ``T_evap`` and ``T_cond`` (one level or a list; degC or ``{"value", "unit"}``)
 instead. The result has one row per fluid and level pair. It does not change
 the problem.

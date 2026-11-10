@@ -21,7 +21,7 @@ from ..domain.enums import HeatPumpAndRefrigerationCycle
 from ..domain.targets import HeatPumpTargetBase
 from ..domain.value import Value
 from ._problem.arguments import temporary_zone_configuration
-from ._problem.targeting.provenance import make_provenance
+from ._problem.targeting.provenance import make_provenance, validate_base_target
 
 if TYPE_CHECKING:
     from .problem import PinchProblem
@@ -75,6 +75,14 @@ def calculate_hpr_refrigerant_screen(
             )
         if not target.hpr_success:
             raise ValueError("Refrigerant screening needs a successful Carnot target.")
+        try:
+            validate_base_target(problem, target, zone=None, period_id=None)
+        except ValueError as exc:
+            raise ValueError(
+                "Refrigerant screening needs the current Carnot target of this "
+                "problem for its zone and period; rerun the target after changing "
+                "the problem or its options."
+            ) from exc
         zone = problem._resolve_target_zone(
             target.provenance.zone_address, master_zone=root
         )

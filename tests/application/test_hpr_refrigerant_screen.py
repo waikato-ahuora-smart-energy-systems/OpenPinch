@@ -172,3 +172,23 @@ def test_signature_is_keyword_only_and_only_the_active_case_mirrors_it():
     # dependence to mirror.
     assert not hasattr(workspace.target.all_periods, "hpr_refrigerant_screen")
     assert not hasattr(workspace.cases().target, "hpr_refrigerant_screen")
+
+
+def test_foreign_stale_or_superseded_targets_are_rejected(carnot_heat_pump):
+    _, target = carnot_heat_pump
+    message = "current Carnot target of this problem"
+    other = PinchProblem("basic_pinch.json", project_name="Site")
+    with pytest.raises(ValueError, match=message):
+        other.target.hpr_refrigerant_screen(target=target)
+
+    problem = PinchProblem("basic_pinch.json", project_name="Site")
+    kwargs = dict(condensers=1, evaporators=1, maximum_restarts=1)
+    first = problem.target.carnot_heat_pump(load_fraction=0.25, **kwargs)
+    problem.target.carnot_heat_pump(load_fraction=0.5, **kwargs)
+    with pytest.raises(ValueError, match=message):
+        problem.target.hpr_refrigerant_screen(target=first)
+
+    current = problem.target.carnot_heat_pump(load_fraction=0.25, **kwargs)
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+    with pytest.raises(ValueError, match=message):
+        problem.target.hpr_refrigerant_screen(target=current)
