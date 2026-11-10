@@ -39,6 +39,15 @@ Documentation
   without a surplus below the pinch. The ``PinchWorkspace`` table notes that
   ``load`` returns ``None`` for input that does not validate.
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat pump and refrigeration targets now accept ``R1233zd(E)`` as a
+  refrigerant. Refrigerant names are still upper-cased, so lower-case input
+  such as ``r134a`` resolves, but a name is kept as given when CoolProp rejects
+  its upper-cased form. ``R1233zd(E)`` was the only CoolProp 8.0.0 fluid
+  affected; it raised ``HPRTargetingError`` in preflight.
+
 0.8.2 (2026-11-10)
 ------------------
 

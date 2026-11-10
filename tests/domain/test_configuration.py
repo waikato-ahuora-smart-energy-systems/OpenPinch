@@ -12,6 +12,7 @@ from OpenPinch.domain.configuration_fields import (
     configuration_option_status,
 )
 from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle, TargetType, ZoneType
+from OpenPinch.domain.fluids import build_coolprop_abstract_state
 from OpenPinch.presentation.configuration import configuration_options
 from tests.support.paths import FIXTURES_ROOT
 
@@ -61,6 +62,24 @@ def test_configuration_exposes_normalised_hpr_backend_options():
     assert not hasattr(cfg, "hpr_refrigerants")
     assert not hasattr(cfg, "hpr_mvr_fluids")
     assert not hasattr(cfg, "effective_eta_ii_he_carnot")
+
+
+def test_configuration_refrigerant_names_resolve_in_coolprop():
+    # CoolProp 8 has no R1233ZD(E) key but accepts R1233zd(E); CoolProp 7.2
+    # (Pyodide) accepts both, so check that each name resolves, not its case.
+    cfg = Configuration(
+        options={"HPR_REFRIGERANTS": ["R1233zd(E)", "r1234ze(e)", "HEOS::R1233zd(E)"]}
+    )
+
+    names = cfg.hpr.normalised_refrigerants
+    for name in names:
+        build_coolprop_abstract_state(name)
+    assert [name.casefold() for name in names] == [
+        "r1233zd(e)",
+        "r1234ze(e)",
+        "heos::r1233zd(e)",
+    ]
+    assert names[1] == "R1234ZE(E)"
 
 
 def test_configuration_disables_effective_hpr_heat_engine_efficiency_by_default():
