@@ -248,3 +248,31 @@ def test_annual_cost_display_units_use_the_annual_operating_time():
     assert utility_cost.value == pytest.approx(80000.0, rel=1e-12)
     assert total_cost.unit == "$/h"
     assert total_cost.value == pytest.approx(10.0, rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    ("metric", "value", "overrides", "expected_value", "expected_unit"),
+    [
+        ("hpr_screen_temperature", Value(85.0, "degC"), {}, 85.0, "degC"),
+        (
+            "hpr_screen_temperature",
+            Value(85.0, "degC"),
+            {"temperature": "K"},
+            358.15,
+            "K",
+        ),
+        ("hpr_screen_temperature_difference", Value(15.0, "K"), {}, 15.0, "delta_degC"),
+        ("hpr_screen_pressure", Value(4.3e5, "Pa"), {}, 4.3, "bar"),
+        ("hpr_screen_pressure", Value(4.3e5, "Pa"), {"pressure": "kPa"}, 430.0, "kPa"),
+        ("hpr_screen_suction_vhc", Value(4353.8, "kJ/m^3"), {}, 4353.8, "kJ/m^3"),
+    ],
+)
+def test_refrigerant_screen_metrics_have_display_units(
+    metric, value, overrides, expected_value, expected_unit
+):
+    converted = unit_system.coerce_output_value(
+        value, metric_name=metric, config={"output_unit_overrides": overrides}
+    )
+
+    assert converted.value == pytest.approx(expected_value)
+    assert converted.unit == expected_unit

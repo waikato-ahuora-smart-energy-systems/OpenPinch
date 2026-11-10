@@ -68,6 +68,18 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
         "delta_degC",
         unit_groups=("delta_temperature", "temperature_difference", "temperature"),
     ),
+    "hpr_screen_temperature": OutputUnitRule(
+        "degC", "degC", unit_groups=("temperature",)
+    ),
+    "hpr_screen_temperature_difference": OutputUnitRule(
+        "delta_degC",
+        "delta_degC",
+        unit_groups=("delta_temperature", "temperature_difference"),
+    ),
+    "hpr_screen_pressure": OutputUnitRule("Pa", "bar", unit_groups=("pressure",)),
+    "hpr_screen_suction_vhc": OutputUnitRule(
+        "kJ/m^3", "kJ/m^3", unit_groups=("volumetric_heating_capacity",)
+    ),
     "utility_heat_flow": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "cold_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),
     "hot_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),

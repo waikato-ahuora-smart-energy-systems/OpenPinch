@@ -23,7 +23,7 @@ application layer builds on these models.
 - `HprPerformanceMap`, `HprPerformanceMapRequest`, `HprPerformanceMapUnits`, `HprPerformancePoint`, `JsonValue` (`hpr_performance_map.py`): versioned physical performance map.
 - Utility placement (`utility_placement.py`): `UtilityPlacementRequest`, `UtilityPlacementOptions`, `UtilityPlacementResult`, `UtilityPlacementModel`, templates, envelopes, candidates and enums.
 - `HeatRecoveryDtMinResult`, `HeatRecoveryDtMinStatus`, `HeatRecoveryQuantity` (`heat_recovery_dt_min.py`): inverse heat-recovery result.
-- `RefrigerantScreenVerdict` (`hpr_refrigerant_screen.py`): refrigerant screening verdicts, in the order they are judged.
+- `HprRefrigerantScreenResult`, `RefrigerantScreenRow`, `RefrigerantScreenQuantity`, `RefrigerantScreenVerdict` (`hpr_refrigerant_screen.py`): refrigerant screening result, one row per fluid and level pair, with verdicts in the order they are judged; `practical` returns the practical rows.
 - `HeatExchangerNetworkControllabilityResult` and its endpoint, actuator, pairing and component models (`controllability.py`).
 - `TurbineSolveResult`, `TurbineStageResult` (`turbine.py`): turbine solve output, raw floats in fixed units (kW, degC, bar, kJ/kg, kg/s); reported per period as `TargetResults.turbine_result`.
 - `CONTRACTS`, `VALUE_JSON_SCHEMA`, `contract_json_schemas` (`schema.py`, in `__all__`) and `STREAM_COLLECTION_JSON_SCHEMA` (module-level, not in `__all__`): JSON Schema for the public contracts.
@@ -43,6 +43,7 @@ application layer builds on these models.
 - Workspace bundles accept only `schema_version` `"3"`; case names are portable (non-empty, no path characters, control characters, leading or trailing whitespace, trailing period or Windows device names, and not `.` or `..`) [workspace.py:PinchWorkspaceBundle, validate_workspace_case_name].
 - A performance map must be in canonical point order, satisfy `q_sink = q_source + electric_power` within tolerance, have useful duty equal to `load_fraction * reference_capacity`, and use basis `q_sink` for heat pumps and `q_source` for refrigeration [hpr_performance_map.py:HprPerformanceMap].
 - `HprTargetSimulationRecord.topology_id` must equal `cycle_id`; every topology other than single-stage vapour compression needs loop evidence; the condensing temperature exceeds the evaporating temperature [hpr.py:HprTargetSimulationRecord].
+- `RefrigerantScreenRow` requires a positive `rank` on practical rows and none on others, and requires the saturation pressures, pressure ratio and suction capacity unless the verdict is above critical or below triple point, when it forbids them [hpr_refrigerant_screen.py:RefrigerantScreenRow].
 - `HeatRecoveryDtMinResult` checks that requested and achieved recovery do not exceed the thermodynamic limit, that the residual equals achieved minus requested, and that `status` agrees with the values [heat_recovery_dt_min.py:HeatRecoveryDtMinResult].
 - Controllability scores and interaction entries lie in 0..1 [controllability.py:_validate_score].
 - Utility-placement values are frozen and finite, and period ids are unique and aligned with weights [utility_placement.py:_FrozenContract, UtilityPlacementResult].
