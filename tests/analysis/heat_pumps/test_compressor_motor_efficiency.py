@@ -289,3 +289,30 @@ def test_simulation_records_give_each_stage_its_motor_efficiency():
 
     motors = [loop.stages[0].motor_efficiency for loop in record.loops]
     assert motors == [0.9, 0.97]
+
+
+def test_motor_efficiency_survives_the_ihx_and_subcooling_resolve():
+    # Subcooling of 80 K cannot be met without process duty, so the cycle
+    # re-solves with the subcooling it can apply.
+    def stage(**kwargs):
+        cycle = VapourCompressionCycle()
+        work = cycle.solve(
+            T_evap=0.0,
+            T_cond=80.0,
+            dtcont=5.0,
+            dT_subcool=80.0,
+            eta_comp=0.7,
+            refrigerant="Ammonia",
+            dT_ihx_gas_side=30.0,
+            Q_heat=0.0,
+            Q_cas_heat=100.0,
+            **kwargs,
+        )
+        return cycle, work
+
+    shaft, shaft_work = stage()
+    cycle, work = stage(eta_motor=0.8)
+
+    assert cycle.dT_subcool == pytest.approx(0.0, abs=1e-6)
+    assert cycle.eta_motor == 0.8
+    assert work == pytest.approx(shaft_work / 0.8, rel=1e-12)
