@@ -24,6 +24,7 @@ application layer builds on these models.
 - Utility placement (`utility_placement.py`): `UtilityPlacementRequest`, `UtilityPlacementOptions`, `UtilityPlacementResult`, `UtilityPlacementModel`, templates, envelopes, candidates and enums.
 - `HeatRecoveryDtMinResult`, `HeatRecoveryDtMinStatus`, `HeatRecoveryQuantity` (`heat_recovery_dt_min.py`): inverse heat-recovery result.
 - `HprRefrigerantScreenResult`, `RefrigerantScreenRow`, `RefrigerantScreenQuantity`, `RefrigerantScreenVerdict` (`hpr_refrigerant_screen.py`): refrigerant screening result, one row per fluid and level pair, with verdicts in the order they are judged; `practical` returns the practical rows.
+- `HprLoadKinksResult`, `HprLoadKink`, `HprLoadKinkKind`, `LOGICAL_LOAD_KINDS` (`hpr_load_kinks.py`): vertices of a heat pump sink or refrigeration source net load profile and the logical HPR load fractions; quantities reuse `HeatRecoveryQuantity`.
 - `HeatExchangerNetworkControllabilityResult` and its endpoint, actuator, pairing and component models (`controllability.py`).
 - `TurbineSolveResult`, `TurbineStageResult` (`turbine.py`): turbine solve output, raw floats in fixed units (kW, degC, bar, kJ/kg, kg/s); reported per period as `TargetResults.turbine_result`.
 - `CONTRACTS`, `VALUE_JSON_SCHEMA`, `contract_json_schemas` (`schema.py`, in `__all__`) and `STREAM_COLLECTION_JSON_SCHEMA` (module-level, not in `__all__`): JSON Schema for the public contracts.
@@ -45,6 +46,8 @@ application layer builds on these models.
 - `HprTargetSimulationRecord.topology_id` must equal `cycle_id`; every topology other than single-stage vapour compression needs loop evidence; the condensing temperature exceeds the evaporating temperature [hpr.py:HprTargetSimulationRecord].
 - `RefrigerantScreenRow` requires a positive `rank` on practical rows and none on others, and requires the saturation pressures, pressure ratio and suction capacity unless the verdict is above critical or below triple point, when it forbids them [hpr_refrigerant_screen.py:RefrigerantScreenRow].
 - `HeatRecoveryDtMinResult` checks that requested and achieved recovery do not exceed the thermodynamic limit, that the residual equals achieved minus requested, and that `status` agrees with the values [heat_recovery_dt_min.py:HeatRecoveryDtMinResult].
+- `HprLoadKinksResult` requires `steepening > 1`, a positive `maximum_duty`, vertex load fractions strictly increasing inside (0, 1), and `logical_load_fractions` equal to the step and steepens vertices followed by 1.0; a vertex has no `slope_after` exactly when it is a step [hpr_load_kinks.py:HprLoadKinksResult] [hpr_load_kinks.py:HprLoadKink].
+- Output metrics `heat_recovery_dt_min` and `hpr_load_kink_slope` are temperature differences, so a temperature display override resolves to its delta unit [units.py:coerce_output_value].
 - Controllability scores and interaction entries lie in 0..1 [controllability.py:_validate_score].
 - Utility-placement values are frozen and finite, and period ids are unique and aligned with weights [utility_placement.py:_FrozenContract, UtilityPlacementResult].
 - Inputs use the validation JSON schema and results the serialisation schema [schema.py:CONTRACTS].

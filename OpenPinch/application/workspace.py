@@ -87,6 +87,22 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
             period_id=period_id,
         )
 
+    def hpr_load_kinks(
+        self,
+        *,
+        zone=None,
+        period_id=None,
+        is_refrigeration=False,
+        steepening=2.0,
+    ) -> CaseBatchResult:
+        return self._run(
+            "hpr_load_kinks",
+            zone=zone,
+            period_id=period_id,
+            is_refrigeration=is_refrigeration,
+            steepening=steepening,
+        )
+
 
 class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
     """Mirror supported all-period target workflows over selected cases."""
@@ -102,6 +118,22 @@ class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
             "heat_recovery_dt_min",
             heat_recovery=heat_recovery,
             zone=zone,
+            workers=workers,
+        )
+
+    def hpr_load_kinks(
+        self,
+        *,
+        zone=None,
+        is_refrigeration=False,
+        steepening=2.0,
+        workers=1,
+    ) -> CaseBatchResult:
+        return self._run(
+            "hpr_load_kinks",
+            zone=zone,
+            is_refrigeration=is_refrigeration,
+            steepening=steepening,
             workers=workers,
         )
 

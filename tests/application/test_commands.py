@@ -93,6 +93,20 @@ def test_refrigerant_screen_command_screens_explicit_levels():
     assert response["value"]["rows"][0]["verdict"] == "practical"
 
 
+def test_command_runs_hpr_load_kinks_with_keyword_arguments():
+    response = run_command(
+        {
+            "command": "target.hpr_load_kinks",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {"is_refrigeration": True, "steepening": 3.0},
+        }
+    )
+
+    assert response["value"]["is_refrigeration"] is True
+    assert response["value"]["steepening"] == 3.0
+    assert response["value"]["logical_load_fractions"][-1] == 1.0
+
+
 def test_design_command_returns_the_design_result_as_value(monkeypatch):
     report = ValidationReport(valid=True, issues=[])
     monkeypatch.setattr(

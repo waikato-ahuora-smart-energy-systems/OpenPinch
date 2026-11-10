@@ -69,6 +69,11 @@ Interaction Matrix
      - frozen screening result
      - source case unchanged
      - base
+   * - active and batch ``target.hpr_load_kinks``
+     - List the logical HPR load fractions for one or every canonical period
+     - frozen result or ordered case result
+     - source cases unchanged
+     - base
    * - ``cases(names).summary_frames()``, ``metrics()``, and ``reports()``
      - Observe every selected solved case and preserve per-case failures
      - result and error mappings

@@ -33,6 +33,12 @@ class OutputUnitRule:
     unit_groups: tuple[str, ...] = ()
 
 
+# Metrics that are temperature differences, so a temperature display unit
+# resolves to its delta unit.
+_TEMPERATURE_DIFFERENCE_METRICS = frozenset(
+    {"heat_recovery_dt_min", "hpr_load_kink_slope"}
+)
+
 _DIMENSIONLESS_UNIT_TOKENS = {"", "-", "dimensionless", "1"}
 
 INPUT_UNIT_RULES: dict[str, InputUnitRule] = {
@@ -79,6 +85,15 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
     "hpr_screen_pressure": OutputUnitRule("Pa", "bar", unit_groups=("pressure",)),
     "hpr_screen_suction_vhc": OutputUnitRule(
         "kJ/m^3", "kJ/m^3", unit_groups=("volumetric_heating_capacity",)
+    ),
+    "hpr_load_kink_duty": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "hpr_load_kink_temperature": OutputUnitRule(
+        "degC", "degC", unit_groups=("temperature",)
+    ),
+    "hpr_load_kink_slope": OutputUnitRule(
+        "delta_degC",
+        "delta_degC",
+        unit_groups=("delta_temperature", "temperature_difference", "temperature"),
     ),
     "utility_heat_flow": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "cold_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),
@@ -412,7 +427,7 @@ def coerce_output_value(
     target_unit = rule.default_unit if display_unit is None else display_unit
     if target_unit is None:
         return resolved
-    if metric_name == "heat_recovery_dt_min":
+    if metric_name in _TEMPERATURE_DIFFERENCE_METRICS:
         target_unit = _as_temperature_difference_unit(target_unit)
     converted = resolved.to(target_unit)
     year_exponent_change = resolved.unit_exponent("year") - converted.unit_exponent(

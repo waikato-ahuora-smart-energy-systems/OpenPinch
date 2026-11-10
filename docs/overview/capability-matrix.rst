@@ -39,6 +39,11 @@ Capability Matrix
      - non-mutating verdict, saturation pressures, pressure ratio and suction
        volumetric heating capacity per fluid
      - CoolProp
+   * - HPR load selection
+     - ``problem.target.hpr_load_kinks()`` and its ``all_periods`` mirror
+     - non-mutating list of net load profile vertices and the logical
+       ``load_fraction`` values at steps and steepening kinks
+     - base
    * - Multiperiod HPR design
      - independent ``problem.target.all_periods`` replay or scalar targeting
        with ``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``

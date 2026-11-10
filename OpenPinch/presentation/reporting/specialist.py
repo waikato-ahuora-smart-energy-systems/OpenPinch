@@ -1,6 +1,7 @@
 """Report adapters preserving independent specialist result contracts."""
 
 from ...contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
+from ...contracts.hpr_load_kinks import HprLoadKinksResult
 from ...contracts.hpr_performance_map import HprPerformanceMap
 from ...contracts.hpr_refrigerant_screen import HprRefrigerantScreenResult
 from ...contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -16,6 +17,7 @@ SPECIALIST_RESULT_ADAPTERS = {
     family: specialist_result
     for family in (
         HeatRecoveryDtMinResult,
+        HprLoadKinksResult,
         HprPerformanceMap,
         HprRefrigerantScreenResult,
         HeatExchangerNetworkSynthesisResult,

@@ -276,3 +276,27 @@ def test_refrigerant_screen_metrics_have_display_units(
 
     assert converted.value == pytest.approx(expected_value)
     assert converted.unit == expected_unit
+
+
+@pytest.mark.parametrize(
+    ("metric_name", "source", "expected_value", "expected_unit"),
+    [
+        ("hpr_load_kink_duty", Value(1_000.0, "kW"), 1.0, "MW"),
+        ("hpr_load_kink_temperature", Value(10.0, "degC"), 50.0, "degF"),
+        ("hpr_load_kink_slope", Value(10.0, "delta_degC"), 18.0, "delta_degF"),
+    ],
+)
+def test_hpr_load_kink_metrics_follow_display_overrides(
+    metric_name,
+    source,
+    expected_value,
+    expected_unit,
+):
+    value = unit_system.coerce_output_value(
+        source,
+        metric_name=metric_name,
+        config={"output_unit_overrides": {"heat_flow": "MW", "temperature": "degF"}},
+    )
+
+    assert value.value == pytest.approx(expected_value, rel=1e-12)
+    assert value.unit == expected_unit

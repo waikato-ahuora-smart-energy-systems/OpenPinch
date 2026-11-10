@@ -5,6 +5,7 @@ target.total_site_heat_integration,Site,independent,direct_heat_integration,ther
 target.all_heat_integration,Region; Community; Site; Process Zone; Unit Operation,independent,none,thermal,available
 target.heat_exchanger_area_and_cost,Site; Process Zone; Unit Operation,independent,direct_heat_integration,thermal,available
 target.heat_recovery_dt_min,Site; Process Zone; Unit Operation,nonmutating,none,inverse_dt_min,available
+target.hpr_load_kinks,Site; Process Zone; Unit Operation,nonmutating,none,load_kinks,available
 target.carnot_heat_pump,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
 target.carnot_refrigeration,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
 target.vapour_compression_heat_pump,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available

@@ -1,0 +1,301 @@
+{
+  "streams": [
+    {
+      "zone": "Roasting[P]/Air system[O]",
+      "name": "C1: Roasting air",
+      "t_supply": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 148.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 230.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Roasting[P]/Air system[O]",
+      "name": "C2: Roaster exhaust",
+      "t_supply": {
+        "value": 100.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 143.75,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hot water[P]/Tracing[O]",
+      "name": "C3: Tracing hot-water network",
+      "t_supply": {
+        "value": 25.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 55.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 400.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hot water[P]/CIP[O]",
+      "name": "C4: CIP water",
+      "t_supply": {
+        "value": 10.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 55.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 60.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Conching[P]/Cooling[O]",
+      "name": "C5: Conching cooling water",
+      "t_supply": {
+        "value": 55.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 25.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 150.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Refrigeration[P]/Recooling[O]",
+      "name": "C6: Refrigeration recooling water",
+      "t_supply": {
+        "value": 35.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 25.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 2200.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    }
+  ],
+  "utilities": [
+    {
+      "name": "Hot utility",
+      "type": "Hot",
+      "t_supply": {
+        "value": 175.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 174.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 160 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 160.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 159.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 90 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 90.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 89.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 55 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 55.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 54.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 25 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 25.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 24.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Cold utility",
+      "type": "Cold",
+      "t_supply": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 5.1,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    }
+  ],
+  "options": {}
+}

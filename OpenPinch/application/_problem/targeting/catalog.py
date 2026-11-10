@@ -68,6 +68,7 @@ METHOD_CATALOG = MappingProxyType(
         "target.heat_recovery_dt_min": _spec(
             periods="nonmutating", adapter="inverse_dt_min"
         ),
+        "target.hpr_load_kinks": _spec(periods="nonmutating", adapter="load_kinks"),
         **{
             f"target.{name}": _spec(
                 scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),

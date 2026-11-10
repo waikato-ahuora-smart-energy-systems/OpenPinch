@@ -1,0 +1,420 @@
+{
+  "streams": [
+    {
+      "zone": "Brewhouse[P]/Mashing[O]",
+      "name": "B1: Pre-mashing",
+      "t_supply": {
+        "value": 15.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 55.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 440.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Mashing[O]",
+      "name": "B2: Mashing",
+      "t_supply": {
+        "value": 55.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 77.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 350.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Lautering[O]",
+      "name": "B3: Lautering and filtering",
+      "t_supply": {
+        "value": 15.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 75.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 600.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Boiling[O]",
+      "name": "B4: Wort-boiling preheating",
+      "t_supply": {
+        "value": 75.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 100.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 300.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Boiling[O]",
+      "name": "B5: Wort boiling",
+      "t_supply": {
+        "value": 100.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 101.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 240.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Wort cooling[O]",
+      "name": "B6: Wort cooling",
+      "t_supply": {
+        "value": 100.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 15.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 850.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Boiling[O]",
+      "name": "B7: Boil-off condensation",
+      "t_supply": {
+        "value": 101.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 100.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 240.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Brewhouse[P]/Condensate[O]",
+      "name": "B8: Condensate cooling",
+      "t_supply": {
+        "value": 100.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 15.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 90.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Cellar[P]/Fermentation[O]",
+      "name": "B9: Fermentation cooling",
+      "t_supply": {
+        "value": 15.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 14.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 150.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 1.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Cellar[P]/Beer cooling[O]",
+      "name": "B10: Beer cooling",
+      "t_supply": {
+        "value": 14.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 3.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 110.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Cellar[P]/Filtration[O]",
+      "name": "B11: Filtration and centrifugation",
+      "t_supply": {
+        "value": 3.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 1.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 40.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Cleaning[P]/CIP[O]",
+      "name": "B12: Clean-in-place",
+      "t_supply": {
+        "value": 15.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 78.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 210.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    }
+  ],
+  "utilities": [
+    {
+      "name": "Hot utility",
+      "type": "Hot",
+      "t_supply": {
+        "value": 125.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 124.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 105 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 105.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 104.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 80 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 80.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 79.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 5 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 5.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 4.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Cold utility",
+      "type": "Cold",
+      "t_supply": {
+        "value": -8.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": -7.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    }
+  ],
+  "options": {}
+}

@@ -62,6 +62,7 @@ from ..targeting.state import (
 
 if TYPE_CHECKING:
     from ....contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
+    from ....contracts.hpr_load_kinks import HprLoadKinksResult
     from ....contracts.hpr_refrigerant_screen import HprRefrigerantScreenResult
     from ....domain.zone import Zone
     from ...problem import PinchProblem
@@ -163,6 +164,24 @@ class _AllPeriodsTargetAccessor:
             self._target._problem,
             heat_recovery=heat_recovery,
             zone=zone,
+            workers=workers,
+        )
+
+    def hpr_load_kinks(
+        self,
+        *,
+        zone=None,
+        is_refrigeration=False,
+        steepening=2.0,
+        workers=1,
+    ) -> dict[str, "HprLoadKinksResult"]:
+        from ...hpr_load_kinks import calculate_all_period_hpr_load_kinks
+
+        return calculate_all_period_hpr_load_kinks(
+            self._target._problem,
+            zone=zone,
+            is_refrigeration=is_refrigeration,
+            steepening=steepening,
             workers=workers,
         )
 
@@ -385,6 +404,25 @@ class _TargetAccessor:
             T_cond=T_cond,
             refrigerants=refrigerants,
             options=options,
+        )
+
+    def hpr_load_kinks(
+        self,
+        *,
+        zone=None,
+        period_id=None,
+        is_refrigeration=False,
+        steepening=2.0,
+    ) -> "HprLoadKinksResult":
+        """Return the net load profile kinks and the logical HPR load fractions."""
+        from ...hpr_load_kinks import calculate_hpr_load_kinks
+
+        return calculate_hpr_load_kinks(
+            self._problem,
+            zone=zone,
+            period_id=period_id,
+            is_refrigeration=is_refrigeration,
+            steepening=steepening,
         )
 
     def indirect_heat_integration(self, **kwargs) -> BaseTargetModel:
