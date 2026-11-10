@@ -60,10 +60,13 @@ Runnable Workflow
 Run Process-level placement against the ``Almond`` direct GCC with four
 isothermal and zero sensible levels on each side. The small search budget in
 ``search_options`` keeps each call to about a second, as in notebook 19; the
-defaults (500 iterations, 5000 evaluations) take about a minute per call. Run
-the code from a script under ``if __name__ == "__main__":`` so worker
-processes are used; without the guard the search runs serially with a
-warning.
+defaults (500 iterations, 5000 evaluations) take about a minute per call.
+With one run and one candidate this example has a single task, so it always
+runs serially. When a larger budget gives several tasks, worker processes are
+used. Under the ``spawn`` and ``forkserver`` start methods (the defaults on
+Windows and macOS), they are used only when the script's entry code is under
+``if __name__ == "__main__":``; without the guard the search runs serially
+with a warning.
 
 .. code-block:: python
 
