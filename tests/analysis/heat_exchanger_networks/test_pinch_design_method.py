@@ -260,6 +260,33 @@ def test_default_process_pool_uses_interpreter_start_method(monkeypatch) -> None
     assert "mp_context" not in captured_kwargs
 
 
+def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
+    monkeypatch, caplog
+) -> None:
+    pool_starts = []
+
+    def forbidden_process_pool_executor(**kwargs):
+        pool_starts.append(kwargs)
+        raise AssertionError("must not start worker processes")
+
+    executor_module = "OpenPinch.analysis.heat_exchanger_networks.execution.executor"
+    monkeypatch.setattr(
+        f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
+    )
+    monkeypatch.setattr(
+        f"{executor_module}._main_module_reruns_in_workers", lambda: True
+    )
+    # A platform with worker processes, so Pyodide reaches the pool too.
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    with caplog.at_level("WARNING"):
+        outcomes = _two_prebuilt_successful_tasks(monkeypatch, _process_pool)
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+    assert pool_starts == []
+    assert "main guard" in caplog.text
+
+
 def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> None:
     calls = []
 
