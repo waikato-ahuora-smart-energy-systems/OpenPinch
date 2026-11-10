@@ -380,6 +380,16 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "run per value."
         ),
     ),
+    "HENS_MIN_EXCHANGER_APPROACH_SHARE": FieldText(
+        "Minimum exchanger approach share", None,
+        (
+            "Smallest exchanger approach the thermal derivative and network evolution "
+            "steps may choose, as a share of the requested approach temperature, from "
+            "0 up to but not including 1. Those steps choose approaches by cost, "
+            "down to 0.1 K by default (0); at 0.5 a 10 K design keeps every "
+            "exchanger at 5 K or more."
+        ),
+    ),
     "HENS_SYNTHESIS_QUALITY_TIER": FieldText(
         "HEN synthesis quality tier", None,
         (
@@ -634,6 +644,13 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Temperature difference between a lower cycle's condenser and the upper "
             "cycle's evaporator in cascades."
+        ),
+    ),
+    "HPR_AMBIENT_AIR_ENABLED": FieldText(
+        "HPR ambient air", None,
+        (
+            "Whether ambient air may act as a free heat source or sink in HPR "
+            "targeting. When off, no air is placed and no AIR streams are added."
         ),
     ),
     "HPR_DT_ENV_CONT": FieldText(

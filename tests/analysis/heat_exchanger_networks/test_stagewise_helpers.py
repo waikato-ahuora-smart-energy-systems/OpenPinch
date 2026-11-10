@@ -1073,6 +1073,39 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     assert target.alpha == []
 
 
+def test_evolution_skips_a_child_that_did_not_converge():
+    # Its TAC is not a converged optimum, so it can't replace any network.
+    candidate = _VerifiedCandidate(m_success=1)
+    candidate.solver_run = SimpleNamespace(converged=False)
+
+    assert stagewise_evolution._is_usable_evolution_candidate(candidate) is False
+
+
+def test_update_with_best_model_adopts_the_solver_run():
+    # The outcome is judged on the adopted network's solve, not the start's.
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.solver_run = SimpleNamespace(converged=False)
+    target.set_initial_values_for_variables = lambda best, brackets: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+        solver_run=SimpleNamespace(converged=True),
+    )
+
+    _update_with_best_model(target, best)
+
+    assert target.solver_run is best.solver_run
+
+
 @pytest.mark.parametrize(
     "kind",
     ["minus", "plus"],
@@ -1135,3 +1168,69 @@ def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
     assert created[0]["solver_options"] == {"max_iter": 7}
     assert created[0]["name"] == f"root-n_{kind} 1 evolution model 0"
     assert child.z[0][0][0].VALUE.value == (0 if kind == "minus" else 1)
+
+
+def _unconverged_start_with_dearer_candidate(monkeypatch):
+    # IPOPT stopped at its iteration limit; GEKKO still reports success, and the
+    # objective (100) is lower than any real network can cost.
+    model = _evolution_model(tac=100.0)
+    model.solver_run = SimpleNamespace(converged=False)
+    candidate = _VerifiedCandidate(m_success=1)
+    candidate.TAC = 150.0
+    adopted = []
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_update_with_best_model",
+        lambda owner, best_model: adopted.append(best_model),
+    )
+    return model, candidate, adopted
+
+
+def test_source_evolution_does_not_benchmark_an_unconverged_start(monkeypatch):
+    model, candidate, adopted = _unconverged_start_with_dearer_candidate(monkeypatch)
+    model.get_n_minus_one_evolution = lambda **kwargs: candidate
+    model.get_n_plus_one_evolution = lambda **kwargs: None
+
+    _get_source_net_benefit_evolution(model, print_output=False, max_depth=1)
+
+    assert adopted == [candidate]
+
+
+def test_branched_evolution_does_not_benchmark_an_unconverged_start(monkeypatch):
+    model, candidate, adopted = _unconverged_start_with_dearer_candidate(monkeypatch)
+    spec = stagewise_evolution._EvolutionCandidateSpec(
+        kind="minus",
+        unit=0,
+        branch_index=0,
+        rank=1,
+        prev_case=model,
+        position=(0, 0, 0),
+        z_allowed=[[[0]]],
+        signature=(),
+    )
+    specs = iter([[spec]])
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_evolution_candidate_specs",
+        lambda *args, **kwargs: next(specs, []),
+    )
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_solve_evolution_candidates",
+        lambda *args, **kwargs: [(spec, candidate)],
+    )
+
+    model.get_net_benefit_evolution(print_output=False, n_ad_branches=2)
+
+    assert adopted == [candidate]
+
+
+def test_evolution_keeps_a_converged_start_cheaper_than_every_candidate(monkeypatch):
+    model, candidate, adopted = _unconverged_start_with_dearer_candidate(monkeypatch)
+    model.solver_run = SimpleNamespace(converged=True)
+    model.get_n_minus_one_evolution = lambda **kwargs: candidate
+    model.get_n_plus_one_evolution = lambda **kwargs: None
+
+    _get_source_net_benefit_evolution(model, print_output=False, max_depth=1)
+
+    assert adopted == []

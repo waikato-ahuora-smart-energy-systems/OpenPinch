@@ -246,7 +246,10 @@ class LocalSynthesisExecutor:
         parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
     ) -> InternalHeatExchangerNetworkProblem:
         parent_problem = self._parent_problem(task, parent_outcomes)
-        dTmin = _task_model_approach_temperature(task)
+        dTmin = _task_model_approach_temperature(
+            task,
+            min_approach_share=problem.master_zone.config.hens.min_exchanger_approach_share,
+        )
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
@@ -407,6 +410,14 @@ def _solve_built_task(
                 return task, _failed_task_outcome(task, reason), internal_problem
 
         network = internal_problem.extract_network(run_id=task.run_id)
+        # An unconverged solve stays a success so downstream tasks can start
+        # from it; demote_infeasible_outcomes keeps it out of the ranking.
+        solver_run = getattr(solved, "solver_run", None)
+        diagnostics = (
+            {}
+            if getattr(solver_run, "converged", True)
+            else {"unconverged_termination": str(solver_run.termination_condition)}
+        )
         return (
             task,
             HeatExchangerNetworkSynthesisTaskOutcome(
@@ -415,6 +426,7 @@ def _solve_built_task(
                 network=network,
                 objective_value=network.total_annual_cost,
                 solver_status=_solver_status(internal_problem),
+                diagnostics=diagnostics,
             ),
             internal_problem,
         )
@@ -507,12 +519,20 @@ def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
 
 def _task_model_approach_temperature(
     task: HeatExchangerNetworkSynthesisTask,
+    *,
+    min_approach_share: float = 0.0,
 ) -> float:
+    """Return the model's minimum approach temperature.
+
+    The pinch design step uses the task's approach. The thermal derivative and
+    evolution steps minimise cost down to 0.1 K, or to ``min_approach_share``
+    (``HENS_MIN_EXCHANGER_APPROACH_SHARE``) times the task's approach if larger.
+    """
     if task.method in {
         HeatExchangerNetworkDesignMethod.ThermalDerivative,
         HeatExchangerNetworkDesignMethod.NetworkEvolution,
     }:
-        return 0.1
+        return max(0.1, min_approach_share * float(task.approach_temperature))
     return float(task.approach_temperature)
 
 

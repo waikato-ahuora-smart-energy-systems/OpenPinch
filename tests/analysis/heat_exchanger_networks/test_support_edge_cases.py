@@ -55,6 +55,7 @@ from OpenPinch.analysis.heat_exchanger_networks.results import (
     seeds,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
+    backend,
     dependencies,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
@@ -619,6 +620,37 @@ def test_internal_problem_error_and_pdm_print_paths():
     assert solve_problem.below.optimised is True
     assert solve_problem.case.post_processed is True
     assert solve_problem.case.output_called is True
+
+
+def test_pdm_amalgamated_case_keeps_an_unconverged_side_solve() -> None:
+    # The amalgamated model is never solved, so it carries the sides' status;
+    # otherwise an unconverged side's objective could win the final ranking.
+    def side(termination):
+        return SimpleNamespace(
+            side_required=True,
+            optimise=lambda print_output=True: None,
+            solver_run=backend.SolverRun(
+                name="couenne", termination_condition=termination
+            ),
+        )
+
+    amalgamated = SimpleNamespace(
+        solver_run=backend.SolverRun(name="apopt"),
+        get_post_process=lambda: None,
+    )
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(),
+        framework="PDM",
+    )
+    problem.above = side("optimal")
+    problem.above.amalgamate_networks = lambda **kwargs: amalgamated
+    problem.below = side("maxTimeLimit")
+    problem.args = {}
+
+    problem._solve_pdm(print_output=False)
+
+    assert problem.case.solver_run.termination_condition == "maxTimeLimit"
+    assert problem.case.solver_run.converged is False
 
 
 def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_falls_back(

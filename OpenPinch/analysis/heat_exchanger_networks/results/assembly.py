@@ -179,10 +179,23 @@ def demote_infeasible_outcomes(
 
     One infeasible outcome no longer aborts the synthesis: it keeps its network
     and reasons for diagnostics, and the result is selected from the feasible
-    outcomes. Selection raises only when none is left.
+    outcomes. Selection raises only when none is left. A solve that stopped
+    before converging is demoted too: it stayed a success only so downstream
+    tasks could start from it, and its objective is not a converged optimum.
     """
     demoted = []
     for outcome in outcomes:
+        termination = outcome.diagnostics.get("unconverged_termination")
+        if outcome.status == "success" and termination is not None:
+            demoted.append(
+                outcome.model_copy(
+                    update={
+                        "status": "failed",
+                        "error": f"solver stopped before converging ({termination})",
+                    }
+                )
+            )
+            continue
         failures = (
             verify_network_feasibility(outcome.network)
             if outcome.status == "success"

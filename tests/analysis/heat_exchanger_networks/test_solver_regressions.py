@@ -349,6 +349,36 @@ def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None
     _assert_live_solver_case_matches_checked_in_summary(case_id)
 
 
+@pytest.mark.solver
+@pytest.mark.process_pools
+# A string condition is evaluated when the test runs, after the helper below
+# is defined.
+@pytest.mark.skipif(
+    "not _live_solver_environment_available()",
+    reason="needs the couenne and ipopt binaries and the gekko and pyomo packages",
+)
+def test_parallel_design_solves_tasks_in_worker_processes() -> None:
+    # Pooled tasks are pickled to worker processes; the serial runs above
+    # never pickle a model.
+    problem = PinchProblem(source=FIXTURE_ROOT / f"{FOUR_STREAM}.json")
+    problem.target.all_heat_integration()
+    settings = replace(
+        workflow_settings_from_problem(problem),
+        approach_temperatures=(14, 20),
+        derivative_thresholds=(0.5,),
+        best_solutions_to_save=1,
+        max_parallel=2,
+    )
+
+    workflow_result = execute_open_hens_method(
+        problem,
+        settings,
+        executor=LocalSynthesisExecutor(print_output=False),
+    )
+
+    assert workflow_result.accepted_result.network.exchangers
+
+
 def _assert_live_solver_case_matches_checked_in_summary(
     case_id: str,
     *,

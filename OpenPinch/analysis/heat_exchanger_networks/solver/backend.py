@@ -38,6 +38,12 @@ DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
     "max_iter": 1000,
     "print_level": 5,
 }
+# Pyomo termination conditions of a converged solve. GEKKO's Pyomo extension
+# only warns on the others (an iteration or time limit, for example) and still
+# reports the solve as successful.
+CONVERGED_TERMINATION_CONDITIONS = frozenset(
+    {"optimal", "locallyOptimal", "globallyOptimal", "feasible"}
+)
 GEKKO_NUMPY_ARRAY_COPY_DEPRECATION = (
     r"__array__ implementation doesn't accept a copy keyword.*"
 )
@@ -55,17 +61,78 @@ class SolverRun:
     failure_reason: str | None = None
     solver_options: dict[str, Any] | None = None
     option_file: str | None = None
+    termination_condition: str | None = None
+
+    @property
+    def converged(self) -> bool:
+        """False when the solver stopped before converging, for example at its
+        iteration limit. Solves without a recorded condition count as converged."""
+
+        return (
+            self.termination_condition is None
+            or self.termination_condition in CONVERGED_TERMINATION_CONDITIONS
+        )
 
 
 def create_gekko_model(*, remote: bool = False) -> Any:
-    """Create a GEKKO model after the optional dependency has been requested."""
+    """Create a GEKKO model after the optional dependency has been requested.
 
-    gekko = require_synthesis_dependency(
+    The model records the Pyomo termination condition of each solve, which
+    GEKKO itself only prints.
+    """
+
+    require_synthesis_dependency(
         "gekko",
         package="gekko",
         purpose="GEKKO heat exchanger network equation model construction",
     )
-    return gekko.GEKKO(remote=remote)
+    return _termination_recording_class("_TerminationRecordingGEKKO")(remote=remote)
+
+
+def __getattr__(name: str) -> type:
+    # Pickle looks classes up by module and name, so unpickling a model in a
+    # process pool worker resolves the lazily built classes here.
+    if name in _TERMINATION_RECORDING_CLASS_NAMES:
+        return _termination_recording_class(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+_TERMINATION_RECORDING_CLASS_NAMES = frozenset(
+    {"_TerminationRecordingGEKKO", "_TerminationRecordingPyomoConverter"}
+)
+_TERMINATION_RECORDING_CLASS_LOCK = threading.Lock()
+
+
+def _termination_recording_class(name: str) -> type:
+    """Return a GEKKO subclass published as a module attribute of this module.
+
+    The classes are built on first use, so importing this module does not
+    import gekko, and published once, so models pickle by reference to them.
+    """
+
+    with _TERMINATION_RECORDING_CLASS_LOCK:
+        if name not in globals():
+            _define_termination_recording_classes()
+    return globals()[name]
+
+
+def _define_termination_recording_classes() -> None:
+    from gekko import GEKKO
+    from gekko.gk_solver_extension_pyomo import PyomoConverter
+
+    class _TerminationRecordingPyomoConverter(PyomoConverter):
+        def handle_status(self, status_dict, status, status_string) -> None:
+            if isinstance(status, self.TerminationCondition):
+                self._gekko_model._openpinch_termination_condition = str(status)
+            super().handle_status(status_dict, status, status_string)
+
+    class _TerminationRecordingGEKKO(GEKKO):
+        def solver_extension_pyomo(self, disp=True):
+            self.solve_with_converter(_TerminationRecordingPyomoConverter, disp)
+
+    for cls in (_TerminationRecordingPyomoConverter, _TerminationRecordingGEKKO):
+        cls.__qualname__ = cls.__name__
+        globals()[cls.__name__] = cls
 
 
 def cleanup_gekko_model(model: Any) -> None:
@@ -208,6 +275,7 @@ def solve_gekko_model(
 
     extension = getattr(model.options, "SOLVER_EXTENSION", None)
     _restore_run_directory(model)
+    model._openpinch_termination_condition = None
     start = time.time()
     failure_reason = None
     try:
@@ -232,6 +300,7 @@ def solve_gekko_model(
         failure_reason=failure_reason,
         solver_options=getattr(model, "_openpinch_solver_options", None),
         option_file=getattr(model, "_openpinch_solver_option_file", None),
+        termination_condition=model._openpinch_termination_condition,
     )
 
 

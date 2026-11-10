@@ -209,6 +209,12 @@ loaded problem configuration. That argument wins over a tier in the call's
 ``options`` passed to design accessors accept other ``HENS_*`` overrides the same
 way: they apply to that call only and do not change the stored configuration.
 
+``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (default 0, at least 0 and below 1) sets
+the smallest exchanger approach the thermal derivative and network evolution
+steps may choose, as a share of the requested approach temperature. At the
+default those steps choose approaches by cost down to 0.1 K; see
+:doc:`../guides/heat-exchanger-network-synthesis`.
+
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` set the network evolution
 breadth of every route when they are set, including the tier 0 and tier 1 routes that
 tiers 2 to 5 run as protected routes, and including ``problem.design.open_hens()``.

@@ -101,7 +101,11 @@ def parse_carnot_state_variables(
     # Air can be a refrigerator's heat sink and a heat pump's heat source, but
     # never a heat pump's load or a refrigerator's duty. Where it is a partner
     # it adds generous availability; the cascade decides how much air is used.
-    air_allowance = float(args.Q_heat_max + args.Q_cool_max)
+    air_allowance = (
+        float(args.Q_heat_max + args.Q_cool_max)
+        if getattr(args, "ambient_air_enabled", True)
+        else 0.0
+    )
     heat_air = 0.0 if args.is_heat_pumping else air_allowance
     cool_air = air_allowance if args.is_heat_pumping else 0.0
     H_cold_available = args.H_cold + args.z_amb_cold * heat_air

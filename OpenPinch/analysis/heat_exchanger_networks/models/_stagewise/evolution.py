@@ -82,8 +82,13 @@ def get_net_benefit_evolution(
     initial_z = getattr(owner, "z_allowed", None)
     if initial_z is not None:
         seen_signatures.add(_topology_signature_from_z(owner, initial_z))
-    frontier = [_EvolutionBranchState(model=owner, best_tac=float(owner.TAC))]
-    best_model = owner
+    best_model = _benchmark_model(owner)
+    frontier = [
+        _EvolutionBranchState(
+            model=owner,
+            best_tac=float(owner.TAC) if best_model is owner else float("inf"),
+        )
+    ]
 
     for unit in range(max_depth):
         logger.debug(
@@ -142,7 +147,7 @@ def get_net_benefit_evolution(
                 )
                 continue
             next_frontier.append(branch_period)
-            if candidate.TAC < best_model.TAC:
+            if best_model is None or candidate.TAC < best_model.TAC:
                 best_model = candidate
         # Keep the best branches by TAC, ties broken on topology signature, so
         # the frontier never grows past the beam width.
@@ -154,14 +159,14 @@ def get_net_benefit_evolution(
             logger.debug("No viable evolution model found.")
             break
 
-        if best_model is not owner:
+        if best_model is not None and best_model is not owner:
             logger.debug(
                 "New best evolution model %s with TAC %.6f",
                 best_model.name,
                 best_model.TAC,
             )
 
-    if best_model.mSuccess and best_model.TAC < owner.TAC:
+    if best_model is not None and best_model is not owner:
         _update_with_best_model(owner, best_model)
     else:
         logger.debug("No evolution improvement found over original model.")
@@ -178,7 +183,7 @@ def _get_source_net_benefit_evolution(
     """Run the original OpenHENS single-path add/remove evolution search."""
 
     model = owner
-    best_model = owner
+    best_model = _benchmark_model(owner)
     for unit in range(max_depth):
         logger.debug(
             "Evolution step %s/%s - Current TAC: %s",
@@ -205,7 +210,7 @@ def _get_source_net_benefit_evolution(
         if model is None:
             logger.debug("No viable model found; ending evolution.")
             break
-        if model.TAC < best_model.TAC:
+        if best_model is None or model.TAC < best_model.TAC:
             best_model = model
             logger.debug(
                 "New best model: %s found with TAC: %.6f",
@@ -213,12 +218,33 @@ def _get_source_net_benefit_evolution(
                 best_model.TAC,
             )
 
-    if best_model.mSuccess and best_model.TAC < owner.TAC:
+    if best_model is not None and best_model is not owner:
         _update_with_best_model(owner, best_model)
     else:
         logger.debug("No improvement found over original model.")
     owner.cleanup()
     return owner
+
+
+def _benchmark_model(owner):
+    """Return the starting model when its TAC is a fair benchmark, else None.
+
+    A solve that stopped before converging (for example at IPOPT's iteration
+    limit) is still reported as successful, but its objective can be far below
+    the cost of any real network. Evolution then keeps its best verified
+    candidate, and the workflow's final ranking compares it with the seed
+    network on verified costs.
+    """
+
+    solver_run = getattr(owner, "solver_run", None)
+    if getattr(solver_run, "converged", True):
+        return owner
+    logger.warning(
+        "Starting model %s did not converge; evolution candidates are not "
+        "compared with its TAC.",
+        getattr(owner, "name", None),
+    )
+    return None
 
 
 def _select_source_best_candidate(
@@ -507,6 +533,8 @@ def _update_with_best_model(owner, best_model) -> None:
         owner.area_cu_shared = copy.deepcopy(best_model.area_cu_shared)
     owner.hu_area_cost_total = copy.deepcopy(best_model.hu_area_cost_total)
     owner.cu_area_cost_total = copy.deepcopy(best_model.cu_area_cost_total)
+    if hasattr(best_model, "solver_run"):
+        owner.solver_run = best_model.solver_run
     owner.get_post_process()
 
 
@@ -687,6 +715,9 @@ def _is_usable_evolution_candidate(candidate) -> bool:
     if candidate is None:
         return False
     if not candidate.mSuccess:
+        return False
+    # A solve stopped at a limit keeps mSuccess, but its TAC is not reliable.
+    if not getattr(getattr(candidate, "solver_run", None), "converged", True):
         return False
     verify = getattr(candidate, "verify", None)
     if not callable(verify):

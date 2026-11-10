@@ -34,6 +34,33 @@ The design view also exposes ``selected_network``, total recovery, hot and cold
 utility duty, and ``utility(name)``. Serialize the complete result with
 ``design.result.model_dump(mode="json")``.
 
+Exchanger Approach Temperatures
+-------------------------------
+
+``approach_temperatures`` (``HENS_APPROACH_TEMPERATURES``) sets the approach of
+the pinch design step: the energy targets the seed networks meet and the
+minimum approach of their exchangers. The thermal derivative and network
+evolution steps that follow minimise total annual cost and choose each
+exchanger's approach from the cost settings, down to 0.1 K. With cheap area,
+exchangers can close well below the requested approach; with dear area, they
+open up and the network uses more utility than the target.
+
+``HENS_MIN_EXCHANGER_APPROACH_SHARE`` raises that floor to a share of the
+requested approach. It defaults to 0, which keeps the 0.1 K floor. At 0.5, a
+10 K design keeps every exchanger at 5 K or more:
+
+.. code-block:: python
+
+   design = problem.design.heat_exchanger_network(
+       approach_temperatures=[10.0],
+       options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.5},
+   )
+
+The share must be below 1: at 1, evolution cannot start from a pinch design
+network whose exchangers sit exactly at the requested approach.
+``verify_network_feasibility`` still checks approaches against the 0.1 K
+floor, not against this share.
+
 Several Hot or Cold Utilities
 -----------------------------
 

@@ -4,6 +4,47 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.8.2 (2026-11-10)
+------------------
+
+New features
+~~~~~~~~~~~~
+
+- New ``HPR_AMBIENT_AIR_ENABLED`` option (default ``True``). Set it to ``False`` to
+  stop heat pump and refrigeration targets from using ambient air as a free heat
+  source or sink. No air is placed, the Carnot search offers no air availability,
+  results report zero ambient duty and add no ``AIR`` streams, and cooling water
+  still applies.
+
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.pinch_design()`` and the synthesis routes that start from it, such as
+  ``design.heat_exchanger_network()``, no longer fail when the stream that sets
+  the pinch has a supply or target temperature with many decimal places (#297).
+  The pinch is rounded to 1e-6 K, so such a stream was kept as a sliver on the far
+  side of the pinch, and Pyomo could not build its heat balance. With a cold stream
+  from 64.123456789 to 90 degC that sets the pinch, the pinch design used to raise
+  ``WorkflowContractError`` and now returns a network. Streams that reach more
+  than 1e-6 K past the pinch are split as before.
+- New option ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (#298). The thermal
+  derivative and network evolution steps of heat exchanger network synthesis
+  choose exchanger approaches by cost, down to 0.1 K, so exchangers could close
+  far below the requested ``approach_temperatures``, which only applies to the
+  pinch design step. The new option sets a floor as a share of the requested
+  approach: at 0.5, a 10 K design keeps every exchanger at 5 K or more. It
+  defaults to 0, which keeps the 0.1 K floor and today's results, and must be
+  below 1. The HEN synthesis guide now explains how approaches are chosen.
+- Network evolution in ``design.heat_exchanger_network()`` no longer returns the
+  unevolved network when its starting solve did not converge (#299). IPOPT
+  stopping at its iteration limit was reported as a success, and the starting
+  model's total annual cost, which can be far below that of any real network,
+  was the benchmark every candidate had to beat. Evolution now adopts its best
+  verified, converged candidate in that case. A design step whose solve did not
+  converge is left out of the final ranking, though later steps still start
+  from it, so its objective can no longer win on cost. Such solves are logged as
+  ``[Unconverged]`` warnings instead of ``[Success]``.
+
 0.8.1 (2026-11-06)
 ------------------
 

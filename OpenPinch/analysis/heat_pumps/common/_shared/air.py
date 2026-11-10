@@ -99,6 +99,7 @@ def cascade_with_air(
     T_air_sink: float,
     T_cooling_water: float | None = None,
     utility_bands: Sequence[tuple[float, float]] = (),
+    air: bool = True,
 ) -> CascadeWithAir:
     """Place free ambient air in a feasible cascade and return external duties.
 
@@ -113,7 +114,8 @@ def cascade_with_air(
     saves the dearer hot utility, then takes heat from what flows on.
     Cooling water at ``T_cooling_water`` then takes heat the same way from
     what is left. A level inside one of ``utility_bands``, each ``(upper, lower)``,
-    moves to the end of that band, so the band counts as at the level.
+    moves to the end of that band, so the band counts as at the level. With
+    ``air`` false no air is placed and only cooling water acts.
     """
     T = np.asarray(T, dtype=float)
     H_net = np.maximum(np.asarray(H_net, dtype=float), 0.0)
@@ -132,7 +134,7 @@ def cascade_with_air(
     # Air heat enters at the source level and can only meet deficits below it;
     # it also lowers every flow above that level, which must stay non-negative.
     Q_air_source = 0.0
-    if T_air_source > T_grid[-1]:
+    if air and T_air_source > T_grid[-1]:
         above = T_grid >= T_air_source
         at = float(np.interp(T_air_source, T_grid[::-1], H_grid[::-1]))
         absorbed_below = at - float(H_grid[T_grid <= T_air_source].min())
@@ -140,7 +142,7 @@ def cascade_with_air(
         Q_air_source = max(min(flow_limit, absorbed_below), 0.0)
 
     remaining = H_grid - np.where(_at_or_above(T_grid, T_air_source), Q_air_source, 0.0)
-    Q_air_sink = _sink_duty(T_grid, remaining, T_air_sink)
+    Q_air_sink = _sink_duty(T_grid, remaining, T_air_sink) if air else 0.0
     remaining = remaining - np.where(_at_or_below(T_grid, T_air_sink), Q_air_sink, 0.0)
     Q_cooling_water = (
         0.0
