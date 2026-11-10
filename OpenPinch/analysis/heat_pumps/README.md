@@ -18,6 +18,7 @@ a docstring.
 - `build_hpr_accounting`, `calc_hpr_obj`, `relative_feasibility_penalty`, `normalise_hpr_penalty_terms`, `normalise_initial_points`, `initialise_hpr_seed` (`optimisation_adapter.py`): objective, penalty and seed helpers (`initialise_hpr_seed` is public but not in `__all__`).
 - `ProcessComponent`, `ProcessComponentHost` (`components.py`): component base record and the protocol it needs from the problem object.
 - `ProcessMVRComponent`, `create_process_mvr_component`, `replay_process_components`, `restore_process_components` (`process_mvr.py`): direct process MVR component with replacement streams, its factory, its re-solve on a rebuilt zone tree, and its rebuild from saved records.
+- `screen_refrigerants`, `screen_refrigerant`, `resolve_refrigerants`, `RefrigerantScreenThresholds`, `RefrigerantScreenEntry`, `NATURAL_REFRIGERANTS` (`refrigerant_screen.py`): screen candidate fluids as single-stage cycles between evaporating and condensing saturation levels, and resolve a candidate group (`all` CoolProp fluids, `natural`) or a list of names.
 - Subdirectories:
   - [_multiperiod](./_multiperiod/README.md): shared-design preparation, execution and aggregation across periods (documented elsewhere).
   - [_process_mvr](./_process_mvr/README.md): private helpers for process MVR selection, membership, replacement streams and work.
@@ -51,6 +52,10 @@ a docstring.
 - Replay keeps the component objects and each stream's `is_active` flag; efficiencies not passed explicitly and `dt_diff_max` are re-read from the new configuration; a failure changes no component. [process_mvr.py:replay_process_components]
 - A saved record names each source by its owning zone's path below the root and its stream name, so a name selector that matched several streams saves all of them and a renamed project still resolves; the `options` and `period_id` of the original call only check the call and are not saved. A missing source raises `ValueError`. [process_mvr.py:ProcessMVRComponent._to_record] [process_mvr.py:restore_process_components]
 - `original_streams`, `replacement_streams` and `stage_results_by_period` return deep copies. [process_mvr.py:ProcessMVRComponent]
+
+- A refrigerant screen judges each fluid in this order: condensing within `dt_cont` of the critical point is above critical; evaporating below CoolProp's minimum temperature is below the triple point; then, from saturation properties, a pressure ratio above `max_pressure_ratio`, a suction pressure below `min_suction_pressure` and condensing within `critical_margin` of the critical point; otherwise practical. Fluids without a saturation state carry no pressures or capacity. [refrigerant_screen.py:screen_refrigerant]
+- A screen covers every evaporating and condensing level pair with positive lift, in level order, and raises `ValueError` when none has; within a pair the practical fluids come first, ranked from 1 by descending suction volumetric heating capacity, then the others in candidate order. [refrigerant_screen.py:screen_refrigerants]
+- Candidate lists are validated by name and mixtures are rejected; `all` is whatever the installed CoolProp lists, so it differs between CoolProp versions. [refrigerant_screen.py:resolve_refrigerants]
 
 ## Side Effects
 - Deep-copies the base target's problem table and mutates the copy with HPR, air and residual columns. [service.py:_compute_single_period_hpr_target] [service.py:_calc_hpr_cascade]

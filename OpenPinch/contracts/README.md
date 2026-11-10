@@ -23,6 +23,7 @@ application layer builds on these models.
 - `HprPerformanceMap`, `HprPerformanceMapRequest`, `HprPerformanceMapUnits`, `HprPerformancePoint`, `JsonValue` (`hpr_performance_map.py`): versioned physical performance map.
 - Utility placement (`utility_placement.py`): `UtilityPlacementRequest`, `UtilityPlacementOptions`, `UtilityPlacementResult`, `UtilityPlacementModel`, templates, envelopes, candidates and enums.
 - `HeatRecoveryDtMinResult`, `HeatRecoveryDtMinStatus`, `HeatRecoveryQuantity` (`heat_recovery_dt_min.py`): inverse heat-recovery result.
+- `RefrigerantScreenVerdict` (`hpr_refrigerant_screen.py`): refrigerant screening verdicts, in the order they are judged.
 - `HeatExchangerNetworkControllabilityResult` and its endpoint, actuator, pairing and component models (`controllability.py`).
 - `TurbineSolveResult`, `TurbineStageResult` (`turbine.py`): turbine solve output, raw floats in fixed units (kW, degC, bar, kJ/kg, kg/s); reported per period as `TargetResults.turbine_result`.
 - `CONTRACTS`, `VALUE_JSON_SCHEMA`, `contract_json_schemas` (`schema.py`, in `__all__`) and `STREAM_COLLECTION_JSON_SCHEMA` (module-level, not in `__all__`): JSON Schema for the public contracts.
