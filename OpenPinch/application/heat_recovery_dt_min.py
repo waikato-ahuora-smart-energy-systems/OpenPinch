@@ -52,6 +52,7 @@ def _resolve_zone_and_period(
     *,
     zone: str | "Zone" | None,
     period_id: str | None,
+    requirement: str = "Heat-recovery dt_min targeting requires",
 ) -> tuple["Zone", int, str]:
     root = problem._build_execution_master_zone()
     if isinstance(zone, Zone):
@@ -64,7 +65,7 @@ def _resolve_zone_and_period(
         raise ValueError(f"Target zone {zone_selector!r} was not found.")
     if selected.type not in _SUPPORTED_ZONE_TYPES:
         raise ValueError(
-            "Heat-recovery dt_min targeting requires a Site, Process Zone, "
+            f"{requirement} a Site, Process Zone, "
             "or Unit Operation scope. Select a direct process-targeting zone "
             "instead of a Community or Region."
         )

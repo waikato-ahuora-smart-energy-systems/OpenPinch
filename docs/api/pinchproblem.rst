@@ -66,6 +66,11 @@ Interaction Matrix
      - frozen diagnostic result
      - source unchanged
      - base
+   * - ``target.hpr_load_kinks``
+     - List the net load profile vertices and the logical HPR load fractions
+     - frozen diagnostic result
+     - source unchanged
+     - base
    * - ``target.carnot_*``, ``vapour_compression_*``, ``mvr_heat_pump``
      - Model-specific HPR studies. ``brayton_*`` raises
        ``NotImplementedError`` pending solver repair
@@ -206,6 +211,54 @@ approach that still meets the requested recovery.
 The complete runnable workflow, validation matrix, unit behavior, workspace
 batch examples, and numerical interpretation are in
 :doc:`../guides/heat-recovery-dt-min`.
+
+HPR Load Kinks
+--------------
+
+``hpr_load_kinks`` finds the logical heat pump and refrigeration loads from
+kinks in the net load profiles of the direct-integration problem table. It runs
+no heat pump and changes nothing in the problem:
+
+.. code-block:: python
+
+   problem = PinchProblem("basic_pinch.json")
+   kinks = problem.target.hpr_load_kinks()
+   kinks.logical_load_fractions  # (0.4..., 1.0)
+   heat_pump = problem.target.carnot_heat_pump(
+       load_fraction=kinks.logical_load_fractions[0]
+   )
+
+A heat pump walks the sink profile (``H_NET_COLD``) up from the pinch;
+``is_refrigeration=True`` walks the source profile (``H_NET_HOT``) down from it.
+The slope at each vertex is the shifted-temperature change per unit load
+fraction. Each vertex has a ``kind``:
+
+- ``step``: the profile changes temperature with no duty after the vertex.
+- ``steepens``: the slope after is at least ``steepening`` (default 2.0) times
+  the slope before.
+- ``flattens``: the slope before is at least ``steepening`` times the slope
+  after.
+- ``minor``: any smaller change.
+
+A heat pump sized up to a step or steepening kink condenses below it; one sized
+past it condenses across the step. ``logical_load_fractions`` lists the step and
+steepens vertices in profile order, followed by 1.0. The fractions are exact,
+not rounded, so passing one as ``load_fraction`` sizes the target to the kink.
+
+``HprLoadKinksResult`` is frozen and contains ``scope``, canonical
+``period_id``, ``is_refrigeration``, ``steepening``, ``maximum_duty``,
+``vertices`` (each with ``load_fraction``, ``duty``, ``temperature``,
+``slope_before``, ``slope_after`` and ``kind``; a step has no ``slope_after``),
+``logical_load_fractions`` and ``provenance``. Duties and temperatures follow
+the configured output units; slopes are temperature differences.
+``problem.target.all_periods.hpr_load_kinks(workers=...)`` returns one result
+per canonical period. Supported scopes are Site, Process Zone and Unit
+Operation. A profile with no duty, or ``steepening`` of 1 or less, raises
+``ValueError``.
+
+.. autoclass:: OpenPinch.contracts.hpr_load_kinks.HprLoadKinksResult
+   :members:
+   :no-index:
 
 Argument Precedence
 -------------------

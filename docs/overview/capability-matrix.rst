@@ -33,6 +33,11 @@ Capability Matrix
      - bounded targets, typed failure diagnostics, costs, graphs, and versioned
        plain maps
      - CoolProp default; optional TESPy through ``openpinch[tespy]``
+   * - HPR load selection
+     - ``problem.target.hpr_load_kinks()`` and its ``all_periods`` mirror
+     - non-mutating list of net load profile vertices and the logical
+       ``load_fraction`` values at steps and steepening kinks
+     - base
    * - Multiperiod HPR design
      - independent ``problem.target.all_periods`` replay or scalar targeting
        with ``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``
