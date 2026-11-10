@@ -13,6 +13,7 @@ from ....domain.problem_table import ProblemTable
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..performance_maps.targeting import normalize_hpr_simulation_backend
+from .compressor_efficiency import compressor_efficiency_model
 
 __all__ = [
     "construct_HPRTargetInputs",
@@ -106,8 +107,10 @@ def construct_HPRTargetInputs(
         refrigerant_ls=hpr.normalised_refrigerants,
         mvr_fluid_ls=hpr.normalised_mvr_fluids,
         do_refrigerant_sort=hpr.refrigerant_sort_enabled,
-        eta_comp=hpr.eta_comp,
-        eta_mvr_comp=hpr.mvr_eta_comp,
+        eta_comp=compressor_efficiency_model(hpr.compressor_model, hpr.eta_comp),
+        eta_mvr_comp=compressor_efficiency_model(
+            hpr.mvr_compressor_model, hpr.mvr_eta_comp
+        ),
         eta_motor=hpr.mvr_eta_motor,
         eta_exp=hpr.eta_exp,
         eta_ii_hpr_carnot=hpr.eta_ii_carnot,

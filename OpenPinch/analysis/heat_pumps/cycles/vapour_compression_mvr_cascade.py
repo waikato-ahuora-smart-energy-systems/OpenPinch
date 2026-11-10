@@ -64,6 +64,14 @@ class VapourCompressionMvrCascade:
         return [*self._vc_cycles, *self._mvr_cycles]
 
     @property
+    def eta_comp(self) -> np.ndarray:
+        """Isentropic efficiency applied in each subcycle's compressor."""
+        return np.array(
+            [cycle.eta_comp for cycle in self._vc_cycles]
+            + [cycle.eta_mvr_comp for cycle in self._mvr_cycles]
+        )
+
+    @property
     def source_split(self) -> float:
         """Split of the hottest VC condenser duty used to generate MVR vapour."""
         return self._source_split

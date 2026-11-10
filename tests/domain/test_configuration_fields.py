@@ -328,3 +328,38 @@ def test_min_exchanger_approach_share_is_a_share_below_one():
             meta.validate_configuration_option_value(
                 "HENS_MIN_EXCHANGER_APPROACH_SHARE", value
             )
+
+
+@pytest.mark.parametrize("key", ["HPR_COMPRESSOR_MODEL", "HPR_MVR_COMPRESSOR_MODEL"])
+def test_hpr_compressor_models_are_named_in_options(key):
+    assert meta.CONFIG_FIELD_SPECS[key].default == "constant"
+    assert meta.validate_configuration_option_value(key, "pareto_front") == (
+        "pareto_front"
+    )
+    with pytest.raises(
+        ValueError,
+        match="must be one of: brendel, constant, pareto_front, wang_cleland",
+    ):
+        meta.validate_configuration_option_value(key, "map")
+
+
+def test_a_compressor_function_is_accepted_per_call_under_its_name():
+    def bitzer_map(conditions):
+        return 0.68
+
+    validated = meta.validate_internal_configuration_options(
+        {"HPR_COMPRESSOR_MODEL": bitzer_map}
+    )
+
+    model = validated["HPR_COMPRESSOR_MODEL"]
+    assert model("conditions") == 0.68
+    assert model.name == "bitzer_map"
+    assert model.to_dict() == {"custom_compressor_model": "bitzer_map"}
+
+
+def test_stored_options_point_a_compressor_function_to_the_per_call_argument():
+    def bitzer_map(conditions):
+        return 0.68
+
+    with pytest.raises(ValueError, match="compressor_model="):
+        meta.validate_configuration_options({"HPR_COMPRESSOR_MODEL": bitzer_map})

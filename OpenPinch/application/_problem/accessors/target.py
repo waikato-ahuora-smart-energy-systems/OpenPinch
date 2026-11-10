@@ -700,6 +700,7 @@ class _TargetAccessor:
         condensers=None,
         evaporators=None,
         compressor_efficiency=None,
+        compressor_model=None,
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
@@ -713,6 +714,7 @@ class _TargetAccessor:
             ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
             ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
             ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
+            ("HPR_COMPRESSOR_MODEL", compressor_model),
         ):
             _set_if_not_none(extra, key, value)
         return self._hpr(
@@ -760,6 +762,7 @@ class _TargetAccessor:
         condensers=None,
         evaporators=None,
         compressor_efficiency=None,
+        compressor_model=None,
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
@@ -773,6 +776,7 @@ class _TargetAccessor:
             ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
             ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
             ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
+            ("HPR_COMPRESSOR_MODEL", compressor_model),
         ):
             _set_if_not_none(extra, key, value)
         return self._hpr(
@@ -880,6 +884,8 @@ class _TargetAccessor:
         is_utility_heat_pump: bool = False,
         mvr_fluids=None,
         mvr_compressor_efficiency=None,
+        mvr_compressor_model=None,
+        compressor_model=None,
         mvr_stages=None,
         motor_efficiency=None,
         zone=None,
@@ -902,6 +908,8 @@ class _TargetAccessor:
             ("HPR_MVR_ETA_COMP", mvr_compressor_efficiency),
             ("HPR_MVR_COUNT", mvr_stages),
             ("HPR_MVR_ETA_MOTOR", motor_efficiency),
+            ("HPR_COMPRESSOR_MODEL", compressor_model),
+            ("HPR_MVR_COMPRESSOR_MODEL", mvr_compressor_model),
         ):
             _set_if_not_none(extra, key, value)
         return self._hpr(

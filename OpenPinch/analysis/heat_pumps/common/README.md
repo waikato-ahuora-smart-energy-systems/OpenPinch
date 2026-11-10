@@ -18,6 +18,7 @@ multi-stage vapour-compression objective, and residual utility accounting.
 - Thermodynamic helpers (`shared.py`): `calc_carnot_heat_pump_cop`, `calc_carnot_heat_engine_eta`, `compute_entropic_mean_temperature`, and `satisfies_second_law` (public but not in `__all__`).
 - `_evaluate_multi_vc_objective` (`multi_vc_objective.py`): shared objective for cascade and parallel vapour-compression targeting (parse vector, solve, build streams, account, attach CoolProp record).
 - `value_at_index`, `to_kelvin`, `to_degrees_celsius`, `to_kilopascal` (`units.py`): period-indexed value and unit conversion.
+- Compressor efficiency (`compressor_efficiency.py`): `CompressorConditions` (refrigerant, suction and discharge pressures in kPa, `pressure_ratio`, suction temperature and dew points in degC, suction and saturated vapour densities in kg/m3), `compressor_efficiency_model` (a model name or function to a constant or a function of the conditions), `evaluate_compressor_model`, `CompressorModelError`, and the HeatPumpLab correlations `pareto_front_efficiency`, `wang_cleland_efficiency`, `brendel_efficiency`.
 - `postprocessing.py`: only private functions; `_get_hpr_residual_utility_summary` is the one the service imports, retargeting utilities against the residual cascade after the HPR.
 - Subdirectories: [_shared](./_shared/README.md): private air, stream and plotting helpers behind `shared.py`.
 
@@ -36,6 +37,7 @@ multi-stage vapour-compression objective, and residual utility accounting.
 - Ambient air and cooling water are applied through `cascade_with_air` on the condenser and evaporator cascades; cooling water applies on the evaporator side only. Air is left out when `args.ambient_air_enabled` is false (`HPR_AMBIENT_AIR_ENABLED`). [shared.py:_cascade_air_duties]
 - `calc_carnot_heat_pump_cop` and `calc_carnot_heat_engine_eta` take absolute temperatures (K); `satisfies_second_law` takes degC and adds 273.15 internally, and `compute_entropic_mean_temperature` takes degC by default and returns K. [shared.py:calc_carnot_heat_pump_cop] [shared.py:satisfies_second_law]
 - Residual loads below `max(tol, 1e-7 * largest)` are treated as rounding noise and set to zero; duplicate residual temperatures with conflicting values raise `ValueError`. [postprocessing.py:_residual_noise_floor] [postprocessing.py:_deduplicate_residual_profile_rows]
+- `HPR_COMPRESSOR_MODEL` and `HPR_MVR_COMPRESSOR_MODEL` `"constant"` pass `HPR_ETA_COMP` and `HPR_MVR_ETA_COMP` through as floats, so the default cycles are unchanged; the named models are HeatPumpLab's correlations bounded to [0.4, 1.0] and pickle. [preprocessing.py:construct_HPRTargetInputs] [compressor_efficiency.py:compressor_efficiency_model]
 - `common` imports the parent's `optimisation_adapter` and `performance_maps.targeting` for accounting and backend names. [shared.py] [preprocessing.py]
 
 ## Side Effects

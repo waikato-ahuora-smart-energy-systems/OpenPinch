@@ -100,6 +100,7 @@ def test_preflight_accepts_approved_single_stage_modes(is_heat_pumping: bool) ->
         ),
         ({"allow_integrated_expander": True}, "integrated_expander_unsupported"),
         ({"dt_hp_ihx": 1.0}, "unsupported_model"),
+        ({"eta_comp": lambda conditions: 0.7}, "unsupported_compressor_model"),
     ],
 )
 def test_preflight_rejects_unsupported_cycle_shapes(overrides, code) -> None:

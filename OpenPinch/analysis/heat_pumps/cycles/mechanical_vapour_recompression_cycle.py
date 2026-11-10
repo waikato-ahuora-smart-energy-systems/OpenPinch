@@ -87,7 +87,9 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
 
     @property
     def eta_mvr_comp(self) -> float:
-        """MVR compressor isentropic efficiency."""
+        """MVR compressor isentropic efficiency, as applied when it is a model."""
+        if callable(self._eta_mvr_comp):
+            return self._eta_comp_applied
         return self._eta_mvr_comp
 
     @property
@@ -359,7 +361,9 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
         self._cycle_states = self._new_cycle_states()
         self._penalty = np.asarray([], dtype=float)
         self._refrigerant = fluid
-        self._eta_mvr_comp = float(eta_mvr_comp)
+        self._eta_mvr_comp = (
+            eta_mvr_comp if callable(eta_mvr_comp) else float(eta_mvr_comp)
+        )
         self._eta_motor = float(eta_motor)
         self._m_dot = 0.0
         self._m_dot_source = 0.0
@@ -385,7 +389,9 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
         if self._dT_subcool < 0.0:
             self._max_work *= 1e3
             return None
-        if self._eta_mvr_comp <= 0.0 or self._eta_motor <= 0.0:
+        if self._eta_motor <= 0.0 or (
+            not callable(self._eta_mvr_comp) and self._eta_mvr_comp <= 0.0
+        ):
             self._max_work *= 1e3
             return None
         if self._T_cond <= self._T_evap:
@@ -485,6 +491,7 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
                     h_in=state0.hmass(),
                     s_in=state0.smass(),
                     P_out=P_hi,
+                    suction=state0,
                 )
             finally:
                 self._eta_comp = old_eta
