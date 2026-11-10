@@ -4,6 +4,20 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``problem.target.hpr_load_kinks()`` finds the logical heat pump and
+  refrigeration loads from kinks in the net load profiles. It lists every
+  vertex of the sink profile (or, with ``is_refrigeration=True``, the source
+  profile) with its load fraction, duty, shifted temperature, slopes and
+  ``kind`` (``step``, ``steepens``, ``flattens`` or ``minor``), and the logical
+  load fractions: each step, each vertex where the profile steepens by at least
+  ``steepening`` (default 2.0), and 1.0. Pass a fraction as ``load_fraction``
+  to any HPR target. The method changes nothing in the problem, and has
+  ``all_periods`` and workspace mirrors. It returns the new frozen
+  ``HprLoadKinksResult`` contract.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -60,6 +60,12 @@ work and separate ambient exchanges (kW). Zero selected load returns no HPR targ
 Use ``load_duty`` for an absolute duty or ``period_loads`` for per-period duties
 instead of ``load_fraction``; these selectors are mutually exclusive.
 
+To choose a load from the shape of the profile rather than a round number,
+``problem.target.hpr_load_kinks()`` lists the logical load fractions: the steps
+and steepening kinks of the sink profile, followed by 1.0
+(``is_refrigeration=True`` uses the source profile). Pass one as
+``load_fraction``. See :doc:`../api/pinchproblem` for the rule.
+
 Heat pumps have no penalty requiring them to consume all low-grade heat.
 Refrigeration retains a feasibility term for unserved selected cooling.
 

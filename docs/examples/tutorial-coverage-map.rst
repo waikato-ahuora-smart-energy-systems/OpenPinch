@@ -4,12 +4,12 @@ Tutorial Coverage Map
 Coverage Result
 ---------------
 
-The released public denominator contains **225 operations** across
+The released public denominator contains **229 operations** across
 ``PinchProblem``, ``PinchWorkspace``, targeting, all-period targeting,
 components and returned component results, ordered case batches, HEN
 design/result views, and plotting. The canonical manifest maps every operation
 except those still under development to an executable tutorial code cell:
-**211/225 operations are mapped**. Routine fake and guarded
+**215/229 operations are mapped**. Routine fake and guarded
 real-engine pytest profiles provide
 additional evidence for the specialist target-owned HPR map operation.
 

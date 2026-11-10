@@ -25,6 +25,7 @@ EXPECTED_TARGET_METHODS = {
     "exergy",
     "heat_exchanger_area_and_cost",
     "heat_recovery_dt_min",
+    "hpr_load_kinks",
     "hpr_performance_map",
     "indirect_heat_integration",
     "isentropic_cogeneration",
