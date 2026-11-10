@@ -116,9 +116,10 @@ def test_every_coolprop_fluid_screens_and_its_verdict_matches_its_properties(
 
 
 def test_thresholds_come_from_the_configuration():
-    assert RefrigerantScreenThresholds.from_configuration(
-        Configuration()
-    ) == RefrigerantScreenThresholds()
+    assert (
+        RefrigerantScreenThresholds.from_configuration(Configuration())
+        == RefrigerantScreenThresholds()
+    )
     config = Configuration(
         options={
             "HPR_DT_CONT": 5.0,

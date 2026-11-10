@@ -43,9 +43,7 @@ _CARNOT_CYCLES = frozenset(
 
 def _placed_levels(levels, duties) -> list[float]:
     """Distinct levels, in order, of the ports that carry duty."""
-    return list(
-        dict.fromkeys(float(t) for t, q in zip(levels, duties) if abs(q) > tol)
-    )
+    return list(dict.fromkeys(float(t) for t, q in zip(levels, duties) if abs(q) > tol))
 
 
 def calculate_hpr_refrigerant_screen(
