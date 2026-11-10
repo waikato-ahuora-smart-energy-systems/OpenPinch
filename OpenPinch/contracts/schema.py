@@ -11,6 +11,7 @@ from pydantic.json_schema import GenerateJsonSchema
 from ..domain.stream_collection import StreamCollection
 from ..domain.value import Value
 from .heat_recovery_dt_min import HeatRecoveryDtMinResult
+from .hpr_load_kinks import HprLoadKinksResult
 from .hpr_performance_map import HprPerformanceMap, HprPerformanceMapRequest
 from .input import TargetInput
 from .output import TargetOutput
@@ -153,6 +154,7 @@ CONTRACTS: dict[str, tuple[type[BaseModel], str]] = {
     "HprPerformanceMap": (HprPerformanceMap, "serialization"),
     "UtilityPlacementResult": (UtilityPlacementResult, "serialization"),
     "HeatRecoveryDtMinResult": (HeatRecoveryDtMinResult, "serialization"),
+    "HprLoadKinksResult": (HprLoadKinksResult, "serialization"),
     "HeatExchangerNetworkSynthesisResult": (
         HeatExchangerNetworkSynthesisResult,
         "serialization",
