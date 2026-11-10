@@ -68,7 +68,11 @@ HPR utilities are priced relative to the HPR electricity price
 
 - External heating costs ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` (default 1.0).
 - Ambient air is free. It supplies and takes heat inside each HPR cascade, as
-  far as its temperature allows.
+  far as its temperature allows: ``ENV_TEMPERATURE`` (default 15 °C) with a
+  ``dt_cont`` of ``HPR_DT_ENV_CONT`` (default 10 K). Set
+  ``HPR_AMBIENT_AIR_ENABLED`` to ``False`` when air is not available as a heat
+  source or sink. No air is then placed, results report zero ambient duty and
+  add no ``AIR`` streams, and cooling water still applies.
 - Cooling water takes heat at ``COSTING_HPR_COOLING_WATER_TEMPERATURE``
   (default 25 °C) plus ``COSTING_HPR_COOLING_WATER_DT_MIN`` (default 5 K) and
   costs ``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE`` (default 0.025).
@@ -83,6 +87,9 @@ HPR utilities are priced relative to the HPR electricity price
 
 Notebook 08 uses a cooling-water ratio of 0.1 to illustrate inexpensive
 cooling without changing global defaults.
+
+Every ``HPR_*`` and ``COSTING_HPR_*`` option is listed in
+:doc:`../api/configuration-options`.
 
 Simulated (vapour-compression) targets also include annualized capital. Each
 heat-pump machine costs::

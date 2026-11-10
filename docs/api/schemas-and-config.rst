@@ -22,8 +22,9 @@ What Each Layer Does
    Define the structured response returned by the top-level service boundary.
 
 ``Configuration``
-   Stores numerical and engineering defaults for heat pumps, utilities,
-   costing, turbines, and solvers. Its method selectors are not user-settable.
+   Stores numerical and engineering defaults for input and output units,
+   thermal and direct-integration settings, costing, heat pumps, ORC,
+   turbines, process MVR and heat exchanger network synthesis. Its method selectors are not user-settable.
    Each prepared :class:`~OpenPinch.domain.zone.Zone` owns one config object.
 
 Discovering Options
