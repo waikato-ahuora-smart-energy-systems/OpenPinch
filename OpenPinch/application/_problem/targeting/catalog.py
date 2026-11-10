@@ -119,6 +119,12 @@ METHOD_CATALOG = MappingProxyType(
             dependencies=("tespy (explicit backend only)",),
             adapter="hpr_map",
         ),
+        "target.hpr_refrigerant_screen": _spec(
+            scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),
+            prerequisites=("carnot_hpr_target",),
+            periods="nonmutating",
+            adapter="refrigerant_screen",
+        ),
         **{
             f"design.{name}": _spec(
                 prerequisites=("direct_heat_integration",),

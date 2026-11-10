@@ -2,6 +2,7 @@
 
 from ...contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
 from ...contracts.hpr_performance_map import HprPerformanceMap
+from ...contracts.hpr_refrigerant_screen import HprRefrigerantScreenResult
 from ...contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ...contracts.utility_placement import UtilityPlacementResult
 
@@ -16,6 +17,7 @@ SPECIALIST_RESULT_ADAPTERS = {
     for family in (
         HeatRecoveryDtMinResult,
         HprPerformanceMap,
+        HprRefrigerantScreenResult,
         HeatExchangerNetworkSynthesisResult,
         UtilityPlacementResult,
     )

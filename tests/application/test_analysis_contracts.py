@@ -103,6 +103,19 @@ def test_nonthermal_result_has_family_report_adapter():
     assert p.results is None
 
 
+def test_refrigerant_screen_has_specialist_report_adapter():
+    from OpenPinch.presentation.reporting.adapters import adapt_analysis_result
+
+    p = PinchProblem(_two_period_payload(), project_name="Site")
+    result = p.target.hpr_refrigerant_screen(
+        T_evap=0.0, T_cond=60.0, refrigerants=["Ammonia"]
+    )
+    report = adapt_analysis_result(result)
+    assert report == result
+    assert report is not result
+    assert report.provenance.method_id == "target.hpr_refrigerant_screen"
+
+
 def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
     from OpenPinch.application._problem.accessors.target import (
         _AllPeriodsTargetAccessor,
@@ -132,10 +145,12 @@ def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
     }
     assert names(_CaseBatchTargetAccessor) == targets - {
         "hpr_performance_map",
+        "hpr_refrigerant_screen",
     }
     assert names(_CaseBatchDesignAccessor) == designs
     period_names = targets - {
         "hpr_performance_map",
+        "hpr_refrigerant_screen",
         "brayton_heat_pump",
         "brayton_refrigeration",
     }
@@ -146,6 +161,7 @@ def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
         "inverse_dt_min",
         "placement",
         "hpr_map",
+        "refrigerant_screen",
         "hen",
         "residual",
     }

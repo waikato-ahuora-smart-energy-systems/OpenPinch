@@ -55,8 +55,8 @@ Core and Intermediate
 7. ``07_area_cost_and_exergy.ipynb`` -- area/cost and exergy enrichment
    (``base``).
 8. ``08_carnot_heat_pump_and_refrigeration.ipynb`` -- bounded one-stage Carnot
-   heat-pump and refrigeration targets, plots, and residual utility placement
-   (``slow-hpr``).
+   heat-pump and refrigeration targets, plots, a natural-refrigerant screen at
+   the heat pump's levels, and residual utility placement (``slow-hpr``).
 9. ``09_vapour_compression.ipynb`` -- comprehensive simulated
    vapour-compression targeting, detached winning records, target-owned performance maps,
    plain-data export, required CoolProp refrigeration, and explicit optional TESPy
