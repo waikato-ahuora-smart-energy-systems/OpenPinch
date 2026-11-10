@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.8.3 (2026-11-11)
+------------------
+
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -42,6 +45,23 @@ Heat pumps and refrigeration
   to any HPR target. The method changes nothing in the problem, and has
   ``all_periods`` and workspace mirrors. It returns the new frozen
   ``HprLoadKinksResult`` contract.
+- Heat pump and refrigeration targets now accept ``R1233zd(E)`` as a
+  refrigerant. Refrigerant names are still upper-cased, so lower-case input
+  such as ``r134a`` resolves, but a name is kept as given when CoolProp rejects
+  its upper-cased form. ``R1233zd(E)`` was the only CoolProp 8.0.0 fluid
+  affected; it raised ``HPRTargetingError`` in preflight.
+- Vapour compression and MVR compressors can follow a compressor efficiency
+  model instead of a constant isentropic efficiency. ``HPR_COMPRESSOR_MODEL``
+  and ``HPR_MVR_COMPRESSOR_MODEL`` take ``"constant"`` (the default, so results
+  are unchanged), ``"pareto_front"``, ``"wang_cleland"`` or ``"brendel"``,
+  correlations from HeatPumpLab. From Python, the ``compressor_model=``
+  argument of ``vapour_compression_heat_pump()``,
+  ``vapour_compression_refrigeration()`` and ``mvr_heat_pump()``, and
+  ``mvr_compressor_model=`` of ``mvr_heat_pump()``, also take a function of the
+  compressor conditions (pressures, suction state, dew points and vapour
+  densities), such as a fit of a manufacturer's compressor map. Provenance
+  records a function by name. The CoolProp backend applies the models; TESPy
+  targeting and performance maps take only a constant efficiency.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -103,27 +123,6 @@ Documentation
   one page only; other pages link to it. The CLI guide moves to
   ``guides/cli.html`` and the Notebooks and Sample Cases guide is folded into
   the Notebook Series page. The old addresses redirect to the new pages.
-
-Heat pumps and refrigeration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- Heat pump and refrigeration targets now accept ``R1233zd(E)`` as a
-  refrigerant. Refrigerant names are still upper-cased, so lower-case input
-  such as ``r134a`` resolves, but a name is kept as given when CoolProp rejects
-  its upper-cased form. ``R1233zd(E)`` was the only CoolProp 8.0.0 fluid
-  affected; it raised ``HPRTargetingError`` in preflight.
-- Vapour compression and MVR compressors can follow a compressor efficiency
-  model instead of a constant isentropic efficiency. ``HPR_COMPRESSOR_MODEL``
-  and ``HPR_MVR_COMPRESSOR_MODEL`` take ``"constant"`` (the default, so results
-  are unchanged), ``"pareto_front"``, ``"wang_cleland"`` or ``"brendel"``,
-  correlations from HeatPumpLab. From Python, the ``compressor_model=``
-  argument of ``vapour_compression_heat_pump()``,
-  ``vapour_compression_refrigeration()`` and ``mvr_heat_pump()``, and
-  ``mvr_compressor_model=`` of ``mvr_heat_pump()``, also take a function of the
-  compressor conditions (pressures, suction state, dew points and vapour
-  densities), such as a fit of a manufacturer's compressor map. Provenance
-  records a function by name. The CoolProp backend applies the models; TESPy
-  targeting and performance maps take only a constant efficiency.
 
 0.8.2 (2026-11-10)
 ------------------
