@@ -58,6 +58,12 @@ Documentation
   the application layer's allowed imports. The two stub reference pages and
   the completed October 2026 audit plan are no longer published, and the
   module appendix is renamed Contributor Module Reference.
+- Reorganised navigation. The API Reference lists the public workflow pages
+  and the contributor reference pages under separate headings, and the
+  Generated Appendix page is gone. Each class and module is now rendered on
+  one page only; other pages link to it. The CLI guide moves to
+  ``guides/cli.html`` and the Notebooks and Sample Cases guide is folded into
+  the Notebook Series page. The old addresses redirect to the new pages.
 
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

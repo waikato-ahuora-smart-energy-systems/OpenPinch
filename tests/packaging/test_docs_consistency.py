@@ -229,8 +229,7 @@ def test_packaged_assets_are_documented_in_examples_and_guides():
         [
             EXAMPLES_ROOT / "notebook-series.rst",
             EXAMPLES_ROOT / "sample-cases.rst",
-            GUIDES_ROOT / "notebooks-and-sample-cases.rst",
-            GUIDES_ROOT / "first-solve-cli.rst",
+            GUIDES_ROOT / "cli.rst",
             README,
         ]
     )
@@ -267,7 +266,7 @@ def test_public_python_surface_is_covered_by_curated_api_docs():
 
 def test_legacy_library_transition_page_is_absent_from_docs_and_navigation():
     assert not (DOCS_ROOT / "reference" / "api-lib.rst").exists()
-    assert "../reference/api-lib" not in _read(API_ROOT / "generated-index.rst")
+    assert "../reference/api-lib" not in _read(API_ROOT / "index.rst")
 
 
 def test_workflow_guides_do_not_recommend_concrete_application_imports():

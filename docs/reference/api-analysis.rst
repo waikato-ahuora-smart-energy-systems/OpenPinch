@@ -119,24 +119,9 @@ rerun. They sit below ``PinchProblem.components`` and are most useful for
 workspace before/after studies where the active stream set changes between
 cases.
 
-.. automodule:: OpenPinch.analysis.heat_pumps
-   :no-members:
-   :no-index:
-
-.. automodule:: OpenPinch.analysis.heat_pumps.components
-   :members:
-   :no-index:
-
-.. automodule:: OpenPinch.analysis.heat_pumps.process_mvr
-   :members:
-   :no-index:
-
-.. automodule:: OpenPinch.analysis.heat_pumps.direct_mvr
-   :no-members:
-
-.. automodule:: OpenPinch.analysis.heat_pumps.direct_mvr.execution
-   :members: solve_direct_gas_mvr_stream, coerce_positive_mvr_stage_count
-   :no-index:
+The component modules (``heat_pumps.components``, ``heat_pumps.process_mvr``
+and ``heat_pumps.direct_mvr``) are documented under Process Component Models in
+:doc:`api-classes`.
 
 Advanced Add-On Analyses
 ------------------------

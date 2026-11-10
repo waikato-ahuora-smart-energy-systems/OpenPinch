@@ -13,6 +13,27 @@ that analysis; stored configuration is only the fallback when an argument is
 omitted. The sample data ships with OpenPinch, so the notebooks run without path
 setup; read the named inputs and assumptions before substituting plant data.
 
+Getting the Notebooks
+---------------------
+
+Copy the series into a working directory with ``openpinch notebook -o
+notebooks`` (see :doc:`../guides/cli`). List the packaged notebooks and sample
+cases from Python:
+
+.. code-block:: python
+
+   from OpenPinch.resources import (
+       list_notebooks,
+       list_sample_cases,
+       notebook_metadata,
+       sample_case_metadata,
+   )
+
+   print(list_sample_cases())
+   print(list_notebooks())
+
+The sample cases are described in :doc:`sample-cases`.
+
 Core and Intermediate
 ---------------------
 

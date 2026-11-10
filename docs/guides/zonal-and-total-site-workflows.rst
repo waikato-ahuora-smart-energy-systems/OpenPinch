@@ -83,4 +83,5 @@ Next Steps
 
 - :doc:`../fundamentals/zones-streams-utilities-and-targets` for the model.
 - :doc:`graphing-and-interpretation` for graph reading order.
-- :doc:`notebooks-and-sample-cases` for notebook 02 and zonal sample cases.
+- :doc:`../examples/notebook-series` for notebook 02 and
+  :doc:`../examples/sample-cases` for the zonal sample cases.

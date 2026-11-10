@@ -78,4 +78,4 @@ Recommended Follow-On Pages
 
 - :doc:`../guides/cogeneration-workflows`
 - :doc:`../api/pinchproblem`
-- :doc:`../api/generated-index`
+- :doc:`../api/index`

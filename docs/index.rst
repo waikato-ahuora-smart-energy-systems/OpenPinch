@@ -24,7 +24,7 @@ Start Here
 I want to solve a case
    Start with :doc:`getting-started`, then use
    :doc:`guides/first-solve-python` for the main Python workflow or
-   :doc:`guides/notebooks-and-sample-cases` for packaged examples.
+   :doc:`examples/notebook-series` for packaged examples.
 
 I need to understand the method
    Start with :doc:`overview/what-is-openpinch`, then read
@@ -38,7 +38,7 @@ I know the required process heat recovery
 
 I am building a reusable study
    Start with :doc:`api/package-root` and :doc:`developer/architecture`.
-   The contributor module reference documents implementation owners for
+   The contributor reference in :doc:`api/index` documents implementation owners for
    contributors.
 
 What OpenPinch Covers

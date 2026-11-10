@@ -77,29 +77,10 @@ prepared or why a target changed after mutating the in-memory model.
 Key Classes
 -----------
 
-.. autoclass:: OpenPinch.domain.zone.Zone
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.domain.stream.Stream
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.domain.stream_collection.StreamCollection
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.domain.problem_table.ProblemTable
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.domain.heat_exchanger_network.HeatExchangerNetwork
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.domain.heat_exchanger.HeatExchanger
-   :members:
-   :no-index:
+``Zone``, ``Stream``, ``StreamCollection``, ``ProblemTable``,
+``HeatExchangerNetwork`` and ``HeatExchanger`` are documented member by member
+in :doc:`../reference/api-classes`, under Streams and Collections, Zones,
+Targets, and Tables, and Heat Exchanger Network Design Records.
 
 Process Components
 ------------------
@@ -109,13 +90,8 @@ before/after studies where a specific unit operation changes the active process
 stream set before targeting. The input's ``process_components`` field saves each
 component as the call that made it, and loading that input re-solves it.
 
-.. autoclass:: OpenPinch.analysis.heat_pumps.components.ProcessComponent
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.analysis.heat_pumps.process_mvr.ProcessMVRComponent
-   :members:
-   :no-index:
+``ProcessComponent`` and ``ProcessMVRComponent`` are documented under Process
+Component Models in :doc:`../reference/api-classes`.
 
 Solved Target Records
 ---------------------
@@ -124,9 +100,8 @@ Targets are stored on zones and normalized through schema models before export.
 The base target schema is a useful reference when you are programmatically
 comparing cases or consuming target results in another tool.
 
-.. autoclass:: OpenPinch.domain.targets.BaseTargetModel
-   :members:
-   :no-index:
+``BaseTargetModel`` is documented under Target Models in
+:doc:`schemas-and-config`.
 
 How These Objects Relate
 ------------------------
