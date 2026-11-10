@@ -1475,6 +1475,38 @@ def test_solve_built_task_model_args_failures_and_verification_paths() -> None:
     assert invalid_problem.kwargs["evolution_n_ad_branches"] == 2
 
 
+def test_solve_built_task_marks_a_solve_that_did_not_converge() -> None:
+    # It stays a success so evolution can start from it; the marker keeps it
+    # out of the final ranking.
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="executor-unconverged",
+        method="thermal_derivative_method",
+        approach_temperature=14.0,
+        stage_count=2,
+        derivative_threshold=0.5,
+    )
+    solver_run = SimpleNamespace(
+        status="ok", converged=False, termination_condition="maxIterations"
+    )
+
+    class UnconvergedInternalProblem:
+        case = SimpleNamespace(solver_run=solver_run)
+
+        def get_solution(self, **kwargs):
+            return SimpleNamespace(mSuccess=1, solver_run=solver_run)
+
+        def extract_network(self, *, run_id):
+            return HeatExchangerNetwork(run_id=run_id, total_annual_cost=1.0)
+
+    _task, outcome, internal_problem = _solve_built_task(
+        (task, UnconvergedInternalProblem(), False, None)
+    )
+
+    assert outcome.status == "success"
+    assert outcome.diagnostics["unconverged_termination"] == "maxIterations"
+    assert internal_problem is not None
+
+
 def test_solve_built_task_success_exception_and_root_build_failure(monkeypatch) -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-success",

@@ -410,6 +410,14 @@ def _solve_built_task(
                 return task, _failed_task_outcome(task, reason), internal_problem
 
         network = internal_problem.extract_network(run_id=task.run_id)
+        # An unconverged solve stays a success so downstream tasks can start
+        # from it; demote_infeasible_outcomes keeps it out of the ranking.
+        solver_run = getattr(solved, "solver_run", None)
+        diagnostics = (
+            {}
+            if getattr(solver_run, "converged", True)
+            else {"unconverged_termination": str(solver_run.termination_condition)}
+        )
         return (
             task,
             HeatExchangerNetworkSynthesisTaskOutcome(
@@ -418,6 +426,7 @@ def _solve_built_task(
                 network=network,
                 objective_value=network.total_annual_cost,
                 solver_status=_solver_status(internal_problem),
+                diagnostics=diagnostics,
             ),
             internal_problem,
         )

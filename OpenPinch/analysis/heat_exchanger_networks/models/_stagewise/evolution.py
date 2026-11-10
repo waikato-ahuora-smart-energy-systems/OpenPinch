@@ -533,6 +533,8 @@ def _update_with_best_model(owner, best_model) -> None:
         owner.area_cu_shared = copy.deepcopy(best_model.area_cu_shared)
     owner.hu_area_cost_total = copy.deepcopy(best_model.hu_area_cost_total)
     owner.cu_area_cost_total = copy.deepcopy(best_model.cu_area_cost_total)
+    if hasattr(best_model, "solver_run"):
+        owner.solver_run = best_model.solver_run
     owner.get_post_process()
 
 
@@ -713,6 +715,9 @@ def _is_usable_evolution_candidate(candidate) -> bool:
     if candidate is None:
         return False
     if not candidate.mSuccess:
+        return False
+    # A solve stopped at a limit keeps mSuccess, but its TAC is not reliable.
+    if not getattr(getattr(candidate, "solver_run", None), "converged", True):
         return False
     verify = getattr(candidate, "verify", None)
     if not callable(verify):

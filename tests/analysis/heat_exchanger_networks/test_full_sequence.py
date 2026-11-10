@@ -43,6 +43,7 @@ from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.results.assembly import (
     build_synthesis_result,
+    demote_infeasible_outcomes,
 )
 from OpenPinch.analysis.heat_exchanger_networks.service import (
     heat_exchanger_network_synthesis_service,
@@ -674,6 +675,28 @@ def test_successful_infeasible_outcome_is_demoted_with_its_reason() -> None:
         match="post-solve feasibility check failed",
     ):
         build_synthesis_result(settings, pdm_tasks, [outcomes[0], *others])
+
+
+def test_unconverged_outcome_is_demoted_before_ranking() -> None:
+    # Its objective is not a converged optimum, so it can't win on cost.
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
+    outcome = FakeSynthesisExecutor().execute(
+        pdm_tasks[:1],
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=1,
+    )[0]
+    unconverged = outcome.model_copy(
+        update={"diagnostics": {"unconverged_termination": "maxTimeLimit"}}
+    )
+
+    (demoted,) = demote_infeasible_outcomes([unconverged])
+
+    assert demoted.status == "failed"
+    assert demoted.error == "solver stopped before converging (maxTimeLimit)"
+    assert demoted.network is not None
 
 
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
