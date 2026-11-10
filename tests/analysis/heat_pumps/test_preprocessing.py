@@ -3,6 +3,7 @@ import pytest
 
 import OpenPinch.analysis.heat_pumps.common.preprocessing as hp_pre
 from OpenPinch.domain.configuration import Configuration
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 from OpenPinch.domain.stream_collection import StreamCollection
 
 
@@ -208,3 +209,19 @@ def test_extend_profile_with_temperature_margin_keeps_empty_profiles_empty():
     assert T_out.size == 0
     assert H_out.size == 0
     assert z_out.size == 0
+
+
+def test_only_vapour_compression_cycles_take_a_compressor_model():
+    # Brayton passes eta_comp to TESPy, which needs a number.
+    config = Configuration(options={"HPR_COMPRESSOR_MODEL": "pareto_front"})
+    config.update_values(HPR_TYPE=HeatPumpAndRefrigerationCycle.Brayton.value)
+
+    args = hp_pre.construct_HPRTargetInputs(
+        Q_hpr_target=50.0,
+        T_vals=np.array([120.0, 80.0, 40.0]),
+        H_hot=np.array([0.0, -50.0, -100.0]),
+        H_cold=np.array([100.0, 50.0, 0.0]),
+        config=config,
+    )
+
+    assert args.eta_comp == pytest.approx(0.7, abs=0.0)

@@ -249,6 +249,72 @@ Set ``is_cascade_cycle=False`` for Parallel vapour compression cycles. Use the
 separate ``mvr_heat_pump()`` method for Vapour compression with MVR cascade;
 MVR is not hidden behind a cycle selector.
 
+Compressor efficiency models
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default every vapour compression compressor has the constant isentropic
+efficiency ``HPR_ETA_COMP`` (0.7), and every MVR compressor
+``HPR_MVR_ETA_COMP``. ``HPR_COMPRESSOR_MODEL`` and
+``HPR_MVR_COMPRESSOR_MODEL`` make the efficiency follow each compressor's
+operating point instead:
+
+- ``"constant"`` (default): ``HPR_ETA_COMP`` or ``HPR_MVR_ETA_COMP``.
+- ``"pareto_front"``: the best published shaft-basis isentropic efficiency at
+  the pressure ratio, fitted by HeatPumpLab to manufacturer selection software,
+  rating tables and measured data for pressure ratios 1 to 20. It falls from
+  0.87 at a ratio of 1 to 0.83 at 4, 0.69 at 15 and 0.58 at 20.
+- ``"wang_cleland"``: Wang and Cleland's polynomial in pressure ratio,
+  (0.65 + 0.015 PR - 0.0015 PR^2) / 0.96.
+- ``"brendel"``: Brendel et al.'s correlation in pressure ratio and suction
+  pressure.
+
+The named models follow HeatPumpLab's compressor models and, as there, are
+bounded to between 0.4 and 1.0. Set them as options, or per call::
+
+   vc = problem.target.vapour_compression_heat_pump(
+       refrigerants=["ammonia"],
+       options={"HPR_COMPRESSOR_MODEL": "pareto_front"},
+   )
+
+From Python, ``compressor_model=`` (and ``mvr_compressor_model=`` on
+``mvr_heat_pump()``) also takes a function, for example a fit of a
+manufacturer's compressor map. It receives the compressor conditions and
+returns the isentropic efficiency on the shaft basis::
+
+   def selected_compressor(conditions):
+       # Dew-point evaporating and condensing temperatures, degC
+       to, tc = conditions.T_evap_dew, conditions.T_cond_dew
+       return 0.78 - 0.002 * (tc - to)
+
+   vc = problem.target.vapour_compression_heat_pump(
+       refrigerants=["ammonia"],
+       compressor_model=selected_compressor,
+   )
+
+The conditions carry ``refrigerant``, ``P_suction`` and ``P_discharge`` (kPa),
+``pressure_ratio``, ``T_suction``, ``T_evap_dew`` and ``T_cond_dew`` (degC),
+and ``rho_suction``, ``rho_evap_dew`` and ``rho_cond_dew`` (saturated vapour
+densities, kg/m3). The dew points and vapour densities are the basis of
+manufacturer maps in evaporating and condensing temperature and of transferring
+a map to another refrigerant.
+
+- A function is called once per compressor in every candidate the search
+  evaluates, so keep it cheap.
+- Raise ``ValueError`` to mark an operating point outside the compressor's
+  envelope; the search treats that candidate as infeasible. A returned
+  efficiency outside (0, 1] stops the search with ``CompressorModelError``.
+- Functions apply per call, through ``compressor_model=`` or the call's
+  ``options``; ``update_options`` and JSON input take only model names. Provenance records a function by its ``__name__``.
+- ``target.all_periods`` with ``workers`` above 1 solves periods in threads,
+  so the function may be called from several threads at once.
+
+The CoolProp backend applies the models. TESPy targeting takes only
+``"constant"``, and a performance map needs a target with a constant
+efficiency, since the map's off-design cycles hold it constant. Direct process
+MVR (``PROCESS_MVR_ETA_COMP``) keeps its constant efficiency. With a model, the
+target simulation record reports the efficiency each compressor ran at, and
+the work-weighted mean as the record's ``compressor_isentropic_efficiency``.
+
 TESPy Targeting and a Target-Owned Map
 --------------------------------------
 

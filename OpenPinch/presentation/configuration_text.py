@@ -564,6 +564,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "MVR compressor efficiency", None,
         "Isentropic efficiency of the MVR compressors in HPR cycles.",
     ),
+    "HPR_MVR_COMPRESSOR_MODEL": FieldText(
+        "MVR compressor model", None,
+        (
+            "Isentropic efficiency model of the MVR compressors: constant "
+            "(HPR_MVR_ETA_COMP), pareto_front, wang_cleland or brendel, as for "
+            "HPR_COMPRESSOR_MODEL."
+        ),
+    ),
     "HPR_MVR_ETA_MOTOR": FieldText(
         "MVR motor efficiency", None,
         "Motor efficiency of the MVR compressors in HPR cycles.",
@@ -587,6 +595,16 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Isentropic efficiency of the compressors in simulated vapour compression "
             "and Brayton cycles."
+        ),
+    ),
+    "HPR_COMPRESSOR_MODEL": FieldText(
+        "HPR compressor model", None,
+        (
+            "Isentropic efficiency model of the vapour compression compressors: "
+            "constant (HPR_ETA_COMP), pareto_front (HeatPumpLab's best published "
+            "efficiency against pressure ratio), wang_cleland (a polynomial in "
+            "pressure ratio) or brendel (pressure ratio and suction pressure). The "
+            "Python API also takes a function of the compressor conditions."
         ),
     ),
     "HPR_ETA_EXP": FieldText(
