@@ -16,6 +16,7 @@ from .configuration_fields import (
     output_unit_options_to_map,
     validate_configuration_options,
 )
+from .fluids import coolprop_fluid_spelling
 
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
@@ -252,16 +253,16 @@ class HprConfig:
     initialise_simulated_cycle: bool
 
     @staticmethod
-    def _normalise_config_list(values, *, uppercase: bool = False) -> list[str]:
-        normalised = [str(value).strip() for value in values if str(value).strip()]
-        if uppercase:
-            return [value.upper() for value in normalised]
-        return normalised
+    def _normalise_config_list(values) -> list[str]:
+        return [str(value).strip() for value in values if str(value).strip()]
 
     @property
     def normalised_refrigerants(self) -> list[str]:
         """Return HPR refrigerant names normalised for thermodynamic backends."""
-        return self._normalise_config_list(self.refrigerants, uppercase=True)
+        return [
+            coolprop_fluid_spelling(value)
+            for value in self._normalise_config_list(self.refrigerants)
+        ]
 
     @property
     def normalised_mvr_fluids(self) -> list[str]:

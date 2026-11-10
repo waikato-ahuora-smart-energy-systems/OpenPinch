@@ -17,7 +17,7 @@ Core in-memory state of OpenPinch: unit-aware values, streams and stream collect
 - Enumerations (`enums.py`): `ZoneType`, `TargetType`, `IntegrationType`, `TargetMethod`, `StreamType`, `StreamID`, `StreamLoc`, `FluidPhase`, `HeatExchangerKind`, `HeatExchangerNetworkLabel`, `ProblemTableLabel`, `GraphType`, `TurbineModel`, `BB_Minimiser` and others, plus the `CogenerationTarget` protocol.
 - `HPRLoadSummary`, `HPRResidualProfile`, `HPRThermalSlice`, `HPRResidualData`, `HPRResidualSnapshot` (`hpr.py`): frozen records handing HPR targeting results to residual utility studies.
 - `validate_solver_option`, `validate_solver_options`, `ALLOWED_SOLVER_OPTION_NAMES` (`solver_options.py`): allow-listed HEN solver options.
-- `build_coolprop_abstract_state`, `validate_coolprop_fluid_name` (`fluids.py`): parse single and mixture CoolProp fluid specs; `critical_point` is a cached helper.
+- `build_coolprop_abstract_state`, `validate_coolprop_fluid_name` (`fluids.py`): parse single and mixture CoolProp fluid specs; `critical_point` is a cached helper, and `coolprop_fluid_spelling` returns a spec upper-cased, or as given when CoolProp rejects the upper-cased form (`HprConfig.normalised_refrigerants` uses it).
 - `Progress`, `reporting`, `scope`, `emit` (`progress.py`): progress reports from long analyses through a context-variable reporter.
 - `non_empty_str`, `finite_float` (`_validation.py`): reusable Pydantic validator factories.
 - Subdirectories:
@@ -49,7 +49,7 @@ Core in-memory state of OpenPinch: unit-aware values, streams and stream collect
 
 ## Side Effects
 - Importing `value.py` creates a Pint `UnitRegistry`, defines `USD` and `NZD`, installs the unit-text grammar check as a preprocessor and sets it as the application registry. [value.py:ureg]
-- `fluids.py` imports `CoolProp` lazily, and `critical_point` caches results with `functools.cache`. [fluids.py:build_coolprop_abstract_state] [fluids.py:critical_point]
+- `fluids.py` imports `CoolProp` lazily, and `critical_point` and `coolprop_fluid_spelling` cache results with `functools.cache`. [fluids.py:build_coolprop_abstract_state] [fluids.py:critical_point] [fluids.py:coolprop_fluid_spelling]
 - `Stream` validates `fluid_name` by constructing a CoolProp state. [stream.py:Stream._normalise_fluid_name]
 - `StreamCollection.add` appends `_n` to the stream's name and key on a key collision (unless `prevent_overwrite=False`), applies the collection's period context to the stream and may widen the collection's context to match a multiperiod stream, and `remove`, `get_stream_by_name` and similar methods emit `warnings.warn` for missing names. [stream_collection.py:StreamCollection.add]
 - `StreamCollection` caches numeric views and, for value-attribute sort keys, the sort order, keyed on stream revision counters; callable or metadata sort keys are re-sorted each time. [stream_collection.py:StreamCollection.numeric_view]

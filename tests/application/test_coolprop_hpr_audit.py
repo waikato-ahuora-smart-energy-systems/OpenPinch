@@ -123,3 +123,25 @@ def test_real_public_multistage_records(topology):
     assert record.nominal_useful_duty == pytest.approx(
         sum(loop.nominal_duty for loop in record.loops)
     )
+
+
+def test_a_refrigerant_whose_upper_cased_name_coolprop_rejects_is_a_target():
+    problem = PinchProblem("basic_pinch.json")
+    target = problem.target.vapour_compression_heat_pump(
+        load_fraction=0.25,
+        condensers=1,
+        evaporators=1,
+        maximum_restarts=1,
+        maximum_iterations=2,
+        maximum_evaluations=20,
+        refrigerants=["R1233zd(E)"],
+        is_cascade_cycle=False,
+        options={
+            "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
+            "HPR_MAX_PRESSURE_RATIO": 1e6,
+        },
+    )
+
+    record = target.hpr_details.target_simulation_record
+    assert record.nominal_useful_duty > 0.0
+    assert record.refrigerant_spec == "R1233zd(E)"

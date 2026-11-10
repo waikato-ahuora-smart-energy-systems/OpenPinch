@@ -63,6 +63,19 @@ def test_configuration_exposes_normalised_hpr_backend_options():
     assert not hasattr(cfg, "effective_eta_ii_he_carnot")
 
 
+def test_configuration_keeps_refrigerant_spelling_coolprop_rejects_upper_cased():
+    # CoolProp has no R1233ZD(E) key, but accepts the user's R1233zd(E).
+    cfg = Configuration(
+        options={"HPR_REFRIGERANTS": ["R1233zd(E)", "r1234ze(e)", "HEOS::R1233zd(E)"]}
+    )
+
+    assert cfg.hpr.normalised_refrigerants == [
+        "R1233zd(E)",
+        "R1234ZE(E)",
+        "HEOS::R1233zd(E)",
+    ]
+
+
 def test_configuration_disables_effective_hpr_heat_engine_efficiency_by_default():
     cfg = Configuration(
         options={
