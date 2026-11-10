@@ -24,6 +24,7 @@ Everything between a prepared problem and the equation models: solver arrays bui
 - Solver names must be in `PYOMO_SOLVERS | GEKKO_SOLVERS`; solver options are validated [backend.py:require_solver_backend, _normalise_solver_options].
 - Pyomo solves that need an option file are serialised by a process-wide lock [backend.py:_solver_working_directory].
 - `create_gekko_model` returns a GEKKO subclass that records each Pyomo solve's termination condition on `SolverRun.termination_condition`. GEKKO reports a solve that stopped at an iteration or time limit as successful; `SolverRun.converged` is false for any condition outside `CONVERGED_TERMINATION_CONDITIONS`, and true when none was recorded (GEKKO-native solvers) [backend.py:create_gekko_model, SolverRun.converged].
+- That subclass and its Pyomo converter are built on first use (importing `backend` does not import gekko) and published once as module attributes of `backend`, so models from `create_gekko_model` pickle for process pool workers [backend.py:_termination_recording_class, __getattr__].
 
 ## Side Effects
 - Pyomo solves with an option file (solver options supplied) change the process working directory under a per-process thread lock, restoring it afterwards [backend.py:_solver_working_directory].

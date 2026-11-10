@@ -670,6 +670,22 @@ def test_pyomo_solve_records_whether_the_solver_converged(
     assert run.converged is converged
 
 
+def test_gekko_model_pickles_for_process_pool_tasks():
+    pytest.importorskip("gekko")
+    import pickle
+
+    # Built synthesis tasks carry their model to ProcessPoolExecutor workers.
+    model = backend.create_gekko_model()
+    try:
+        model.Var(value=5.0)
+        restored = pickle.loads(pickle.dumps(model))
+    finally:
+        backend.cleanup_gekko_model(model)
+
+    assert type(restored) is type(model)
+    assert len(restored._variables) == 1
+
+
 def test_optimise_warns_when_the_solver_stopped_before_converging(monkeypatch, caplog):
     model = _model()
     model.m = _FakeModel(solve_status=1, objective=1.0)
