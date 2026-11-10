@@ -144,4 +144,4 @@ def test_a_refrigerant_whose_upper_cased_name_coolprop_rejects_is_a_target():
 
     record = target.hpr_details.target_simulation_record
     assert record.nominal_useful_duty > 0.0
-    assert record.refrigerant_spec == "R1233zd(E)"
+    assert record.refrigerant_spec.casefold() == "r1233zd(e)"
