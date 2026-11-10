@@ -15,6 +15,7 @@ from OpenPinch.analysis.heat_pumps.refrigerant_screen import (
     screen_refrigerants,
 )
 from OpenPinch.contracts.hpr_refrigerant_screen import RefrigerantScreenVerdict as V
+from OpenPinch.domain.configuration import Configuration
 
 # The paper runs used a 5 K working-fluid approach (HPR_DT_CONT).
 PAPER = RefrigerantScreenThresholds(dt_cont=5.0)
@@ -112,3 +113,25 @@ def test_every_coolprop_fluid_screens_and_its_verdict_matches_its_properties(
     if entry.verdict is V.PRACTICAL:
         assert entry.p_evap >= PAPER.min_suction_pressure
         assert entry.T_crit - entry.T_cond >= PAPER.critical_margin
+
+
+def test_thresholds_come_from_the_configuration():
+    assert RefrigerantScreenThresholds.from_configuration(
+        Configuration()
+    ) == RefrigerantScreenThresholds()
+    config = Configuration(
+        options={
+            "HPR_DT_CONT": 5.0,
+            "HPR_MAX_PRESSURE_RATIO": 12.0,
+            "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.3,
+            "HPR_SCREEN_CRITICAL_MARGIN": 10.0,
+        }
+    )
+    assert RefrigerantScreenThresholds.from_configuration(
+        config
+    ) == RefrigerantScreenThresholds(
+        dt_cont=5.0,
+        max_pressure_ratio=12.0,
+        min_suction_pressure=0.3e5,
+        critical_margin=10.0,
+    )

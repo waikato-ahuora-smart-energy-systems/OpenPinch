@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 import CoolProp.CoolProp as _coolprop
 
 from ...contracts.hpr_refrigerant_screen import RefrigerantScreenVerdict
+from ...domain.configuration import Configuration
 from ...domain.fluids import validate_coolprop_fluid_name
 
 NATURAL_REFRIGERANTS = (
@@ -61,6 +62,16 @@ class RefrigerantScreenThresholds:
     max_pressure_ratio: float = 15.0
     min_suction_pressure: float = 0.5e5
     critical_margin: float = 15.0
+
+    @classmethod
+    def from_configuration(cls, config: Configuration) -> "RefrigerantScreenThresholds":
+        """Read the limits from ``HPR_*`` configuration (suction floor in bar)."""
+        return cls(
+            dt_cont=config.hpr.dt_cont,
+            max_pressure_ratio=config.hpr.max_pressure_ratio,
+            min_suction_pressure=config.hpr.screen_min_suction_pressure * 1e5,
+            critical_margin=config.hpr.screen_critical_margin,
+        )
 
 
 @dataclass(frozen=True)

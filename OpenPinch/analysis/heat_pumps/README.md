@@ -55,6 +55,7 @@ a docstring.
 
 - A refrigerant screen judges each fluid in this order: condensing within `dt_cont` of the critical point is above critical; evaporating below CoolProp's minimum temperature is below the triple point; then, from saturation properties, a pressure ratio above `max_pressure_ratio`, a suction pressure below `min_suction_pressure` and condensing within `critical_margin` of the critical point; otherwise practical. Fluids without a saturation state carry no pressures or capacity. [refrigerant_screen.py:screen_refrigerant]
 - A screen covers every evaporating and condensing level pair with positive lift, in level order, and raises `ValueError` when none has; within a pair the practical fluids come first, ranked from 1 by descending suction volumetric heating capacity, then the others in candidate order. [refrigerant_screen.py:screen_refrigerants]
+- `RefrigerantScreenThresholds.from_configuration` reads `HPR_DT_CONT`, `HPR_MAX_PRESSURE_RATIO`, `HPR_SCREEN_MIN_SUCTION_PRESSURE` (bar, held in Pa) and `HPR_SCREEN_CRITICAL_MARGIN`. [refrigerant_screen.py:RefrigerantScreenThresholds]
 - Candidate lists are validated by name and mixtures are rejected; `all` is whatever the installed CoolProp lists, so it differs between CoolProp versions. [refrigerant_screen.py:resolve_refrigerants]
 
 ## Side Effects
