@@ -40,6 +40,11 @@ Heat exchanger network synthesis
   verified candidate in that case, and the final ranking compares it with the
   seed network on verified costs. Such solves are logged as ``[Unconverged]``
   warnings instead of ``[Success]``.
+- ``design.heat_exchanger_network()`` works again when ``HENS_MAX_PARALLEL`` is
+  above 1, as in the Yee and Grossmann (1990) sample case and tutorial 15. The
+  GEKKO model that records solver termination conditions (#299) could not be
+  pickled, so every design that sent tasks to a process pool raised
+  ``PicklingError``.
 
 0.8.1 (2026-11-06)
 ------------------

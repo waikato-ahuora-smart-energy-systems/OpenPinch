@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 import os
 import shutil
 import threading
@@ -82,16 +81,43 @@ def create_gekko_model(*, remote: bool = False) -> Any:
     GEKKO itself only prints.
     """
 
-    gekko = require_synthesis_dependency(
+    require_synthesis_dependency(
         "gekko",
         package="gekko",
         purpose="GEKKO heat exchanger network equation model construction",
     )
-    return _termination_recording_gekko_class(gekko.GEKKO)(remote=remote)
+    return _termination_recording_class("_TerminationRecordingGEKKO")(remote=remote)
 
 
-@functools.cache
-def _termination_recording_gekko_class(gekko_class: type) -> type:
+def __getattr__(name: str) -> type:
+    # Pickle looks classes up by module and name, so unpickling a model in a
+    # process pool worker resolves the lazily built classes here.
+    if name in _TERMINATION_RECORDING_CLASS_NAMES:
+        return _termination_recording_class(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+_TERMINATION_RECORDING_CLASS_NAMES = frozenset(
+    {"_TerminationRecordingGEKKO", "_TerminationRecordingPyomoConverter"}
+)
+_TERMINATION_RECORDING_CLASS_LOCK = threading.Lock()
+
+
+def _termination_recording_class(name: str) -> type:
+    """Return a GEKKO subclass published as a module attribute of this module.
+
+    The classes are built on first use, so importing this module does not
+    import gekko, and published once, so models pickle by reference to them.
+    """
+
+    with _TERMINATION_RECORDING_CLASS_LOCK:
+        if name not in globals():
+            _define_termination_recording_classes()
+    return globals()[name]
+
+
+def _define_termination_recording_classes() -> None:
+    from gekko import GEKKO
     from gekko.gk_solver_extension_pyomo import PyomoConverter
 
     class _TerminationRecordingPyomoConverter(PyomoConverter):
@@ -100,11 +126,13 @@ def _termination_recording_gekko_class(gekko_class: type) -> type:
                 self._gekko_model._openpinch_termination_condition = str(status)
             super().handle_status(status_dict, status, status_string)
 
-    class _TerminationRecordingGEKKO(gekko_class):
+    class _TerminationRecordingGEKKO(GEKKO):
         def solver_extension_pyomo(self, disp=True):
             self.solve_with_converter(_TerminationRecordingPyomoConverter, disp)
 
-    return _TerminationRecordingGEKKO
+    for cls in (_TerminationRecordingPyomoConverter, _TerminationRecordingGEKKO):
+        cls.__qualname__ = cls.__name__
+        globals()[cls.__name__] = cls
 
 
 def cleanup_gekko_model(model: Any) -> None:
