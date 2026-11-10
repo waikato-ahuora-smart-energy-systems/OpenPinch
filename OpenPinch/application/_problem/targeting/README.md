@@ -6,7 +6,8 @@ their capabilities, `dispatch.py` orders zone traversal, `execution.py` runs ser
 zone tree and caches `TargetOutput`, `state.py` isolates each call on a copy and commits it on
 success, and `provenance.py` fingerprints inputs and stamps targets so later calls can validate a
 `base_target`. The accessors in `OpenPinch/application/_problem/accessors`, `problem.py`,
-`workspace.py`, `case_derivation.py`, `hpr_selection.py` and `heat_recovery_dt_min.py` use it.
+`workspace.py`, `case_derivation.py`, `hpr_selection.py`, `heat_recovery_dt_min.py` and
+`hpr_load_kinks.py` use it.
 
 ## Interface
 - `METHOD_CATALOG`, `AnalysisMethodSpec` (`catalog.py`): read-only map of `target.*` and `design.*` method names to scopes, prerequisites, period behaviour, dependencies and result adapter.

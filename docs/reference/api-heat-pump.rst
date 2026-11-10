@@ -149,6 +149,9 @@ surrounding whitespace, and abbreviated or historical spellings are rejected.
 .. automodule:: OpenPinch.analysis.heat_pumps.common.encoding
    :members:
 
+.. automodule:: OpenPinch.analysis.heat_pumps.common.load_kinks
+   :members:
+
 .. automodule:: OpenPinch.analysis.heat_pumps.common.preprocessing
    :members:
 
