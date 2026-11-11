@@ -15,6 +15,10 @@ from ....domain._stream.linearisation import (
 from ....domain.configuration import tol
 from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
+from ..common.compressor_efficiency import (
+    CompressorConditions,
+    evaluate_compressor_model,
+)
 
 # Qualities this close to 0 or 1 are saturated liquid or vapour; differences
 # below it are CoolProp round-off and must not change the cycle's path.
@@ -48,6 +52,8 @@ class VapourCompressionCycle:
         self._dT_superheat: float = 0.0
         self._dT_subcool: float = 0.0
         self._eta_comp: float = 1.0
+        self._eta_comp_applied: float = 1.0
+        self._eta_motor: float = 1.0
         self._ihx_gas_dt: float = 0.0
         self._dtcont: float = 0.0
         # Default value used in piecewise approximation of non-linear T-h profiles.
@@ -313,8 +319,13 @@ class VapourCompressionCycle:
 
     @property
     def eta_comp(self) -> float:
-        """Isentropic compressor efficiency."""
-        return self._eta_comp
+        """Isentropic compressor efficiency applied in the last solve."""
+        return self._eta_comp_applied
+
+    @property
+    def eta_motor(self) -> float:
+        """Compressor motor efficiency applied in the last solve."""
+        return self._eta_motor
 
     @property
     def dT_ihx_gas_side(self) -> float:
@@ -483,8 +494,30 @@ class VapourCompressionCycle:
         quality = float(state.Q()) if h_liquid < h < h_vapour else None
         return h, float(state.T()), quality
 
+    def _compressor_conditions(
+        self, suction: CoolProp.AbstractState, P_out: float
+    ) -> CompressorConditions:
+        P_in = float(suction.p())
+        evap_dew = self._compute_state_from_pressure_quality(P_in, 1.0)
+        cond_dew = self._compute_state_from_pressure_quality(P_out, 1.0)
+        return CompressorConditions(
+            refrigerant=self._refrigerant,
+            P_suction=P_in / 1000.0,
+            P_discharge=float(P_out) / 1000.0,
+            T_suction=self._convert_K_to_C(float(suction.T())),
+            T_evap_dew=self._convert_K_to_C(float(evap_dew.T())),
+            T_cond_dew=self._convert_K_to_C(float(cond_dew.T())),
+            rho_suction=float(suction.rhomass()),
+            rho_evap_dew=float(evap_dew.rhomass()),
+            rho_cond_dew=float(cond_dew.rhomass()),
+        )
+
     def _compute_compressor_outlet_state(
-        self, h_in: float, s_in: float, P_out: float
+        self,
+        h_in: float,
+        s_in: float,
+        P_out: float,
+        suction: CoolProp.AbstractState | None = None,
     ) -> CoolProp.AbstractState:
         s = self._get_fluid_state(self._refrigerant)
         try:
@@ -501,7 +534,13 @@ class VapourCompressionCycle:
             )
 
         h_out_isentropic = s.hmass()
-        h_out = h_in + (h_out_isentropic - h_in) / self._eta_comp
+        eta = self._eta_comp
+        if callable(eta):
+            eta = evaluate_compressor_model(
+                eta, self._compressor_conditions(suction, P_out)
+            )
+        self._eta_comp_applied = eta
+        h_out = h_in + (h_out_isentropic - h_in) / eta
         return self._compute_state_from_pressure_enthalpy(P=P_out, h=h_out)
 
     def _compute_state_from_pressure_enthalpy(
@@ -583,6 +622,7 @@ class VapourCompressionCycle:
         dT_superheat: float = 0.0,
         dT_subcool: float = 0.0,
         eta_comp: float = 0.7,
+        eta_motor: float = 1.0,
         refrigerant: str = "water",
         dT_ihx_gas_side: float = 10.0,
         Q_heat: float = None,
@@ -608,6 +648,9 @@ class VapourCompressionCycle:
             Degree of subcooling after the condenser, heat delivered to the process [K].
         eta_comp : float, optional
             Isentropic efficiency of the compressor [-].
+        eta_motor : float, optional
+            Efficiency of the compressor motor [-]. Motor losses raise the
+            electrical work and leave the cycle duties unchanged.
         refrigerant : str, optional
             Cycle refrigerant; supports multi-component fluids.
         dT_ihx_gas_side : float, optional
@@ -630,7 +673,7 @@ class VapourCompressionCycle:
         Returns
         -------
         float
-            Compressor power requirement for the solved operating point [W].
+            Compressor electrical power for the solved operating point [W].
         """
         self._solved = False
         self.temperature_unit = "K"
@@ -659,6 +702,9 @@ class VapourCompressionCycle:
             self._Q_evap = self._Q_cool + self._Q_cas_cool
 
         self._eta_comp = eta_comp
+        if not 0.0 < float(eta_motor) <= 1.0:
+            raise ValueError("eta_motor must be in the interval (0, 1].")
+        self._eta_motor = float(eta_motor)
         self._ihx_gas_dt = max(
             min(
                 dT_ihx_gas_side,
@@ -715,7 +761,10 @@ class VapourCompressionCycle:
 
         # 1 - Compressor discharge (real), compressing from the IHX outlet state
         state1 = self._compute_compressor_outlet_state(
-            h_in=h_ihx_out, s_in=state_ihx_out.smass(), P_out=P_hi
+            h_in=h_ihx_out,
+            s_in=state_ihx_out.smass(),
+            P_out=P_hi,
+            suction=state_ihx_out,
         )
         self._save_cycle_state(state1, 1)
 
@@ -768,6 +817,7 @@ class VapourCompressionCycle:
                 dT_superheat=dT_superheat,
                 dT_subcool=float(self._dT_subcool),
                 eta_comp=eta_comp,
+                eta_motor=eta_motor,
                 refrigerant=refrigerant,
                 dT_ihx_gas_side=dT_ihx_gas_side,
                 Q_heat=Q_heat,
@@ -795,7 +845,7 @@ class VapourCompressionCycle:
 
         self._q_evap = state0.hmass() - state3.hmass()
         self._q_cond = state1.hmass() - state2.hmass()
-        self._w_net = self._q_cond - self._q_evap
+        self._w_net = (self._q_cond - self._q_evap) / self._eta_motor
         if is_heat_pump:
             self._m_dot = self._Q_cond / self._q_cond
             self._Q_evap = self._m_dot * self._q_evap

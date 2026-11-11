@@ -13,11 +13,12 @@ Core in-memory state of OpenPinch: unit-aware values, streams and stream collect
 - `AnalysisProvenance` (`analysis.py`): frozen record of an analysis's owner, method, zone address, periods, input fingerprint, prerequisite ids and canonical settings JSON.
 - `HeatExchanger` (`heat_exchanger.py`) and `HeatExchangerNetwork` (`heat_exchanger_network.py`): validated exchanger and network records, with period-aware totals and labelled lookups; `HeatExchangerNetwork.from_structure` builds a zero-duty structure.
 - `Configuration` (`configuration.py`): flat options turned into typed frozen groups (`problem`, `input_units`, `output_units`, `thermal`, `costing`, `hens`, `hpr`, `orc`, `power` and others); `tol`, `C_to_K`, `DUTY_RTOL`, `T_CRIT`, `duty_tolerance`, `heat_resolution` are the numerical constants and helpers.
+- `CustomCompressorModel` (`compressor_model.py`): a user compressor efficiency function with its name; `to_dict` gives `{"custom_compressor_model": name}`, the form provenance records.
 - `CONFIG_FIELD_SPECS`, `USER_CONFIG_FIELD_SPECS`, `ConfigurationFieldSpec`, `validate_configuration_options`, `validate_internal_configuration_options`, `validate_configuration_option_value`, `input_unit_options_to_map`, `output_unit_options_to_map` (`configuration_fields.py`): declarative option table and validators.
 - Enumerations (`enums.py`): `ZoneType`, `TargetType`, `IntegrationType`, `TargetMethod`, `StreamType`, `StreamID`, `StreamLoc`, `FluidPhase`, `HeatExchangerKind`, `HeatExchangerNetworkLabel`, `ProblemTableLabel`, `GraphType`, `TurbineModel`, `BB_Minimiser` and others, plus the `CogenerationTarget` protocol.
 - `HPRLoadSummary`, `HPRResidualProfile`, `HPRThermalSlice`, `HPRResidualData`, `HPRResidualSnapshot` (`hpr.py`): frozen records handing HPR targeting results to residual utility studies.
 - `validate_solver_option`, `validate_solver_options`, `ALLOWED_SOLVER_OPTION_NAMES` (`solver_options.py`): allow-listed HEN solver options.
-- `build_coolprop_abstract_state`, `validate_coolprop_fluid_name` (`fluids.py`): parse single and mixture CoolProp fluid specs; `critical_point` is a cached helper.
+- `build_coolprop_abstract_state`, `validate_coolprop_fluid_name` (`fluids.py`): parse single and mixture CoolProp fluid specs; `critical_point` is a cached helper, and `coolprop_fluid_spelling` returns a spec upper-cased, or as given when CoolProp rejects the upper-cased form (`HprConfig.normalised_refrigerants` uses it).
 - `Progress`, `reporting`, `scope`, `emit` (`progress.py`): progress reports from long analyses through a context-variable reporter.
 - `non_empty_str`, `finite_float` (`_validation.py`): reusable Pydantic validator factories.
 - Subdirectories:
@@ -36,6 +37,7 @@ Core in-memory state of OpenPinch: unit-aware values, streams and stream collect
 - Retired short attribute names on `Stream` (for example `t_supply`, `htc`) raise `AttributeError` on assignment. [stream.py:Stream.__setattr__]
 - Configuration group dataclasses must match `CONFIG_FIELD_SPECS` field for field, checked at import. [configuration.py:_check_group_types]
 - Configuration option keys are validated against `CONFIG_FIELD_SPECS`; unknown keys are rejected, and `HPR_TYPE`, `ORC_MODEL` and `POWER_TURB_MODEL` are accepted only by the internal validator. [configuration_fields.py:validate_configuration_options] [configuration_fields.py:validate_internal_configuration_options]
+- `HPR_COMPRESSOR_MODEL` and `HPR_MVR_COMPRESSOR_MODEL` take a model name; only the internal validator accepts a function, wrapped in `CustomCompressorModel`, and the user validator rejects one with a pointer to the per-call argument. [configuration_fields.py:_validate_configuration_options] [configuration_fields.py:_compressor_model]
 - Period ids are unique and non-empty, and the weight list is empty (equal weights), has one value, or has one per period. [configuration_fields.py:_validate_period_options]
 - `tol` is 1e-6 and the temperature rounding in the problem table derives from it. [configuration.py:tol] [_problem_table/intervals.py:_TEMPERATURE_DECIMAL_PLACES]
 - Adding a target to a zone removes stored targets that depend on it, directly or transitively, unless `invalidate_dependents` is false. [zone.py:Zone.add_target]
@@ -49,7 +51,7 @@ Core in-memory state of OpenPinch: unit-aware values, streams and stream collect
 
 ## Side Effects
 - Importing `value.py` creates a Pint `UnitRegistry`, defines `USD` and `NZD`, installs the unit-text grammar check as a preprocessor and sets it as the application registry. [value.py:ureg]
-- `fluids.py` imports `CoolProp` lazily, and `critical_point` caches results with `functools.cache`. [fluids.py:build_coolprop_abstract_state] [fluids.py:critical_point]
+- `fluids.py` imports `CoolProp` lazily, and `critical_point` and `coolprop_fluid_spelling` cache results with `functools.cache`. [fluids.py:build_coolprop_abstract_state] [fluids.py:critical_point] [fluids.py:coolprop_fluid_spelling]
 - `Stream` validates `fluid_name` by constructing a CoolProp state. [stream.py:Stream._normalise_fluid_name]
 - `StreamCollection.add` appends `_n` to the stream's name and key on a key collision (unless `prevent_overwrite=False`), applies the collection's period context to the stream and may widen the collection's context to match a multiperiod stream, and `remove`, `get_stream_by_name` and similar methods emit `warnings.warn` for missing names. [stream_collection.py:StreamCollection.add]
 - `StreamCollection` caches numeric views and, for value-attribute sort keys, the sort order, keyed on stream revision counters; callable or metadata sort keys are re-sorted each time. [stream_collection.py:StreamCollection.numeric_view]

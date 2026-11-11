@@ -78,6 +78,8 @@ class HprPerformanceMapRequest(_FrozenContract):
     sink_temperatures: tuple[float, ...]
     load_fractions: tuple[float, ...]
     reference_capacity: float | None = Field(default=None, gt=0.0)
+    # 1.0 maps compressor shaft power; below 1, electric power through the motor.
+    motor_efficiency: float = Field(default=1.0, gt=0.0, le=1.0)
 
     @field_validator("map_id")
     @classmethod
@@ -153,6 +155,9 @@ class HprPerformanceMap(_FrozenContract):
     provenance: dict[str, JsonValue]
     points: tuple[HprPerformancePoint, ...] = Field(min_length=1)
     cop_convention: Literal["heating", "cooling"]
+    # 1.0 reports compressor shaft power; below 1, electric power with the motor
+    # losses leaving the cycle.
+    motor_efficiency: float = Field(default=1.0, gt=0.0, le=1.0)
     energy_balance_tolerance: float = Field(default=1e-6, ge=0.0)
     temperature_match_tolerance: float = Field(default=1e-6, ge=0.0)
 
@@ -261,11 +266,12 @@ class HprPerformanceMap(_FrozenContract):
         return self
 
     def _validate_point_physics(self, point: HprPerformancePoint) -> None:
-        residual = abs(point.q_sink - point.q_source - point.electric_power)
+        shaft_power = self.motor_efficiency * point.electric_power
+        residual = abs(point.q_sink - point.q_source - shaft_power)
         if residual > self.energy_balance_tolerance:
             raise ValueError(
                 f"performance point {point.name!r} violates "
-                "q_sink = q_source + electric_power"
+                "q_sink = q_source + electric_power * motor_efficiency"
             )
         useful_duty = (
             point.q_sink

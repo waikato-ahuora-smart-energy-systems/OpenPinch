@@ -564,6 +564,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "MVR compressor efficiency", None,
         "Isentropic efficiency of the MVR compressors in HPR cycles.",
     ),
+    "HPR_MVR_COMPRESSOR_MODEL": FieldText(
+        "MVR compressor model", None,
+        (
+            "Isentropic efficiency model of the MVR compressors: constant "
+            "(HPR_MVR_ETA_COMP), pareto_front, wang_cleland or brendel, as for "
+            "HPR_COMPRESSOR_MODEL."
+        ),
+    ),
     "HPR_MVR_ETA_MOTOR": FieldText(
         "MVR motor efficiency", None,
         "Motor efficiency of the MVR compressors in HPR cycles.",
@@ -587,6 +595,23 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Isentropic efficiency of the compressors in simulated vapour compression "
             "and Brayton cycles."
+        ),
+    ),
+    "HPR_COMPRESSOR_MODEL": FieldText(
+        "HPR compressor model", None,
+        (
+            "Isentropic efficiency model of the vapour compression compressors: "
+            "constant (HPR_ETA_COMP), pareto_front (HeatPumpLab's best published "
+            "efficiency against pressure ratio), wang_cleland (a polynomial in "
+            "pressure ratio) or brendel (pressure ratio and suction pressure). The "
+            "Python API also takes a function of the compressor conditions."
+        ),
+    ),
+    "HPR_ETA_MOTOR": FieldText(
+        "HPR motor efficiency", None,
+        (
+            "Motor efficiency of the vapour compression compressors. The electrical "
+            "work is the shaft work divided by it; the losses leave the cycle."
         ),
     ),
     "HPR_ETA_EXP": FieldText(
@@ -637,6 +662,20 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Largest ratio of condensing to evaporating pressure across one "
             "vapour-compression compressor."
+        ),
+    ),
+    "HPR_SCREEN_MIN_SUCTION_PRESSURE": FieldText(
+        "Refrigerant screen suction pressure floor", "bar",
+        (
+            "Refrigerant screening flags a fluid whose evaporating saturation "
+            "pressure is below this as deep vacuum suction."
+        ),
+    ),
+    "HPR_SCREEN_CRITICAL_MARGIN": FieldText(
+        "Refrigerant screen critical margin", "delta_degC",
+        (
+            "Refrigerant screening flags a fluid that condenses within this of its "
+            "critical temperature as near critical."
         ),
     ),
     "HPR_DT_CASCADE_HX": FieldText(

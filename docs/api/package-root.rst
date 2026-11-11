@@ -18,9 +18,11 @@ engineers do not need those imports for supported workflows.
 
 .. autoclass:: OpenPinch.PinchProblem
    :no-index:
+   :no-members:
 
 .. autoclass:: OpenPinch.PinchWorkspace
    :no-index:
+   :no-members:
 
 See Also
 --------

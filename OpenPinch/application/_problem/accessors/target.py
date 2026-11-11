@@ -62,6 +62,8 @@ from ..targeting.state import (
 
 if TYPE_CHECKING:
     from ....contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
+    from ....contracts.hpr_load_kinks import HprLoadKinksResult
+    from ....contracts.hpr_refrigerant_screen import HprRefrigerantScreenResult
     from ....domain.zone import Zone
     from ...problem import PinchProblem
 
@@ -165,6 +167,24 @@ class _AllPeriodsTargetAccessor:
             workers=workers,
         )
 
+    def hpr_load_kinks(
+        self,
+        *,
+        zone=None,
+        is_refrigeration=False,
+        steepening=2.0,
+        workers=1,
+    ) -> dict[str, "HprLoadKinksResult"]:
+        from ...hpr_load_kinks import calculate_all_period_hpr_load_kinks
+
+        return calculate_all_period_hpr_load_kinks(
+            self._target._problem,
+            zone=zone,
+            is_refrigeration=is_refrigeration,
+            steepening=steepening,
+            workers=workers,
+        )
+
     def utility_placement(self, **kwargs):
         """Optimize one shared placement over every canonical period."""
         if kwargs.get("base_target") is not None:
@@ -198,6 +218,7 @@ install_catalog_forwarders(
         "brayton_heat_pump",
         "brayton_refrigeration",
         "hpr_performance_map",
+        "hpr_refrigerant_screen",
     ),
 )
 
@@ -358,6 +379,50 @@ class _TargetAccessor:
             heat_recovery=heat_recovery,
             zone=zone,
             period_id=period_id,
+        )
+
+    def hpr_refrigerant_screen(
+        self,
+        *,
+        target=None,
+        T_evap=None,
+        T_cond=None,
+        refrigerants=None,
+        options=None,
+    ) -> "HprRefrigerantScreenResult":
+        """Screen candidate fluids as single-stage cycles between saturation levels.
+
+        The levels come from a Carnot heat pump or refrigeration ``target`` or
+        from explicit ``T_evap`` and ``T_cond``.
+        """
+        from ...hpr_refrigerant_screen import calculate_hpr_refrigerant_screen
+
+        return calculate_hpr_refrigerant_screen(
+            self._problem,
+            target=target,
+            T_evap=T_evap,
+            T_cond=T_cond,
+            refrigerants=refrigerants,
+            options=options,
+        )
+
+    def hpr_load_kinks(
+        self,
+        *,
+        zone=None,
+        period_id=None,
+        is_refrigeration=False,
+        steepening=2.0,
+    ) -> "HprLoadKinksResult":
+        """Return the net load profile kinks and the logical HPR load fractions."""
+        from ...hpr_load_kinks import calculate_hpr_load_kinks
+
+        return calculate_hpr_load_kinks(
+            self._problem,
+            zone=zone,
+            period_id=period_id,
+            is_refrigeration=is_refrigeration,
+            steepening=steepening,
         )
 
     def indirect_heat_integration(self, **kwargs) -> BaseTargetModel:
@@ -700,6 +765,7 @@ class _TargetAccessor:
         condensers=None,
         evaporators=None,
         compressor_efficiency=None,
+        compressor_model=None,
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
@@ -713,6 +779,7 @@ class _TargetAccessor:
             ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
             ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
             ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
+            ("HPR_COMPRESSOR_MODEL", compressor_model),
         ):
             _set_if_not_none(extra, key, value)
         return self._hpr(
@@ -760,6 +827,7 @@ class _TargetAccessor:
         condensers=None,
         evaporators=None,
         compressor_efficiency=None,
+        compressor_model=None,
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
@@ -773,6 +841,7 @@ class _TargetAccessor:
             ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
             ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
             ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
+            ("HPR_COMPRESSOR_MODEL", compressor_model),
         ):
             _set_if_not_none(extra, key, value)
         return self._hpr(
@@ -880,6 +949,8 @@ class _TargetAccessor:
         is_utility_heat_pump: bool = False,
         mvr_fluids=None,
         mvr_compressor_efficiency=None,
+        mvr_compressor_model=None,
+        compressor_model=None,
         mvr_stages=None,
         motor_efficiency=None,
         zone=None,
@@ -902,6 +973,8 @@ class _TargetAccessor:
             ("HPR_MVR_ETA_COMP", mvr_compressor_efficiency),
             ("HPR_MVR_COUNT", mvr_stages),
             ("HPR_MVR_ETA_MOTOR", motor_efficiency),
+            ("HPR_COMPRESSOR_MODEL", compressor_model),
+            ("HPR_MVR_COMPRESSOR_MODEL", mvr_compressor_model),
         ):
             _set_if_not_none(extra, key, value)
         return self._hpr(

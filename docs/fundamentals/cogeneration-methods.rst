@@ -8,7 +8,12 @@ Above Pinch Logic
 -----------------
 
 Above Pinch cogeneration interprets suitable hot utility demands as candidate
-steam extraction levels in a multistage turbine train. The workflow estimates:
+steam extraction levels in a multistage turbine train. By default it uses the
+hot utilities of the zone's Indirect (Total Site) target when one exists, then
+the HPR targets, then the Direct target; pass ``base_target=`` to choose one.
+A utility at or above water's critical temperature, outside water saturation,
+above the turbine inlet pressure, or with no duty is not a turbine stage. The
+workflow estimates:
 
 - turbine work target
 - turbine efficiency target
@@ -40,11 +45,18 @@ from ``zone.config.power`` (for example ``zone.config.power.turb_t_in``):
 - ``POWER_ETA_MECH``
 - ``POWER_HIGH_P_COND_FLASH_ENABLED``
 
-The turbine model is selected by the target method name, not by an option. The
-Varbanov et al. (2004) correlation is offered as two methods, one for each of its
-size bands, ``varbanov_small_turbine_cogeneration`` (stage work at or below
-2000 kW) and ``varbanov_large_turbine_cogeneration`` (above 2000 kW). Using one
-outside its band gives a warning; see :doc:`../guides/cogeneration-workflows`.
+The turbine model is selected by the target method name, not by an option:
+
+- ``cogeneration``, the default, uses Medina-Flores et al. (2010)
+- ``sun_smith_cogeneration`` uses Sun and Smith (2015)
+- ``varbanov_small_turbine_cogeneration`` and
+  ``varbanov_large_turbine_cogeneration`` use the two size bands of Varbanov et
+  al. (2004): stage work at or below 2000 kW, and above 2000 kW
+- ``isentropic_cogeneration(efficiency=...)`` uses a fixed isentropic
+  efficiency, greater than 0 and at most 1, in place of ``POWER_MIN_EFF``
+
+Using a Varbanov method outside its band gives a warning; see
+:doc:`../guides/cogeneration-workflows`.
 
 This keeps the turbine workflow aligned with the rest of the package model:
 configuration lives on the prepared zone, not in workbook-style side channels.
@@ -66,4 +78,4 @@ Recommended Follow-On Pages
 
 - :doc:`../guides/cogeneration-workflows`
 - :doc:`../api/pinchproblem`
-- :doc:`../api/generated-index`
+- :doc:`../api/index`

@@ -14,16 +14,18 @@ What Each Layer Does
 --------------------
 
 ``TargetInput`` and related schemas
-   Define the request format for process streams, utilities, the optional
-   zone tree, an optional serialized heat exchanger network, and the
-   ``residual_basis`` and ``plant_profile_data`` fields.
+   Define the request format for process streams, utilities, flat
+   ``options``, the optional zone tree, an optional serialized heat exchanger
+   network, saved ``process_components``, and the ``residual_basis`` and
+   ``plant_profile_data`` fields.
 
 ``TargetOutput`` and target/result schemas
    Define the structured response returned by the top-level service boundary.
 
 ``Configuration``
-   Stores numerical and engineering defaults for heat pumps, utilities,
-   costing, turbines, and solvers. Its method selectors are not user-settable.
+   Stores numerical and engineering defaults for input and output units,
+   thermal and direct-integration settings, costing, heat pumps, ORC,
+   turbines, process MVR and heat exchanger network synthesis. Its method selectors are not user-settable.
    Each prepared :class:`~OpenPinch.domain.zone.Zone` owns one config object.
 
 Discovering Options
@@ -39,6 +41,8 @@ enum choices, numeric bounds, and config paths:
 
    options = configuration_options()
    hpr_options = [field for field in options if field.group == "hpr"]
+
+The same metadata is tabulated on :doc:`configuration-options`.
 
 Common options include ``THERMAL_DT_CONT`` for minimum contribution
 temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical

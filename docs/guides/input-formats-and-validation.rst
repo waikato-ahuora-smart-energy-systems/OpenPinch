@@ -51,7 +51,18 @@ Schema-first validation:
 
    from OpenPinch.contracts.input import TargetInput
 
-   source_data = {"streams": [...], "utilities": [...]}
+   source_data = {
+       "streams": [
+           {
+               "name": "Hot feed",
+               "zone": "Process",
+               "t_supply": 180.0,
+               "t_target": 80.0,
+               "heat_flow": 1000.0,
+           },
+       ],
+       "utilities": [],
+   }
    input_data = TargetInput.model_validate(source_data)
 
 Expected Output
@@ -72,7 +83,8 @@ Supported Source Shapes
 
 - packaged sample-case names such as ``basic_pinch.json``
 - JSON files
-- Excel workbooks (``.xlsx``, ``.xlsb`` and ``.xlsm``); a legacy ``.xls``
+- Excel workbooks (``.xlsx``, ``.xlsb`` and ``.xlsm``); reading them needs
+  ``openpinch[notebook]`` or ``openpinch[dashboard]``. A legacy ``.xls``
   workbook is rejected, so save it as ``.xlsx`` first
 - CSV directories containing ``streams.csv`` and ``utilities.csv``
 - ``(streams_csv, utilities_csv)`` tuples
@@ -260,7 +272,12 @@ owns the off state.
 
 For every point::
 
-   q_sink = q_source + electric_power
+   q_sink = q_source + motor_efficiency * electric_power
+
+``motor_efficiency`` is a map field set by the map request. At its default of
+1.0, ``electric_power`` is compressor shaft power. Below 1.0 it is electrical
+power, with the motor losses leaving the cycle; set it to the target's
+``HPR_ETA_MOTOR`` to map the target's electrical power.
 
 The useful duty depends on the operating mode::
 

@@ -16,7 +16,7 @@ OpenPinch has three GitHub Actions workflows:
    number and commits the change to ``develop``.
 
 ``release.yml``
-   Runs on every push to ``main``. It runs ``ci.yml`` with the full profile
+   Runs on every push to ``main``, or manually on ``main``. It runs ``ci.yml`` with the full profile
    and, when the project version is new, publishes the files that CI built.
 
 Validation profiles
@@ -26,7 +26,7 @@ Validation profiles
    :header-rows: 1
 
    * - Change
-     - Lint, unit tests (95% branch coverage), docs, TESPy, build, install smoke, Pyodide
+     - Lint, unit tests (95% branch coverage), docs, HPR tutorial notebooks, TESPy, build, install smoke, Pyodide
      - Solver tests (external Couenne and IPOPT solver binaries), unit tests on Python 3.12 and 3.13, floors, performance
      - Version-bump check (the **Version bump** job in ``ci.yml``)
    * - PR into ``develop`` / push to ``develop``

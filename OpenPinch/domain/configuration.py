@@ -16,6 +16,7 @@ from .configuration_fields import (
     output_unit_options_to_map,
     validate_configuration_options,
 )
+from .fluids import coolprop_fluid_spelling
 
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
@@ -231,10 +232,13 @@ class HprConfig:
     mvr_fluids: list[str]
     mvr_count: int
     mvr_eta_comp: float
+    mvr_compressor_model: str
     mvr_eta_motor: float
     n_cond: int
     n_evap: int
     eta_comp: float
+    eta_motor: float
+    compressor_model: str
     eta_exp: float
     eta_ii_carnot: float
     he_eta_ii_carnot: float
@@ -245,6 +249,8 @@ class HprConfig:
     ambient_air_enabled: bool
     dt_env_cont: float
     max_pressure_ratio: float
+    screen_min_suction_pressure: float
+    screen_critical_margin: float
     max_multistart: int
     eta_penalty: float
     rho_penalty: float
@@ -252,16 +258,16 @@ class HprConfig:
     initialise_simulated_cycle: bool
 
     @staticmethod
-    def _normalise_config_list(values, *, uppercase: bool = False) -> list[str]:
-        normalised = [str(value).strip() for value in values if str(value).strip()]
-        if uppercase:
-            return [value.upper() for value in normalised]
-        return normalised
+    def _normalise_config_list(values) -> list[str]:
+        return [str(value).strip() for value in values if str(value).strip()]
 
     @property
     def normalised_refrigerants(self) -> list[str]:
         """Return HPR refrigerant names normalised for thermodynamic backends."""
-        return self._normalise_config_list(self.refrigerants, uppercase=True)
+        return [
+            coolprop_fluid_spelling(value)
+            for value in self._normalise_config_list(self.refrigerants)
+        ]
 
     @property
     def normalised_mvr_fluids(self) -> list[str]:

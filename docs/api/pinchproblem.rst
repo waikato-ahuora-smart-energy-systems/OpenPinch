@@ -66,12 +66,23 @@ Interaction Matrix
      - frozen diagnostic result
      - source unchanged
      - base
+   * - ``target.hpr_load_kinks``
+     - List the net load profile vertices and the logical HPR load fractions
+     - frozen diagnostic result
+     - source unchanged
+     - base
    * - ``target.carnot_*``, ``vapour_compression_*``, ``mvr_heat_pump``
      - Model-specific HPR studies. ``brayton_*`` raises
        ``NotImplementedError`` pending solver repair
      - target output
      - targeted
      - base; TESPy for ``simulation_backend="tespy"``
+   * - ``target.hpr_refrigerant_screen``
+     - Screen fluids as single-stage cycles between a Carnot target's
+       saturation levels or explicit levels
+     - frozen screening result
+     - source unchanged
+     - base
    * - ``target.cogeneration`` and named turbine-model methods
      - Cogeneration screening
      - target output
@@ -79,7 +90,7 @@ Interaction Matrix
      - base
    * - ``target.organic_rankine_cycle``, ``carnot_orc``
      - Organic Rankine cycle screening
-     - target output
+     - target output, or ``None`` when there is no surplus below the pinch
      - targeted
      - base
    * - ``target.utility_placement``
@@ -110,6 +121,22 @@ Interaction Matrix
      - dataframe, mapping, report, or record
      - none
      - base
+   * - ``compare_to``
+     - Compare the numeric summary metrics of two solved problems
+     - dataframe
+     - none
+     - base
+   * - ``update_options``, ``set_dt_cont_multiplier``
+     - Change stored options or the temperature-approach contribution
+     - zone
+     - re-prepare; clears stale results
+     - base
+   * - ``residual_utility``, ``with_utilities_from``
+     - Derive a new unsolved problem from a residual HPR target or a donor's
+       utilities
+     - new problem
+     - source unchanged
+     - base
    * - ``plot.catalog``, ``plot.data``, and named plot methods
      - Inspect cached graph data or build a figure
      - catalog, mapping, or figure
@@ -130,9 +157,10 @@ corresponding global ``dt_min`` is unknown:
 
 .. code-block:: python
 
+   problem = PinchProblem("basic_pinch.json")
    result = problem.target.heat_recovery_dt_min(
        heat_recovery={"value": 4_000.0, "unit": "kW"},
-       zone="Site/Process",
+       zone="Site/Plant",
        period_id="0",
    )
 
@@ -163,9 +191,10 @@ IDs themselves are ``value`` and ``unit``:
 
 .. code-block:: python
 
+   problem = PinchProblem("crude_preheat_train_multiperiod.json")
    period_results = (
        problem.target.all_periods.heat_recovery_dt_min(
-           heat_recovery={"base": 4_000.0, "turndown": 3_200.0},
+           heat_recovery={"base": 4_000.0, "turndown": 3_200.0, "peak": 4_800.0},
            workers=2,
        )
    )
@@ -188,6 +217,85 @@ approach that still meets the requested recovery.
 The complete runnable workflow, validation matrix, unit behavior, workspace
 batch examples, and numerical interpretation are in
 :doc:`../guides/heat-recovery-dt-min`.
+
+Refrigerant Screening
+---------------------
+
+``problem.target.hpr_refrigerant_screen`` screens candidate working fluids as
+single-stage cycles between the evaporating and condensing levels of a
+successful Carnot heat pump or refrigeration target. The target must be the
+problem's current one: a target from another problem, or one superseded or made
+stale by later changes, is rejected. Pass the target, or both
+``T_evap`` and ``T_cond`` (one level or a list; degC or ``{"value", "unit"}``)
+instead. The result has one row per fluid and level pair. It does not change
+the problem.
+
+.. code-block:: python
+
+   heat_pump = problem.target.carnot_heat_pump(load_fraction=0.25)
+   screen = problem.target.hpr_refrigerant_screen(
+       target=heat_pump, refrigerants="natural"
+   )
+   [row.fluid for row in screen.practical]
+
+   problem.target.hpr_refrigerant_screen(T_evap=0.0, T_cond=85.0)
+
+``refrigerants`` defaults to every fluid in the installed CoolProp; pass
+``"natural"`` for water, ammonia, CO2 and the hydrocarbons, or a list of fluid
+names. See :doc:`../fundamentals/heat-pump-and-refrigeration-methods` for the
+verdicts and thresholds.
+
+.. autoclass:: OpenPinch.contracts.hpr_refrigerant_screen.HprRefrigerantScreenResult
+   :members:
+   :no-index:
+
+HPR Load Kinks
+--------------
+
+``hpr_load_kinks`` finds the logical heat pump and refrigeration loads from
+kinks in the net load profiles of the direct-integration problem table. It runs
+no heat pump and changes nothing in the problem:
+
+.. code-block:: python
+
+   problem = PinchProblem("basic_pinch.json")
+   kinks = problem.target.hpr_load_kinks()
+   kinks.logical_load_fractions  # (0.4..., 1.0)
+   heat_pump = problem.target.carnot_heat_pump(
+       load_fraction=kinks.logical_load_fractions[0]
+   )
+
+A heat pump walks the sink profile (``H_NET_COLD``) up from the pinch;
+``is_refrigeration=True`` walks the source profile (``H_NET_HOT``) down from it.
+The slope at each vertex is the shifted-temperature change per unit load
+fraction. Each vertex has a ``kind``:
+
+- ``step``: the profile changes temperature with no duty after the vertex.
+- ``steepens``: the slope after is at least ``steepening`` (default 2.0) times
+  the slope before.
+- ``flattens``: the slope before is at least ``steepening`` times the slope
+  after.
+- ``minor``: any smaller change.
+
+A heat pump sized up to a step or steepening kink condenses below it; one sized
+past it condenses across the step. ``logical_load_fractions`` lists the step and
+steepens vertices in profile order, followed by 1.0. The fractions are exact,
+not rounded, so passing one as ``load_fraction`` sizes the target to the kink.
+
+``HprLoadKinksResult`` is frozen and contains ``scope``, canonical
+``period_id``, ``is_refrigeration``, ``steepening``, ``maximum_duty``,
+``vertices`` (each with ``load_fraction``, ``duty``, ``temperature``,
+``slope_before``, ``slope_after`` and ``kind``; a step has no ``slope_after``),
+``logical_load_fractions`` and ``provenance``. Duties and temperatures follow
+the configured output units; slopes are temperature differences.
+``problem.target.all_periods.hpr_load_kinks(workers=...)`` returns one result
+per canonical period. Supported scopes are Site, Process Zone and Unit
+Operation. A profile with no duty, or ``steepening`` of 1 or less, raises
+``ValueError``.
+
+.. autoclass:: OpenPinch.contracts.hpr_load_kinks.HprLoadKinksResult
+   :members:
+   :no-index:
 
 Argument Precedence
 -------------------
@@ -249,7 +357,8 @@ Exergy, energy transfer and the five cogeneration methods retain their existing
 base-target capabilities and infer omitted scalar zone/period selections.
 Area/cost, new HPR targeting and aggregate integration do not gain new basis
 capabilities in this release. ``hpr_performance_map`` keeps its required
-``target=`` argument. See :doc:`../guides/heat-pump-workflows` for examples,
+``target=`` argument, and ``hpr_refrigerant_screen`` takes its Carnot target as
+``target=``. See :doc:`../guides/heat-pump-workflows` for examples,
 unsupported selections and ownership rules.
 
 Input JSON remains input-only. Reconstructing a solved placement case from

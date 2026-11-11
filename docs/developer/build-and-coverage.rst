@@ -39,15 +39,18 @@ provide core-runtime and wheel-install compatibility coverage.
 CI Lanes
 --------
 
-``ci.yml`` owns branch coverage, docs, TESPy, optional-install and
-cross-platform wheel smoke tests, and the Pyodide lane, which is required for
-``CI OK``. Pull requests into ``main`` and every push to ``main`` also run the
+``ci.yml`` owns lint, branch coverage, docs, the HPR tutorial notebooks
+(``notebooks-hpr``), TESPy, optional-install and cross-platform wheel smoke
+tests, and the Pyodide lane, which is required for ``CI OK``. A dependency
+audit (pip-audit) runs on every change but is informational and not required
+by ``CI OK``. Pull requests into ``main`` and every push to ``main`` also run the
 solver tests, the performance lane, the py312 and py313 unit lanes and the
 ``floors`` lane (runtime dependencies installed at the lowest versions
 ``pyproject.toml`` allows). Branch coverage must stay at or above 95 percent.
 The unit lane runs on parallel test workers, and tests run optimisation tasks
-serially unless marked ``process_pools``. The release lanes keep real worker
-processes for every test by setting ``OPENPINCH_TEST_REAL_POOLS=1``. ``release.yml`` publishes from ``main`` when the version is new; for
+serially unless marked ``process_pools``. The main-only compat lanes (unit-py312,
+unit-py313, floors and performance) set ``OPENPINCH_TEST_REAL_POOLS=1`` so
+every test uses real worker processes. ``release.yml`` publishes from ``main`` when the version is new; for
 how to cut a release, see :doc:`releasing`.
 
 Repository Controls

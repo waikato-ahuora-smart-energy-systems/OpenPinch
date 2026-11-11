@@ -106,6 +106,28 @@ For multiple operating periods, call
 ``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
 all-period targeting.
 
+Quality Tiers and Convergence
+-----------------------------
+
+The quality tier sets how widely synthesis searches, from 0 to 5.
+``heat_exchanger_network()`` runs tier 0, which skips the thermal derivative
+step; ``enhanced_heat_exchanger_network()`` runs tier 2 unless
+``quality_tier`` is given; ``open_hens()`` always runs tier 1, the standard
+OpenHENS pinch design, thermal derivative and network evolution sequence. A
+``HENS_SYNTHESIS_QUALITY_TIER`` stored in the problem's options replaces the
+first two defaults. The tier that ran is in
+``design.result.manifest.synthesis_quality_tier``. The other ``HENS_*`` keys,
+such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument),
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_SOLVE_TOLERANCE``, are listed with
+their defaults in :doc:`../api/configuration-options`.
+
+A solve that stopped before converging, for example at the IPOPT iteration
+limit, is logged as an ``[Unconverged]`` warning. Its network still seeds the
+steps that follow, but it is left out of the final ranking, so a low objective
+from an unconverged model cannot win on cost. Networks that fail
+``verify_network_feasibility`` are left out in the same way. When no converged,
+feasible network remains, the design method raises ``WorkflowContractError``.
+
 Duty Allocation on a Fixed Network
 ----------------------------------
 
@@ -114,6 +136,7 @@ OpenPinch allocate the duties. List recovery matches as
 ``(hot_stream, cold_stream, stage)`` with one-based stages, heaters by cold
 stream and coolers by hot stream. A ``HeatExchangerNetwork``, such as a
 previous design's ``selected_network``, is accepted in place of the mapping.
+The example uses the four-stream ``problem`` loaded under Ranked Synthesis.
 
 .. code-block:: python
 
@@ -204,17 +227,22 @@ Serialized Network Input
 ------------------------
 
 The supported bridge carries the exact JSON-visible runtime dump through
-``TargetInput.network``:
+``TargetInput.network``. Here ``network`` is the rank-1 network from Ranked
+Synthesis:
 
 .. code-block:: python
 
-   from OpenPinch.contracts.input import TargetInput
+   import json
 
+   from OpenPinch.contracts.input import TargetInput
+   from OpenPinch.resources import read_sample_case
+
+   case = json.loads(read_sample_case("Four-stream-Yee-and-Grossmann-1990-1.json"))
    network_payload = network.model_dump(mode="json")
    input_data = TargetInput.model_validate(
        {
-           "streams": stream_payloads,
-           "utilities": utility_payloads,
+           "streams": case["streams"],
+           "utilities": case["utilities"],
            "network": network_payload,
        }
    )

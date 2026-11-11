@@ -64,6 +64,14 @@ class VapourCompressionMvrCascade:
         return [*self._vc_cycles, *self._mvr_cycles]
 
     @property
+    def eta_comp(self) -> np.ndarray:
+        """Isentropic efficiency applied in each subcycle's compressor."""
+        return np.array(
+            [cycle.eta_comp for cycle in self._vc_cycles]
+            + [cycle.eta_mvr_comp for cycle in self._mvr_cycles]
+        )
+
+    @property
     def source_split(self) -> float:
         """Split of the hottest VC condenser duty used to generate MVR vapour."""
         return self._source_split
@@ -225,6 +233,7 @@ class VapourCompressionMvrCascade:
         eta_comp: float = 0.7,
         eta_mvr_comp: float = 0.7,
         eta_motor: float = 1.0,
+        eta_vc_motor: float = 1.0,
         refrigerant: list[str] | str = "water",
         mvr_fluid: list[str] | str = "Water",
         dt_cascade_hx: float = 0.0,
@@ -233,7 +242,8 @@ class VapourCompressionMvrCascade:
         """Solve the VC+MVR cascade for serial MVR lift and split variables.
 
         A heat-side ``duty_allocation`` overrides ``Q_heat_vc``; its cool side
-        is ignored.
+        is ignored. ``eta_motor`` is the motor efficiency of the MVR stages and
+        ``eta_vc_motor`` that of the vapour compression stages.
         """
         self._solved = False
         self._vc_cycles = []
@@ -323,6 +333,7 @@ class VapourCompressionMvrCascade:
                 dtcont=self._dtcont,
                 dT_subcool=dT_subcool_vc[i],
                 eta_comp=eta_comp,
+                eta_motor=eta_vc_motor,
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=dT_ihx_gas_side_vc[i],
                 Q_heat=self._direct_vc_heat[i],

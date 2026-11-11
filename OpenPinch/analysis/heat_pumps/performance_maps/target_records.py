@@ -75,6 +75,7 @@ def build_coolprop_target_simulation_record(
 
     loops = _build_coolprop_loops(
         args=args,
+        cycle=cycle,
         topology=topology,
         Q_heat=Q_heat,
         Q_cool=Q_cool,
@@ -98,7 +99,7 @@ def build_coolprop_target_simulation_record(
         nominal_useful_duty=useful_duty,
         source_approach_temperature=float(args.dtcont_hp),
         sink_approach_temperature=float(args.dtcont_hp),
-        compressor_isentropic_efficiency=float(args.eta_comp),
+        compressor_isentropic_efficiency=_compressor_efficiency(args, cycle, work),
         superheat=superheat,
         subcooling=subcooling,
         internal_hx_gas_temperature_change=ihx,
@@ -112,6 +113,7 @@ def build_coolprop_target_simulation_record(
             "saturation_anchor": "evaporation_dew_condensation_bubble",
             "candidate_solve_mode": "steady_state",
             "modeled_auxiliaries": [],
+            **_compressor_model_assumption(args),
         },
         loops=loops,
     )
@@ -120,6 +122,7 @@ def build_coolprop_target_simulation_record(
 def _build_coolprop_loops(
     *,
     args: HeatPumpTargetInputs,
+    cycle: object,
     topology: HPRTopologyIdentifier,
     Q_heat: np.ndarray,
     Q_cool: np.ndarray,
@@ -135,6 +138,13 @@ def _build_coolprop_loops(
         n_vc = max(int(args.n_cond), int(args.n_evap))
     refrigerants = [str(value) for value in args.refrigerant_ls]
     mvr_fluids = [str(value) for value in getattr(args, "mvr_fluid_ls", [])]
+    eta_comp = (
+        _broadcast_vector(
+            _required_vector(cycle, "eta_comp"), Q_heat.size, name="eta_comp"
+        )
+        if _has_compressor_model(args)
+        else None
+    )
     loops: list[HPRSimulationLoopRecord] = []
     for ordinal in range(Q_heat.size):
         is_mvr = (
@@ -155,9 +165,13 @@ def _build_coolprop_loops(
             source_approach_temperature=float(args.dtcont_hp),
             sink_approach_temperature=float(args.dtcont_hp),
             compressor_isentropic_efficiency=float(
-                args.eta_mvr_comp if is_mvr else args.eta_comp
+                eta_comp[ordinal]
+                if eta_comp is not None
+                else args.eta_mvr_comp
+                if is_mvr
+                else args.eta_comp
             ),
-            motor_efficiency=(float(args.eta_motor) if is_mvr else None),
+            motor_efficiency=float(args.eta_mvr_motor if is_mvr else args.eta_motor),
             useful_duty=duty,
             compressor_work=float(work[ordinal]),
             assumptions={"power_boundary": "compressor_only"},
@@ -174,6 +188,34 @@ def _build_coolprop_loops(
             )
         )
     return tuple(loops)
+
+
+def _compressor_efficiency(
+    args: HeatPumpTargetInputs, cycle: object, work: np.ndarray
+) -> float:
+    """Return the constant efficiency, or the work-weighted efficiency a model gave."""
+    if not _has_compressor_model(args):
+        return float(args.eta_comp)
+    eta = _broadcast_vector(
+        _required_vector(cycle, "eta_comp"), work.size, name="eta_comp"
+    )
+    return float(np.dot(eta, work) / work.sum())
+
+
+def _compressor_model_assumption(args: HeatPumpTargetInputs) -> dict[str, str]:
+    """Name the compressor model, when the efficiency followed one."""
+    if not callable(args.eta_comp):
+        return {}
+    model = args.eta_comp
+    return {
+        "compressor_model": str(
+            getattr(model, "name", None) or getattr(model, "__name__", "custom")
+        )
+    }
+
+
+def _has_compressor_model(args: HeatPumpTargetInputs) -> bool:
+    return callable(args.eta_comp) or callable(getattr(args, "eta_mvr_comp", None))
 
 
 def _required_vector(value: object, attribute: str) -> np.ndarray:

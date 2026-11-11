@@ -372,3 +372,23 @@ def test_service_preflights_once_and_passes_prepared_value_to_optimizer(
 
     assert output["simulation_backend"] == "tespy"
     assert calls == [args, (args, prepared)]
+
+
+def test_tespy_objective_divides_the_compressor_power_by_the_motor_efficiency() -> None:
+    args, prepared = _prepared_args(eta_motor=0.8)
+    fake = FakeHprTargetEvaluator(cop=5.0)
+    coordinator = _coordinator(fake)
+
+    result = cascade._compute_tespy_cascade_hp_system_obj(
+        _candidate(args),
+        args,
+        coordinator=coordinator,
+        prepared=prepared,
+    )
+    coordinator.close()
+
+    request = fake.requests[0]
+    assert result.success is True
+    assert result.w_net == pytest.approx(request.useful_duty / 5.0 / 0.8)
+    assert result.cop_h == pytest.approx(5.0 * 0.8)
+    assert result.Q_heat.tolist() == pytest.approx([request.useful_duty])

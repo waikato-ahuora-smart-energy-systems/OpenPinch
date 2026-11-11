@@ -397,6 +397,15 @@ def test_complete_fake_generation_constructs_one_unit1_map_atomically():
     assert result.provenance["modeled_auxiliaries"] == []
 
 
+def test_requested_motor_efficiency_turns_shaft_power_into_electric_power():
+    result, _, _ = _generate_with_fake(request=_request(motor_efficiency=0.8))
+
+    assert result.motor_efficiency == 0.8
+    for point in result.points:
+        assert point.electric_power == pytest.approx(point.q_sink / 4.0 / 0.8)
+        assert point.cop == pytest.approx(4.0 * 0.8)
+
+
 def test_equal_fake_calls_produce_structurally_equal_maps_and_provenance():
     first, _, _ = _generate_with_fake()
     second, _, _ = _generate_with_fake()

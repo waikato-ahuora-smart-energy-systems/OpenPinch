@@ -25,6 +25,8 @@ One module per heat pump and refrigeration (HPR) cycle topology. Each defines ho
 - VC+MVR is heat-pump-only and requires at least one MVR stage [vapour_compression_mvr.py:optimise_vapour_compression_mvr_heat_pump_placement, vapour_compression_mvr.py:_num_mvr_stages].
 - A failed VC+MVR candidate returns a finite penalised objective with `success=False`, which `optimisation_adapter._CachedHPRScalarObjective` scores as `1e30`, so the finite value never ranks candidates; errors after the cycle is evaluated are re-raised as post-solve errors [vapour_compression_mvr.py:_finite_failed_vc_mvr_result, vapour_compression_mvr.py:_compute_vc_mvr_system_obj].
 - The TESPy candidate uses fixed superheat (5 K), disables the internal heat exchanger (bounds 0 to 0), and rejects candidates with non-positive allocated duty [cascade_vapour_compression.py:_TESPY_TARGET_SUPERHEAT, cascade_vapour_compression.py:_compute_tespy_cascade_hp_system_obj].
+- The TESPy candidate's work is TESPy's compressor (shaft) power divided by `args.eta_motor`, and its COP is reduced to match; duties are TESPy's [cascade_vapour_compression.py:_compute_tespy_cascade_hp_system_obj].
+- The CoolProp builders pass `args.eta_motor` to the vapour compression cycles; vapour compression with MVR passes `args.eta_mvr_motor` to its MVR stages [parallel_vapour_compression.py:_build_and_solve_parallel_cycles, cascade_vapour_compression.py:_build_and_solve_cascade_cycle, vapour_compression_mvr.py:_compute_vc_mvr_system_obj].
 - Final-mode results carry a simulation record; search-mode results do not [cascade_vapour_compression.py:_compute_tespy_cascade_hp_system_obj, vapour_compression_mvr.py:_compute_vc_mvr_system_obj].
 
 ## Side Effects

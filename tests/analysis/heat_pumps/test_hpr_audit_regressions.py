@@ -165,7 +165,7 @@ def test_asymmetric_vc_mvr_record_preserves_zero_duty_stage_and_roles():
         refrigerant_ls=["R134a", "R123"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
         is_heat_pumping=True,
     )
     cycle = SimpleNamespace(
@@ -244,7 +244,7 @@ def test_final_record_validation_is_not_candidate_infeasibility(monkeypatch):
         refrigerant_ls=["R134A"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
         initialise_simulated_cycle=False,
     )
     point = np.array([0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])

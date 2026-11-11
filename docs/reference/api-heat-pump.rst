@@ -95,13 +95,9 @@ condense, in one stage only, because a later stage would start from liquid; with
 ``n_stages`` above 1 it raises the same error. Multi-stage MVR of a condensing
 stream is not modelled.
 
-.. automodule:: OpenPinch.contracts.hpr_performance_map
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.contracts.hpr.HprTargetSimulationRecord
-   :members:
-   :no-index:
+The performance-map contract (``OpenPinch.contracts.hpr_performance_map``) and
+``HprTargetSimulationRecord`` are documented under HPR Performance-Map Contract
+in :doc:`../api/schemas-and-config`.
 
 .. autoclass:: OpenPinch.contracts.hpr.HPRFailureSummary
    :members:
@@ -153,6 +149,9 @@ surrounding whitespace, and abbreviated or historical spellings are rejected.
 .. automodule:: OpenPinch.analysis.heat_pumps.common.encoding
    :members:
 
+.. automodule:: OpenPinch.analysis.heat_pumps.common.load_kinks
+   :members:
+
 .. automodule:: OpenPinch.analysis.heat_pumps.common.preprocessing
    :members:
 
@@ -169,21 +168,9 @@ HPR Schemas
 attribute-only access. Use their named attributes while processing results and
 ``model_dump()`` when a mapping is required; they do not emulate dictionaries.
 
-.. autoclass:: OpenPinch.contracts.hpr.HPRParsedState
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.contracts.hpr.HeatPumpTargetInputs
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.contracts.hpr.HPRBackendResult
-   :members:
-   :no-index:
-
-.. autoclass:: OpenPinch.contracts.hpr.SimulatedHPRAnnualizedCostAccounting
-   :members:
-   :no-index:
+These four records (``HPRParsedState``, ``HeatPumpTargetInputs``,
+``HPRBackendResult`` and ``SimulatedHPRAnnualizedCostAccounting``) are
+documented under HPR Schemas in :doc:`../api/schemas-and-config`.
 
 Cycle Optimisation Services
 ---------------------------

@@ -250,7 +250,7 @@ def test_generalized_coolprop_record_preserves_ordered_detached_loops(
         refrigerant_ls=["R134A"] * n_vc,
         mvr_fluid_ls=["Water"] * n_mvr,
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
     count = n_vc + n_mvr
     state = HPRParsedState(

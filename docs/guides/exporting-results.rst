@@ -43,8 +43,10 @@ Expected Output
 - ``summary_frame()`` returns a pandas table for scriptable inspection.
 - ``export_excel(...)`` writes workbook artifacts for review or handoff.
 - ``problem.plot.export(...)`` writes portable HTML graph files.
-- ``show_dashboard()`` opens the Streamlit review surface when dashboard
-  dependencies are installed.
+- ``show_dashboard()`` renders the Streamlit dashboard when the script runs
+  under Streamlit: put the solve and ``problem.show_dashboard()`` in
+  ``app.py`` and run ``streamlit run app.py`` (needs ``openpinch[dashboard]``).
+  Called from plain Python or Jupyter it renders nothing.
 
 Interpretation
 --------------

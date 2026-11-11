@@ -44,7 +44,8 @@ Included Cases
 
 ``Four-stream-Yee-and-Grossmann-1990-1.json``
    Converted OpenHENS Yee and Grossmann four-stream heat exchanger network
-   synthesis example used by notebooks 15 through 17.
+   synthesis example used by notebook 06 (as a two-period case) and
+   notebooks 15 through 17.
 
 How To Copy Them
 ----------------

@@ -1191,7 +1191,7 @@ def test_compute_vc_mvr_system_obj_validates_dict_state_and_returns_finite_failu
         refrigerant_ls=["R134A"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
     x = np.array([0.2] * hp_vc_mvr._vc_mvr_layout(args).size)
     parsed_state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
@@ -1264,7 +1264,7 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
         n_mvr=2,
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
     init_res = SimpleNamespace(
         # Below R134a's subcritical ceiling (Tcrit 101.06 C less 2 K), so the
@@ -1340,7 +1340,7 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
         refrigerant_ls=["R134A"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
     x = np.array([0.2] * hp_vc_mvr._vc_mvr_layout(args).size)
 
@@ -1391,7 +1391,7 @@ def test_compute_vc_mvr_system_obj_real_cascade_smoke():
         refrigerant_ls=["R134A"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
         initialise_simulated_cycle=False,
     )
     x = np.array([0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
@@ -1417,7 +1417,7 @@ def test_compute_vc_mvr_system_obj_debug_reraises(monkeypatch):
         refrigerant_ls=["R134A"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
     x = np.array([0.2] * hp_vc_mvr._vc_mvr_layout(args).size)
 
@@ -1439,7 +1439,7 @@ def test_vc_mvr_refrigeration_rejected_clearly():
         n_mvr=1,
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
 
     with pytest.raises(ValueError, match="heat-pump-only"):
@@ -1562,7 +1562,7 @@ def test_vc_mvr_parse_floors_evaporation_at_the_refrigerant_minimum():
         refrigerant_ls=["water"],
         mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
-        eta_motor=0.95,
+        eta_mvr_motor=0.95,
     )
     args.T_hot = np.array([30.0, 10.0, -20.0])
     x = np.zeros(hp_vc_mvr._vc_mvr_layout(args).size)

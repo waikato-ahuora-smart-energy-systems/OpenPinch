@@ -78,4 +78,27 @@ def validate_coolprop_fluid_name(value: str) -> None:
         raise ValueError(f"Invalid CoolProp fluid_name {value!r}: {exc}") from exc
 
 
-__all__ = ["build_coolprop_abstract_state", "validate_coolprop_fluid_name"]
+@functools.cache
+def coolprop_fluid_spelling(value: str) -> str:
+    """Return ``value`` upper-cased, or as given when CoolProp rejects that.
+
+    Upper-casing lets lower-case input such as ``r134a`` resolve, but CoolProp
+    has no upper-case key for every fluid: it accepts ``R1233zd(E)`` and not
+    ``R1233ZD(E)``. A spec CoolProp rejects either way is upper-cased, so the
+    caller reports the failure as before.
+    """
+    upper = value.upper()
+    for spelling in (upper, value):
+        try:
+            build_coolprop_abstract_state(spelling)
+        except ValueError:
+            continue
+        return spelling
+    return upper
+
+
+__all__ = [
+    "build_coolprop_abstract_state",
+    "coolprop_fluid_spelling",
+    "validate_coolprop_fluid_name",
+]

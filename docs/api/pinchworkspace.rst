@@ -34,7 +34,8 @@ Interaction Matrix
      - Dependency
    * - construction, ``load``, ``case``, ``use_case``, ``list_cases``
      - Load, retrieve, select, and list named cases
-     - problem or names
+     - problem or names; ``load`` returns ``None`` for input that does not
+       validate, which is still stored as the case
      - prepare/select
      - base
    * - ``scenario``
@@ -59,6 +60,17 @@ Interaction Matrix
      - base
    * - active and batch ``target.heat_recovery_dt_min``
      - Invert a requested process recovery for one or every canonical period
+     - frozen result or ordered case result
+     - source cases unchanged
+     - base
+   * - active ``target.hpr_refrigerant_screen``
+     - Screen fluids between one Carnot target's levels or explicit levels; no
+       batch or ``all_periods`` mirror, since it takes one case's target
+     - frozen screening result
+     - source case unchanged
+     - base
+   * - active and batch ``target.hpr_load_kinks``
+     - List the logical HPR load fractions for one or every canonical period
      - frozen result or ordered case result
      - source cases unchanged
      - base

@@ -18,10 +18,12 @@ Stability Levels
 
 ``Stable``
    Package-root case management, direct and Total Site heat integration,
-   reporting, and the documented observation lifecycle.
+   inverse ``heat_recovery_dt_min`` targeting, reporting, and the documented
+   observation lifecycle.
 
 ``Advanced``
-   Heat Pump, cogeneration, exergy, process MVR, multiperiod, and HEN design
+   Heat Pump, Organic Rankine Cycle, cogeneration, exergy, energy transfer,
+   area and cost, utility placement, process MVR, multiperiod, and HEN design
    methods exposed through descriptive ``problem.target`` and
    ``problem.design`` callables.
 

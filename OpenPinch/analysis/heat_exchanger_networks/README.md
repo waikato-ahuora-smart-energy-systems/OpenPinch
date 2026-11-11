@@ -21,7 +21,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
   - [targeting](./targeting/README.md): method orchestration and topology helpers.
 
 ## Invariants
-- Runtime options must be a dict or `None` and must not contain `HENS_` keys; persistent controls are loaded with the problem [context.py:normalise_runtime_options].
+- Runtime options reaching this package must be a dict or `None` and must not contain `HENS_` keys; persistent controls are loaded with the problem. The `problem.design` accessors move `HENS_` keys from a call's `options` into that call's configuration before this check, so users may pass them there [context.py:normalise_runtime_options].
 - Open-HENS and PDM reject `initial_networks`; `method=None` runs tier 0 and `OpenHENS` runs tier 1 [service.py:heat_exchanger_network_synthesis_service].
 - The call-local quality tier of the OpenHENS entry points must be an integer from 0 to 5; the standalone method services use the configured tier [service.py:_validate_quality_tier].
 - An accepted design is ranked, selected and verified; verification failures raise `RuntimeError` [context.py:finalise_design_result].
@@ -33,7 +33,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 ## Side Effects
 - `finalise_design_result` assigns `problem._results` with the design attached [context.py:finalise_design_result].
 - `ensure_target_results` runs direct heat integration through `problem.target` when no matching targets are cached [context.py:ensure_target_results].
-- Synthesis runs solver models in a `ProcessPoolExecutor` through `LocalSynthesisExecutor` when more than one worker is available; duty optimisation solves serially in-process through `FixedStructureDutyExecutor`. Both launch external solver executables via GEKKO/Pyomo [execution/executor.py:LocalSynthesisExecutor, duty_optimisation.py:FixedStructureDutyExecutor].
+- Synthesis runs solver models in a `ProcessPoolExecutor` through `LocalSynthesisExecutor` when more than one worker is available and the main script has a main guard (or the start method is fork); duty optimisation solves serially in-process through `FixedStructureDutyExecutor`. Both launch external solver executables via GEKKO/Pyomo [execution/executor.py:LocalSynthesisExecutor, duty_optimisation.py:FixedStructureDutyExecutor].
 - Controllability and indexing are pure.
 
 ## Verification

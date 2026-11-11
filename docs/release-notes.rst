@@ -4,6 +4,133 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.8.3 (2026-11-11)
+------------------
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New configuration option ``HPR_ETA_MOTOR`` (default 0.95) is the motor
+  efficiency of the vapour compression compressors, as ``HPR_MVR_ETA_MOTOR``
+  already is for MVR. The electrical work is the shaft work divided by it, and
+  the motor losses leave the cycle, so condenser and evaporator duties are
+  unchanged. It applies to single-stage, parallel and cascade cycles, the
+  vapour compression stages of vapour compression with MVR, and the TESPy
+  backend, and each simulation record stage carries its motor efficiency.
+  Vapour compression work and costs rise by about 5% at the default; set
+  ``HPR_ETA_MOTOR`` to 1.0 for the previous results, and with a compressor
+  model that gives overall efficiency, such as ``brendel``, since that already
+  includes the motor.
+- ``HprPerformanceMapRequest`` and ``HprPerformanceMap`` have a new
+  ``motor_efficiency`` field (default 1.0). At 1.0 a map's ``electric_power``
+  is compressor shaft power, as before. Set it, for example to the target's
+  ``HPR_ETA_MOTOR``, to map electrical power: ``electric_power`` is the shaft
+  power divided by it, the COP uses it, and each point satisfies
+  ``q_sink = q_source + motor_efficiency * electric_power``. Maps without the
+  field still validate.
+- New ``problem.target.hpr_refrigerant_screen()`` screens working fluids as
+  single-stage cycles between the evaporating and condensing levels of a
+  Carnot heat pump or refrigeration target (``target=...``), or between
+  explicit ``T_evap`` and ``T_cond``. Each fluid gets its saturation
+  pressures, pressure ratio, suction volumetric heating capacity and a verdict:
+  above critical, below triple point, over ratio limit, deep vacuum suction,
+  near critical or practical. Practical fluids are ranked by suction
+  volumetric heating capacity. The candidates default to every CoolProp fluid;
+  ``refrigerants="natural"`` selects water, ammonia, CO2 and the
+  hydrocarbons. The result is a frozen ``HprRefrigerantScreenResult`` and the
+  problem is not changed. The Carnot tutorial notebook shows it.
+- New configuration options ``HPR_SCREEN_MIN_SUCTION_PRESSURE`` (0.5 bar) and
+  ``HPR_SCREEN_CRITICAL_MARGIN`` (15 K) set the screen's deep vacuum and
+  near-critical limits.
+- New ``problem.target.hpr_load_kinks()`` finds the logical heat pump and
+  refrigeration loads from kinks in the net load profiles. It lists every
+  vertex of the sink profile (or, with ``is_refrigeration=True``, the source
+  profile) with its load fraction, duty, shifted temperature, slopes and
+  ``kind`` (``step``, ``steepens``, ``flattens`` or ``minor``), and the logical
+  load fractions: each step, each vertex where the profile steepens by at least
+  ``steepening`` (default 2.0), and 1.0. Pass a fraction as ``load_fraction``
+  to any HPR target. The method changes nothing in the problem, and has
+  ``all_periods`` and workspace mirrors. It returns the new frozen
+  ``HprLoadKinksResult`` contract.
+- Heat pump and refrigeration targets now accept ``R1233zd(E)`` as a
+  refrigerant. Refrigerant names are still upper-cased, so lower-case input
+  such as ``r134a`` resolves, but a name is kept as given when CoolProp rejects
+  its upper-cased form. ``R1233zd(E)`` was the only CoolProp 8.0.0 fluid
+  affected; it raised ``HPRTargetingError`` in preflight.
+- Vapour compression and MVR compressors can follow a compressor efficiency
+  model instead of a constant isentropic efficiency. ``HPR_COMPRESSOR_MODEL``
+  and ``HPR_MVR_COMPRESSOR_MODEL`` take ``"constant"`` (the default, so results
+  are unchanged), ``"pareto_front"``, ``"wang_cleland"`` or ``"brendel"``,
+  correlations from HeatPumpLab. From Python, the ``compressor_model=``
+  argument of ``vapour_compression_heat_pump()``,
+  ``vapour_compression_refrigeration()`` and ``mvr_heat_pump()``, and
+  ``mvr_compressor_model=`` of ``mvr_heat_pump()``, also take a function of the
+  compressor conditions (pressures, suction state, dew points and vapour
+  densities), such as a fit of a manufacturer's compressor map. Provenance
+  records a function by name. The CoolProp backend applies the models; TESPy
+  targeting and performance maps take only a constant efficiency.
+
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis, such as
+  ``design.heat_exchanger_network()``, no longer crashes with
+  ``BrokenProcessPool`` when run from a script with no
+  ``if __name__ == "__main__":`` guard on macOS, Windows, or Linux on Python
+  3.14. Worker processes there import the main script again, so each one
+  re-ran the whole script. Synthesis now logs a warning and solves its tasks
+  serially in that case, as the optimisation backends already did. Put the
+  script's entry code under a main guard to use worker processes.
+
+Documentation
+~~~~~~~~~~~~~
+
+- New Configuration Options page in the API reference lists every option with
+  its type, default, unit, limits and description, generated from
+  ``configuration_options()``. It includes options such as
+  ``HPR_AMBIENT_AIR_ENABLED`` that were only described in the release notes.
+- The heat pump guide and methods page now explain ``HPR_AMBIENT_AIR_ENABLED``
+  and ``HPR_DT_ENV_CONT``, and how cascade stages pass heat and subcool since
+  the 0.8.0 cascade fixes. The HEN synthesis guide now gives each design
+  method's default quality tier and explains that unconverged solves
+  (``[Unconverged]`` warnings) are left out of the final ranking. The
+  cogeneration guide now gives ``isentropic_cogeneration``'s required
+  ``efficiency`` and says where band warnings appear.
+- Fixed examples that raised: the inverse ``dt_min`` examples on the
+  ``PinchProblem`` page named a zone and periods that no sample case has, and
+  the zonal guide asked a single-period case for its winter period.
+- The ``PinchProblem`` interaction table now lists ``compare_to``,
+  ``update_options``, ``set_dt_cont_multiplier``, ``residual_utility`` and
+  ``with_utilities_from``, and notes that the ORC methods return ``None``
+  without a surplus below the pinch. The ``PinchWorkspace`` table notes that
+  ``load`` returns ``None`` for input that does not validate.
+- The capability matrix, stability levels and overview lists now include the
+  Organic Rankine Cycle, residual utility, area and cost, and utility
+  placement methods. The cogeneration methods page lists all five turbine
+  methods and says which target's hot utilities they use. The heat pump
+  methods page states that cascade topology is the default and which methods
+  take the utility-placement flags. The graphs page lists every
+  ``problem.plot`` method.
+- Fixed examples: the schema-first validation example used ``...``
+  placeholders, the HEN serialized-network example used undefined payloads,
+  and the utility placement examples now use a small search budget that runs
+  in about a second per call.
+- The guides now say which extra Excel input needs, that
+  ``show_dashboard()`` renders only under ``streamlit run``, that notebooks
+  need a Jupyter front end, and that ``openpinch notebook --force``
+  overwrites existing copies.
+- Developer pages corrected against CI: lanes and the dependency audit, where
+  ``OPENPINCH_TEST_REAL_POOLS`` is set, the development install command, and
+  the application layer's allowed imports. The two stub reference pages and
+  the completed October 2026 audit plan are no longer published, and the
+  module appendix is renamed Contributor Module Reference.
+- Reorganised navigation. The API Reference lists the public workflow pages
+  and the contributor reference pages under separate headings, and the
+  Generated Appendix page is gone. Each class and module is now rendered on
+  one page only; other pages link to it. The CLI guide moves to
+  ``guides/cli.html`` and the Notebooks and Sample Cases guide is folded into
+  the Notebook Series page. The old addresses redirect to the new pages.
+
 0.8.2 (2026-11-10)
 ------------------
 

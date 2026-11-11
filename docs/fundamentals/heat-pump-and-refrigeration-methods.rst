@@ -25,13 +25,27 @@ Placement and Topology
 ----------------------
 
 Direct placement couples the HPR model to a process heat-integration target.
-Utility placement couples it to the site utility system. For Carnot methods,
-``is_utility_heat_pump`` or ``is_utility_refrigeration`` expresses that choice.
+Utility placement couples it to the site utility system.
+``is_utility_heat_pump`` (heat pump methods, including ``mvr_heat_pump``) or
+``is_utility_refrigeration`` (refrigeration methods) selects utility
+placement; the default ``False`` is direct placement.
 
-Parallel topology represents independent lifts. Cascade topology connects
-successive temperature lifts and is selected with ``is_cascade_cycle`` where
-the model supports it. MVR is a separate named workflow rather than a hidden
+Cascade topology, the default (``is_cascade_cycle=True``), connects successive
+temperature lifts. Pass ``is_cascade_cycle=False`` for parallel, independent
+lifts. The flag applies to the Carnot and vapour-compression methods. MVR is a separate named workflow rather than a hidden
 cycle-string combination.
+
+In a cascade each lower stage condenses into the evaporator of the stage above
+it. With one condenser and several evaporators, only the top stage delivers
+process heat; the lower stages lift heat to the stage above. In multi-stage
+refrigeration each stage's condenser passes heat up to the evaporator of the
+warmer stage, and the top stage rejects the remainder. A stage's subcooling heat
+must fit in its own process duty, so a stage that only passes heat up does not
+subcool. Vapour-compression compressors are limited to a pressure ratio of
+``HPR_MAX_PRESSURE_RATIO`` (default 15).
+
+Ambient air is a free heat source for heat pumps and a free heat sink for
+refrigeration unless ``HPR_AMBIENT_AIR_ENABLED`` is ``False``.
 
 Bounded Search and Failure Evidence
 -----------------------------------
@@ -89,6 +103,46 @@ point and condensation pressure uses the bubble point, which matters for
 zeotropic blends. Preflight checks one evaporating and condensing probe pair for
 each stage, so a fluid that passes it can still be unsupported at other states the optimizer tries; those candidates are rejected
 during optimization. The external ``REFPROP`` backend is outside this contract.
+
+Refrigerant Screening
+---------------------
+
+``problem.target.hpr_refrigerant_screen`` checks which working fluids suit the
+levels a Carnot target places before a vapour-compression study. Each fluid is
+treated as a single-stage cycle between every evaporating level and every
+condensing level above it. A Carnot target supplies its distinct levels whose
+ports carry duty; explicit ``T_evap`` and ``T_cond`` can be given instead. The
+levels are saturation temperatures.
+
+For each fluid and level pair the screen reports the critical temperature, the
+evaporating (dew point) and condensing (bubble point) saturation pressures,
+their ratio, and the suction volumetric heating capacity: the evaporating
+latent heat times the saturated vapour density, in kJ/m3. The verdict is the
+first of these that applies:
+
+1. ``above critical``: the condensing level is within ``HPR_DT_CONT`` of the
+   critical temperature. The vapour-compression model is subcritical only.
+2. ``below triple point``: the evaporating level is below the fluid's minimum
+   temperature in CoolProp.
+3. ``over ratio limit``: the pressure ratio is above
+   ``HPR_MAX_PRESSURE_RATIO``.
+4. ``deep vacuum suction``: the evaporating pressure is below
+   ``HPR_SCREEN_MIN_SUCTION_PRESSURE`` (0.5 bar by default).
+5. ``near critical``: the condensing level is within
+   ``HPR_SCREEN_CRITICAL_MARGIN`` (15 K by default) of the critical temperature.
+6. ``practical``: none of the above.
+
+Fluids above critical or below their triple point have no pressures or
+capacity. Within each level pair the practical fluids come first, ranked by
+suction volumetric heating capacity; a larger capacity means a smaller
+compressor for the same duty. The candidates default to every pure and
+pseudo-pure fluid in the installed CoolProp, so the list can differ between
+CoolProp versions; ``refrigerants="natural"`` selects water, ammonia, CO2,
+propane, n-butane, isobutane, n-pentane, isopentane and neopentane. Mixtures
+are not screened.
+
+The screen is a first filter, not a cycle simulation: it ignores compressor
+discharge temperature, superheat, subcooling and multistage options.
 
 Winning Design and Part-Load Maps
 ---------------------------------

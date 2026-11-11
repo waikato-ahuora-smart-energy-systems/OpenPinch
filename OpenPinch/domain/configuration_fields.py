@@ -12,6 +12,7 @@ from functools import partial
 from types import UnionType
 from typing import Any, List, get_args, get_origin
 
+from .compressor_model import CustomCompressorModel
 from .enums import BB_Minimiser, HeatPumpAndRefrigerationCycle, TurbineModel, ZoneType
 from .solver_options import validate_solver_option
 
@@ -46,6 +47,13 @@ class ConfigurationOptionStatus:
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
 HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
+HPR_COMPRESSOR_MODEL_VALUES = frozenset(
+    {"constant", "pareto_front", "wang_cleland", "brendel"}
+)
+# Options that also take a compressor efficiency function, per call only.
+HPR_COMPRESSOR_MODEL_KEYS = frozenset(
+    {"HPR_COMPRESSOR_MODEL", "HPR_MVR_COMPRESSOR_MODEL"}
+)
 _HENS_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
@@ -144,6 +152,16 @@ def _string_choice(name: str, value: Any, choices: frozenset[str]) -> str:
         choices_text = ", ".join(sorted(choices))
         raise ValueError(f"{name} must be one of: {choices_text}.")
     return value
+
+
+def _compressor_model(name: str, value: Any) -> str:
+    if callable(value):
+        argument = name.removeprefix("HPR_").lower()
+        raise ValueError(
+            f"{name} takes a function only per call, as {argument}= of a "
+            "problem.target HPR method; stored options take a model name."
+        )
+    return _string_choice(name, value, HPR_COMPRESSOR_MODEL_VALUES)
 
 
 def _positive_float(name: str, value: Any) -> float:
@@ -396,10 +414,13 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_MVR_FLUIDS": _spec(List[str], ["Water"], "hpr", "mvr_fluids"),
     "HPR_MVR_COUNT": _spec(int, 1, "hpr", "mvr_count", numeric_min=1.0),
     "HPR_MVR_ETA_COMP": _spec(float, 0.7, "hpr", "mvr_eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "HPR_MVR_COMPRESSOR_MODEL": _spec(str, "constant", "hpr", "mvr_compressor_model", validator=_compressor_model),
     "HPR_MVR_ETA_MOTOR": _spec(float, 0.95, "hpr", "mvr_eta_motor", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_N_COND": _spec(int, 3, "hpr", "n_cond", numeric_min=0.0),
     "HPR_N_EVAP": _spec(int, 2, "hpr", "n_evap", numeric_min=0.0),
     "HPR_ETA_COMP": _spec(float, 0.7, "hpr", "eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "HPR_ETA_MOTOR": _spec(float, 0.95, "hpr", "eta_motor", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "HPR_COMPRESSOR_MODEL": _spec(str, "constant", "hpr", "compressor_model", validator=_compressor_model),
     "HPR_ETA_EXP": _spec(float, 0.7, "hpr", "eta_exp", numeric_min=0.0, numeric_max=1.0),
     "HPR_ETA_II_CARNOT": _spec(float, 0.5, "hpr", "eta_ii_carnot", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_HE_ETA_II_CARNOT": _spec(float, 0.5, "hpr", "he_eta_ii_carnot", numeric_min=0.0, numeric_max=1.0),
@@ -410,6 +431,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_AMBIENT_AIR_ENABLED": _spec(bool, True, "hpr", "ambient_air_enabled"),
     "HPR_DT_ENV_CONT": _spec(float, 10.0, "hpr", "dt_env_cont", numeric_min=0.0),
     "HPR_MAX_PRESSURE_RATIO": _spec(float, 15.0, "hpr", "max_pressure_ratio", numeric_min=1.0),
+    "HPR_SCREEN_MIN_SUCTION_PRESSURE": _spec(float, 0.5, "hpr", "screen_min_suction_pressure", numeric_min=0.0),
+    "HPR_SCREEN_CRITICAL_MARGIN": _spec(float, 15.0, "hpr", "screen_critical_margin", numeric_min=0.0),
     "HPR_MAX_MULTISTART": _spec(int, 10, "hpr", "max_multistart", numeric_min=0.0),
     "HPR_ETA_PENALTY": _spec(float, 0.001, "hpr", "eta_penalty", numeric_min=0.0),
     "HPR_RHO_PENALTY": _spec(float, 10.0, "hpr", "rho_penalty", numeric_min=0.0),
@@ -516,7 +539,13 @@ def _validate_configuration_options(
         raise ValueError(f"Unknown configuration option(s): {', '.join(dead_keys)}.")
 
     validated = {
-        str(key): _validate_configuration_option_value(str(key), value)
+        str(key): (
+            CustomCompressorModel.wrap(value)
+            if allow_method_selectors
+            and str(key) in HPR_COMPRESSOR_MODEL_KEYS
+            and callable(value)
+            else _validate_configuration_option_value(str(key), value)
+        )
         for key, value in options.items()
     }
     effective_options = {

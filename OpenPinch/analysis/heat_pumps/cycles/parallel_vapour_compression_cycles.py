@@ -202,6 +202,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         dT_superheat: np.ndarray = 0.0,
         dT_subcool: np.ndarray = 0.0,
         eta_comp: float = 0.7,
+        eta_motor: float = 1.0,
         refrigerant: List[str] | str = "water",
         dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray | float | None = None,
@@ -226,6 +227,8 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
             Degree of subcooling after the condenser [K].
         eta_comp : float, optional
             Isentropic efficiency of the compressor [-].
+        eta_motor : float, optional
+            Efficiency of each compressor motor [-].
         refrigerant : List[str] | str, optional
             Cycle refrigerants; one per heat pump or a scalar value.
         dT_ihx_gas_side : np.ndarray | float, optional
@@ -243,7 +246,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         Returns
         -------
         float
-            Total compressor power requirement for the solved operating point [W].
+            Total compressor electrical power for the solved operating point [W].
         """
         self._solved = False
         self._subcycles = []
@@ -285,6 +288,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
                 dT_superheat=dT_superheat_all[i],
                 dT_subcool=dT_subcool_all[i],
                 eta_comp=eta_comp,
+                eta_motor=eta_motor,
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=ihx_gas_dt_all[i],
                 Q_heat=Q_heat_all[i],

@@ -73,7 +73,7 @@ def test_unit_policy_has_no_alias_constructor_or_attribute() -> None:
 
 def test_removed_legacy_documentation_and_test_name_stay_absent() -> None:
     assert not (REPOSITORY_ROOT / "docs/reference/api-lib.rst").exists()
-    assert "../reference/api-lib" not in _source("docs/api/generated-index.rst")
+    assert "../reference/api-lib" not in _source("docs/api/index.rst")
     assert "test_validate_utilities_data_alias_executes" not in _source(
         "tests/adapters/test_workbook.py"
     )

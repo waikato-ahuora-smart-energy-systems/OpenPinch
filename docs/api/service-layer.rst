@@ -34,9 +34,8 @@ Use the service layer when you need to:
 Main Service Surface
 --------------------
 
-.. automodule:: OpenPinch.application.targeting
-   :members:
-   :no-index:
+``OpenPinch.application.targeting`` holds the service functions; its members
+are documented in :doc:`../reference/api-analysis`.
 
 Inverse Heat-Recovery ``dt_min`` Service
 ----------------------------------------
@@ -77,6 +76,22 @@ Ordinary targeting continues to use its established cascade grid.
 
 Process-engineer examples and the full behavioral contract are in
 :doc:`../guides/heat-recovery-dt-min`.
+
+HPR Load Kinks Service
+----------------------
+
+``OpenPinch.application.hpr_load_kinks`` runs direct heat integration on an
+isolated copy of the problem, classifies the vertices of the sink or source net
+load profile with ``OpenPinch.analysis.heat_pumps.common.load_kinks``, and
+converts the result to configured output units. Application code should
+normally call ``problem.target.hpr_load_kinks(...)`` or its ``all_periods``
+mirror.
+
+.. autofunction:: OpenPinch.application.hpr_load_kinks.calculate_hpr_load_kinks
+   :no-index:
+
+.. autofunction:: OpenPinch.application.hpr_load_kinks.calculate_all_period_hpr_load_kinks
+   :no-index:
 
 Preparation Entry Point
 -----------------------

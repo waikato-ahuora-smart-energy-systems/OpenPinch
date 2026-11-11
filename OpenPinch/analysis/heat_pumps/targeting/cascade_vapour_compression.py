@@ -390,6 +390,7 @@ def _build_and_solve_cascade_cycle(
         dT_subcool=state_vars.dT_subcool,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
         eta_comp=args.eta_comp,
+        eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,
         dt_cascade_hx=args.dt_cascade_hx,
         is_heat_pump=is_heat_pumping,
@@ -448,14 +449,16 @@ def _compute_tespy_cascade_hp_system_obj(
         raise TypeError("HPR target evaluator coordinator returned an invalid value")
 
     hpr_streams = _build_tespy_hpr_streams(evaluated, args)
+    # TESPy returns shaft power; the motor losses leave the cycle.
+    work = evaluated.compressor_power / args.eta_motor
     result = evaluate_vapour_hpr_result(
         args=args,
         state=state,
-        work=evaluated.compressor_power,
-        work_arr=np.array([evaluated.compressor_power], dtype=float),
+        work=work,
+        work_arr=np.array([work], dtype=float),
         Q_heat=np.array([evaluated.q_sink], dtype=float),
         Q_cool=np.array([evaluated.q_source], dtype=float),
-        cop_h=evaluated.cop,
+        cop_h=evaluated.cop * args.eta_motor,
         hpr_streams=hpr_streams,
         model=None,
         penalty_terms=[],

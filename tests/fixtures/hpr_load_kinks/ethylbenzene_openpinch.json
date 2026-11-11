@@ -1,0 +1,638 @@
+{
+  "streams": [
+    {
+      "zone": "K-3[P]",
+      "name": "E1: Steam K-3",
+      "t_supply": {
+        "value": 114.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 27.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 740.5,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-3[P]",
+      "name": "E2: Product K-3",
+      "t_supply": {
+        "value": 114.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 44.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 557.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Ethylbenzene recovery[P]",
+      "name": "E3: Rectified ethylbenzene cooling",
+      "t_supply": {
+        "value": 99.6,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 21.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 148.2,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Ethylbenzene recovery[P]",
+      "name": "E4: Steam condensate E-93",
+      "t_supply": {
+        "value": 115.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 91.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 193.6,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-52[P]",
+      "name": "E5: Benzene steam top K-52",
+      "t_supply": {
+        "value": 89.1,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 38.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 1595.6,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-52[P]",
+      "name": "E6: Excess benzene E-56",
+      "t_supply": {
+        "value": 38.1,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 31.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 25.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-62[P]",
+      "name": "E7a: Rectified ethylbenzene steam K-62",
+      "t_supply": {
+        "value": 136.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 135.9,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 2088.9,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-62[P]",
+      "name": "E7b: Rectified ethylbenzene sensible cooling",
+      "t_supply": {
+        "value": 136.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 99.5,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 446.4,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-72[P]",
+      "name": "E8: Steam PAB K-72",
+      "t_supply": {
+        "value": 90.2,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 42.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 146.8,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-42[P]",
+      "name": "E9: Azeotrope steam K-42",
+      "t_supply": {
+        "value": 76.9,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 23.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 319.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-42[P]",
+      "name": "E10: Distillation fluid K-42 cooling",
+      "t_supply": {
+        "value": 92.7,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 90.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 100.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-112[P]",
+      "name": "E11: Hydrocarbon steam K-112",
+      "t_supply": {
+        "value": 99.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 45.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.54,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-112[P]",
+      "name": "E12: Sour boiled water K-112",
+      "t_supply": {
+        "value": 99.4,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 27.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 601.3,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Feed preheat[P]",
+      "name": "E13: Alkylate E-10 E-11 E-12",
+      "t_supply": {
+        "value": 38.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 72.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 211.7,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-52[P]",
+      "name": "E14: Distillation fluid K-52 reboiler",
+      "t_supply": {
+        "value": 153.1,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 156.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 1691.3,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-62[P]",
+      "name": "E15: Distillation fluid K-62 reboiler",
+      "t_supply": {
+        "value": 189.5,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 191.3,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 2441.1,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-72[P]",
+      "name": "E16: Distillation fluid K-72 reboiler",
+      "t_supply": {
+        "value": 162.3,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 187.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 3303.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Feed preheat[P]",
+      "name": "E17: Benzene charge E-13 E-14 E-41",
+      "t_supply": {
+        "value": 38.2,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 41.0,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 100.0,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "K-42[P]",
+      "name": "E18: Hot jet K-42",
+      "t_supply": {
+        "value": 92.7,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 95.8,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 527.1,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    }
+  ],
+  "utilities": [
+    {
+      "name": "Hot utility",
+      "type": "Hot",
+      "t_supply": {
+        "value": 220.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 219.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 200 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 200.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 199.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 170 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 170.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 169.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 135 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 135.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 134.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 90 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 90.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 89.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Site utility 25 C",
+      "type": "Both",
+      "t_supply": {
+        "value": 25.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 24.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Cold utility",
+      "type": "Cold",
+      "t_supply": {
+        "value": 10.0,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 10.1,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0.0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30.0,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    }
+  ],
+  "options": {}
+}
