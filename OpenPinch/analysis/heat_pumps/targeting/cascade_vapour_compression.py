@@ -283,8 +283,13 @@ def _parse_cascade_hp_state_variables(
     )
     if getattr(args, "stage_lift_floor", None) is not None:
         # A shared multiperiod machine cannot turn its lift below its floor.
+        # The floors are physical lifts; the levels are process levels, which
+        # the cascade exchangers widen.
         T_cond, T_evap = raise_cascade_lifts_to_floor(
-            T_cond, T_evap, args.stage_lift_floor
+            T_cond,
+            T_evap,
+            np.asarray(args.stage_lift_floor, dtype=float)
+            - _cascade_exchanger_lift(T_cond.size, T_evap.size, args),
         )
     dT_subcool = map_x_arr_to_DT_arr(
         x_subcool,
@@ -345,10 +350,33 @@ def _parse_cascade_hp_state_variables(
 
 
 def _cascade_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
-    """Each stage's lift, upper level less lower level, as ``x`` decodes."""
+    """Each stage's physical lift as ``x`` decodes, hottest stage first.
+
+    That is the gap between its process levels plus any cascade exchanger
+    approach it lifts across.
+    """
     state = _parse_cascade_hp_state_variables(x, args)
     levels = np.concatenate([state.T_cond, state.T_evap])
-    return levels[:-1] - levels[1:]
+    return (
+        levels[:-1]
+        - levels[1:]
+        + _cascade_exchanger_lift(state.T_cond.size, state.T_evap.size, args)
+    )
+
+
+def _cascade_exchanger_lift(
+    n_cond: int, n_evap: int, args: HeatPumpTargetInputs
+) -> np.ndarray:
+    """The cascade exchanger approach each stage lifts across, hottest first.
+
+    A stage below a process condensing level evaporates ``dt_cascade_hx``
+    below it; a stage above a process evaporating level condenses that much
+    above it. The stage between the condensing and evaporating levels has no
+    cascade exchanger. See ``_cascade_stage_preflight_state``.
+    """
+    stage = np.arange(n_cond + n_evap - 1)
+    crosses = (stage + 1 < n_cond) | (stage >= n_cond)
+    return np.where(crosses, float(getattr(args, "dt_cascade_hx", 0.0)), 0.0)
 
 
 def _condenser_stage_evaporating_temperatures(

@@ -28,7 +28,8 @@ Heat pumps and refrigeration
   0.25) of its design lift, its largest lift in any period, in every period.
   A period that needs less lift runs at the floor, condensing higher at a
   worse COP, as a fixed machine at part load would. There is no separate
-  turndown penalty.
+  turndown penalty. A cascade stage's lift includes the cascade exchanger
+  approach it lifts across.
 - Search and reporting.
 
   - Each warm start now seeds one restart; the other restarts start from
