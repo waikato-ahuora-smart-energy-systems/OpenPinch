@@ -189,7 +189,7 @@ Heat Pump and Refrigeration
    "``HPR_HE_ETA_II_CARNOT``","number","``0.5``","","0 to 1","Fraction of the Carnot efficiency achieved by the integrated expander (heat engine), when it is enabled."
    "``HPR_INTEGRATED_EXPANDER_ENABLED``","boolean","``False``","","","Let Carnot-model cycles generate work where heat flows from a hotter evaporator level to a colder condenser level. Heat only moves downhill, one condenser-evaporator pair at a time; with this off, such a pair is plain heat recovery with no work credit."
    "``HPR_DT_CONT``","number","``1.0``","delta_degC",">= 0","dt_cont of the heat pump or refrigeration working fluid, used to shift the process profiles it exchanges heat with."
-   "``HPR_DT_IHX``","number","``5.0``","delta_degC",">= 0","Minimum approach at the internal heat exchanger's hot end: the suction gas leaves it at least this far below the liquid entering it. CoolProp vapour compression only; TESPy targets have no internal heat exchanger."
+   "``HPR_DT_IHX``","number","``5.0``","delta_degC",">= 0","Minimum approach at the internal heat exchanger's hot end: the suction gas leaves it at least this far below the liquid entering it, in the CoolProp and TESPy vapour compression models."
    "``HPR_DT_CASCADE_HX``","number","``5.0``","delta_degC",">= 0","Temperature difference between a lower cycle's condenser and the upper cycle's evaporator in cascades."
    "``HPR_AMBIENT_AIR_ENABLED``","boolean","``True``","","","Whether ambient air may act as a free heat source or sink in HPR targeting. When off, no air is placed and no AIR streams are added."
    "``HPR_DT_ENV_CONT``","number","``10.0``","delta_degC",">= 0","dt_cont of ambient air when it acts as a heat pump source or sink."

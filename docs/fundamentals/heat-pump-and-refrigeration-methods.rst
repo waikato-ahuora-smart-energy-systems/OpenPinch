@@ -129,9 +129,9 @@ no CoolProp fallback, retry, or fabricated successful value after a TESPy
 candidate failure.
 
 The initial TESPy target model is scalar and single-stage: one evaporator, one
-condenser, and one refrigerant loop. It excludes parallel or multi-port cycles,
-integrated expanders, an internal heat exchanger, and shared-vector
-multiperiod optimization. Candidate-local convergence failures allow later
+condenser, and one refrigerant loop, with an optional internal heat exchanger
+searched as in the CoolProp model. It excludes parallel or multi-port cycles,
+integrated expanders, and shared-vector multiperiod optimization. Candidate-local convergence failures allow later
 candidates to run; dependency, configuration, lifecycle, and cleanup failures
 abort the call. Targeting is sequential and each call owns its evaluator and
 exact bounded cache.

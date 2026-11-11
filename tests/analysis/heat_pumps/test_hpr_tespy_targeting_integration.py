@@ -392,3 +392,33 @@ def test_tespy_objective_divides_the_compressor_power_by_the_motor_efficiency() 
     assert result.w_net == pytest.approx(request.useful_duty / 5.0 / 0.8)
     assert result.cop_h == pytest.approx(5.0 * 0.8)
     assert result.Q_heat.tolist() == pytest.approx([request.useful_duty])
+
+
+def test_the_tespy_search_varies_the_internal_heat_exchanger() -> None:
+    args, _ = _prepared_args()
+
+    _, bounds = cascade._get_cascade_hp_opt_setup(None, args)
+
+    assert bounds[-1] == (0.0, 1.0)
+
+
+def test_a_tespy_request_caps_the_internal_heat_exchanger_at_its_approach() -> None:
+    args, prepared = _prepared_args(dt_hp_ihx=5.0)
+    fake = FakeHprTargetEvaluator()
+    coordinator = _coordinator(fake)
+    point = _candidate(args)
+    point[-1] = 1.0
+
+    cascade._compute_tespy_cascade_hp_system_obj(
+        point, args, coordinator=coordinator, prepared=prepared
+    )
+    coordinator.close()
+
+    request = fake.requests[0]
+    assert request.internal_hx_gas_temperature_change == pytest.approx(
+        request.condensing_temperature
+        - request.subcooling
+        - request.evaporating_temperature
+        - request.superheat
+        - 5.0
+    )
