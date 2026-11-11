@@ -309,9 +309,8 @@ class HeatPumpTargetInputs(BaseModel):
     bckgrd_cold_streams: StreamCollection
     # True when the background is the utility levels, not the process.
     background_is_utility: bool = False
-    # Refrigeration only: the cooling warmer than the targeted coldest
-    # Q_hpr_target, and the default refrigeration it needs on its own.
-    untargeted_cooling_streams: StreamCollection | None = None
+    # Refrigeration only: the default refrigeration that the cooling warmer
+    # than the targeted coldest Q_hpr_target needs on its own.
     refrigeration_allowance: float | None = None
     bb_minimiser: str
     eta_penalty: float

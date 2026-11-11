@@ -4,6 +4,20 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed refrigeration targets at a load fraction below 1 that failed with
+  "failed to return an optimal result" although designs serving the whole
+  target existed. The default refrigeration allowed for the untargeted warmer
+  cooling was computed from a separate cascade of that cooling, which put the
+  split temperature on the problem table's rounded grid. On a near-isothermal
+  profile, such as a utility level, the rounding made the allowance a fraction
+  of a watt too small, and every design was rejected as leaving cooling
+  unserved. The allowance is now the full cooling's need less the target, on
+  the cascade the designs are evaluated on. Seen on the DTU brewery with
+  utility placement at 56.4% load.
+
 0.8.3 (2026-11-11)
 ------------------
 

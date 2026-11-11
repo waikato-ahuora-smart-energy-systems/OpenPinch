@@ -311,7 +311,9 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
             return _sc(_stream("HP", 90.0, 80.0, 10.0, is_process_stream=False))
 
     monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
-    seq = iter([_pt_with_hnet(1.0, 1.0), _pt_with_hnet(1.0, 1.0)])
+    # Condenser and evaporator cascades, then the full background for the
+    # refrigeration allowance.
+    seq = iter([_pt_with_hnet(1.0, 1.0) for _ in range(3)])
     monkeypatch.setattr(
         target_cascade, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )
