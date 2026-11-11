@@ -474,11 +474,6 @@ def preflight_tespy_hpr_targeting(
             "integrated_expander_unsupported",
             "TESPy targeting does not support the integrated-expander option.",
         )
-    if any(float(value) != 0.0 for value in (getattr(args, "dt_hp_ihx", 0.0),)):
-        raise HprTargetCompatibilityError(
-            "unsupported_model",
-            "TESPy single-stage targeting does not include an internal heat exchanger.",
-        )
     if callable(args.eta_comp):
         raise HprTargetCompatibilityError(
             "unsupported_compressor_model",

@@ -205,6 +205,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         eta_motor: float = 1.0,
         refrigerant: List[str] | str = "water",
         dT_ihx_gas_side: np.ndarray | float = 10.0,
+        dt_ihx: float = 0.0,
         Q_heat: np.ndarray | float | None = None,
         Q_cool: np.ndarray | float | None = None,
         duty_allocation: DutyAllocationRequest | None = None,
@@ -233,6 +234,8 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
             Cycle refrigerants; one per heat pump or a scalar value.
         dT_ihx_gas_side : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
+        dt_ihx : float, optional
+            Minimum approach at each stage's internal heat exchanger hot end [K].
         Q_heat : np.ndarray | float | None, optional
             Heat delivered to the process [W].
         Q_cool : np.ndarray | float | None, optional
@@ -291,6 +294,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
                 eta_motor=eta_motor,
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=ihx_gas_dt_all[i],
+                dt_ihx=dt_ihx,
                 Q_heat=Q_heat_all[i],
                 Q_cool=Q_cool_all[i],
                 is_heat_pump=is_heat_pump,

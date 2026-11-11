@@ -271,6 +271,7 @@ def _compute_vc_mvr_system_obj(
             dT_subcool_vc=parsed["dT_subcool_vc"],
             dT_subcool_mvr=parsed["dT_subcool_mvr"],
             dT_ihx_gas_side_vc=state_vars.dT_ihx_gas_side,
+            dt_ihx=args.dt_hp_ihx,
             eta_comp=args.eta_comp,
             eta_mvr_comp=args.eta_mvr_comp,
             eta_motor=args.eta_mvr_motor,

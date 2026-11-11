@@ -78,11 +78,11 @@ class RefrigerantScreenThresholds:
     ``max_stage_lift`` is also screened split into a cascade.
     """
 
-    dt_cont: float = 0.0
+    dt_cont: float = 1.0
     max_pressure_ratio: float = 15.0
     min_suction_pressure: float = 0.5e5
     critical_margin: float = 5.0
-    dt_cascade_hx: float = 0.0
+    dt_cascade_hx: float = 5.0
     max_stage_lift: float = 70.0
 
     @classmethod
