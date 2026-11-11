@@ -193,7 +193,7 @@ Heat Pump and Refrigeration
    "``HPR_DT_ENV_CONT``","number","``10.0``","delta_degC",">= 0","dt_cont of ambient air when it acts as a heat pump source or sink."
    "``HPR_MAX_PRESSURE_RATIO``","number","``15.0``","",">= 1","Largest ratio of condensing to evaporating pressure across one vapour-compression compressor."
    "``HPR_SCREEN_MIN_SUCTION_PRESSURE``","number","``0.5``","bar",">= 0","Refrigerant screening flags a fluid whose evaporating saturation pressure is below this as deep vacuum suction."
-   "``HPR_SCREEN_CRITICAL_MARGIN``","number","``15.0``","delta_degC",">= 0","Refrigerant screening flags a fluid that condenses within this of its critical temperature as near critical."
+   "``HPR_SCREEN_CRITICAL_MARGIN``","number","``5.0``","delta_degC",">= 0","Refrigerant screening flags a fluid that condenses within this of its critical temperature as near critical."
    "``HPR_MAX_MULTISTART``","number","``10``","",">= 0","Number of HPR optimiser runs from different starting points."
    "``HPR_ETA_PENALTY``","number","``0.001``","",">= 0","Passed to the HPR targeting inputs, but no current HPR calculation reads it."
    "``HPR_RHO_PENALTY``","number","``10.0``","",">= 0","Weight of the penalty on constraint violations, relative to the targeted duty, in HPR optimisation."

@@ -17,6 +17,23 @@ Heat pumps and refrigeration
   unserved. The allowance is now the full cooling's need less the target, on
   the cascade the designs are evaluated on. Seen on the DTU brewery with
   utility placement at 56.4% load.
+- ``hpr_refrigerant_screen`` now screens every layout a Carnot target's levels
+  allow, for the targeting method that would use it, instead of pairing every
+  evaporating level with every condensing level as single-stage cycles. Each
+  choice of ``n`` condensing and ``m`` evaporating levels gives a single-stage,
+  parallel or cascade layout, following the Carnot target's topology, and a
+  cascade heat pump also gives vapour compression plus MVR layouts, with the
+  MVR on water. Each stage screens the fluids at its own temperatures, so a
+  cascade's upper stage is judged on its own small lift. A fluid set takes one
+  feasible fluid per stage, with the critical temperature never rising from
+  the hottest stage down. The result has ``topology``, ``is_heat_pumping``,
+  ``dt_cascade_hx`` and ``layouts`` in place of ``rows`` and ``practical``;
+  each layout has ``method``, ``stages``, ``n_fluid_sets`` and
+  ``fluid_sets()``, and ``feasible_layouts`` keeps those with a fluid set.
+  Explicit levels now need ``topology`` and take ``is_refrigeration``.
+- In the refrigerant screen, deep vacuum suction and over ratio limit now rule a
+  fluid out of a stage, while near critical fluids stay feasible.
+  ``HPR_SCREEN_CRITICAL_MARGIN`` defaults to 5 K instead of 15 K.
 
 0.8.3 (2026-11-11)
 ------------------

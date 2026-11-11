@@ -1,15 +1,23 @@
-"""Single-stage refrigerant screening between evaporating and condensing levels."""
+"""Refrigerant screening of every HPR layout between saturation levels."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from itertools import combinations
 
 import CoolProp.CoolProp as _coolprop
 
-from ...contracts.hpr_refrigerant_screen import RefrigerantScreenVerdict
+from ...contracts.hpr import HPRTopologyIdentifier
+from ...contracts.hpr_refrigerant_screen import (
+    RefrigerantScreenVerdict,
+    count_ordered_fluid_sets,
+    ordered_fluid_sets,
+)
 from ...domain.configuration import Configuration
 from ...domain.fluids import validate_coolprop_fluid_name
+from .targeting.vapour_compression_mvr import MAX_MVR_STAGE_LIFT
 
 NATURAL_REFRIGERANTS = (
     "Water",
@@ -24,6 +32,13 @@ NATURAL_REFRIGERANTS = (
 )
 
 _KELVIN = 273.15
+
+# An MVR is an open cycle on the process or utility steam, so water is its
+# only working fluid.
+MVR_FLUID = "Water"
+_FEASIBLE = frozenset(
+    {RefrigerantScreenVerdict.PRACTICAL, RefrigerantScreenVerdict.NEAR_CRITICAL}
+)
 
 
 def resolve_refrigerants(selection: str | Sequence[str] | None) -> tuple[str, ...]:
@@ -56,12 +71,17 @@ def resolve_refrigerants(selection: str | Sequence[str] | None) -> tuple[str, ..
 
 @dataclass(frozen=True)
 class RefrigerantScreenThresholds:
-    """Limits a fluid must meet to be practical; pressures in Pa, margins in K."""
+    """Limits a fluid must meet to be practical; pressures in Pa, margins in K.
+
+    ``dt_cascade_hx`` is not a limit but sets where a cascade or MVR stage
+    evaporates relative to the stage below it.
+    """
 
     dt_cont: float = 0.0
     max_pressure_ratio: float = 15.0
     min_suction_pressure: float = 0.5e5
-    critical_margin: float = 15.0
+    critical_margin: float = 5.0
+    dt_cascade_hx: float = 0.0
 
     @classmethod
     def from_configuration(cls, config: Configuration) -> "RefrigerantScreenThresholds":
@@ -71,6 +91,7 @@ class RefrigerantScreenThresholds:
             max_pressure_ratio=config.hpr.max_pressure_ratio,
             min_suction_pressure=config.hpr.screen_min_suction_pressure * 1e5,
             critical_margin=config.hpr.screen_critical_margin,
+            dt_cascade_hx=config.hpr.dt_cascade_hx,
         )
 
 
@@ -139,40 +160,203 @@ def screen_refrigerant(
     )
 
 
-def screen_refrigerants(
+def is_feasible(verdict: RefrigerantScreenVerdict) -> bool:
+    """Return whether a fluid with ``verdict`` can run the stage.
+
+    Above critical, below the triple point, over the ratio limit and deep
+    vacuum suction are hard limits; near critical is feasible.
+    """
+    return verdict in _FEASIBLE
+
+
+@dataclass(frozen=True)
+class ScreenStage:
+    """One compression stage of a layout, with every candidate screened.
+
+    ``kind`` is ``"vapour_compression"`` or ``"mvr"``. The feasible fluids
+    come first, ranked from 1 by descending suction volumetric heating
+    capacity, then the others in candidate order.
+    """
+
+    kind: str
+    T_evap: float
+    T_cond: float
+    entries: tuple[RefrigerantScreenEntry, ...]
+
+    @property
+    def feasible(self) -> tuple[str, ...]:
+        """The feasible fluids, best ranked first."""
+        return tuple(entry.fluid for entry in self.entries if entry.rank is not None)
+
+
+@dataclass(frozen=True)
+class ScreenLayout:
+    """One targeting method on one choice of Carnot levels, hottest first."""
+
+    method: HPRTopologyIdentifier
+    T_cond_levels: tuple[float, ...]
+    T_evap_levels: tuple[float, ...]
+    stages: tuple[ScreenStage, ...]
+
+    def _columns(self) -> list[list[tuple[str, float]]]:
+        return [
+            [(e.fluid, e.T_crit) for e in stage.entries if e.rank is not None]
+            for stage in self.stages
+            if stage.kind == "vapour_compression"
+        ]
+
+    def _mvr_runs(self) -> bool:
+        return all(stage.feasible for stage in self.stages if stage.kind == "mvr")
+
+    @property
+    def n_fluid_sets(self) -> int:
+        """How many fluid sets can run every stage, Tcrit never rising down them."""
+        return count_ordered_fluid_sets(self._columns()) if self._mvr_runs() else 0
+
+    def fluid_sets(self) -> tuple[tuple[str, ...], ...]:
+        """Every vapour compression fluid set, one fluid per stage, hottest first.
+
+        A set's critical temperature never rises down the stages. MVR stages
+        always run on water and are left out of the sets.
+        """
+        return ordered_fluid_sets(self._columns()) if self._mvr_runs() else ()
+
+
+def _hottest_first(levels: Sequence[float]) -> tuple[float, ...]:
+    return tuple(sorted(dict.fromkeys(float(t) for t in levels), reverse=True))
+
+
+def _parallel_pairs(T_cond, T_evap) -> list[tuple[float, float]]:
+    """Machine ``i`` pairs the ``i``-th hottest levels; the shorter list repeats."""
+    n, m = len(T_cond), len(T_evap)
+    return [(T_evap[min(i, m - 1)], T_cond[min(i, n - 1)]) for i in range(max(n, m))]
+
+
+def _cascade_pairs(T_cond, T_evap, dt_hx: float) -> list[tuple[float, float]]:
+    """Stage ``i`` lifts from level ``i + 1`` to level ``i``, hottest first.
+
+    A condenser stage above another condenser stage evaporates ``dt_hx``
+    below it; an evaporator stage condenses ``dt_hx`` above the level it
+    feeds. This is how cascade targeting sets its stage temperatures.
+    """
+    levels, n = (*T_cond, *T_evap), len(T_cond)
+    pairs = []
+    for i in range(len(levels) - 1):
+        if i < n:
+            gap = dt_hx if i + 1 < n else 0.0
+            pairs.append((levels[i + 1] - gap, levels[i]))
+        else:
+            pairs.append((levels[i + 1], levels[i] + dt_hx))
+    return pairs
+
+
+def _mvr_pairs(served, T_start: float) -> list[tuple[float, float]]:
+    """Equal MVR lifts of at most ``MAX_MVR_STAGE_LIFT`` up to each served level."""
+    pairs, low = [], T_start
+    for high in reversed(served):
+        n = math.ceil((high - low) / MAX_MVR_STAGE_LIFT - 1e-9)
+        bounds = [low + (high - low) * j / n for j in range(n)] + [high]
+        pairs.extend(zip(bounds, bounds[1:]))
+        low = high
+    return pairs[::-1]
+
+
+def screen_layouts(
     T_evap_levels: Sequence[float],
     T_cond_levels: Sequence[float],
     fluids: Sequence[str],
     thresholds: RefrigerantScreenThresholds,
-) -> tuple[RefrigerantScreenEntry, ...]:
-    """Screen every fluid between every evaporating and condensing level.
+    *,
+    topology: str,
+    is_heat_pumping: bool = True,
+) -> tuple[ScreenLayout, ...]:
+    """Screen every layout that a ``topology`` Carnot target's levels allow.
 
-    Pairs whose condensing level is not above the evaporating level are
-    skipped; ``ValueError`` is raised when no pair remains. Each level pair
-    lists its practical fluids first, ranked by suction volumetric heating
-    capacity, then the others in candidate order.
+    Every choice of ``n`` condensing and ``m`` evaporating levels, from one
+    of each up to all of them, gives a layout: a single stage for one of
+    each, otherwise parallel or cascade vapour compression. A cascade heat
+    pump also gives every vapour compression plus MVR layout, with the MVR
+    serving one or more of the hottest chosen levels on water and parallel
+    vapour compression below it. Layouts with a stage that has no lift are
+    dropped; ``ValueError`` is raised when none is left.
     """
-    entries: list[RefrigerantScreenEntry] = []
-    for T_evap in T_evap_levels:
-        for T_cond in T_cond_levels:
-            if T_cond <= T_evap:
-                continue
-            pair = [
-                screen_refrigerant(fluid, T_evap, T_cond, thresholds)
-                for fluid in fluids
+    if topology not in ("parallel", "cascade"):
+        raise ValueError(
+            f"Refrigerant screening topology must be 'parallel' or 'cascade', not "
+            f"{topology!r}."
+        )
+    T_cond, T_evap = _hottest_first(T_cond_levels), _hottest_first(T_evap_levels)
+    stages: dict[tuple, ScreenStage] = {}
+
+    def stage(kind: str, T_e: float, T_c: float) -> ScreenStage:
+        key = (kind, T_e, T_c)
+        if key not in stages:
+            candidates = (MVR_FLUID,) if kind == "mvr" else fluids
+            entries = [
+                screen_refrigerant(fluid, T_e, T_c, thresholds) for fluid in candidates
             ]
-            practical = sorted(
-                (e for e in pair if e.verdict is RefrigerantScreenVerdict.PRACTICAL),
+            feasible = sorted(
+                (e for e in entries if is_feasible(e.verdict)),
                 key=lambda e: -e.suction_vhc,
             )
-            entries.extend(
-                replace(entry, rank=rank) for rank, entry in enumerate(practical, 1)
+            stages[key] = ScreenStage(
+                kind,
+                T_e,
+                T_c,
+                (
+                    *(replace(e, rank=rank) for rank, e in enumerate(feasible, 1)),
+                    *(e for e in entries if not is_feasible(e.verdict)),
+                ),
             )
-            entries.extend(
-                e for e in pair if e.verdict is not RefrigerantScreenVerdict.PRACTICAL
-            )
-    if not entries:
+        return stages[key]
+
+    def layout(method, conds, evaps, mvr_pairs, vc_pairs) -> ScreenLayout | None:
+        if any(T_c <= T_e for T_e, T_c in (*mvr_pairs, *vc_pairs)):
+            return None
+        return ScreenLayout(
+            method,
+            conds,
+            evaps,
+            (
+                *(stage("mvr", *pair) for pair in mvr_pairs),
+                *(stage("vapour_compression", *pair) for pair in vc_pairs),
+            ),
+        )
+
+    def choices(min_n: int = 1):
+        for n in range(min_n, len(T_cond) + 1):
+            for m in range(1, len(T_evap) + 1):
+                for conds in combinations(T_cond, n):
+                    for evaps in combinations(T_evap, m):
+                        yield conds, evaps
+
+    layouts = []
+    for conds, evaps in choices():
+        if len(conds) == len(evaps) == 1:
+            method = HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
+            pairs = _parallel_pairs(conds, evaps)
+        elif topology == "parallel":
+            method = HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
+            pairs = _parallel_pairs(conds, evaps)
+        else:
+            method = HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION
+            pairs = _cascade_pairs(conds, evaps, thresholds.dt_cascade_hx)
+        layouts.append(layout(method, conds, evaps, (), pairs))
+    if topology == "cascade" and is_heat_pumping:
+        for conds, evaps in choices(min_n=2):
+            for k in range(1, len(conds)):
+                layouts.append(
+                    layout(
+                        HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,
+                        conds,
+                        evaps,
+                        _mvr_pairs(conds[:k], conds[k] - thresholds.dt_cascade_hx),
+                        _parallel_pairs(conds[k:], evaps),
+                    )
+                )
+    layouts = [item for item in layouts if item is not None]
+    if not layouts:
         raise ValueError(
             "Refrigerant screening found no evaporating level below a condensing level."
         )
-    return tuple(entries)
+    return tuple(layouts)

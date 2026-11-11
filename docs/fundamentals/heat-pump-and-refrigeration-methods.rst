@@ -108,17 +108,38 @@ Refrigerant Screening
 ---------------------
 
 ``problem.target.hpr_refrigerant_screen`` checks which working fluids suit the
-levels a Carnot target places before a vapour-compression study. Each fluid is
-treated as a single-stage cycle between every evaporating level and every
-condensing level above it. A Carnot target supplies its distinct levels whose
-ports carry duty; explicit ``T_evap`` and ``T_cond`` can be given instead. The
-levels are saturation temperatures.
+levels a Carnot target places before a vapour-compression study. A Carnot
+target supplies its distinct levels whose ports carry duty and its topology,
+parallel or cascade, and whether it is a heat pump or refrigeration; explicit
+``T_evap`` and ``T_cond`` can be given instead, with ``topology`` and, for
+refrigeration, ``is_refrigeration=True``. The levels are saturation
+temperatures, taken hottest first.
 
-For each fluid and level pair the screen reports the critical temperature, the
-evaporating (dew point) and condensing (bubble point) saturation pressures,
-their ratio, and the suction volumetric heating capacity: the evaporating
-latent heat times the saturated vapour density, in kJ/m3. The verdict is the
-first of these that applies:
+The screen lists every layout the levels allow. Each choice of ``n``
+condensing and ``m`` evaporating levels, from one of each up to all of them,
+is a layout of the targeting method that would use it:
+
+- one condensing and one evaporating level: a single-stage cycle;
+- parallel topology: ``max(n, m)`` parallel machines, machine ``i`` between
+  the ``i``-th hottest evaporating and condensing levels (the shorter list
+  repeats its last level);
+- cascade topology: ``n + m - 1`` stages, each lifting from the next level down
+  to its own. A stage above another condenser stage evaporates
+  ``HPR_DT_CASCADE_HX`` below that stage's level, and a stage below another
+  evaporator stage condenses ``HPR_DT_CASCADE_HX`` above it, as in cascade
+  targeting;
+- cascade heat pumps also give vapour compression plus MVR: the MVR serves one
+  or more of the hottest chosen condensing levels and parallel vapour
+  compression the rest. The MVR starts ``HPR_DT_CASCADE_HX`` below the hottest
+  vapour compression level and lifts in equal stages of at most 20 K. An MVR is
+  an open cycle, so its stages screen water only.
+
+A layout with a stage that has no lift is dropped. Each stage screens every
+candidate fluid between its own evaporating and condensing temperatures and
+reports the critical temperature, the evaporating (dew point) and condensing
+(bubble point) saturation pressures, their ratio, and the suction volumetric
+heating capacity: the evaporating latent heat times the saturated vapour
+density, in kJ/m3. The verdict is the first of these that applies:
 
 1. ``above critical``: the condensing level is within ``HPR_DT_CONT`` of the
    critical temperature. The vapour-compression model is subcritical only.
@@ -129,20 +150,31 @@ first of these that applies:
 4. ``deep vacuum suction``: the evaporating pressure is below
    ``HPR_SCREEN_MIN_SUCTION_PRESSURE`` (0.5 bar by default).
 5. ``near critical``: the condensing level is within
-   ``HPR_SCREEN_CRITICAL_MARGIN`` (15 K by default) of the critical temperature.
+   ``HPR_SCREEN_CRITICAL_MARGIN`` (5 K by default) of the critical temperature.
+   With the margin no wider than ``HPR_DT_CONT``, no fluid is near critical.
 6. ``practical``: none of the above.
 
-Fluids above critical or below their triple point have no pressures or
-capacity. Within each level pair the practical fluids come first, ranked by
-suction volumetric heating capacity; a larger capacity means a smaller
-compressor for the same duty. The candidates default to every pure and
-pseudo-pure fluid in the installed CoolProp, so the list can differ between
-CoolProp versions; ``refrigerants="natural"`` selects water, ammonia, CO2,
-propane, n-butane, isobutane, n-pentane, isopentane and neopentane. Mixtures
-are not screened.
+The first four are hard limits: a fluid is feasible on a stage only when it is
+practical or near critical. Fluids above critical or below their triple point
+have no pressures or capacity. Within each stage the feasible fluids come
+first, ranked by suction volumetric heating capacity; a larger capacity means a
+smaller compressor for the same duty.
+
+A fluid set takes one feasible fluid per vapour compression stage, hottest
+stage first, and its critical temperature never rises down the stages: the
+targets sort a refrigerant list that way, so a hotter stage never runs a fluid
+with a lower critical temperature. The same fluid may repeat. Each layout
+reports ``n_fluid_sets``, and ``fluid_sets()`` lists them; a layout whose MVR
+stage is infeasible has none.
+
+The candidates default to every pure and pseudo-pure fluid in the installed
+CoolProp, so the list can differ between CoolProp versions;
+``refrigerants="natural"`` selects water, ammonia, CO2, propane, n-butane,
+isobutane, n-pentane, isopentane and neopentane. Mixtures are not screened.
 
 The screen is a first filter, not a cycle simulation: it ignores compressor
-discharge temperature, superheat, subcooling and multistage options.
+discharge temperature, superheat and subcooling, and the detailed search may
+move the levels away from the Carnot ones.
 
 Winning Design and Part-Load Maps
 ---------------------------------
