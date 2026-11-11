@@ -670,21 +670,22 @@ def test_hpr_backend_result_derives_hot_and_cold_stream_views_from_combined_stre
     assert len(res.hpr_cold_streams) == 1
 
 
-def test_condensing_search_range_stays_below_the_refrigerant_critical_point():
-    # Ammonia's critical point is ~132.3 degC: condensing above it has no
-    # saturation state, so the search must not propose it (CI regression on
-    # notebooks 09/10, where every candidate failed in CoolProp's PQ flash).
+def test_coolprop_condensing_search_range_spans_the_whole_sink():
+    # Above ammonia's ~132.3 degC critical point a CoolProp stage runs
+    # transcritical, so the search covers the sink up to 200 degC.
     args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=["ammonia"])
-    hot, cold = hp_shared.condensing_temperature_search_range(args)
-    assert cold == 60.0
-    t_crit = hp_shared._coolprop.PropsSI("Tcrit", "ammonia") - 273.15
-    assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
+
+    assert hp_shared.condensing_temperature_search_range(args) == (200.0, 60.0)
 
 
 def test_condensing_caps_reuse_the_cached_mixture_critical_point():
     """A mixture critical point takes about 0.1 s, and the caps run per candidate."""
     spec = "R134a[0.5]&R245fa[0.5]"
-    args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=[spec])
+    args = SimpleNamespace(
+        T_cold=np.array([200.0, 60.0]),
+        refrigerant_ls=[spec],
+        simulation_backend="tespy",
+    )
     hp_shared.critical_point.cache_clear()
 
     hp_shared.condensing_temperature_search_range(args)
@@ -694,21 +695,19 @@ def test_condensing_caps_reuse_the_cached_mixture_critical_point():
     assert (info.misses, info.hits) == (1, 1)
 
 
-def test_tespy_condensing_search_range_has_the_coolprop_ceiling():
+def test_only_tespy_condensing_search_range_stays_below_the_critical_point():
+    # TESPy models subcritical cycles only (ammonia's Tcrit is ~132.3 degC).
     tespy = SimpleNamespace(
         T_cold=np.array([200.0, 60.0]),
         refrigerant_ls=["ammonia"],
         simulation_backend="tespy",
     )
-    coolprop = SimpleNamespace(
-        T_cold=np.array([200.0, 60.0]),
-        refrigerant_ls=["ammonia"],
-        simulation_backend="coolprop",
-    )
-    assert hp_shared.condensing_temperature_search_range(
-        tespy
-    ) == hp_shared.condensing_temperature_search_range(coolprop)
-    assert hp_shared.condensing_temperature_search_range(tespy)[0] < 200.0
+
+    hot, cold = hp_shared.condensing_temperature_search_range(tespy)
+
+    assert cold == 60.0
+    t_crit = hp_shared._coolprop.PropsSI("Tcrit", "ammonia") - 273.15
+    assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
 
 
 def test_condensing_search_range_is_unchanged_when_no_cap_applies():

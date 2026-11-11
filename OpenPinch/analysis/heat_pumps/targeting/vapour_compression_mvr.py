@@ -35,6 +35,7 @@ from ..common.shared import (
     is_negligible_useful_duty,
     limit_parallel_pressure_ratios,
     post_solve_error,
+    subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
@@ -159,11 +160,17 @@ def _get_vc_mvr_opt_setup(
     x_evap = map_T_arr_to_x_arr(T_evap_seed, args.T_hot[-1], args.T_hot[0])
     # The search penalises a pressure ratio over the limit: seed the closed
     # stages within it so even a small search starts unpenalised.
+    T_cond_limited = subcritical_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)),
+        args,
+    )
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(T_cond_limited, *condensing_temperature_search_range(args)),
+        0.0,
+        1.0,
+    )
     T_evap_limited = limit_parallel_pressure_ratios(
-        cap_stage_condensing_temperatures(
-            map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)),
-            args,
-        ),
+        T_cond_limited,
         floor_stage_evaporating_temperatures(
             map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
         ),

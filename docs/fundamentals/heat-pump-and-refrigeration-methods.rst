@@ -43,6 +43,13 @@ warmer stage, and the top stage rejects the remainder. A stage's subcooling heat
 must fit in its own process duty, so a stage that only passes heat up does not
 subcool.
 
+A CoolProp stage may condense above its fluid's critical temperature. It then
+runs transcritical: its high pressure is the critical isochore's pressure at
+the condensing temperature, and its gas cooler glides down to that temperature
+less the subcooling. Its pressure is still held to the discharge pressure
+limit below. The warm start is always subcritical. TESPy targets stay
+subcritical.
+
 Each vapour-compression stage is held to practical limits. Condensate is
 injected into the compressor discharge until the gas is at most
 ``HPR_MAX_DISCHARGE_SUPERHEAT`` (default 50 K) above its dew point; the

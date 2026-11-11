@@ -64,6 +64,7 @@ __all__ = [
     "calc_hpr_machine_capital_costs",
     "NEGLIGIBLE_USEFUL_DUTY_FRACTION",
     "cap_stage_condensing_temperatures",
+    "subcritical_stage_condensing_temperatures",
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "cycle_limits",
@@ -767,11 +768,9 @@ def calc_carnot_heat_engine_eta(
     return eta.item() if eta.ndim == 0 else eta
 
 
-# Condensing temperatures within this margin of a refrigerant's critical
-# temperature have no usable saturation state (the cycle's pressure lookup
-# switches to the critical isochore there), so the search stays below it. TESPy
-# still solves inside the margin, but both backends share the limit so their
-# targets compare the same designs.
+# TESPy models subcritical cycles only, so its condensing search stays this far
+# below the refrigerant's critical temperature. CoolProp stages above the
+# critical point run transcritical, so their search is not capped.
 SUBCRITICAL_CONDENSING_MARGIN_K = 2.0
 
 
@@ -800,15 +799,17 @@ def condensing_temperature_search_range(
 ) -> tuple[float, float]:
     """Return the ``(hottest, coldest)`` condensing temperatures to search, in degC.
 
-    The range spans the heat-sink profile (``args.T_cold``) but is capped just
-    below the highest critical temperature among the candidate refrigerants:
-    a subcritical vapour-compression condenser cannot operate above it, and
-    every candidate there fails in CoolProp and TESPy. Without the cap the
-    search can spend its whole budget in that infeasible region. The range is
-    returned unchanged when the refrigerants' critical points are unknown or
-    when the cap would leave nothing to search.
+    The range spans the heat-sink profile (``args.T_cold``). A CoolProp stage
+    above its critical point runs transcritical, so CoolProp searches all of
+    it. TESPy models subcritical cycles only, so its range is capped just below
+    the highest critical temperature among the candidate refrigerants, where
+    every candidate would fail. The range is returned unchanged when the
+    refrigerants' critical points are unknown or when the cap would leave
+    nothing to search.
     """
     t_hot, t_cold = float(args.T_cold[0]), float(args.T_cold[-1])
+    if getattr(args, "simulation_backend", "coolprop") != "tespy":
+        return t_hot, t_cold
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
         t_crit = max(float(critical_point(ref)[0]) for ref in refrigerants)
@@ -836,13 +837,29 @@ def cap_stage_condensing_temperatures(
     T_cond: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> np.ndarray:
+    """Cap each TESPy stage's condensing temperature below its refrigerant's Tcrit.
+
+    CoolProp stages above their critical point run transcritical and are
+    returned unchanged. TESPy stages are capped as in
+    ``subcritical_stage_condensing_temperatures``.
+    """
+    if getattr(args, "simulation_backend", "coolprop") != "tespy":
+        return np.asarray(T_cond, dtype=float)
+    return subcritical_stage_condensing_temperatures(T_cond, args)
+
+
+def subcritical_stage_condensing_temperatures(
+    T_cond: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
     """Cap each stage's condensing temperature below its own refrigerant's Tcrit.
 
-    ``condensing_temperature_search_range`` caps the whole search at the
-    highest critical temperature among the refrigerants. A stage with a
-    lower-Tcrit refrigerant (R134a beside water, say) could still be decoded
-    above its own critical point, where every candidate fails. Stage ``i`` uses
-    ``args.refrigerant_ls[i]`` and keeps that pairing; the result is
+    TESPy decodes every candidate this way, and every warm start is seeded
+    this way, so a search starts subcritical. ``condensing_temperature_search_range``
+    caps a TESPy search at the highest critical temperature among the
+    refrigerants, but a stage with a lower-Tcrit refrigerant (R134a beside
+    water, say) could still be decoded above its own critical point. Stage
+    ``i`` uses ``args.refrigerant_ls[i]`` and keeps that pairing; the result is
     non-increasing (a capped stage pulls the colder stages down with it).
     """
     T_cond = np.asarray(T_cond, dtype=float)
@@ -911,13 +928,18 @@ def _coldest_evaporator_within_pressure_ratio(
 ) -> float:
     """Return the evaporating temperature (degC) at ``max_ratio`` below ``T_cond``.
 
-    Returns -inf where there is no such state, as for a condenser beyond the
-    critical point or a pressure below the triple point: those candidates fail
-    or are floored elsewhere.
+    The high pressure follows the cycle: saturation below the critical point,
+    the critical isochore within 1 K of it and above (transcritical). Returns
+    -inf where there is no such state, as for a pressure below the triple
+    point: those candidates fail or are floored elsewhere.
     """
     state = build_coolprop_abstract_state(refrigerant)
     try:
-        state.update(_coolprop.QT_INPUTS, 0.0, T_cond + 273.15)
+        t_crit, _, d_crit = critical_point(refrigerant)
+        if T_cond + 273.15 > t_crit - 1.0:
+            state.update(_coolprop.DmassT_INPUTS, d_crit, T_cond + 273.15)
+        else:
+            state.update(_coolprop.QT_INPUTS, 0.0, T_cond + 273.15)
         state.update(_coolprop.PQ_INPUTS, state.p() / max_ratio, 1.0)
     except ValueError:
         return -np.inf

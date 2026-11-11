@@ -801,13 +801,18 @@ class VapourCompressionCycle:
             ).hmass()
             + dh_ihx
         )  # Find the limit to subcooling of the suction gas
-        self._T_cond_sat_liq = self._compute_state_from_pressure_quality(
-            P=P_hi,
-            Q=0,
-        ).T()  # Saturated liquid temperature at the condenser pressure
+        # Saturated liquid at the condenser pressure, or for a transcritical
+        # stage the gas at T_cond on the supercritical isobar.
+        condensing_reference = self._condensing_reference_state(P_hi)
+        self._T_cond_sat_liq = condensing_reference.T()
+        T_cond_out_start = (
+            min(self._T_cond_sat_liq, self._t_crit - 0.1)
+            if P_hi < self._p_crit
+            else self._T_cond_sat_liq
+        )
         h_cond_out_tar = self._compute_state_from_pressure_temperature(
             P=P_hi,
-            T=min(self._T_cond_sat_liq, self._t_crit - 0.1) - self._dT_subcool,
+            T=T_cond_out_start - self._dT_subcool,
             phase=0,
         ).hmass()
         h_cond_out_cascade = (
@@ -822,9 +827,12 @@ class VapourCompressionCycle:
             P=P_hi,
             h=h_cond_out,
         )
+        # Actual subcooling possible; differences within round-off of the
+        # condensing reference are none.
+        dT_subcool_applied = self._T_cond_sat_liq - state2.T()
         self._dT_subcool = (
-            self._T_cond_sat_liq - state2.T()
-        )  # Actual subcooling possible
+            dT_subcool_applied if dT_subcool_applied > SUBCOOLING_SETTLED_K else 0.0
+        )
         self._save_cycle_state(state2, 2)
         self._injection_ratio = self._liquid_injection_ratio(state1, state2, limits)
 
@@ -1012,7 +1020,7 @@ class VapourCompressionCycle:
         """
         if self._Q_cas_heat <= tol:
             return -np.inf
-        h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
+        h_sat_liq = self._condensing_reference_state(P_hi).hmass()
         q_subcool_max = (h_in - h_sat_liq) * max(self._Q_heat, 0.0) / self._Q_cas_heat
         return h_sat_liq - q_subcool_max
 
@@ -1030,8 +1038,19 @@ class VapourCompressionCycle:
         share = max(self._Q_heat, 0.0) / self._Q_evap
         if share >= 1.0:
             return -np.inf
-        h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
+        h_sat_liq = self._condensing_reference_state(P_hi).hmass()
         return (h_sat_liq - share * h_comp_in) / (1.0 - share)
+
+    def _condensing_reference_state(self, P_hi: float) -> CoolProp.AbstractState:
+        """Where condensing ends and subcooling starts on the high-side isobar.
+
+        Below the critical pressure this is the saturated liquid. A
+        transcritical stage has no saturation: its gas cooler is measured
+        from ``T_cond``, so subcooling is the glide below it.
+        """
+        if P_hi < self._p_crit:
+            return self._compute_state_from_pressure_quality(P=P_hi, Q=0)
+        return self._compute_state_from_pressure_temperature(P=P_hi, T=self._T_cond)
 
     def _limit_violations(
         self, P_lo: float, P_hi: float, limits: CycleLimits | None

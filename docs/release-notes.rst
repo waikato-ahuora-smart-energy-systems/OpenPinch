@@ -14,6 +14,15 @@ Heat pumps and refrigeration
   suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
   Every heat pump and refrigeration target moves; set the three options to 0
   for the previous results.
+- CoolProp vapour-compression targets may now run a stage transcritical.
+  Condensing was capped 2 K below the fluid's critical temperature. A stage
+  condensing above it now takes its high pressure from the critical isochore
+  at the condensing temperature. Its gas cooler glides down to that
+  temperature less the subcooling, and it is held to the discharge pressure
+  limit. The warm start is still seeded subcritical, and TESPy targets stay
+  subcritical. A stage with no subcooling now reports exactly zero, where
+  round-off could give a tiny negative value that failed the simulation
+  record.
 - Vapour-compression stages are now held to practical limits.
 
   - Liquid injection: condensate is injected into the compressor discharge

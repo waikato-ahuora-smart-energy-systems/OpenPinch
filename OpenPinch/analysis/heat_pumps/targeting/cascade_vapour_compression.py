@@ -37,6 +37,7 @@ from ..common.shared import (
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_cascade_pressure_ratios,
+    subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
@@ -196,7 +197,7 @@ def _get_cascade_hp_opt_setup(
     # Nor about pressure ratios, which the search penalises: seed within the
     # limit so even a small search starts from an unpenalised design.
     T_cond_seed, T_evap_seed = limit_cascade_pressure_ratios(
-        cap_stage_condensing_temperatures(
+        subcritical_stage_condensing_temperatures(
             map_x_arr_to_T_arr(
                 np.asarray(x_cond), *condensing_temperature_search_range(args)
             ),
