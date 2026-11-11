@@ -107,3 +107,49 @@ def test_the_alternatives_reach_the_public_output():
     output = adapter.translate_hpr_output(_solve())
 
     assert len(output.alternatives) == 2
+
+
+def test_an_acceptable_point_is_a_candidate_when_penalised_points_rank_first():
+    # Seventeen slightly penalised points rank below the one feasible design
+    # (cost plus penalty 50 against 100), crowding it out of the 16 kept
+    # viable points. The feasible design is still the target.
+    feasible = 0.9
+    points = [round(0.01 * i, 2) for i in range(17)] + [feasible]
+
+    def objective(x, args, *, debug=False, artifact_mode=HPREvaluationMode.FINAL):
+        works = [10.0, 0.0]
+        penalised = round(float(x[0]), 2) != feasible
+        result = HPRBackendResult(
+            obj=50.0 if penalised else 100.0,
+            utility_tot=1.0,
+            w_net=10.0,
+            w_hpr=np.array(works),
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            feasibility_penalty=5.0 if penalised else 0.0,
+        )
+        if artifact_mode is HPREvaluationMode.FINAL:
+            result = result.with_updates(
+                artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection())
+            )
+        return result
+
+    def optimiser(problem, *, method, options):
+        for x in points:
+            problem.objective(np.array([x]), *problem.args)
+        raise NoOptimisationCandidatesError("none")
+
+    result = adapter.solve_hpr_placement(
+        f_obj=objective,
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=_base_args(
+            hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+            max_multi_start=1,
+        ),
+        candidate_search=partial(adapter.run_hpr_candidate_search, optimiser=optimiser),
+    )
+
+    assert result.obj == pytest.approx(100.0)
