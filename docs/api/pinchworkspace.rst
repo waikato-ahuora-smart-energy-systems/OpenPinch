@@ -64,7 +64,8 @@ Interaction Matrix
      - source cases unchanged
      - base
    * - active ``target.hpr_refrigerant_screen``
-     - Screen fluids between one Carnot target's levels or explicit levels; no
+     - Screen fluids on every layout of one Carnot target's levels or explicit
+       levels; no
        batch or ``all_periods`` mirror, since it takes one case's target
      - frozen screening result
      - source case unchanged

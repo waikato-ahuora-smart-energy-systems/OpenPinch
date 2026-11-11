@@ -78,7 +78,7 @@ Interaction Matrix
      - targeted
      - base; TESPy for ``simulation_backend="tespy"``
    * - ``target.hpr_refrigerant_screen``
-     - Screen fluids as single-stage cycles between a Carnot target's
+     - Screen fluids on every parallel or cascade layout of a Carnot target's
        saturation levels or explicit levels
      - frozen screening result
      - source unchanged
@@ -221,14 +221,17 @@ batch examples, and numerical interpretation are in
 Refrigerant Screening
 ---------------------
 
-``problem.target.hpr_refrigerant_screen`` screens candidate working fluids as
-single-stage cycles between the evaporating and condensing levels of a
-successful Carnot heat pump or refrigeration target. The target must be the
-problem's current one: a target from another problem, or one superseded or made
-stale by later changes, is rejected. Pass the target, or both
-``T_evap`` and ``T_cond`` (one level or a list; degC or ``{"value", "unit"}``)
-instead. The result has one row per fluid and level pair. It does not change
-the problem.
+``problem.target.hpr_refrigerant_screen`` screens candidate working fluids on
+every layout of the evaporating and condensing levels of a successful Carnot
+heat pump or refrigeration target: single stage, parallel or cascade (as the
+target's topology), and vapour compression plus MVR for a cascade heat pump.
+The target must be the problem's current one: a target from another problem,
+or one superseded or made stale by later changes, is rejected. Pass the target,
+or both ``T_evap`` and ``T_cond`` (one level or a list; degC or
+``{"value", "unit"}``) with ``topology`` (``"parallel"`` or ``"cascade"``) and,
+for refrigeration, ``is_refrigeration=True``. The result has one layout per
+method and choice of levels, each with its stages, ranked fluids and fluid
+sets. It does not change the problem.
 
 .. code-block:: python
 
@@ -236,9 +239,12 @@ the problem.
    screen = problem.target.hpr_refrigerant_screen(
        target=heat_pump, refrigerants="natural"
    )
-   [row.fluid for row in screen.practical]
+   for layout in screen.feasible_layouts:
+       layout.method, layout.n_fluid_sets, layout.fluid_sets()
 
-   problem.target.hpr_refrigerant_screen(T_evap=0.0, T_cond=85.0)
+   problem.target.hpr_refrigerant_screen(
+       T_evap=50.0, T_cond=[180.0, 120.0, 90.0], topology="cascade"
+   )
 
 ``refrigerants`` defaults to every fluid in the installed CoolProp; pass
 ``"natural"`` for water, ammonia, CO2 and the hydrocarbons, or a list of fluid

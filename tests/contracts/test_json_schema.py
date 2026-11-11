@@ -93,10 +93,14 @@ def test_dt_min_result_schema_lists_dt_min_and_limit():
     assert {"dt_min", "thermodynamic_limit"} <= set(schema["properties"])
 
 
-def test_refrigerant_screen_schema_lists_rows_and_levels():
+def test_refrigerant_screen_schema_lists_layouts_and_levels():
     schema = contract_json_schemas()["HprRefrigerantScreenResult"]
 
-    assert {"rows", "T_evap_levels", "T_cond_levels"} <= set(schema["properties"])
+    assert {"layouts", "topology", "T_evap_levels", "T_cond_levels"} <= set(
+        schema["properties"]
+    )
+    layout = schema["$defs"]["RefrigerantScreenLayout"]
+    assert {"method", "stages", "n_fluid_sets"} <= set(layout["properties"])
 
 
 def test_network_synthesis_result_schema_lists_network():

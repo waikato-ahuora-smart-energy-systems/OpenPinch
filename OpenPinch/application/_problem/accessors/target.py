@@ -387,13 +387,17 @@ class _TargetAccessor:
         target=None,
         T_evap=None,
         T_cond=None,
+        topology=None,
+        is_refrigeration=None,
         refrigerants=None,
         options=None,
     ) -> "HprRefrigerantScreenResult":
-        """Screen candidate fluids as single-stage cycles between saturation levels.
+        """Screen candidate fluids on every layout of the saturation levels.
 
-        The levels come from a Carnot heat pump or refrigeration ``target`` or
-        from explicit ``T_evap`` and ``T_cond``.
+        The levels come from a Carnot heat pump or refrigeration ``target``,
+        which also sets the topology (parallel or cascade), or from explicit
+        ``T_evap`` and ``T_cond`` with ``topology`` and, for refrigeration,
+        ``is_refrigeration=True``.
         """
         from ...hpr_refrigerant_screen import calculate_hpr_refrigerant_screen
 
@@ -402,6 +406,8 @@ class _TargetAccessor:
             target=target,
             T_evap=T_evap,
             T_cond=T_cond,
+            topology=topology,
+            is_refrigeration=is_refrigeration,
             refrigerants=refrigerants,
             options=options,
         )
