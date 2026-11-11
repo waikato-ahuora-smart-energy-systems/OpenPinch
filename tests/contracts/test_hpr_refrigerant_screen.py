@@ -87,6 +87,7 @@ def _result(**overrides) -> HprRefrigerantScreenResult:
         "max_pressure_ratio": 15.0,
         "min_suction_pressure": _quantity(0.5, "bar"),
         "critical_margin": _quantity(5.0, "delta_degC"),
+        "max_stage_lift": _quantity(70.0, "delta_degC"),
         "layouts": [_layout([TOP, BOTTOM])],
     }
     payload.update(overrides)
@@ -200,5 +201,18 @@ def test_layouts_check_their_stages_and_fluid_set_count():
     with pytest.raises(ValidationError, match="water"):
         wet = _stage(115.0, 135.0, [_row("Ammonia", "practical", 1)], kind="mvr")
         _result(layouts=[_layout([wet, BOTTOM], n_fluid_sets=3)])
+    with pytest.raises(ValidationError, match="added levels"):
+        _result(
+            layouts=[_layout([TOP, BOTTOM], added_levels=[_quantity(100.0, "degC")])]
+        )
+    assert (
+        _result(
+            layouts=[_layout([TOP, BOTTOM], added_levels=[_quantity(85.0, "degC")])]
+        )
+        .layouts[0]
+        .added_levels[0]
+        .value
+        == 85.0
+    )
     with pytest.raises(ValidationError, match="at least 1"):
         _result(layouts=[_layout([], n_fluid_sets=1)])

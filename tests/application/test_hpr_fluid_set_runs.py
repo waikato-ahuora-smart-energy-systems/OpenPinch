@@ -100,6 +100,7 @@ def _screen(*layouts, is_heat_pumping=True) -> HprRefrigerantScreenResult:
             "max_pressure_ratio": 15.0,
             "min_suction_pressure": _quantity(0.5, "bar"),
             "critical_margin": _quantity(5.0, "delta_degC"),
+            "max_stage_lift": _quantity(70.0, "delta_degC"),
             "layouts": list(layouts or (SINGLE_HOT, SINGLE_COLD, CASCADE, MVR)),
         }
     )

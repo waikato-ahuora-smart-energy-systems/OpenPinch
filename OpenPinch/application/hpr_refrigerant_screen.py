@@ -189,6 +189,7 @@ def calculate_hpr_refrigerant_screen(
             max_pressure_ratio=thresholds.max_pressure_ratio,
             min_suction_pressure=quantity(thresholds.min_suction_pressure, _PRESSURE),
             critical_margin=quantity(thresholds.critical_margin, _DIFFERENCE),
+            max_stage_lift=quantity(thresholds.max_stage_lift, _DIFFERENCE),
             layouts=tuple(
                 RefrigerantScreenLayout(
                     method=layout.method,
@@ -200,6 +201,9 @@ def calculate_hpr_refrigerant_screen(
                     ),
                     stages=tuple(stage_contract(stage) for stage in layout.stages),
                     n_fluid_sets=layout.n_fluid_sets,
+                    added_levels=tuple(
+                        quantity(t, _TEMPERATURE) for t in layout.added_levels
+                    ),
                 )
                 for layout in layouts
             ),

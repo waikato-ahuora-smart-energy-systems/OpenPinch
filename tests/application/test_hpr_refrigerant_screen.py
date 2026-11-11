@@ -44,6 +44,8 @@ def test_explicit_levels_screen_every_layout_of_the_topology():
         7,
         27,
         7,
+        17,
+        66,
     ]
     top = result.layouts[3].stages[0]
     assert top.T_evap == RefrigerantScreenQuantity(value=115.0, unit="degC")
@@ -59,6 +61,12 @@ def test_explicit_levels_screen_every_layout_of_the_topology():
     assert result.critical_margin == RefrigerantScreenQuantity(
         value=5.0, unit="delta_degC"
     )
+    assert result.max_stage_lift == RefrigerantScreenQuantity(
+        value=70.0, unit="delta_degC"
+    )
+    assert [[q.value for q in layout.added_levels] for layout in result.layouts][
+        -2:
+    ] == [[117.5], [135.0]]
     assert result.min_suction_pressure == RefrigerantScreenQuantity(
         value=0.5, unit="bar"
     )

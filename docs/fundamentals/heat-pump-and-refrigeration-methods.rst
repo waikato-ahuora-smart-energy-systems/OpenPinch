@@ -134,6 +134,15 @@ is a layout of the targeting method that would use it:
   vapour compression level and lifts in equal stages of at most 20 K. An MVR is
   an open cycle, so its stages screen water only.
 
+A single-stage or cascade layout with a stage lifting more than
+``HPR_SCREEN_MAX_STAGE_LIFT`` (70 K by default) is also screened as a cascade
+that splits that stage into the fewest equal lifts within the limit, allowing
+``HPR_DT_CASCADE_HX`` between them. The inserted levels are condensing levels,
+except where the stage joins the evaporating side of a refrigeration cascade;
+the layout lists them as ``added_levels``. Parallel machines and the vapour
+compression stages under an MVR are not split, since no targeting method runs a
+cascade inside them.
+
 A layout with a stage that has no lift is dropped. Each stage screens every
 candidate fluid between its own evaporating and condensing temperatures and
 reports the critical temperature, the evaporating (dew point) and condensing
