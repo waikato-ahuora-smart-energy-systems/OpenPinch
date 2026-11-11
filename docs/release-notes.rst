@@ -25,7 +25,9 @@ Heat pumps and refrigeration
   - Process exchangers are sized interval by interval against the closest
     part of the sink or source each condenser or evaporator can reach. Heat
     exchanged with ambient air goes through an air cooler or heater. Internal
-    and cascade exchangers are sized from their own approaches.
+    and cascade exchangers are sized from their own approaches. A condenser
+    section counts as gas or liquid against its own stage's condensing
+    temperature, and parallel compressor units each have their own motor.
   - New ``HPR_U_TWO_PHASE`` (2000 W/m²K), ``HPR_U_LIQUID`` (1000),
     ``HPR_U_GAS`` (400) and ``HPR_U_AIR`` (50) set the heat transfer
     coefficients.

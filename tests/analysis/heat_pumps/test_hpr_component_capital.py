@@ -477,3 +477,87 @@ def test_the_duty_based_capital_settings_are_gone(key):
     from OpenPinch.domain.configuration_fields import CONFIG_FIELD_SPECS
 
     assert key not in CONFIG_FIELD_SPECS
+
+
+def _stage_condensers(*profiles):
+    from OpenPinch.domain._stream.linearisation import (
+        build_segmented_stream_from_profile,
+    )
+
+    streams = StreamCollection()
+    for i, profile in enumerate(profiles):
+        streams.add(
+            build_segmented_stream_from_profile(
+                name=f"Condenser {i}",
+                profile=np.asarray(profile, dtype=float),
+                is_hot_stream=True,
+                is_process_stream=False,
+                delta_t_contribution=0.0,
+            )
+        )
+    return streams
+
+
+def test_condenser_sections_take_the_phase_of_their_own_stage():
+    from OpenPinch.analysis.heat_pumps.common.machine_capital import (
+        _condenser_coefficient,
+    )
+
+    # Stage A condenses at 90 C and subcools to 70 C; stage B desuperheats
+    # from 65 C and condenses at 60 C. A's liquid is above B's condensing
+    # temperature but is still liquid.
+    streams = _stage_condensers(
+        [[0.0, 90.0], [100.0, 90.0], [140.0, 70.0]],
+        [[0.0, 65.0], [10.0, 60.0], [110.0, 60.0]],
+    )
+    args = _base_args(u_two_phase=2000.0, u_liquid=1000.0, u_gas=400.0)
+    u = _condenser_coefficient(streams, args, condensing_temperatures=[90.0, 60.0])
+
+    t = np.array
+    assert u(t([80.0]), t([75.0]), t([0.0]), t([0.0])) == pytest.approx([1000.0])
+    assert u(t([64.0]), t([62.0]), t([0.0]), t([0.0])) == pytest.approx([400.0])
+    assert u(t([90.0]), t([90.0]), t([0.0]), t([0.0])) == pytest.approx([2000.0])
+
+
+def test_overlapping_stage_sections_add_as_conductances():
+    from OpenPinch.analysis.heat_pumps.common.machine_capital import (
+        _condenser_coefficient,
+    )
+
+    # Between 70 and 80 C, A's liquid gives 2 kW/K and B's gas 1 kW/K.
+    streams = _stage_condensers(
+        [[0.0, 90.0], [100.0, 90.0], [140.0, 70.0]],
+        [[0.0, 80.0], [10.0, 70.0], [110.0, 60.0]],
+    )
+    args = _base_args(u_two_phase=2000.0, u_liquid=1000.0, u_gas=400.0)
+    u = _condenser_coefficient(streams, args, condensing_temperatures=[90.0, 60.0])
+
+    expected = 3.0 / (2.0 / 1000.0 + 1.0 / 400.0)
+    # rel=1e-3: the builder gives condensing a 0.01 K span, so A's liquid
+    # runs 89.99 -> 70 C, 2.001 kW/K.
+    assert u(
+        np.array([76.0]), np.array([74.0]), np.array([0.0]), np.array([0.0])
+    ) == pytest.approx([expected], rel=1e-3)
+
+
+def test_parallel_compressor_units_each_have_their_own_motor():
+    from OpenPinch.analysis.heat_pumps.common.capital import (
+        CompressorDuty,
+        MachineComponents,
+        installed_capital,
+    )
+
+    # 560 m3/h of ammonia takes two 280 m3/h compressors, each with a motor
+    # driving half the shaft power.
+    split = installed_capital(
+        MachineComponents(compressors=(CompressorDuty("Ammonia", 560.0, 200.0),))
+    )
+    two = installed_capital(
+        MachineComponents(
+            compressors=(
+                CompressorDuty("Ammonia", 280.0, 100.0),
+                CompressorDuty("Ammonia", 280.0, 100.0),
+            )
+        )
+    )
+    assert split == pytest.approx(two)

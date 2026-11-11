@@ -62,14 +62,10 @@ def process_side_areas(
     def is_process_duty(duty: float, total: float) -> bool:
         return duty > max(tol, _NEGLIGIBLE_PROCESS_DUTY_FRACTION * total)
 
-    T_cond_min = min(condensing_temperatures, default=np.inf)
-
-    def condenser_u(t_h1, t_h2, t_c1, t_c2):
-        isothermal = np.abs(t_h1 - t_h2) < _ISOTHERMAL_K
-        gas = 0.5 * (t_h1 + t_h2) > T_cond_min
-        return np.where(
-            isothermal, args.u_two_phase, np.where(gas, args.u_gas, args.u_liquid)
-        )
+    hot = hpr_streams.get_hot_utility_streams()
+    condenser_u = _condenser_coefficient(
+        hot, args, condensing_temperatures=condensing_temperatures
+    )
 
     def evaporator_u(t_h1, t_h2, t_c1, t_c2):
         isothermal = np.abs(t_c1 - t_c2) < _ISOTHERMAL_K
@@ -79,7 +75,6 @@ def process_side_areas(
         return lambda *t: 1.0 / (1.0 / u(*t) + 1.0 / args.u_air)
 
     condenser = air_cooler = 0.0
-    hot = hpr_streams.get_hot_utility_streams()
     if len(hot):
         T_hp, H_hp = _trim(*_composite(hot, args))
         total = float(H_hp[0])
@@ -173,6 +168,82 @@ def machine_components(
     return tuple(result)
 
 
+def _condenser_coefficient(
+    streams: StreamCollection,
+    args: HeatPumpTargetInputs,
+    *,
+    condensing_temperatures: Sequence[float],
+):
+    """Return the condensing side's ``U`` for each interval of a match.
+
+    A (near) isothermal interval condenses. A sloped section is gas above its
+    own stage's condensing temperature and liquid below it, so a hotter
+    stage's subcooled liquid stays liquid. Sections of several stages in one
+    interval add as conductances: ``1/U`` is their heat-weighted ``1/U``.
+    A stage condenses at its isothermal section; a transcritical stage, which
+    has none, at the highest condensing temperature within its range.
+    """
+    sections = []
+    for stage in _stream_segments(streams, args):
+        T_cond = _stage_condensing_temperature(stage, condensing_temperatures)
+        for hi, lo, heat in stage:
+            if hi - lo >= _ISOTHERMAL_K:
+                u = args.u_gas if 0.5 * (hi + lo) > T_cond else args.u_liquid
+                sections.append((hi, lo, heat / (hi - lo), u))
+
+    def coefficient(t_h1, t_h2, t_c1, t_c2):
+        middle = 0.5 * (np.asarray(t_h1, float) + np.asarray(t_h2, float))
+        heat = np.zeros_like(middle)
+        resistance = np.zeros_like(middle)
+        for hi, lo, density, u in sections:
+            inside = (middle > lo) & (middle < hi)
+            heat += np.where(inside, density, 0.0)
+            resistance += np.where(inside, density / u, 0.0)
+        sloped = np.where(
+            heat > 0.0, heat / np.where(resistance > 0.0, resistance, 1.0), 1.0
+        )
+        isothermal = (np.abs(np.asarray(t_h1) - np.asarray(t_h2)) < _ISOTHERMAL_K) | (
+            heat <= 0.0
+        )
+        return np.where(isothermal, args.u_two_phase, sloped)
+
+    return coefficient
+
+
+def _stage_condensing_temperature(
+    stage: list[tuple[float, float, float]], condensing_temperatures: Sequence[float]
+) -> float:
+    """A stage's condensing temperature, from its own sections."""
+    isothermal = [hi for hi, lo, _ in stage if hi - lo < _ISOTHERMAL_K]
+    if isothermal:
+        return max(isothermal)
+    top = max(hi for hi, _, _ in stage)
+    bottom = min(lo for _, lo, _ in stage)
+    within = [t for t in condensing_temperatures if bottom <= t <= top]
+    return max(within, default=min(condensing_temperatures, default=np.inf))
+
+
+def _stream_segments(
+    streams: StreamCollection, args: HeatPumpTargetInputs
+) -> list[list[tuple[float, float, float]]]:
+    """Each stream's linear segments as ``(hot end, cold end, heat)``."""
+    period = int(getattr(args, "period_idx", 0) or 0)
+
+    def value(quantity) -> float:
+        values = np.ravel(getattr(quantity, "value", quantity))
+        return float(values[min(period, values.size - 1)])
+
+    result = []
+    for stream in streams:
+        stage = []
+        for segment in stream.segments if stream.has_segments else (stream,):
+            a = value(segment.supply_temperature)
+            b = value(segment.target_temperature)
+            stage.append((max(a, b), min(a, b), abs(value(segment.heat_flow))))
+        result.append(stage)
+    return result
+
+
 def _composite(
     streams: StreamCollection, args: HeatPumpTargetInputs
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -181,18 +252,7 @@ def _composite(
     Each linear stream segment holds its heat evenly over its temperature
     range; the composite's heat at a temperature is all the heat below it.
     """
-    period = int(getattr(args, "period_idx", 0) or 0)
-
-    def value(quantity) -> float:
-        values = np.ravel(getattr(quantity, "value", quantity))
-        return float(values[min(period, values.size - 1)])
-
-    segments = []
-    for stream in streams:
-        for segment in stream.segments if stream.has_segments else (stream,):
-            a = value(segment.supply_temperature)
-            b = value(segment.target_temperature)
-            segments.append((max(a, b), min(a, b), abs(value(segment.heat_flow))))
+    segments = [s for stage in _stream_segments(streams, args) for s in stage]
     T = np.unique([t for hi, lo, _ in segments for t in (hi, lo)])[::-1]
     H = np.zeros_like(T)
     for hi, lo, heat in segments:

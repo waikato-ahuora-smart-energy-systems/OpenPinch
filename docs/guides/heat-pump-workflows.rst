@@ -104,7 +104,8 @@ Refrig. 55, table 4):
 
 - screw compressors on suction volume flow, by fluid family (R134a and other
   fluids, ammonia, hydrocarbons, CO2); a flow beyond the largest compressor
-  (280 m³/h, CO2 25.6 m³/h) takes several in parallel;
+  (280 m³/h, CO2 25.6 m³/h) takes several in parallel, each with its own
+  motor;
 - water vapour (closed water stages and MVR) on turbo compressors, which
   Ommen does not cover: anchored on Zuhlsdorf et al. (2018, 13th IIR Gustav
   Lorentzen Conference), where two of 1231 and 468 m³/h cost EUR 50,000 with
@@ -121,7 +122,9 @@ Installed capital is 4.16 times the purchased cost (Bejan et al. 1996), scaled
 so that Ommen's 1 MW ammonia example costs the IEA HPT Annex 68 level for
 1 MW (2025 USD). Exchanger areas are duty / (U x LMTD), with ``U`` from
 ``HPR_U_TWO_PHASE`` (default 2000 W/m²K), ``HPR_U_LIQUID`` (1000) and
-``HPR_U_GAS`` (400) by the heat pump side's phase. The IHX uses its own end
+``HPR_U_GAS`` (400) by the heat pump side's phase, a stage's sensible
+sections counting as gas above its own condensing temperature and liquid
+below it. The IHX uses its own end
 temperatures and the cascade exchanger ``HPR_DT_CASCADE_HX``. The condensers
 and evaporators are matched interval by interval against the closest part of
 the sink below them and the source above them, with ``HPR_DT_CONT`` and the

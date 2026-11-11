@@ -135,9 +135,15 @@ def compressor_pec(fluid: str, volume_flow: float) -> float:
     volume_flow = max(float(volume_flow), 0.0)
     if volume_flow <= 0.0:
         return 0.0
-    reference, flow_ref, exponent, largest = _COMPRESSORS[_family(fluid)]
-    units = max(math.ceil(volume_flow / largest), 1)
+    reference, flow_ref, exponent, _ = _COMPRESSORS[_family(fluid)]
+    units = _compressor_units(fluid, volume_flow)
     return units * reference * (volume_flow / units / flow_ref) ** exponent
+
+
+def _compressor_units(fluid: str, volume_flow: float) -> int:
+    """The number of equal compressors in parallel for a suction volume flow."""
+    largest = _COMPRESSORS[_family(fluid)][3]
+    return max(math.ceil(max(float(volume_flow), 0.0) / largest), 1)
 
 
 def motor_pec(fluid: str, shaft_power: float) -> float:
@@ -160,10 +166,17 @@ def exchanger_pec(area: float) -> float:
 
 
 def _purchased_equipment_cost(machine: MachineComponents) -> float:
-    return sum(
-        compressor_pec(c.fluid, c.volume_flow) + motor_pec(c.fluid, c.shaft_power)
-        for c in machine.compressors
-    ) + sum(exchanger_pec(area) for area in machine.exchanger_areas)
+    return sum(_compressors_and_motors_pec(c) for c in machine.compressors) + sum(
+        exchanger_pec(area) for area in machine.exchanger_areas
+    )
+
+
+def _compressors_and_motors_pec(compressor: CompressorDuty) -> float:
+    """Each parallel compressor unit has its own motor, driving its share."""
+    units = _compressor_units(compressor.fluid, compressor.volume_flow)
+    return compressor_pec(compressor.fluid, compressor.volume_flow) + units * (
+        motor_pec(compressor.fluid, compressor.shaft_power / units)
+    )
 
 
 # Ommen's worked example (Table A.4): ammonia, 467 m3/h, 146 kW, a 73.2 m2
