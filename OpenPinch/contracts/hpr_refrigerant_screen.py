@@ -158,6 +158,8 @@ class RefrigerantScreenLayout(_FrozenContract):
 
     ``n_fluid_sets`` counts the fluid sets that can run every stage with
     the critical temperature never rising from the hottest stage down.
+    ``added_levels`` are levels a split inserted between Carnot levels so no
+    stage lifts more than the screen's ``max_stage_lift``.
     """
 
     method: HPRTopologyIdentifier
@@ -165,6 +167,7 @@ class RefrigerantScreenLayout(_FrozenContract):
     T_evap_levels: tuple[RefrigerantScreenQuantity, ...] = Field(min_length=1)
     stages: tuple[RefrigerantScreenStage, ...] = Field(min_length=1)
     n_fluid_sets: int
+    added_levels: tuple[RefrigerantScreenQuantity, ...] = ()
 
     def _columns(self) -> list[list[tuple[str, float]]]:
         return [
@@ -182,6 +185,9 @@ class RefrigerantScreenLayout(_FrozenContract):
 
     @model_validator(mode="after")
     def _validate_count(self) -> Self:
+        levels = (*self.T_cond_levels, *self.T_evap_levels)
+        if any(level not in levels for level in self.added_levels):
+            raise ValueError("added levels must be among the layout's levels")
         count = count_ordered_fluid_sets(self._columns()) if self._mvr_runs() else 0
         if self.n_fluid_sets != count:
             raise ValueError(
@@ -212,6 +218,7 @@ class HprRefrigerantScreenResult(_FrozenContract):
     max_pressure_ratio: float
     min_suction_pressure: RefrigerantScreenQuantity
     critical_margin: RefrigerantScreenQuantity
+    max_stage_lift: RefrigerantScreenQuantity
     layouts: tuple[RefrigerantScreenLayout, ...]
 
     @property

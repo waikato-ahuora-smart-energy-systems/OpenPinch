@@ -31,6 +31,10 @@ Heat pumps and refrigeration
   each layout has ``method``, ``stages``, ``n_fluid_sets`` and
   ``fluid_sets()``, and ``feasible_layouts`` keeps those with a fluid set.
   Explicit levels now need ``topology`` and take ``is_refrigeration``.
+- A single-stage or cascade layout with a stage lifting more than the new
+  ``HPR_SCREEN_MAX_STAGE_LIFT`` (default 70 K) is also screened as a cascade
+  with that stage split into equal lifts within the limit; the inserted levels
+  are the layout's ``added_levels``.
 - In the refrigerant screen, deep vacuum suction and over ratio limit now rule a
   fluid out of a stage, while near critical fluids stay feasible.
   ``HPR_SCREEN_CRITICAL_MARGIN`` defaults to 5 K instead of 15 K.

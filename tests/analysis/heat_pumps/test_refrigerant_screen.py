@@ -109,8 +109,12 @@ def _single_stages():
     ]
 
 
+def _carnot_level_layouts(layouts):
+    return [layout for layout in layouts if not layout.added_levels]
+
+
 def test_parallel_screen_covers_every_subset_of_the_levels():
-    layouts = _example("parallel")
+    layouts = _carnot_level_layouts(_example("parallel"))
 
     vc = "vapour_compression"
     assert [_shape(layout) for layout in layouts] == _single_stages() + [
@@ -132,7 +136,11 @@ def test_parallel_screen_covers_every_subset_of_the_levels():
 
 
 def test_cascade_stages_evaporate_below_the_next_level_down():
-    layouts = [layout for layout in _example("cascade") if layout.method is not MVR]
+    layouts = [
+        layout
+        for layout in _carnot_level_layouts(_example("cascade"))
+        if layout.method is not MVR
+    ]
 
     vc = "vapour_compression"
     assert [_shape(layout) for layout in layouts] == _single_stages() + [
@@ -224,6 +232,7 @@ def test_refrigeration_has_no_mvr_and_stacks_evaporating_levels():
         is_heat_pumping=False,
     )
 
+    layouts = _carnot_level_layouts(layouts)
     assert [(layout.method, layout.T_evap_levels) for layout in layouts] == [
         (SC, (20.0,)),
         (SC, (0.0,)),
@@ -241,7 +250,9 @@ def test_refrigeration_has_no_mvr_and_stacks_evaporating_levels():
         topology="parallel",
         is_heat_pumping=False,
     )
-    assert [(s.T_evap, s.T_cond) for s in parallel[-1].stages] == [
+    assert [
+        (s.T_evap, s.T_cond) for s in _carnot_level_layouts(parallel)[-1].stages
+    ] == [
         (20.0, 100.0),
         (0.0, 100.0),
     ]
@@ -277,6 +288,60 @@ def test_fluid_sets_never_raise_the_critical_temperature_down_the_stages():
     assert ("Ammonia", "Ammonia") in middle_down.fluid_sets()
 
 
+def test_stages_lifting_more_than_the_limit_are_also_screened_as_cascades():
+    # 50 -> 180 C lifts 130 K: two stages of 67.5 K with the 5 K cascade gap.
+    (parallel_split,) = [lay for lay in _example("parallel") if lay.added_levels]
+    assert parallel_split.method is CAS
+    assert parallel_split.added_levels == (117.5,)
+    assert parallel_split.T_cond_levels == (180.0, 117.5)
+    assert [(s.T_evap, s.T_cond) for s in parallel_split.stages] == [
+        (112.5, 180.0),
+        (50.0, 117.5),
+    ]
+    # 50 -> 120 C lifts exactly 70 K and is not split; the 85 -> 180 C top
+    # stage of the 180 and 90 C cascade lifts 95 K and is.
+    splits = [lay for lay in _example("cascade") if lay.added_levels]
+    assert [(lay.T_cond_levels, lay.added_levels) for lay in splits] == [
+        ((180.0, 117.5), (117.5,)),
+        ((180.0, 135.0, 90.0), (135.0,)),
+    ]
+    assert [(s.T_evap, s.T_cond) for s in splits[1].stages] == [
+        (130.0, 180.0),
+        (85.0, 135.0),
+        (50.0, 90.0),
+    ]
+    assert all(s.T_cond - s.T_evap <= 70.0 for lay in splits for s in lay.stages)
+
+
+def test_refrigeration_splits_on_the_evaporating_side():
+    layouts = screen_layouts(
+        (-30.0,),
+        (60.0,),
+        ("Ammonia",),
+        EXAMPLE,
+        topology="cascade",
+        is_heat_pumping=False,
+    )
+
+    (split,) = [layout for layout in layouts if layout.added_levels]
+    assert split.T_evap_levels == (12.5, -30.0)
+    assert split.added_levels == (12.5,)
+    assert [(s.T_evap, s.T_cond) for s in split.stages] == [
+        (12.5, 60.0),
+        (-30.0, 17.5),
+    ]
+
+
+def test_a_wider_lift_limit_splits_nothing():
+    wide = RefrigerantScreenThresholds(
+        dt_cont=5.0, dt_cascade_hx=5.0, max_stage_lift=200.0
+    )
+    layouts = screen_layouts(
+        (50.0,), (180.0,), ("Isopentane",), wide, topology="cascade"
+    )
+    assert [layout.added_levels for layout in layouts] == [()]
+
+
 def test_layouts_without_lift_are_dropped_and_none_left_raises():
     layouts = screen_layouts(
         (50.0, 70.0), (60.0,), ("Ammonia",), EXAMPLE, topology="parallel"
@@ -286,6 +351,14 @@ def test_layouts_without_lift_are_dropped_and_none_left_raises():
     ]
     with pytest.raises(ValueError, match="no evaporating level below"):
         screen_layouts((60.0,), (40.0,), ("Ammonia",), EXAMPLE, topology="cascade")
+    with pytest.raises(ValueError, match="lift limit above the cascade"):
+        screen_layouts(
+            (0.0,),
+            (40.0,),
+            ("Ammonia",),
+            RefrigerantScreenThresholds(dt_cascade_hx=5.0, max_stage_lift=5.0),
+            topology="cascade",
+        )
     with pytest.raises(ValueError, match="'parallel' or 'cascade'"):
         screen_layouts((0.0,), (40.0,), ("Ammonia",), EXAMPLE, topology="series")
 
@@ -346,6 +419,7 @@ def test_thresholds_come_from_the_configuration():
             "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.3,
             "HPR_SCREEN_CRITICAL_MARGIN": 10.0,
             "HPR_DT_CASCADE_HX": 5.0,
+            "HPR_SCREEN_MAX_STAGE_LIFT": 60.0,
         }
     )
     assert RefrigerantScreenThresholds.from_configuration(
@@ -356,4 +430,5 @@ def test_thresholds_come_from_the_configuration():
         min_suction_pressure=0.3e5,
         critical_margin=10.0,
         dt_cascade_hx=5.0,
+        max_stage_lift=60.0,
     )

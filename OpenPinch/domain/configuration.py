@@ -251,6 +251,7 @@ class HprConfig:
     max_pressure_ratio: float
     screen_min_suction_pressure: float
     screen_critical_margin: float
+    screen_max_stage_lift: float
     max_multistart: int
     eta_penalty: float
     rho_penalty: float
