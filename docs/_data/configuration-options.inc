@@ -194,6 +194,7 @@ Heat Pump and Refrigeration
    "``HPR_MAX_PRESSURE_RATIO``","number","``15.0``","",">= 1","Largest ratio of condensing to evaporating pressure across one vapour-compression compressor."
    "``HPR_SCREEN_MIN_SUCTION_PRESSURE``","number","``0.5``","bar",">= 0","Refrigerant screening flags a fluid whose evaporating saturation pressure is below this as deep vacuum suction."
    "``HPR_SCREEN_CRITICAL_MARGIN``","number","``5.0``","delta_degC",">= 0","Refrigerant screening flags a fluid that condenses within this of its critical temperature as near critical."
+   "``HPR_SCREEN_MAX_STAGE_LIFT``","number","``70.0``","delta_degC",">= 0","Refrigerant screening also screens a cascade for a single-stage or cascade layout with a stage lifting more than this, splitting the stage into equal lifts within it. Must exceed HPR_DT_CASCADE_HX."
    "``HPR_MAX_MULTISTART``","number","``10``","",">= 0","Number of HPR optimiser runs from different starting points."
    "``HPR_ETA_PENALTY``","number","``0.001``","",">= 0","Passed to the HPR targeting inputs, but no current HPR calculation reads it."
    "``HPR_RHO_PENALTY``","number","``10.0``","",">= 0","Weight of the penalty on constraint violations, relative to the targeted duty, in HPR optimisation."

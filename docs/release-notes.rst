@@ -31,6 +31,10 @@ Heat pumps and refrigeration
   each layout has ``method``, ``stages``, ``n_fluid_sets`` and
   ``fluid_sets()``, and ``feasible_layouts`` keeps those with a fluid set.
   Explicit levels now need ``topology`` and take ``is_refrigeration``.
+- A single-stage or cascade layout with a stage lifting more than the new
+  ``HPR_SCREEN_MAX_STAGE_LIFT`` (default 70 K) is also screened as a cascade
+  with that stage split into equal lifts within the limit; the inserted levels
+  are the layout's ``added_levels``.
 - ``HPR_MVR_FLUIDS`` (``mvr_fluids=`` of ``mvr_heat_pump``) now names the
   fluids of the vapour compression stages of a vapour compression plus MVR
   cascade, one per stage, instead of the MVR stages' fluid. The MVR stages are
@@ -43,6 +47,21 @@ Heat pumps and refrigeration
 - In the refrigerant screen, deep vacuum suction and over ratio limit now rule a
   fluid out of a stage, while near critical fluids stay feasible.
   ``HPR_SCREEN_CRITICAL_MARGIN`` defaults to 5 K instead of 15 K.
+- ``vapour_compression_heat_pump``, ``vapour_compression_refrigeration`` and
+  ``mvr_heat_pump`` take a refrigerant screen result, or one of its layouts,
+  as ``refrigerants`` and run the target once for every fluid set it proposes
+  for that method: single-stage and cascade layouts for a cascade cycle,
+  parallel layouts for a parallel cycle, and vapour compression plus MVR
+  layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators
+  and MVR stages from its layout (a split layout's added levels included),
+  unless given, when only layouts with those
+  counts run; layouts asking for the same counts and fluids share one run. The
+  result is an ``HprFluidSetRunsResult`` with every run, failures included,
+  and ``best``, the successful run with the lowest total annualized cost. A
+  refrigerant list, or one fluid set from ``fluid_sets()``, still returns the
+  target. ``mvr_heat_pump`` now takes ``refrigerants`` for its vapour
+  compression stages, and refuses ``mvr_fluids`` alongside a screen, since
+  the fluid sets choose those fluids.
 
 0.8.3 (2026-11-11)
 ------------------

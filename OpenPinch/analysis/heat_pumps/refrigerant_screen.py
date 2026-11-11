@@ -74,7 +74,8 @@ class RefrigerantScreenThresholds:
     """Limits a fluid must meet to be practical; pressures in Pa, margins in K.
 
     ``dt_cascade_hx`` is not a limit but sets where a cascade or MVR stage
-    evaporates relative to the stage below it.
+    evaporates relative to the stage below it. A stage lifting more than
+    ``max_stage_lift`` is also screened split into a cascade.
     """
 
     dt_cont: float = 0.0
@@ -82,6 +83,7 @@ class RefrigerantScreenThresholds:
     min_suction_pressure: float = 0.5e5
     critical_margin: float = 5.0
     dt_cascade_hx: float = 0.0
+    max_stage_lift: float = 70.0
 
     @classmethod
     def from_configuration(cls, config: Configuration) -> "RefrigerantScreenThresholds":
@@ -92,6 +94,7 @@ class RefrigerantScreenThresholds:
             min_suction_pressure=config.hpr.screen_min_suction_pressure * 1e5,
             critical_margin=config.hpr.screen_critical_margin,
             dt_cascade_hx=config.hpr.dt_cascade_hx,
+            max_stage_lift=config.hpr.screen_max_stage_lift,
         )
 
 
@@ -191,12 +194,16 @@ class ScreenStage:
 
 @dataclass(frozen=True)
 class ScreenLayout:
-    """One targeting method on one choice of Carnot levels, hottest first."""
+    """One targeting method on one choice of Carnot levels, hottest first.
+
+    ``added_levels`` are the levels a split inserted between Carnot levels.
+    """
 
     method: HPRTopologyIdentifier
     T_cond_levels: tuple[float, ...]
     T_evap_levels: tuple[float, ...]
     stages: tuple[ScreenStage, ...]
+    added_levels: tuple[float, ...] = ()
 
     def _columns(self) -> list[list[tuple[str, float]]]:
         return [
@@ -250,6 +257,49 @@ def _cascade_pairs(T_cond, T_evap, dt_hx: float) -> list[tuple[float, float]]:
     return pairs
 
 
+def _intermediate_condensing(
+    T_evap: float, T_cond: float, dt_hx: float, max_lift: float
+) -> list[float]:
+    """Condensing levels, coldest first, that split a stage into equal lifts.
+
+    ``k`` stages of lift ``L`` with a ``dt_hx`` gap between them span
+    ``k * L - (k - 1) * dt_hx``; ``k`` is the fewest with ``L <= max_lift``.
+    """
+    span = T_cond - T_evap
+    if span <= max_lift:
+        return []
+    k = math.ceil((span - dt_hx) / (max_lift - dt_hx) - 1e-9)
+    lift = (span + (k - 1) * dt_hx) / k
+    return [T_evap + lift + j * (lift - dt_hx) for j in range(k - 1)]
+
+
+def _split_levels(conds, evaps, dt_hx: float, max_lift: float, is_heat_pumping):
+    """Insert levels into a cascade so no stage lifts more than ``max_lift``.
+
+    A stage between condensing levels gains condensing levels and one between
+    evaporating levels gains evaporating levels; the stage joining the two
+    sides gains condensing levels in a heat pump and evaporating levels in
+    refrigeration. Returns the new condensing and evaporating levels and the
+    inserted ones.
+    """
+    levels, n = (*conds, *evaps), len(conds)
+    pairs = _cascade_pairs(conds, evaps, dt_hx)
+    cond_out, evap_out, added = [], [], []
+    for i, level in enumerate(levels):
+        (cond_out if i < n else evap_out).append(level)
+        if i == len(levels) - 1:
+            break
+        T_e, T_c = pairs[i]
+        inserted = _intermediate_condensing(T_e, T_c, dt_hx, max_lift)[::-1]
+        if i < n - 1 or (i == n - 1 and is_heat_pumping):
+            cond_out.extend(inserted)
+        else:
+            inserted = [T - dt_hx for T in inserted]
+            evap_out.extend(inserted)
+        added.extend(inserted)
+    return tuple(cond_out), tuple(evap_out), tuple(added)
+
+
 def _mvr_pairs(served, T_start: float) -> list[tuple[float, float]]:
     """Equal MVR lifts of at most ``MAX_MVR_STAGE_LIFT`` up to each served level."""
     pairs, low = [], T_start
@@ -277,13 +327,20 @@ def screen_layouts(
     each, otherwise parallel or cascade vapour compression. A cascade heat
     pump also gives every vapour compression plus MVR layout, with the MVR
     serving one or more of the hottest chosen levels on water and parallel
-    vapour compression below it. Layouts with a stage that has no lift are
-    dropped; ``ValueError`` is raised when none is left.
+    vapour compression below it. Last come cascades that split each single
+    stage or cascade with a stage lifting more than ``max_stage_lift``.
+    Layouts with a stage that has no lift are dropped; ``ValueError`` is
+    raised when none is left.
     """
     if topology not in ("parallel", "cascade"):
         raise ValueError(
             f"Refrigerant screening topology must be 'parallel' or 'cascade', not "
             f"{topology!r}."
+        )
+    if thresholds.max_stage_lift <= thresholds.dt_cascade_hx:
+        raise ValueError(
+            "Refrigerant screening needs a stage lift limit above the cascade "
+            "exchanger approach."
         )
     T_cond, T_evap = _hottest_first(T_cond_levels), _hottest_first(T_evap_levels)
     stages: dict[tuple, ScreenStage] = {}
@@ -310,7 +367,9 @@ def screen_layouts(
             )
         return stages[key]
 
-    def layout(method, conds, evaps, mvr_pairs, vc_pairs) -> ScreenLayout | None:
+    def layout(
+        method, conds, evaps, mvr_pairs, vc_pairs, added=()
+    ) -> ScreenLayout | None:
         if any(T_c <= T_e for T_e, T_c in (*mvr_pairs, *vc_pairs)):
             return None
         return ScreenLayout(
@@ -321,6 +380,7 @@ def screen_layouts(
                 *(stage("mvr", *pair) for pair in mvr_pairs),
                 *(stage("vapour_compression", *pair) for pair in vc_pairs),
             ),
+            added,
         )
 
     def choices(min_n: int = 1):
@@ -330,7 +390,8 @@ def screen_layouts(
                     for evaps in combinations(T_evap, m):
                         yield conds, evaps
 
-    layouts = []
+    dt_hx = thresholds.dt_cascade_hx
+    layouts, splits = [], []
     for conds, evaps in choices():
         if len(conds) == len(evaps) == 1:
             method = HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
@@ -340,8 +401,29 @@ def screen_layouts(
             pairs = _parallel_pairs(conds, evaps)
         else:
             method = HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION
-            pairs = _cascade_pairs(conds, evaps, thresholds.dt_cascade_hx)
+            pairs = _cascade_pairs(conds, evaps, dt_hx)
         layouts.append(layout(method, conds, evaps, (), pairs))
+        # A single stage or cascade with an over-lift stage is also a cascade
+        # with that stage split; parallel machines have no such method.
+        if (
+            layouts[-1] is None
+            or method is HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
+        ):
+            continue
+        split_conds, split_evaps, added = _split_levels(
+            conds, evaps, dt_hx, thresholds.max_stage_lift, is_heat_pumping
+        )
+        if added:
+            splits.append(
+                layout(
+                    HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
+                    split_conds,
+                    split_evaps,
+                    (),
+                    _cascade_pairs(split_conds, split_evaps, dt_hx),
+                    added,
+                )
+            )
     if topology == "cascade" and is_heat_pumping:
         for conds, evaps in choices(min_n=2):
             for k in range(1, len(conds)):
@@ -354,7 +436,7 @@ def screen_layouts(
                         _parallel_pairs(conds[k:], evaps),
                     )
                 )
-    layouts = [item for item in layouts if item is not None]
+    layouts = [item for item in (*layouts, *splits) if item is not None]
     if not layouts:
         raise ValueError(
             "Refrigerant screening found no evaporating level below a condensing level."

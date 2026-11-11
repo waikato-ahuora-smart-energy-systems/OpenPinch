@@ -255,6 +255,39 @@ verdicts and thresholds.
    :members:
    :no-index:
 
+The vapour compression targets (``vapour_compression_heat_pump``,
+``vapour_compression_refrigeration`` and ``mvr_heat_pump``) take the screen, or
+one of its layouts, as ``refrigerants`` and run once for every fluid set it
+proposes for their method: single-stage and cascade layouts for a cascade
+cycle, parallel layouts for a parallel cycle, and vapour compression plus MVR
+layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators and
+MVR stages from its layout, so a split layout runs one condenser on each of its
+``added_levels``; pass ``condensers`` or ``evaporators`` to run only the layouts
+with those counts. Layouts asking for the same counts and fluids
+share one run. A run that fails is kept with its error, and ``best`` is the
+successful run with the lowest total annualized cost. One fluid set from
+``fluid_sets()``, like a refrigerant list, runs once and returns the target.
+
+.. code-block:: python
+
+   runs = problem.target.vapour_compression_heat_pump(
+       refrigerants=screen, load_fraction=0.25
+   )
+   for run in runs.runs:
+       run.fluids, run.success, run.total_annualized_cost, run.error
+   best = runs.best.target
+
+Every run commits like a single target call, so afterwards the problem holds
+the last successful run; each run's ``target`` can still be passed on as
+``target=``.
+
+.. autoclass:: OpenPinch.contracts.hpr_fluid_set_runs.HprFluidSetRunsResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.hpr_fluid_set_runs.HprFluidSetRun
+   :no-index:
+
 HPR Load Kinks
 --------------
 

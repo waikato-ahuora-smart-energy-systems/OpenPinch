@@ -682,6 +682,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "critical temperature as near critical."
         ),
     ),
+    "HPR_SCREEN_MAX_STAGE_LIFT": FieldText(
+        "Refrigerant screen stage lift limit", "delta_degC",
+        (
+            "Refrigerant screening also screens a cascade for a single-stage or "
+            "cascade layout with a stage lifting more than this, splitting the "
+            "stage into equal lifts within it. Must exceed HPR_DT_CASCADE_HX."
+        ),
+    ),
     "HPR_DT_CASCADE_HX": FieldText(
         "HPR cascade heat exchanger approach", "delta_degC",
         (
