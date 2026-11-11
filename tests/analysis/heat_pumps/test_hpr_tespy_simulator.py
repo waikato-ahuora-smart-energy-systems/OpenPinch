@@ -468,6 +468,31 @@ def test_the_tespy_design_point_matches_coolprop_with_an_internal_heat_exchanger
 
 
 @pytest.mark.tespy
+def test_a_map_point_caps_the_internal_heat_exchanger_rise_at_its_span():
+    # The design point (5 -> 55 C) takes the full 30 K rise. The off-design
+    # point (5 -> 40 C) has 40 - 2 - 5 - 5 = 28 K between the suction gas and
+    # the liquid; with a 5 K approach the gas rises only 23 K.
+    context = build_hpr_map_generation_context(
+        _basis(
+            simulation_backend="tespy",
+            internal_hx_gas_temperature_change=30.0,
+            internal_hx_approach_temperature=5.0,
+        ),
+        _request(source_temperatures=[8.0], sink_temperatures=[36.0]),
+    )
+    simulator = TespyHprPointSimulator()
+    simulator.prepare(context)
+    assert simulator._compressor_inlet.td_dew.val == pytest.approx(5.0 + 30.0)
+
+    simulator._apply_condition(
+        evaporating_temperature=5.0, condensing_temperature=40.0, useful_duty=500.0
+    )
+
+    assert simulator._compressor_inlet.td_dew.val == pytest.approx(5.0 + 23.0)
+    simulator.close()
+
+
+@pytest.mark.tespy
 def test_tespy_adapter_rejects_wrong_lifecycle_and_backend():
     simulator = TespyHprPointSimulator()
     point = next(iter_hpr_operating_points(_tespy_context()))

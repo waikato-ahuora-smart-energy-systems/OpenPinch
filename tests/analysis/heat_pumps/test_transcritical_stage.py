@@ -116,3 +116,21 @@ def test_a_warm_start_above_the_critical_point_is_seeded_subcritical():
 
     t_crit = CP.PropsSI("Tcrit", "n-Butane") - 273.15
     assert state.T_cond[0] == pytest.approx(t_crit - SUBCRITICAL_CONDENSING_MARGIN_K)
+
+
+def test_a_compressor_correlation_sees_the_critical_point_as_a_transcritical_dew():
+    # Above the critical pressure there is no dew point; the dew line ends at
+    # the critical point, which a correlation is given instead.
+    seen = []
+
+    def efficiency(conditions):
+        seen.append(conditions)
+        return 0.7
+
+    cycle = _co2_stage(eta_comp=efficiency)
+
+    assert cycle.solved
+    (conditions,) = seen
+    assert conditions.P_discharge > CP.PropsSI("pcrit", "CO2") / 1000.0
+    assert conditions.T_cond_dew == pytest.approx(CP.PropsSI("Tcrit", "CO2") - 273.15)
+    assert conditions.rho_cond_dew == pytest.approx(CP.PropsSI("rhocrit", "CO2"))

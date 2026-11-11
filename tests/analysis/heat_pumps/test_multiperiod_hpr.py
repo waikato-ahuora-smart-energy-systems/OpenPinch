@@ -1212,3 +1212,109 @@ def test_the_shared_design_search_gets_the_setups_stage_lifts(monkeypatch):
         )
 
     assert seen["stage_lifts"] is lifts
+
+
+def _vapour_period_args(*, weights, selected="p0", **overrides):
+    vapour = HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+    cases = [
+        HPRPeriodCase(
+            period_id=f"p{idx}",
+            period_idx=idx,
+            weight=weight,
+            args=_input_args(period_idx=idx, hpr_type=vapour, **overrides),
+        )
+        for idx, weight in enumerate(weights)
+    ]
+    return MultiPeriodHPRTargetInputs(
+        period_cases=cases,
+        selected_period_id=selected,
+        selected_period_idx=int(selected[1:]),
+        hpr_type=vapour,
+        max_multi_start=1,
+        bb_minimiser="rbf_surrogate",
+    )
+
+
+def test_a_penalty_in_a_lightly_weighted_period_still_rejects_the_design(
+    monkeypatch,
+):
+    # The weighted penalty, 1 in 1001, is diluted below the tolerance; the
+    # design is still infeasible in p1.
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (OptimisationCandidate(objective=100.0, point=(1.0,)),),
+    )
+
+    def objective(x, args, debug=False):
+        return _backend_result(
+            obj=100.0, utility_tot=1.0, period_idx=args.period_idx
+        ).with_updates(feasibility_penalty=0.05 if args.period_idx == 1 else 0.0)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_vapour_period_args(weights=(1000.0, 1.0)),
+        )
+
+    assert any(
+        failure.summary.startswith(INFEASIBLE_HEAT_PUMP_REASON)
+        for failure in raised.value.diagnostics.representative_failures
+    )
+
+
+def test_an_unserved_heating_duty_is_reported_for_its_own_period(monkeypatch):
+    # p0 (selected) serves its 100 kW; p1 serves 50 of its 200 kW.
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (OptimisationCandidate(objective=100.0, point=(1.0,)),),
+    )
+    mp_args = _vapour_period_args(weights=(1.0, 1.0), enforce_heating_duty=True)
+    mp_args.period_cases[0].args.Q_hpr_target = 100.0
+    mp_args.period_cases[1].args.Q_hpr_target = 200.0
+
+    def objective(x, args, debug=False):
+        served = 100.0 if args.period_idx == 0 else 50.0
+        return _backend_result(
+            obj=100.0, utility_tot=1.0, period_idx=args.period_idx
+        ).with_updates(
+            Q_heat=np.array([served]),
+            feasibility_penalty=0.0 if args.period_idx == 0 else 10.0,
+        )
+
+    with pytest.raises(HPRTargetingError) as raised:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective, x0_ls=None, bnds=[(0.0, 1.0)], args=mp_args
+        )
+
+    summaries = [
+        failure.summary for failure in raised.value.diagnostics.representative_failures
+    ]
+    assert any("serves 50 of the 200 kW" in summary for summary in summaries)
+
+
+def test_a_shared_design_reports_its_alternatives(monkeypatch):
+    from functools import partial
+
+    import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
+
+    from .test_hpr_alternatives import _objective, _optimiser
+
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        partial(adapter.run_hpr_candidate_search, optimiser=_optimiser),
+    )
+
+    result = hp_execution.solve_hpr_multiperiod_placement(
+        f_obj=_objective,
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=_vapour_period_args(weights=(1.0, 1.0)),
+    )
+
+    assert result.obj == pytest.approx(100.0)
+    assert [a.objective for a in result.alternatives] == pytest.approx([102.0, 103.0])

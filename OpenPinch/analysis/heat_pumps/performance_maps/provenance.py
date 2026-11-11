@@ -60,6 +60,9 @@ def build_hpr_map_provenance(
             "internal_hx_gas_temperature_change": (
                 basis.internal_hx_gas_temperature_change
             ),
+            "internal_hx_approach_temperature": (
+                basis.internal_hx_approach_temperature
+            ),
         },
         "characteristic_set_id": metadata.characteristic_set_id,
         "design_converged": metadata.design_converged,

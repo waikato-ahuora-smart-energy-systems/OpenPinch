@@ -11,7 +11,8 @@ Imported by `service.py`:
 - `period_case_by_id`, `period_id_for_index` (`preparation.py`): look up a prepared case by id, or a period id from an index.
 
 Internal to the directory:
-- `solve_hpr_multiperiod_placement` (`execution.py`): search one shared vector across all period cases and return the first successful candidate as a translated result, or raise an HPR targeting error.
+- `solve_hpr_multiperiod_placement` (`execution.py`): search one shared vector across all period cases and return the first successful candidate, with its alternatives, as a translated result, or raise an HPR targeting error.
+- `reject_penalised_periods` (`execution.py`): reject a shared design still penalised in any period, each period checked on its own result and inputs.
 - `evaluate_multiperiod_candidate`, `selected_period_case` (`aggregation.py`): evaluate one design vector in every period and aggregate; resolve the selected period case.
 - `get_multiperiod_hpr_optimisation_setup` (`setup.py`): return starting points, bounds, the period objective and, for vapour compression cycles, the stage lifts for a cycle type.
 - `_PreparedHPRPeriodCase` (`state.py`): slotted dataclass holding period id, index, weight, solver case, base target and optimiser problem table.
@@ -25,6 +26,7 @@ Internal to the directory:
 - For vapour compression cycles the setup also returns the stage lifts (`x, args -> lifts`). Each candidate is first decoded in every period without a floor; each stage's design lift is its largest lift in any period, and every period then decodes with `stage_lift_floor = HPR_TURNDOWN x design lift`, its condensers raised where a stage lifts less. There is no separate turndown penalty: the higher condensing temperature and worse COP are the cost. The floor is set on each period's `args` per candidate. [aggregation.py:_set_stage_lift_floors] [setup.py:get_multiperiod_hpr_optimisation_setup]
 - The selected period is resolved by id first, then by index; absence raises `ValueError` [aggregation.py:selected_period_case].
 - Candidates are tried in ranked order and the loop stops at the first zero-useful-duty candidate [execution.py:solve_hpr_multiperiod_placement].
+- A shared design is rejected when any period's own feasibility penalty exceeds `PENALTY_TOLERANCE` of that period's objective, however light its weight; the failure reports that period's served and targeted duty. Alternatives are re-evaluated across every period and checked the same way. [execution.py:reject_penalised_periods] [execution.py:solve_hpr_multiperiod_placement]
 - The TESPy backend is rejected for multiperiod inputs by `preflight_tespy_hpr_targeting` [execution.py:get_multiperiod_hpr_targets, ../performance_maps/targeting.py:preflight_tespy_hpr_targeting].
 - Brayton raises `NotImplementedError`; vapour compression with MVR is heat-pump-only [setup.py:get_multiperiod_hpr_optimisation_setup].
 - Parallel cycle types force `n_cond == n_evap` on every period case [setup.py:get_multiperiod_hpr_optimisation_setup].

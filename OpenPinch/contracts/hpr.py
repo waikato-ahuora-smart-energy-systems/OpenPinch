@@ -196,6 +196,8 @@ class HprTargetSimulationRecord(BaseModel):
     superheat: float = Field(ge=0.0)
     subcooling: float = Field(ge=0.0)
     internal_hx_gas_temperature_change: float = Field(ge=0.0)
+    # The IHX hot-end approach: the gas leaves at least this below the liquid.
+    internal_hx_approach_temperature: float = Field(default=0.0, ge=0.0)
     evaporator_count: int = Field(ge=1)
     condenser_count: int = Field(ge=1)
     period_id: str | None = None

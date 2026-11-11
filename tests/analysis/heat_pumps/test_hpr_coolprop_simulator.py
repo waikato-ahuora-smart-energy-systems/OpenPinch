@@ -225,3 +225,38 @@ def test_solved_cycle_with_invalid_result_is_nonconverged(
 
     assert raised.value.code == "non_converged"
     simulator.close()
+
+
+def test_a_map_point_keeps_the_internal_heat_exchanger_approach():
+    # At this point's lift a 40 K gas-side rise does not fit: the gas may leave
+    # the IHX at most 5 K below the liquid entering it, not at its temperature.
+    context = build_hpr_map_generation_context(
+        _basis(
+            internal_hx_gas_temperature_change=40.0,
+            internal_hx_approach_temperature=5.0,
+        ),
+        _request(
+            source_temperatures=[8.0], sink_temperatures=[36.0], load_fractions=[1.0]
+        ),
+    )
+    point = next(iter_hpr_operating_points(context))
+    simulator = CoolPropHprPointSimulator()
+    simulator.prepare(context)
+
+    result = simulator.simulate(point)
+    simulator.close()
+
+    expected = VapourCompressionCycle()
+    expected.solve(
+        T_evap=point.evaporating_temperature,
+        T_cond=point.condensing_temperature,
+        dtcont=3.0,
+        dT_superheat=context.basis.superheat,
+        dT_subcool=context.basis.subcooling,
+        eta_comp=context.basis.compressor_isentropic_efficiency,
+        refrigerant="R134a",
+        dT_ihx_gas_side=40.0,
+        dt_ihx=5.0,
+        Q_heat=point.requested_useful_duty * 1_000.0,
+    )
+    assert result.compressor_power == pytest.approx(expected.work / 1_000.0, rel=1e-10)

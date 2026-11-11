@@ -9,7 +9,7 @@ import numpy as np
 from ....contracts.hpr import HeatPumpTargetInputs, HPRActiveStage, HPREffectiveTopology
 from ..optimisation_adapter import NEGLIGIBLE_STAGE_WORK_FRACTION
 
-__all__ = ["effective_topology"]
+__all__ = ["effective_topology", "topology_from_stages"]
 
 
 def effective_topology(model: Any, args: HeatPumpTargetInputs) -> HPREffectiveTopology:
@@ -21,7 +21,17 @@ def effective_topology(model: Any, args: HeatPumpTargetInputs) -> HPREffectiveTo
     model's order: hottest first for a cascade, then MVR stages after the
     vapour compression stages of a VC+MVR cascade.
     """
-    stages = _stages(model)
+    return topology_from_stages(_stages(model), args)
+
+
+def topology_from_stages(
+    stages: list[HPRActiveStage], args: HeatPumpTargetInputs
+) -> HPREffectiveTopology:
+    """Return the requested layout and which of the configured ``stages`` work.
+
+    The same rule as :func:`effective_topology`, for a design described by
+    its stages rather than a solved model (a TESPy target).
+    """
     total_work = sum(abs(stage.work) for stage in stages)
     min_lift = float(getattr(args, "min_stage_lift", 0.0) or 0.0)
     active = tuple(

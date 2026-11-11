@@ -14,6 +14,7 @@ from ....contracts.hpr import (
     MultiPeriodHPRTargetInputs,
 )
 from ..optimisation_adapter import (
+    _alternative_designs,
     _is_no_beneficial_heat_pump,
     evaluate_hpr_candidate,
     normalise_initial_points,
@@ -114,15 +115,24 @@ def solve_hpr_multiperiod_placement(
     selected_case = selected_period_case(args)
     failures: list[tuple[int, HPRBackendResult]] = []
     for candidate in candidates:
-        result = reject_penalised_design(
+        result = reject_penalised_periods(
             evaluate_hpr_candidate(
                 objective=objective,
                 point=candidate.point,
                 args=args,
             ),
-            selected_case.args,
+            args,
         )
         if result.success and np.isfinite(float(result.obj)):
+            result = result.with_updates(
+                alternatives=_alternative_designs(
+                    objective,
+                    args,
+                    result,
+                    getattr(candidates, "designs", ()),
+                    reject=reject_penalised_periods,
+                )
+            )
             return translate_hpr_result(result, ambient_args=selected_case.args)
         failures.append((len(failures), result))
         if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
@@ -148,4 +158,31 @@ def solve_hpr_multiperiod_placement(
     )
 
 
-__all__ = ["get_multiperiod_hpr_targets", "solve_hpr_multiperiod_placement"]
+def reject_penalised_periods(
+    result: HPRBackendResult,
+    args: MultiPeriodHPRTargetInputs,
+) -> HPRBackendResult:
+    """Return a failure for a shared design still penalised in any period.
+
+    Each period is judged on its own result and inputs, so a penalty in a
+    lightly weighted period is not diluted by the others, and the failure
+    reports that period's own duties.
+    """
+    if not result.success:
+        return result
+    outputs = result.period_outputs or {}
+    for case in args.period_cases:
+        period = outputs.get(str(case.period_id))
+        if period is None:
+            continue
+        checked = reject_penalised_design(period, case.args)
+        if not checked.success:
+            return checked
+    return result
+
+
+__all__ = [
+    "get_multiperiod_hpr_targets",
+    "reject_penalised_periods",
+    "solve_hpr_multiperiod_placement",
+]

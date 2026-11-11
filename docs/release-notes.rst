@@ -42,12 +42,18 @@ Heat pumps and refrigeration
   heat exchanger. The search varies it as for CoolProp, held to the
   ``HPR_DT_IHX`` approach; with no gas-side rise the network has none. TESPy
   design points match the CoolProp cycle's COP to 1e-4 with and without it.
+- Performance maps keep the target's ``HPR_DT_IHX`` approach at every point.
+  Target simulation records carry it as ``internal_hx_approach_temperature``.
+  At points with less lift than the target, the CoolProp map simulator ran
+  the internal heat exchanger with no approach, and the TESPy one could set
+  a suction gas hotter than the liquid heating it. Both overstated its duty.
 - Shared multiperiod designs now keep a minimum lift. Each
   vapour-compression stage lifts at least ``HPR_TURNDOWN`` (new, default
   0.25) of its design lift, its largest lift in any period, in every period.
   A period that needs less lift runs at the floor, condensing higher at a
   worse COP, as a fixed machine at part load would. There is no separate
-  turndown penalty.
+  turndown penalty. A cascade stage's lift includes the cascade exchanger
+  approach it lifts across.
 - Search and reporting.
 
   - Each warm start now seeds one restart; the other restarts start from
@@ -58,11 +64,12 @@ Heat pumps and refrigeration
     requested layout and the stages the design uses, with their fluids,
     temperatures, pressure ratios, work and duties, and a one-line label such
     as "... 3x2 requested; 1 of 4 stages used". A shared multiperiod design
-    counts a stage that works in any period.
+    counts a stage that works in any period. TESPy targets report theirs
+    too, so their alternatives are reported as well.
   - ``hpr_details.alternatives`` lists up to three distinct designs (other
     working stages or fluids) within 5% of the target's objective, with
     their topology and objective gap. Very different machines can cost
-    nearly the same.
+    nearly the same. Shared multiperiod targets report them too.
   - ``hpr_summary`` includes the topology label and the alternatives.
 
 - Penalised designs, wrong-side heat and the utility capital credit.
@@ -70,7 +77,9 @@ Heat pumps and refrigeration
   - A final vapour-compression heat pump design that still carries a
     feasibility penalty is no longer a target. The next candidate is tried,
     as refrigeration designs already were. Shared multiperiod designs, heat
-    pump or refrigeration, are now checked the same way.
+    pump or refrigeration, are now checked the same way, period by period:
+    a penalty in a lightly weighted period still rejects the design, and the
+    failure reports that period's served and targeted heating.
   - Heat a vapour-compression heat pump's condensers reject to ambient air is
     penalised as heat the process could not use. It was free, so a heat
     pump could deliver heat where no process needed it. Refrigerators still
@@ -92,7 +101,9 @@ Heat pumps and refrigeration
   limit. The warm start is still seeded subcritical, and TESPy targets stay
   subcritical. A stage with no subcooling now reports exactly zero, where
   round-off could give a tiny negative value that failed the simulation
-  record.
+  record. A compressor efficiency correlation (``HPR_COMPRESSOR_MODEL``) is
+  given the critical point as a transcritical stage's discharge dew point,
+  where it used to fail the candidate.
 - Vapour-compression stages are now held to practical limits.
 
   - Liquid injection: condensate is injected into the compressor discharge

@@ -186,11 +186,8 @@ def test_each_topology_reads_its_stage_lifts_from_the_plain_decode():
         T_hot=np.array([120.0, 70.0, 20.0]),
     )
     x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.3)
-    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
-    levels = np.concatenate([state.T_cond, state.T_evap])
-
     np.testing.assert_allclose(
-        hp_cascade._cascade_stage_lifts(x, args), levels[:-1] - levels[1:]
+        hp_cascade._cascade_stage_lifts(x, args), _physical_lifts(x, args)
     )
 
     args = _args()
@@ -242,3 +239,45 @@ def test_the_shared_search_applies_the_stage_lift_floor(monkeypatch):
         )
 
     assert floors_seen[0] == [10.0]
+
+
+def _cascade_with_exchangers():
+    # Two condensing and two evaporating levels, with 5 K cascade exchangers:
+    # the top stage evaporates 5 K below the second condensing level and the
+    # bottom stage condenses 5 K above the first evaporating level.
+    args = _base_args(
+        n_cond=2,
+        n_evap=2,
+        dt_cascade_hx=5.0,
+        refrigerant_ls=["Ammonia"] * 3,
+        T_cold=np.array([130.0, 80.0, 30.0]),
+        T_hot=np.array([120.0, 70.0, 20.0]),
+    )
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.3)
+    return args, x
+
+
+def _physical_lifts(x, args):
+    stages = hp_cascade._cascade_stage_preflight_state(
+        hp_cascade._parse_cascade_hp_state_variables(x, args), args
+    )
+    return np.sort(stages.T_cond)[::-1] - np.sort(stages.T_evap)[::-1]
+
+
+def test_cascade_stage_lifts_include_the_cascade_exchanger_approach():
+    args, x = _cascade_with_exchangers()
+
+    np.testing.assert_allclose(
+        hp_cascade._cascade_stage_lifts(x, args), _physical_lifts(x, args)
+    )
+
+
+def test_a_cascade_stage_floor_holds_its_physical_lift():
+    args, x = _cascade_with_exchangers()
+    plain = _physical_lifts(x, args)
+    args.stage_lift_floor = plain + np.array([5.0, 0.0, 0.0])
+
+    floored = _physical_lifts(x, args)
+
+    assert floored[0] == pytest.approx(plain[0] + 5.0)
+    np.testing.assert_allclose(floored[1:], plain[1:])
