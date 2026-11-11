@@ -688,6 +688,11 @@ class _TargetAccessor:
     ):
         """Run ``surface`` once per fluid set the screened refrigerants propose."""
         arguments = {k: v for k, v in arguments.items() if k != "self"}
+        if arguments.get("mvr_fluids") is not None:
+            raise ValueError(
+                "mvr_fluids names the vapour compression fluids, which the "
+                "screened fluid sets choose; drop mvr_fluids."
+            )
         plan = plan_fluid_set_runs(
             arguments.pop("refrigerants"),
             methods=methods,

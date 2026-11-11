@@ -60,7 +60,8 @@ Heat pumps and refrigeration
   and ``best``, the successful run with the lowest total annualized cost. A
   refrigerant list, or one fluid set from ``fluid_sets()``, still returns the
   target. ``mvr_heat_pump`` now takes ``refrigerants`` for its vapour
-  compression stages.
+  compression stages, and refuses ``mvr_fluids`` alongside a screen, since
+  the fluid sets choose those fluids.
 
 0.8.3 (2026-11-11)
 ------------------

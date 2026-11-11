@@ -379,3 +379,12 @@ def test_no_successful_run_leaves_the_problem_as_it_was(monkeypatch):
     problem.target.vapour_compression_heat_pump(refrigerants=_screen(SINGLE_HOT))
 
     assert problem.results is None
+
+
+def test_mvr_fluids_cannot_replace_the_screened_fluid_sets(calls):
+    with pytest.raises(ValueError, match="mvr_fluids"):
+        PinchProblem().target.mvr_heat_pump(
+            refrigerants=_screen(), mvr_fluids=["Ammonia"]
+        )
+
+    assert calls == []
