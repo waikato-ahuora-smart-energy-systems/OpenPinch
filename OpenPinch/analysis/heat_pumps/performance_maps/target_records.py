@@ -137,7 +137,6 @@ def _build_coolprop_loops(
     if topology is HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR:
         n_vc = max(int(args.n_cond), int(args.n_evap))
     refrigerants = [str(value) for value in args.refrigerant_ls]
-    mvr_fluids = [str(value) for value in getattr(args, "mvr_fluid_ls", [])]
     eta_comp = (
         _broadcast_vector(
             _required_vector(cycle, "eta_comp"), Q_heat.size, name="eta_comp"
@@ -151,9 +150,7 @@ def _build_coolprop_loops(
             topology is HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR and ordinal >= n_vc
         )
         role = "mvr" if is_mvr else "vapour_compression"
-        fluid_index = ordinal - n_vc if is_mvr else ordinal
-        fluids = mvr_fluids if is_mvr else refrigerants
-        fluid = fluids[min(fluid_index, len(fluids) - 1)]
+        fluid = "Water" if is_mvr else refrigerants[min(ordinal, len(refrigerants) - 1)]
         duty = float(Q_heat[ordinal] if args.is_heat_pumping else Q_cool[ordinal])
         stage = HPRSimulationStageRecord(
             stage_id=f"{role}-{ordinal}",

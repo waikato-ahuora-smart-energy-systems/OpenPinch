@@ -553,8 +553,12 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         ),
     ),
     "HPR_MVR_FLUIDS": FieldText(
-        "MVR fluids", None,
-        "Working fluids of the MVR stages in vapour compression with MVR cycles.",
+        "MVR cascade fluids", None,
+        (
+            "Fluids of the vapour compression stages in vapour compression with "
+            "MVR cycles, one per stage; empty uses HPR_REFRIGERANTS. Water is "
+            "not allowed: the MVR stages always run on water."
+        ),
     ),
     "HPR_MVR_COUNT": FieldText(
         "MVR stage count", None,

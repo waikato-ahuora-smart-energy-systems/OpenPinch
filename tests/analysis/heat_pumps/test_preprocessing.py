@@ -151,7 +151,7 @@ def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
             "HPR_ETA_PENALTY": 0.123,
             "HPR_RHO_PENALTY": 4.5,
             "HPR_REFRIGERANTS": ["water", "r134a"],
-            "HPR_MVR_FLUIDS": ["Water", "R245FA"],
+            "HPR_MVR_FLUIDS": ["ammonia", "R245FA"],
             "HPR_HE_ETA_II_CARNOT": 0.42,
             "HPR_INTEGRATED_EXPANDER_ENABLED": True,
         }
@@ -168,7 +168,7 @@ def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
     assert args.eta_penalty == pytest.approx(0.123)
     assert args.rho_penalty == pytest.approx(4.5)
     assert args.refrigerant_ls == ["WATER", "R134A"]
-    assert args.mvr_fluid_ls == ["Water", "R245FA"]
+    assert args.mvr_fluid_ls == ["AMMONIA", "R245FA"]
     assert args.eta_ii_he_carnot == pytest.approx(0.42)
     assert args.ambient_air_enabled is True
 

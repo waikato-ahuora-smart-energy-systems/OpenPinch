@@ -51,7 +51,7 @@ def _input_args(**overrides) -> HeatPumpTargetInputs:
     data.setdefault("n_mvr", 1)
     data.setdefault("eta_mvr_comp", 0.7)
     data.setdefault("eta_mvr_motor", 0.95)
-    data.setdefault("mvr_fluid_ls", ["Water"])
+    data.setdefault("mvr_fluid_ls", [])
     return HeatPumpTargetInputs.model_validate(data)
 
 
@@ -1046,3 +1046,50 @@ def test_shared_design_is_given_the_weight_of_periods_without_load(monkeypatch):
 
     # p2 has no HPR load, so it has no case, but its weight still counts.
     assert seen["idle_period_weight"] == pytest.approx(4.0)
+
+
+def _vc_mvr_period_cases(**overrides) -> list[HPRPeriodCase]:
+    return [
+        HPRPeriodCase(
+            period_id=f"p{idx}",
+            period_idx=idx,
+            weight=1.0,
+            args=_input_args(
+                hpr_type=HeatPumpAndRefrigerationCycle.VapourCompMVR.value,
+                n_cond=2,
+                n_evap=2,
+                period_idx=idx,
+                **overrides,
+            ),
+        )
+        for idx in range(2)
+    ]
+
+
+def test_multiperiod_vc_mvr_preflights_the_mvr_fluids_not_the_unused_refrigerants(
+    monkeypatch,
+):
+    cases = _vc_mvr_period_cases(
+        refrigerant_ls=["not-a-fluid"], mvr_fluid_ls=["AMMONIA"]
+    )
+    monkeypatch.setattr(
+        hp_setup, "preflight_coolprop_hpr_targeting", lambda **_kwargs: None
+    )
+
+    hp_setup.get_multiperiod_hpr_optimisation_setup(cases, selected_case=cases[0])
+
+    assert [case.args.refrigerant_ls for case in cases] == [["AMMONIA"] * 2] * 2
+
+
+def test_multiperiod_vc_mvr_rejects_an_invalid_mvr_fluid_before_the_seed(
+    monkeypatch,
+):
+    cases = _vc_mvr_period_cases(mvr_fluid_ls=["not-a-fluid"])
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("the Carnot seed ran before the fluid preflight")
+
+    monkeypatch.setattr(hp_setup, "initialise_hpr_seed", forbidden)
+
+    with pytest.raises(HPRTargetingError):
+        hp_setup.get_multiperiod_hpr_optimisation_setup(cases, selected_case=cases[0])

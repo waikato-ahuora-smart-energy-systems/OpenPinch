@@ -65,7 +65,9 @@ search controls through ``maximum_restarts``, ``maximum_iterations``, and
 ``maximum_evaluations``. Vapour-compression methods additionally accept
 explicit backend and refrigerant selections. The Carnot, vapour-compression, and
 ``mvr_heat_pump`` methods accept explicit condenser and evaporator selections;
-``mvr_heat_pump`` accepts explicit MVR fluids and stage count. A successful
+``mvr_heat_pump`` accepts the fluids of its vapour compression stages
+(``mvr_fluids``, never water, as the MVR stages always run on water) and the
+MVR stage count. A successful
 target exposes ``hpr_success``, ``hpr_load`` where scalar load evidence exists,
 and detached ``hpr_details``.
 

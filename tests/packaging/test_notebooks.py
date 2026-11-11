@@ -527,7 +527,7 @@ def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
     source = _combined_source(notebook)
 
     assert "mvr_stages=1" in source
-    assert 'mvr_fluids=["Water"]' in source
+    assert "mvr_fluids" not in source
     assert "maximum_restarts=1" in source
     assert "maximum_iterations=3" in source
     assert "maximum_evaluations=50" in source
