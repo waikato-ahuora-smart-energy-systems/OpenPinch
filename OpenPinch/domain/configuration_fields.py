@@ -363,17 +363,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HPR_COOLING_WATER_DT_MIN": _spec(float, 5.0, "costing", "hpr_cooling_water_dt_min", numeric_min=0.0),
     "COSTING_HPR_REFRIGERATION_ETA_II": _spec(float, 0.4, "costing", "hpr_refrigeration_eta_ii", numeric_min=0.0, positive=True),
     "COSTING_HPR_REFRIGERATION_DT": _spec(float, 5.0, "costing", "hpr_refrigeration_dt", numeric_min=0.0),
-    # Installed HPR capital: C = F_inst * C_eq * (Q_cap / 1 MW)^exp
-    #   * (fixed_share + stage_share * n_stages) * f_T,
-    # f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K.
-    # C_eq is fitted to the IEA HPT Project 68 cost data (2025 USD).
-    "COSTING_HPR_EQUIPMENT_COST": _spec(float, 485000.0, "costing", "hpr_equipment_cost", numeric_min=0.0),
-    "COSTING_HPR_INSTALLATION_FACTOR": _spec(float, 2.3, "costing", "hpr_installation_factor", numeric_min=0.0),
-    "COSTING_HPR_COST_EXP": _spec(float, 0.7, "costing", "hpr_cost_exp", numeric_min=0.0),
-    "COSTING_HPR_COST_FIXED_SHARE": _spec(float, 0.7, "costing", "hpr_cost_fixed_share", numeric_min=0.0),
-    "COSTING_HPR_COST_STAGE_SHARE": _spec(float, 0.3, "costing", "hpr_cost_stage_share", numeric_min=0.0),
-    "COSTING_HPR_COST_TEMP_FACTOR": _spec(float, 0.4, "costing", "hpr_cost_temp_factor", numeric_min=0.0),
-    "COSTING_HPR_COST_TEMP_BASE": _spec(float, 75.0, "costing", "hpr_cost_temp_base"),
+    # Installed HPR capital is priced from its components (Ommen et al. 2015,
+    # scaled to the IEA HPT Annex 68 level); see heat_pumps/common/capital.py.
     "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "hpr_capital_recovery_enabled"),
     # Installed capital of the default utilities the heat pump displaces, per
     # kW of capacity, annualised with the same capital recovery factor.
@@ -424,6 +415,10 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": _spec(bool, False, "hpr", "multiperiod_optimization_enabled"),
     "HPR_ENFORCE_HEATING_DUTY": _spec(bool, False, "hpr", "enforce_heating_duty"),
     "HPR_TURNDOWN": _spec(float, 0.25, "hpr", "turndown", numeric_min=0.0, numeric_max=1.0),
+    "HPR_U_TWO_PHASE": _spec(float, 2000.0, "hpr", "u_two_phase", numeric_min=0.0, positive=True),
+    "HPR_U_LIQUID": _spec(float, 1000.0, "hpr", "u_liquid", numeric_min=0.0, positive=True),
+    "HPR_U_GAS": _spec(float, 400.0, "hpr", "u_gas", numeric_min=0.0, positive=True),
+    "HPR_U_AIR": _spec(float, 50.0, "hpr", "u_air", numeric_min=0.0, positive=True),
     "HPR_REFRIGERANTS": _spec(List[str], ["water", "ammonia"], "hpr", "refrigerants"),
     "HPR_REFRIGERANT_SORT_ENABLED": _spec(bool, True, "hpr", "refrigerant_sort_enabled"),
     "HPR_MVR_FLUIDS": _spec(List[str], [], "hpr", "mvr_fluids", validator=_mvr_cascade_fluids),

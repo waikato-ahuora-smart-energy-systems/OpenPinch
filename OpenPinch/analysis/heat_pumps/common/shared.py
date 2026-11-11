@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Any
 
 import CoolProp.CoolProp as _coolprop
@@ -29,9 +28,6 @@ from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..cycles.limits import CycleLimits
-from ..optimisation_adapter import (
-    NEGLIGIBLE_STAGE_WORK_FRACTION,
-)
 from ..optimisation_adapter import (
     build_hpr_accounting as _build_hpr_accounting,
 )
@@ -59,12 +55,11 @@ from ._shared.air import (
 from ._shared.air import (
     utility_bands as _utility_bands,
 )
+from .capital import installed_capital
+from .machine_capital import machine_components, process_side_areas
 
 __all__ = [
-    "HPRCostUnit",
     "SUBCRITICAL_CONDENSING_MARGIN_K",
-    "calc_hpr_capital_cost",
-    "calc_hpr_machine_capital_costs",
     "NEGLIGIBLE_USEFUL_DUTY_FRACTION",
     "cap_stage_condensing_temperatures",
     "subcritical_stage_condensing_temperatures",
@@ -157,118 +152,13 @@ def hpr_penalty_cost_scale(args: HeatPumpTargetInputs) -> float:
     return max(total, 1.0)
 
 
-@dataclass(frozen=True)
-class HPRCostUnit:
-    """One heat-pump machine for capital costing.
-
-    ``Q_cap`` is its heating-side capacity in kW: all the heat it rejects
-    outside itself (condensing, desuperheating and subcooling), whether to
-    the process or to air. ``T_hot_max`` is the highest temperature at which
-    it delivers heat, in degC. ``n_closed`` and ``n_mvr`` count its closed
-    refrigerant and open MVR compression stages.
-    """
-
-    Q_cap: float
-    T_hot_max: float
-    n_closed: int = 1
-    n_mvr: int = 0
-
-
-def calc_hpr_capital_cost(
-    units: Sequence[HPRCostUnit],
-    args: HeatPumpTargetInputs,
-) -> Value:
-    """Return the installed capital cost of the heat-pump machines.
-
-    This is the sum of :func:`calc_hpr_machine_capital_costs`.
-    """
-    return Value(sum(calc_hpr_machine_capital_costs(units, args)), "$")
-
-
-def calc_hpr_machine_capital_costs(
-    units: Sequence[HPRCostUnit],
-    args: HeatPumpTargetInputs,
-) -> tuple[float, ...]:
-    """Return the installed capital cost of each heat-pump machine, in $.
-
-    Each machine costs::
-
-        F_inst * C_eq * (Q_cap / 1 MW)^exp
-            * (fixed_share + stage_share * (n_closed + n_mvr)) * f_T
-
-    with ``f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K``.
-    The machines are costed separately, and a machine with no capacity costs
-    nothing.
-    """
-    costs = []
-    for unit in units:
-        Q_mw = max(float(unit.Q_cap), 0.0) / 1000.0
-        if Q_mw <= 0.0:
-            costs.append(0.0)
-            continue
-        stage_factor = float(args.hpr_cost_fixed_share) + float(
-            args.hpr_cost_stage_share
-        ) * (int(unit.n_closed) + int(unit.n_mvr))
-        f_T = (
-            1.0
-            + float(args.hpr_cost_temp_factor)
-            * max(0.0, float(unit.T_hot_max) - float(args.hpr_cost_temp_base))
-            / 100.0
-        )
-        costs.append(
-            float(args.hpr_installation_factor)
-            * float(args.hpr_equipment_cost)
-            * Q_mw ** float(args.hpr_cost_exp)
-            * stage_factor
-            * f_T
-        )
-    return tuple(costs)
-
-
-def _single_cost_unit(
-    state: HPRParsedState,
-    hpr_streams: StreamCollection,
-    work_arr: np.ndarray | None,
-    args: HeatPumpTargetInputs,
-) -> list[HPRCostUnit]:
-    """Treat all the stages as one machine (a cascade).
-
-    Each closed stage has its own compressor, so the stage count comes from
-    the solved stage works: a cascade with ``n_cond`` condenser and
-    ``n_evap`` evaporator levels has ``n_cond + n_evap - 1`` stages, more
-    than its ``n_cond`` condensing temperatures. A stage whose work is at
-    most ``NEGLIGIBLE_STAGE_WORK_FRACTION`` of the machine's work (merged
-    levels, or no duty) has no compressor and is not charged.
-    """
-    hot = hpr_streams.get_hot_utility_streams()
-    Q_cap = (
-        max(float(hot.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
-        if len(hot)
-        else 0.0
-    )
-    T_cond = np.asarray(state.T_cond, dtype=float).ravel()
-    works = np.abs(np.asarray(work_arr if work_arr is not None else [], dtype=float))
-    n_stages = (
-        int(np.count_nonzero(works > NEGLIGIBLE_STAGE_WORK_FRACTION * works.sum()))
-        if works.size
-        else T_cond.size
-    )
-    return [
-        HPRCostUnit(
-            Q_cap=Q_cap,
-            T_hot_max=float(T_cond.max()) if T_cond.size else 0.0,
-            n_closed=max(int(n_stages), 1),
-        )
-    ]
-
-
 def calc_simulated_hpr_annualized_costs(
     *,
     work: float,
     Q_ext_heat: float,
     Q_cooling_water: float,
     Q_refrigeration: float,
-    cost_units: Sequence[HPRCostUnit],
+    machine_capital: Sequence[float],
     penalty_weight: float,
     args: HeatPumpTargetInputs,
 ) -> SimulatedHPRAnnualizedCostAccounting:
@@ -293,7 +183,7 @@ def calc_simulated_hpr_annualized_costs(
         + compute_annual_energy_cost(Q_refrigeration, ref_price, annual_hours)
     ).to("$/y")
 
-    machine_capital = calc_hpr_machine_capital_costs(cost_units, args)
+    machine_capital = tuple(float(capital) for capital in machine_capital)
     machine_annualized_capital = tuple(
         float(
             compute_annual_capital_cost(
@@ -583,14 +473,15 @@ def evaluate_vapour_hpr_result(
     penalty_terms: list[float] | None = None,
     dT_subcool: np.ndarray | None = None,
     dT_superheat: np.ndarray | None = None,
-    cost_units: Sequence[HPRCostUnit] | None = None,
+    machines: Sequence[Sequence[Any]] | None = None,
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared simulated-vapour accounting, plotting, and result assembly.
 
-    ``cost_units`` lists the machines to cost; by default all the stages are
-    one machine.
+    ``machines`` lists each machine's solved stages for capital costing; by
+    default all the stages of ``model`` are one machine, and with no model
+    there is no machine to cost.
     """
     # Ambient air is a free utility in each cascade: it supplies heat below its
     # source temperature and takes heat above its sink temperature, only as
@@ -628,8 +519,19 @@ def evaluate_vapour_hpr_result(
     evap_wrong_side = evap.Q_ext_top
     Q_amb_hot = cond.Q_air_source + evap.Q_air_source
     Q_amb_cold = cond.Q_air_sink + evap.Q_air_sink
-    if cost_units is None:
-        cost_units = _single_cost_unit(state, hpr_streams, work_arr, args)
+    if machines is None:
+        machines = [] if model is None else [_model_stages(model)]
+    components = machine_components(
+        machines,
+        process_areas=process_side_areas(
+            hpr_streams,
+            args,
+            condensing_temperatures=np.atleast_1d(np.asarray(state.T_cond, float)),
+            air_duties=(cond.Q_air_sink, evap.Q_air_source),
+            wrong_side_duties=(cond_wrong_side, evap_wrong_side),
+        ),
+        args=args,
+    )
     all_penalty_terms = [
         *_normalise_hpr_penalty_terms(penalty_terms),
         cond_wrong_side,
@@ -661,7 +563,7 @@ def evaluate_vapour_hpr_result(
         Q_ext_heat=Q_ext_heat,
         Q_cooling_water=Q_cooling_water,
         Q_refrigeration=Q_refrigeration,
-        cost_units=cost_units,
+        machine_capital=[installed_capital(machine) for machine in components],
         penalty_weight=penalty_weight,
         args=args,
     )
@@ -731,6 +633,13 @@ def evaluate_vapour_hpr_result(
             else None
         ),
     )
+
+
+def _model_stages(model: Any) -> list[Any]:
+    """The solved stages of a cascade, parallel or VC+MVR model."""
+    if hasattr(model, "vc_cycles"):
+        return [*model.vc_cycles, *model.mvr_cycles]
+    return list(model._subcycles)
 
 
 def compute_entropic_mean_temperature(

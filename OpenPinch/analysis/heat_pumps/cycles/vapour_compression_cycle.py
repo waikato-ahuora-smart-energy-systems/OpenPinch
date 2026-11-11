@@ -335,6 +335,41 @@ class VapourCompressionCycle:
         return self._ihx_gas_dt
 
     @property
+    def suction_volume_flow(self) -> float:
+        """Compressor suction volume flow in m3/h (duties in kW, mass flow in kg/s)."""
+        self._require_solution()
+        # m_dot is duty (kW) over specific enthalpy (J/kg): kg/s / 1000.
+        return self._m_dot * 1000.0 / self._rho_suction * 3600.0
+
+    @property
+    def shaft_power(self) -> float:
+        """Compressor shaft power in kW: the electrical work less motor losses."""
+        self._require_solution()
+        return float(self._work) * self._eta_motor
+
+    @property
+    def ihx_duty(self) -> float:
+        """Heat the internal heat exchanger moves from liquid to gas, in kW."""
+        self._require_solution()
+        return self._m_dot * self._dh_ihx
+
+    @property
+    def ihx_liquid_outlet_temperature(self) -> float:
+        """Liquid temperature leaving the internal heat exchanger, in degC."""
+        self._require_solution()
+        return self._T_ihx_liquid_out - 273.15
+
+    @property
+    def ihx_lmtd(self) -> float:
+        """Counter-current log-mean temperature difference of the IHX, in K."""
+        self._require_solution()
+        hot_end = self._cycle_states[2]["T"] - self._T_ihx_gas_out
+        cold_end = self._T_ihx_liquid_out - self._T_ihx_gas_in
+        if abs(hot_end - cold_end) < 1e-9:
+            return float(hot_end)
+        return float((hot_end - cold_end) / np.log(hot_end / cold_end))
+
+    @property
     def liquid_injection_ratio(self) -> float:
         """Condensate injected into the discharge per kg compressed."""
         return self._injection_ratio
@@ -876,6 +911,16 @@ class VapourCompressionCycle:
             h=state2.hmass() - dh_ihx,
         )
         self._save_cycle_state(state3, 3)
+        # Kept for costing: the suction gas density and the IHX's ends.
+        self._rho_suction = float(state_ihx_out.rhomass())
+        self._dh_ihx = float(dh_ihx)
+        self._T_ihx_gas_in = float(state0.T())
+        self._T_ihx_gas_out = float(state_ihx_out.T())
+        self._T_ihx_liquid_out = float(
+            self._compute_state_from_pressure_enthalpy(
+                P=P_hi, h=state2.hmass() - dh_ihx
+            ).T()
+        )
 
         self._q_evap = state0.hmass() - state3.hmass()
         self._q_cond = state1.hmass() - state2.hmass()

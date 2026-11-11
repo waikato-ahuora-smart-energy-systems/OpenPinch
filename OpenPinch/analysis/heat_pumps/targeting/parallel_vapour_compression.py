@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from ....contracts.hpr import (
@@ -24,7 +26,6 @@ from ..common.encoding import (
 from ..common.layout import HPRoptVectorLayout, clip_to_bounds
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
-    HPRCostUnit,
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
     cycle_limits,
@@ -268,28 +269,15 @@ def _compute_parallel_hp_system_obj(
         build_record=build_coolprop_target_simulation_record,
         check_temperature_lift=True,
         result_state_fields=("dT_superheat",),
-        cost_units=_parallel_cost_units,
+        machines=_parallel_machines,
         debug=debug,
         artifact_mode=artifact_mode,
     )
 
 
-def _parallel_cost_units(
-    state_vars: HPRParsedState,
-    hp: ParallelVapourCompressionCycles,
-) -> list[HPRCostUnit]:
-    """Each parallel cycle is its own single-stage machine.
-
-    Its capacity is all the heat its condenser rejects, for a heat pump and a
-    refrigerator alike.
-    """
-    return [
-        HPRCostUnit(Q_cap=float(Q_cap), T_hot_max=float(T_cond))
-        for Q_cap, T_cond in zip(
-            np.asarray(hp.Q_cond_arr, dtype=float).ravel(),
-            np.asarray(state_vars.T_cond, dtype=float).ravel(),
-        )
-    ]
+def _parallel_machines(hp: ParallelVapourCompressionCycles) -> list[list[Any]]:
+    """Each parallel cycle is its own single-stage machine."""
+    return [[cycle] for cycle in hp._subcycles]
 
 
 def _parallel_topology_id(_args: HeatPumpTargetInputs) -> HPRTopologyIdentifier:

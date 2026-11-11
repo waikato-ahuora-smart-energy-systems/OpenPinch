@@ -14,6 +14,30 @@ Heat pumps and refrigeration
   suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
   Every heat pump and refrigeration target moves; set the three options to 0
   for the previous results.
+- Heat pump capital is now priced from each machine's components instead of
+  its heating duty. Installed capital is 4.16 times the purchased cost of the
+  compressors (on suction volume flow), motors (on shaft power) and plate heat
+  exchangers (on area), with the correlations of Ommen et al. (2015). It is
+  scaled so that Ommen's 1 MW ammonia example costs the IEA HPT Annex 68 level
+  the previous model used. Water vapour compressors (closed water stages and
+  MVR) are priced as turbo compressors anchored on Zuhlsdorf et al. (2018).
+
+  - Process exchangers are sized interval by interval against the closest
+    part of the sink or source each condenser or evaporator can reach. Heat
+    exchanged with ambient air goes through an air cooler or heater. Internal
+    and cascade exchangers are sized from their own approaches.
+  - New ``HPR_U_TWO_PHASE`` (2000 W/m²K), ``HPR_U_LIQUID`` (1000),
+    ``HPR_U_GAS`` (400) and ``HPR_U_AIR`` (50) set the heat transfer
+    coefficients.
+  - The ``COSTING_HPR_EQUIPMENT_COST``, ``COSTING_HPR_INSTALLATION_FACTOR``,
+    ``COSTING_HPR_COST_EXP``, ``COSTING_HPR_COST_FIXED_SHARE``,
+    ``COSTING_HPR_COST_STAGE_SHARE``, ``COSTING_HPR_COST_TEMP_FACTOR`` and
+    ``COSTING_HPR_COST_TEMP_BASE`` options are removed.
+  - Capital now grows with lift, low suction pressure and small approach
+    temperatures. Water below about 80 °C is far dearer than before: its
+    suction volume is large. Every heat pump target with capital recovery on
+    moves.
+
 - TESPy single-stage targets and performance maps now model an internal
   heat exchanger. The search varies it as for CoolProp, held to the
   ``HPR_DT_IHX`` approach; with no gas-side rise the network has none. TESPy

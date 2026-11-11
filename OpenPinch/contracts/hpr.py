@@ -282,13 +282,6 @@ class HeatPumpTargetInputs(BaseModel):
     annual_op_time: float
     discount_rate: float
     serv_life: float
-    hpr_equipment_cost: float
-    hpr_installation_factor: float
-    hpr_cost_exp: float
-    hpr_cost_fixed_share: float
-    hpr_cost_stage_share: float
-    hpr_cost_temp_factor: float
-    hpr_cost_temp_base: float
     hpr_capital_recovery: bool = True
     utility_capital_recovery: bool = True
     hot_utility_capital_cost: float = 0.0
@@ -320,6 +313,14 @@ class HeatPumpTargetInputs(BaseModel):
     # Shared multiperiod designs: each stage's lift in every period is at least
     # turndown x its design lift; the search sets stage_lift_floor (K).
     turndown: float = 0.0
+    # Capital costing: overall heat transfer coefficients (W/m2K) by the heat
+    # pump side's phase, the ambient air side's (in series with the heat pump
+    # side's), and the process streams' own approach (K).
+    u_two_phase: float = 2000.0
+    u_liquid: float = 1000.0
+    u_gas: float = 400.0
+    u_air: float = 50.0
+    process_dt_cont: float = 0.0
     stage_lift_floor: np.ndarray | None = None
     bb_minimiser: str
     eta_penalty: float

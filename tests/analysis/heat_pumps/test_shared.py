@@ -222,7 +222,7 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
         Q_ext_heat=8.0,
         Q_cooling_water=4.0,
         Q_refrigeration=2.0,
-        cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
+        machine_capital=[600_000.0, 400_000.0],
         penalty_weight=2.0,
         args=args,
     )
@@ -233,9 +233,10 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
     # 10 kW power + 8 kW heat at 0.5 + 4 kW cooling water at 0.025
     # + 2 kW refrigeration at 0.5, at $100/MWh for 1000 h.
     assert costs.hpr_operating_cost.value == pytest.approx(1510.0)
-    # 2.3 x $485k x (1 MW)^0.7 x (0.7 + 0.3) x (1 + 0.4 x 0.75)
+    # The machines' installed capital adds up.
     assert costs.hpr_capital_cost.unit == "$"
-    assert costs.hpr_capital_cost.value == pytest.approx(2.3 * 485000.0 * 1.3)
+    assert costs.hpr_capital_cost.value == pytest.approx(1_000_000.0)
+    assert costs.hpr_machine_capital_costs == (600_000.0, 400_000.0)
     assert costs.hpr_total_annualized_cost.unit == "$/y"
     assert costs.feasibility_penalty.unit == "$/y"
     # The weight prices at the no-heat-pump cost of Q_hpr_target: 200 kW of
@@ -263,7 +264,7 @@ def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery()
             Q_ext_heat=8.0,
             Q_cooling_water=0.0,
             Q_refrigeration=2.0,
-            cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
+            machine_capital=[1_000_000.0],
             penalty_weight=0.0,
             args=_base_args(**kwargs, **flags),
         )
@@ -286,30 +287,6 @@ def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery()
 
     no_utility = costs(utility_capital_recovery=False)
     assert no_utility.hpr_utility_annualized_capital_cost.value == 0.0
-
-
-def test_hpr_capital_cost_scales_with_size_stages_and_temperature():
-    args = _base_args()
-    unit = hp_shared.HPRCostUnit(Q_cap=2000.0, T_hot_max=200.0, n_closed=2, n_mvr=1)
-
-    cost = hp_shared.calc_hpr_capital_cost([unit], args)
-
-    expected = 2.3 * 485000.0 * 2.0**0.7 * (0.7 + 0.3 * 3) * (1.0 + 0.4 * 1.25)
-    assert cost.unit == "$"
-    assert cost.value == pytest.approx(expected)
-
-
-def test_hpr_capital_cost_sums_machines_and_ignores_idle_ones():
-    args = _base_args()
-    cool = hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=60.0)
-    idle = hp_shared.HPRCostUnit(Q_cap=0.0, T_hot_max=180.0)
-
-    one = hp_shared.calc_hpr_capital_cost([cool], args).value
-    both = hp_shared.calc_hpr_capital_cost([cool, cool, idle], args).value
-
-    # Below the 75 C base there is no temperature factor.
-    assert one == pytest.approx(2.3 * 485000.0)
-    assert both == pytest.approx(2.0 * one)
 
 
 def test_default_refrigeration_ratio_uses_carnot_cop_to_cooling_water():
@@ -393,35 +370,6 @@ def test_vapour_refrigeration_penalises_unserved_cooling():
     assert refrigeration.Q_ext_cold == pytest.approx(100.0)
     assert refrigeration.feasibility_penalty > 0.0
     assert heat_pump.feasibility_penalty == pytest.approx(0.0)
-
-
-def test_cascade_cost_unit_counts_every_solved_stage():
-    args = _base_args()
-    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
-    state = HPRParsedState(T_cond=np.array([110.0, 90.0]))
-
-    (unit,) = hp_shared._single_cost_unit(
-        state, streams, np.array([10.0, 8.0, 6.0]), args
-    )
-
-    # Two condenser levels and two evaporator levels: three stages.
-    assert unit.n_closed == 3
-    assert unit.Q_cap == pytest.approx(500.0)
-    assert unit.T_hot_max == pytest.approx(110.0)
-
-
-def test_cascade_cost_unit_does_not_charge_a_stage_that_does_no_work():
-    """A stage with no work (merged levels, no duty) has no compressor to buy,
-    so a 3x2 cascade can collapse onto a cheaper 2x1 or 1x1 design."""
-    args = _base_args()
-    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
-    state = HPRParsedState(T_cond=np.array([110.0, 90.0, 90.0]))
-
-    (unit,) = hp_shared._single_cost_unit(
-        state, streams, np.array([10.0, 0.0, 6.0, 0.0]), args
-    )
-
-    assert unit.n_closed == 2
 
 
 def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():

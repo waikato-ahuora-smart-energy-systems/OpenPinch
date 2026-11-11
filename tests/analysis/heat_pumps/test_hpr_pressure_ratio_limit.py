@@ -72,9 +72,13 @@ def _ahmad_utility_refrigeration(*, limit: float | None = None):
     path = Path(__file__).parents[3] / "examples/stream_data/p_Ahmad (example 3).json"
     problem = PinchProblem(json.loads(path.read_text()))
     problem.target.direct_heat_integration()
-    # Water evaporates far below its 0.5 bar suction floor here, so the floor
-    # is off: these tests isolate the pressure ratio limit.
-    options = {"HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0}
+    # Water evaporates far below its 0.5 bar suction floor here, where its
+    # compressors would be vast and dear, so the floor and capital are off:
+    # these tests isolate the pressure ratio limit.
+    options = {
+        "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
+        "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
+    }
     if limit is not None:
         options["HPR_MAX_PRESSURE_RATIO"] = limit
     return problem.target.vapour_compression_refrigeration(

@@ -43,7 +43,7 @@ def _evaluate_multi_vc_objective(
     build_record: Callable[..., Any],
     check_temperature_lift: bool = False,
     result_state_fields: Sequence[str] = (),
-    cost_units: Callable[[HPRParsedState, Any], Any] | None = None,
+    machines: Callable[[Any], Any] | None = None,
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
@@ -54,8 +54,9 @@ def _evaluate_multi_vc_objective(
     unsolved-cycle failure reason.  ``result_state_fields`` lists extra parsed
     state attributes forwarded to ``evaluate_result`` by name.
     ``check_temperature_lift`` rejects candidates with a negative lift across
-    any stage before the cycle is solved. ``cost_units(state, hp)`` lists the
-    machines to cost; by default all the stages are one machine.
+    any stage before the cycle is solved. ``machines(hp)`` lists each
+    machine's stages for capital costing; by default all the stages are one
+    machine.
     """
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
     state_vars = parse_state(x, args)
@@ -117,7 +118,7 @@ def _evaluate_multi_vc_objective(
             model=hp,
             penalty_terms=[hp.penalty],
             dT_subcool=state_vars.dT_subcool,
-            cost_units=None if cost_units is None else cost_units(state_vars, hp),
+            machines=None if machines is None else machines(hp),
             debug=debug,
             artifact_mode=artifact_mode,
             **{name: getattr(state_vars, name) for name in result_state_fields},

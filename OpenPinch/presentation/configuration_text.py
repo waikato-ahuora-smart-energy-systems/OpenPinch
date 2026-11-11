@@ -273,43 +273,6 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "temperature."
         ),
     ),
-    "COSTING_HPR_EQUIPMENT_COST": FieldText(
-        "HPR equipment cost at 1 MW", "$",
-        (
-            "Equipment cost of a 1 MW single-stage heat pump, scaled by capacity, "
-            "stages and temperature in HPR capital costs."
-        ),
-    ),
-    "COSTING_HPR_INSTALLATION_FACTOR": FieldText(
-        "HPR installation factor", None,
-        "Multiplies the HPR equipment cost to give the installed capital cost.",
-    ),
-    "COSTING_HPR_COST_EXP": FieldText(
-        "HPR capacity cost exponent", None,
-        "Exponent on each machine's capacity (in MW) in HPR capital costs.",
-    ),
-    "COSTING_HPR_COST_FIXED_SHARE": FieldText(
-        "HPR cost fixed share", None,
-        "Share of HPR capital that does not depend on the number of stages.",
-    ),
-    "COSTING_HPR_COST_STAGE_SHARE": FieldText(
-        "HPR cost share per stage", None,
-        "Share of HPR capital added for each compression stage, including MVR stages.",
-    ),
-    "COSTING_HPR_COST_TEMP_FACTOR": FieldText(
-        "HPR cost temperature factor", None,
-        (
-            "Fractional capital increase per 100 K that the hottest delivery "
-            "temperature exceeds the cost base temperature."
-        ),
-    ),
-    "COSTING_HPR_COST_TEMP_BASE": FieldText(
-        "HPR cost base temperature", "degC",
-        (
-            "Delivery temperature above which HPR capital cost rises with the "
-            "temperature factor."
-        ),
-    ),
     "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": FieldText(
         "Annualise HPR capital", None,
         "Include the annualised heat pump capital in the HPR total annual cost.",
@@ -543,6 +506,34 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "heating duty regardless of economics, as a refrigerator must serve "
             "its cooling: heating it leaves unserved is penalised, and a final "
             "design still short of it is not a target."
+        ),
+    ),
+    "HPR_U_TWO_PHASE": FieldText(
+        "HPR two-phase heat transfer coefficient", "W/m2K",
+        (
+            "Overall heat transfer coefficient for heat pump exchanger sections "
+            "where the working fluid condenses or evaporates, and for cascade "
+            "exchangers, in capital costing."
+        ),
+    ),
+    "HPR_U_LIQUID": FieldText(
+        "HPR liquid heat transfer coefficient", "W/m2K",
+        "Overall heat transfer coefficient for subcooling sections in capital costing.",
+    ),
+    "HPR_U_GAS": FieldText(
+        "HPR gas heat transfer coefficient", "W/m2K",
+        (
+            "Overall heat transfer coefficient for desuperheating sections and "
+            "internal heat exchangers in capital costing."
+        ),
+    ),
+    "HPR_U_AIR": FieldText(
+        "HPR air-side heat transfer coefficient", "W/m2K",
+        (
+            "Air-side heat transfer coefficient of the air coolers and heaters "
+            "through which a heat pump rejects heat to, or draws heat from, "
+            "ambient air, in capital costing. It acts in series with the "
+            "working fluid side's coefficient."
         ),
     ),
     "HPR_TURNDOWN": FieldText(

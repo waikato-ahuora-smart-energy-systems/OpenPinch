@@ -11,7 +11,7 @@ expose piecewise condenser and evaporator streams for the cascade accounting
 in `../common`. `__init__.py` has only a docstring.
 
 ## Interface
-- `VapourCompressionCycle` (`vapour_compression_cycle.py`): six-state single-stage cycle with an internal heat exchanger (gas-side change defaults to 10 K, 0 disables it), heat-pump or refrigeration mode, cascade duty hand-off, and `build_stream_collection`.
+- `VapourCompressionCycle` (`vapour_compression_cycle.py`): six-state single-stage cycle with an internal heat exchanger (gas-side change defaults to 10 K, 0 disables it), heat-pump or refrigeration mode, cascade duty hand-off, and `build_stream_collection`; for capital costing it reports `suction_volume_flow` (m3/h), `shaft_power` (kW), `ihx_duty` (kW), `ihx_liquid_outlet_temperature` and `ihx_lmtd`.
 - `CascadeVapourCompressionCycle` (`cascade_vapour_compression_cycle.py`): stages coupled through cascade exchangers; `solve` takes condenser and evaporator temperature arrays and a `DutyAllocationRequest`. Stages are ordered hottest first and heat always passes up the cascade. A heat pump solves from the top stage down and the coldest stage takes the remaining cooling; a refrigerator solves from the coldest stage up and the top stage rejects the remaining heat.
 - `ParallelVapourCompressionCycles` (`parallel_vapour_compression_cycles.py`): independent subcycles solved side by side.
 - `CycleLimits` (`limits.py`): the practical limits a vapour compression stage is held to, passed to `solve` as `limits`.

@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from ....contracts.hpr import HeatPumpTargetInputs, HPRActiveStage, HPREffectiveTopology
-from .shared import NEGLIGIBLE_STAGE_WORK_FRACTION
+from ..optimisation_adapter import NEGLIGIBLE_STAGE_WORK_FRACTION
 
 __all__ = ["effective_topology"]
 

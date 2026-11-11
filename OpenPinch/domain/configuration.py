@@ -167,13 +167,6 @@ class CostingConfig:
     hpr_cooling_water_dt_min: float
     hpr_refrigeration_eta_ii: float
     hpr_refrigeration_dt: float
-    hpr_equipment_cost: float
-    hpr_installation_factor: float
-    hpr_cost_exp: float
-    hpr_cost_fixed_share: float
-    hpr_cost_stage_share: float
-    hpr_cost_temp_factor: float
-    hpr_cost_temp_base: float
     hpr_capital_recovery_enabled: bool
     hpr_utility_capital_recovery_enabled: bool
     hpr_hot_utility_capital_cost: float
@@ -229,6 +222,10 @@ class HprConfig:
     multiperiod_optimization_enabled: bool
     enforce_heating_duty: bool
     turndown: float
+    u_two_phase: float
+    u_liquid: float
+    u_gas: float
+    u_air: float
     refrigerants: list[str]
     refrigerant_sort_enabled: bool
     mvr_fluids: list[str]

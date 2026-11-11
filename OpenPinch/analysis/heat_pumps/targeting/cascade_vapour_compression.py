@@ -42,6 +42,7 @@ from ..common.shared import (
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
+from ..cycles.vapour_compression_cycle import VapourCompressionCycle
 from ..optimisation_adapter import initialise_hpr_seed, solve_hpr_placement
 from ..performance_maps.coolprop_preflight import (
     preflight_coolprop_fluid_names,
@@ -486,6 +487,11 @@ def _compute_tespy_cascade_hp_system_obj(
     if not isinstance(evaluated, HprTargetThermodynamicResult):
         raise TypeError("HPR target evaluator coordinator returned an invalid value")
 
+    try:
+        replica = _coolprop_replica(request, args)
+    except ValueError as exc:
+        # No CoolProp cycle to cost, as below the fluid's minimum temperature.
+        return _tespy_candidate_failure(state, f"capital costing: {exc}")
     hpr_streams = _build_tespy_hpr_streams(evaluated, args)
     # TESPy returns shaft power; the motor losses leave the cycle.
     work = evaluated.compressor_power / args.eta_motor
@@ -502,6 +508,7 @@ def _compute_tespy_cascade_hp_system_obj(
         penalty_terms=[],
         dT_subcool=state.dT_subcool,
         dT_superheat=np.array([request.superheat], dtype=float),
+        machines=[[replica]],
         debug=debug,
         artifact_mode=artifact_mode,
     )
@@ -539,6 +546,33 @@ def _tespy_ihx_gas_rise(state: HPRParsedState, args: HeatPumpTargetInputs) -> fl
         - float(getattr(args, "dt_hp_ihx", 0.0))
     )
     return max(min(float(state.dT_ihx_gas_side[0]), ceiling), 0.0)
+
+
+def _coolprop_replica(
+    request: HprTargetThermodynamicRequest, args: HeatPumpTargetInputs
+) -> VapourCompressionCycle:
+    """The CoolProp cycle at a TESPy candidate's design point, for costing.
+
+    TESPy returns duties and power but no compressor or exchanger states; the
+    two backends agree at the design point.
+    """
+    cycle = VapourCompressionCycle()
+    is_heat_pump = request.mode == "heat_pump"
+    cycle.solve(
+        T_evap=request.evaporating_temperature,
+        T_cond=request.condensing_temperature,
+        dtcont=0.0,
+        dT_superheat=request.superheat,
+        dT_subcool=request.subcooling,
+        eta_comp=request.compressor_isentropic_efficiency,
+        eta_motor=args.eta_motor,
+        refrigerant=request.working_fluid.source_spec,
+        dT_ihx_gas_side=request.internal_hx_gas_temperature_change,
+        Q_heat=request.useful_duty if is_heat_pump else None,
+        Q_cool=None if is_heat_pump else request.useful_duty,
+        is_heat_pump=is_heat_pump,
+    )
+    return cycle
 
 
 def _tespy_primary_duty_allocation(

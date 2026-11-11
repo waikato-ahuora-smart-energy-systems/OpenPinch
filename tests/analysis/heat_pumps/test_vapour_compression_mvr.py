@@ -1393,7 +1393,13 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
         T_evap_mvr = np.array([90.0])
         mvr_cycles = [
             SimpleNamespace(
-                dT_subcool=1.0, Ps=[1.0e5, 1.5e5], work=15.0, process_heat=120.0
+                dT_subcool=1.0,
+                Ps=[1.0e5, 1.5e5],
+                Hs=[2.675e6, 2.75e6],  # saturated steam at 1 bar, compressed
+                source_m_dot=0.05,
+                work=15.0,
+                eta_motor=1.0,
+                process_heat=120.0,
             )
         ]
         vc_cycles = [
@@ -1404,6 +1410,8 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
                 T_cond_sat_liq=90.0,
                 Ps=[5.0e5, 30.0e5],
                 work=25.0,
+                suction_volume_flow=40.0,
+                shaft_power=25.0,
                 Q_heat=80.0,
                 Q_cool=90.0,
             )
