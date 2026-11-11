@@ -13,6 +13,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from ...contracts.hpr import (
+    INFEASIBLE_HEAT_PUMP_REASON,
     INFEASIBLE_REFRIGERATION_REASON,
     ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
@@ -189,7 +190,7 @@ def _contains_boolean(value: object) -> bool:
 
 
 # A penalty below this fraction of the objective is solver tolerance.
-REFRIGERATION_PENALTY_TOLERANCE = 1e-6
+PENALTY_TOLERANCE = 1e-6
 
 
 def solve_hpr_placement(
@@ -228,8 +229,7 @@ def solve_hpr_placement(
             point=candidate.point,
             args=args,
         )
-        if _is_infeasible_refrigeration(result, args):
-            result = HPRBackendResult.failure(reason=INFEASIBLE_REFRIGERATION_REASON)
+        result = reject_penalised_design(result, args)
         found = result.success and np.isfinite(float(result.obj))
         emit_progress(
             analysis="hpr_targeting",
@@ -265,22 +265,32 @@ def solve_hpr_placement(
     )
 
 
-def _is_infeasible_refrigeration(
+def reject_penalised_design(
     result: HPRBackendResult,
     args: HeatPumpTargetInputs,
-) -> bool:
-    """Return whether a final refrigeration design still carries a penalty.
+) -> HPRBackendResult:
+    """Return a failure for a final design that still carries a penalty.
 
-    The penalty steers the search towards serving the duty, but a refrigerator
-    still short of it at the end is not a target.
+    The penalty steers the search towards a feasible design (serving the
+    duty, staying within the stage limits), but a design still outside them
+    at the end is not a target. Carnot designs only seed or screen, and their
+    objective is not a cost, so they are kept.
     """
-    if getattr(args, "is_heat_pumping", True) or not result.success:
-        return False
-    if "Carnot" in str(args.hpr_type):
-        # A Carnot design only seeds or screens; its objective is not a cost.
-        return False
-    allowed = REFRIGERATION_PENALTY_TOLERANCE * abs(float(result.obj))
-    return float(result.feasibility_penalty) > allowed
+    if not result.success or "Carnot" in str(args.hpr_type):
+        return result
+    allowed = PENALTY_TOLERANCE * abs(float(result.obj))
+    if float(result.feasibility_penalty) <= allowed:
+        return result
+    if not getattr(args, "is_heat_pumping", True):
+        return HPRBackendResult.failure(reason=INFEASIBLE_REFRIGERATION_REASON)
+    reason = INFEASIBLE_HEAT_PUMP_REASON
+    if getattr(args, "enforce_heating_duty", False):
+        served = float(np.sum(result.Q_heat)) if result.Q_heat is not None else 0.0
+        reason += (
+            f" It serves {served:.4g} of the {float(args.Q_hpr_target):.4g} kW "
+            "heating duty it must meet."
+        )
+    return HPRBackendResult.failure(reason=reason)
 
 
 def raise_hpr_targeting_error(

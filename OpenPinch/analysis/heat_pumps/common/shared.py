@@ -74,6 +74,7 @@ __all__ = [
     "calc_simulated_hpr_annualized_costs",
     "hpr_penalty_cost_scale",
     "refrigeration_allowance",
+    "heating_allowance",
     "calc_carnot_heat_engine_eta",
     "calc_carnot_heat_pump_cop",
     "compute_entropic_mean_temperature",
@@ -394,6 +395,34 @@ def refrigeration_allowance(args: HeatPumpTargetInputs) -> float:
     return allowance
 
 
+def heating_allowance(args: HeatPumpTargetInputs) -> float:
+    """Return the hot utility the untargeted heating needs on its own.
+
+    The heat pump counterpart of ``refrigeration_allowance``, used when
+    ``args.enforce_heating_duty`` asks a heat pump to serve its whole
+    ``Q_hpr_target``: the full heating's hot utility less the target, on the
+    same cascade the designs are evaluated on. Computed once and stored on
+    ``args``.
+    """
+    cached = getattr(args, "heating_allowance", None)
+    if cached is not None:
+        return float(cached)
+    full_need = _cascade_air_duties(
+        StreamCollection(),
+        args.bckgrd_cold_streams,
+        args,
+        _ambient_source_temperature(args),
+        _ambient_sink_temperature(args),
+        T_background=args.T_cold,
+    ).Q_ext_top
+    allowance = max(float(full_need) - float(args.Q_hpr_target), 0.0)
+    try:
+        args.heating_allowance = allowance
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return allowance
+
+
 def _cascade_air_duties(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
@@ -607,7 +636,16 @@ def evaluate_vapour_hpr_result(
         cond_wrong_side,
         evap_wrong_side,
     ]
-    if not getattr(args, "is_heat_pumping", True):
+    if getattr(args, "is_heat_pumping", True):
+        # Heat a heat pump's condensers reject to air is heat the process could
+        # not use: wrong-side heat, though air takes it for free. A refrigerator
+        # rejecting to air is an ordinary air-cooled condenser.
+        all_penalty_terms.append(cond.Q_air_sink)
+        if getattr(args, "enforce_heating_duty", False):
+            # Hot utility beyond what the untargeted heating needs on its own
+            # is targeted heating the heat pump leaves unserved.
+            all_penalty_terms.append(max(Q_ext_heat - heating_allowance(args), 0.0))
+    else:
         # A refrigerator must serve the targeted coldest cooling. Cooling water
         # and air take the warmer rest for free; only default refrigeration
         # beyond what that rest needs on its own is unserved, so a zero-duty

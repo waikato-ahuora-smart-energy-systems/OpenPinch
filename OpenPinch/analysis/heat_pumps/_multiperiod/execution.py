@@ -18,6 +18,7 @@ from ..optimisation_adapter import (
     evaluate_hpr_candidate,
     normalise_initial_points,
     raise_hpr_targeting_error,
+    reject_penalised_design,
     run_hpr_candidate_search,
     translate_hpr_output,
     translate_hpr_result,
@@ -103,10 +104,13 @@ def solve_hpr_multiperiod_placement(
     selected_case = selected_period_case(args)
     failures: list[tuple[int, HPRBackendResult]] = []
     for candidate in candidates:
-        result = evaluate_hpr_candidate(
-            objective=objective,
-            point=candidate.point,
-            args=args,
+        result = reject_penalised_design(
+            evaluate_hpr_candidate(
+                objective=objective,
+                point=candidate.point,
+                args=args,
+            ),
+            selected_case.args,
         )
         if result.success and np.isfinite(float(result.obj)):
             return translate_hpr_result(result, ambient_args=selected_case.args)

@@ -106,6 +106,7 @@ class HPRProfile:
             kwargs["options"] = {
                 **kwargs.get("options", {}),
                 "HPR_ETA_MOTOR": 1.0,
+                "COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED": True,
             }
         return kwargs
 
@@ -229,8 +230,9 @@ HPR_SENTINELS_WITHOUT_SUCTION_FLOOR = frozenset(
 )
 
 # This sentinel's heat pump only just pays: with the default motor losses
-# (HPR_ETA_MOTOR 0.95) none improves on the baseline, so it runs with an ideal
-# motor to keep proving the search on a solvable problem.
+# (HPR_ETA_MOTOR 0.95), or without credit for the hot utility capital it
+# displaces (off by default), none improves on the baseline. It runs with an
+# ideal motor and the credit on to keep proving the search on a solvable problem.
 HPR_SENTINELS_WITH_IDEAL_MOTOR = frozenset({"utility-optimized-vc-mvr-heat-pump"})
 
 # A utility refrigerator must lift heat from below ambient to the hot-utility
@@ -634,13 +636,16 @@ def observe_hpr_search() -> Iterator[list[SearchObservation]]:
                 for value in np.asarray(kwargs["point"], dtype=float).reshape(-1)
             )
             objective = float(result.obj)
+            # Viable means a final target could be this point: a design still
+            # carrying a penalty is rejected at the end, so it is not viable.
+            accepted = adapter.reject_penalised_design(result, kwargs["args"])
             observations.append(
                 SearchObservation(
                     point=point,
-                    success=bool(result.success and math.isfinite(objective)),
+                    success=bool(accepted.success and math.isfinite(objective)),
                     objective=(
                         objective
-                        if result.success and math.isfinite(objective)
+                        if accepted.success and math.isfinite(objective)
                         else None
                     ),
                     objective_name=getattr(kwargs.get("objective"), "__name__", None),

@@ -129,8 +129,10 @@ def test_real_public_multistage_records(topology):
 
 def test_a_refrigerant_whose_upper_cased_name_coolprop_rejects_is_a_target():
     problem = PinchProblem("basic_pinch.json")
+    # At 25% the target is the top of the sink, about 173 C, where this small
+    # search finds no unpenalised R1233zd(E) design; at 50% it does.
     target = problem.target.vapour_compression_heat_pump(
-        load_fraction=0.25,
+        load_fraction=0.5,
         condensers=1,
         evaporators=1,
         maximum_restarts=1,

@@ -14,6 +14,25 @@ Heat pumps and refrigeration
   suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
   Every heat pump and refrigeration target moves; set the three options to 0
   for the previous results.
+- Penalised designs, wrong-side heat and the utility capital credit.
+
+  - A final vapour-compression heat pump design that still carries a
+    feasibility penalty is no longer a target. The next candidate is tried,
+    as refrigeration designs already were. Shared multiperiod designs, heat
+    pump or refrigeration, are now checked the same way.
+  - Heat a vapour-compression heat pump's condensers reject to ambient air is
+    penalised as heat the process could not use. It was free, so a heat
+    pump could deliver heat where no process needed it. Refrigerators still
+    reject to air freely.
+  - ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` now defaults to
+    ``False``. A heat pump is no longer credited with the capital of the hot
+    utility and refrigeration plant it displaces, as a retrofit keeps that
+    plant. Set it to ``True`` for a new site.
+  - New ``HPR_ENFORCE_HEATING_DUTY`` (default ``False``): a vapour-compression
+    heat pump must serve its whole targeted heating duty regardless of
+    economics, as a refrigerator must serve its cooling. If no design meets
+    it, the target fails with the duty the best design serves.
+
 - CoolProp vapour-compression targets may now run a stage transcritical.
   Condensing was capped 2 K below the fluid's critical temperature. A stage
   condensing above it now takes its high pressure from the critical isochore

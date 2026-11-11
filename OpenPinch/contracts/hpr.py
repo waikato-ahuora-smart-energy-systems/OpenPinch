@@ -312,6 +312,10 @@ class HeatPumpTargetInputs(BaseModel):
     # Refrigeration only: the default refrigeration that the cooling warmer
     # than the targeted coldest Q_hpr_target needs on its own.
     refrigeration_allowance: float | None = None
+    # Heat pumps that must serve their whole target (enforce_heating_duty):
+    # the hot utility the untargeted heating needs on its own.
+    enforce_heating_duty: bool = False
+    heating_allowance: float | None = None
     bb_minimiser: str
     eta_penalty: float
     rho_penalty: float
@@ -472,6 +476,10 @@ class HPRThermoArtifacts(BaseModel):
 ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
 INFEASIBLE_REFRIGERATION_REASON = (
     "Refrigeration candidate carries a feasibility penalty, such as unserved cooling."
+)
+INFEASIBLE_HEAT_PUMP_REASON = (
+    "Heat pump candidate carries a feasibility penalty, such as a stage outside "
+    "its limits."
 )
 """Final-evaluation failure reason for a design equivalent to no heat pump.
 

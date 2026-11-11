@@ -12,7 +12,7 @@ a docstring.
 
 ## Interface
 - `compute_direct_heat_pump_or_refrigeration_target`, `compute_indirect_heat_pump_or_refrigeration_target` (`service.py`): solve a direct or utility-system target for a `Zone`; return a target model, or `None` when the selected load is below `tol` or the selected period has no HPR load.
-- `solve_hpr_placement`, `run_hpr_candidate_search`, `evaluate_hpr_candidate`, `raise_hpr_targeting_error` (`optimisation_adapter.py`): multistart search over a bounded HPR objective, candidate evaluation and detached `HPRTargetingError` reporting.
+- `solve_hpr_placement`, `run_hpr_candidate_search`, `evaluate_hpr_candidate`, `reject_penalised_design`, `raise_hpr_targeting_error` (`optimisation_adapter.py`): multistart search over a bounded HPR objective, candidate evaluation, final feasibility acceptance and detached `HPRTargetingError` reporting.
 - `translate_hpr_result`, `translate_hpr_output` (`optimisation_adapter.py`): attach ambient streams to a backend result and validate it as the public `HeatPumpTargetOutputs`; `translate_hpr_result` marks the result successful, so call it only on an accepted candidate.
 - `aggregate_hpr_period_results` (`optimisation_adapter.py`): combine period results for a shared multiperiod design (weighted operation, peak capital).
 - `build_hpr_accounting`, `calc_hpr_obj`, `relative_feasibility_penalty`, `normalise_hpr_penalty_terms`, `normalise_initial_points`, `initialise_hpr_seed` (`optimisation_adapter.py`): objective, penalty and seed helpers (`initialise_hpr_seed` is public but not in `__all__`).
@@ -40,6 +40,7 @@ a docstring.
 - Candidate coordinates must be finite; identical points are evaluated once; failed candidates score `1e30`. [optimisation_adapter.py:_CachedHPRScalarObjective] [optimisation_adapter.py:_FAILED_CANDIDATE_OBJECTIVE]
 - Objectives must return `HPRBackendResult`, and `SEARCH` mode strips artifacts and simulation records. [optimisation_adapter.py:evaluate_hpr_candidate]
 - Candidates are returned best first and the first successful one is translated; a zero-useful-duty result ends the ranking and is reported as "no beneficial heat pump". [optimisation_adapter.py:solve_hpr_placement] [optimisation_adapter.py:_merge_ranked_candidates]
+- A final vapour-compression design (heat pump or refrigerator, single or shared multiperiod) whose feasibility penalty exceeds `PENALTY_TOLERANCE` (1e-6) of its objective is rejected and the next candidate tried; Carnot designs are kept. A heat pump with `enforce_heating_duty` reports the duty it serves. [optimisation_adapter.py:reject_penalised_design] [_multiperiod/execution.py:solve_hpr_multiperiod_placement]
 - Bounds must be finite and ordered, and warm starts must lie inside them; otherwise `ValueError`. [optimisation_adapter.py:run_hpr_candidate_search]
 - Penalty terms must be numeric and finite and may not be boolean. [optimisation_adapter.py:normalise_hpr_penalty_terms]
 - Public output must be copyable, acyclic and made of numeric arrays, `Value`, `StreamCollection`, known models, string-keyed dicts, lists and tuples; anything else raises `TypeError`. [optimisation_adapter.py:_validate_hpr_public_value]

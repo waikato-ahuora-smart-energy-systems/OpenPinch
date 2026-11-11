@@ -227,6 +227,7 @@ class HprConfig:
     load_duty: float | None
     load_period_values: dict[str, float]
     multiperiod_optimization_enabled: bool
+    enforce_heating_duty: bool
     refrigerants: list[str]
     refrigerant_sort_enabled: bool
     mvr_fluids: list[str]

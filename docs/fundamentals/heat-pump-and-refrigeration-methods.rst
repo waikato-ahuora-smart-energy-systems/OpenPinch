@@ -63,8 +63,21 @@ lift below ``HPR_MIN_STAGE_LIFT`` (default 5 K), and whenever the compressor
 discharges two-phase. MVR stages on process vapour are not held to these
 limits.
 
+A vapour-compression design that still carries a feasibility penalty at the
+end of the search is not a target, for heat pumps as for refrigeration. A heat
+pump serves as much of its target as pays, unless ``HPR_ENFORCE_HEATING_DUTY``
+is set: then heating it leaves unserved is penalised as a refrigerator's
+unserved cooling is.
+
 Ambient air is a free heat source for heat pumps and a free heat sink for
-refrigeration unless ``HPR_AMBIENT_AIR_ENABLED`` is ``False``.
+refrigeration unless ``HPR_AMBIENT_AIR_ENABLED`` is ``False``. Heat a heat
+pump's condensers reject to air is heat the process could not use, so a
+vapour-compression heat pump is penalised for it.
+
+The annual cost credits a heat pump with the capital of the hot utility and
+refrigeration plant it displaces only when
+``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` is set (off by default, as a
+retrofit keeps its plant).
 
 Bounded Search and Failure Evidence
 -----------------------------------

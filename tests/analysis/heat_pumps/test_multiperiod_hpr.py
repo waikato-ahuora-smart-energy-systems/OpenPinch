@@ -18,6 +18,7 @@ from OpenPinch.analysis.heat_pumps._multiperiod.state import (
 from OpenPinch.analysis.heat_pumps.optimisation_adapter import translate_hpr_output
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.hpr import (
+    INFEASIBLE_HEAT_PUMP_REASON,
     ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
@@ -1093,3 +1094,47 @@ def test_multiperiod_vc_mvr_rejects_an_invalid_mvr_fluid_before_the_seed(
 
     with pytest.raises(HPRTargetingError):
         hp_setup.get_multiperiod_hpr_optimisation_setup(cases, selected_case=cases[0])
+
+
+def test_a_shared_design_still_carrying_a_penalty_is_not_a_target(monkeypatch):
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (OptimisationCandidate(objective=100.0, point=(1.0,)),),
+    )
+    vapour = HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+    cases = [
+        HPRPeriodCase(
+            period_id=f"p{idx}",
+            period_idx=idx,
+            weight=1.0,
+            args=_input_args(period_idx=idx, hpr_type=vapour),
+        )
+        for idx in (0, 1)
+    ]
+    mp_args = MultiPeriodHPRTargetInputs(
+        period_cases=cases,
+        selected_period_id="p0",
+        selected_period_idx=0,
+        hpr_type=vapour,
+        max_multi_start=1,
+        bb_minimiser="rbf_surrogate",
+    )
+
+    def objective(x, args, debug=False):
+        return _backend_result(
+            obj=100.0, utility_tot=1.0, period_idx=args.period_idx
+        ).with_updates(feasibility_penalty=1.0)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=mp_args,
+        )
+
+    assert any(
+        failure.summary == INFEASIBLE_HEAT_PUMP_REASON
+        for failure in raised.value.diagnostics.representative_failures
+    )

@@ -750,3 +750,94 @@ def test_carnot_evaporator_cascade_gets_the_utility_bands(monkeypatch):
     condenser, evaporator = backgrounds
     np.testing.assert_allclose(condenser, args.T_cold)
     np.testing.assert_allclose(evaporator, args.T_hot)
+
+
+def _condenser_beyond_the_sink(is_heat_pumping):
+    # 100 kW of condenser heat at 120-100 C against a sink that takes 40 kW:
+    # air, a free sink at about 20 C, would take the other 60 kW.
+    args = _base_args(
+        T_hot=np.array([15.0, 5.0]),
+        H_hot=np.array([0.0, 0.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([40.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_heat_max=40.0,
+        Q_cool_max=0.0,
+        is_heat_pumping=is_heat_pumping,
+    )
+    hpr_streams = _sc(_stream("cond", 120.0, 100.0, 100.0, is_process_stream=False))
+    return hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([100.0]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=hpr_streams,
+    )
+
+
+def test_heat_pump_condenser_heat_rejected_to_air_is_penalised():
+    heat_pump = _condenser_beyond_the_sink(is_heat_pumping=True)
+
+    assert heat_pump.Q_amb_cold == pytest.approx(60.0)
+    assert heat_pump.feasibility_penalty == pytest.approx(
+        hp_shared._cycle_penalty(args=_base_args(), cycle_penalty_terms=[60.0])
+        * hp_shared.hpr_penalty_cost_scale(_base_args())
+    )
+
+
+def test_refrigerator_condenser_heat_rejected_to_air_is_free():
+    refrigerator = _condenser_beyond_the_sink(is_heat_pumping=False)
+
+    assert refrigerator.Q_amb_cold == pytest.approx(60.0)
+    assert refrigerator.feasibility_penalty == pytest.approx(0.0)
+
+
+def _heat_pump_short_of_its_target(enforce):
+    # The sink needs 100 kW at 95-45 C and the target is 60 kW of it; the heat
+    # pump delivers 40 kW at 120-100 C, leaving 60 kW of hot utility where
+    # the untargeted rest needs 40 kW on its own.
+    args = _base_args(
+        T_hot=np.array([15.0, 5.0]),
+        H_hot=np.array([0.0, 0.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([100.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_hpr_target=60.0,
+        Q_heat_max=100.0,
+        Q_cool_max=0.0,
+        enforce_heating_duty=enforce,
+    )
+    hpr_streams = _sc(_stream("cond", 120.0, 100.0, 40.0, is_process_stream=False))
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([40.0]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=hpr_streams,
+    )
+    return result, args
+
+
+def test_an_enforced_heating_duty_penalises_the_heat_the_heat_pump_leaves():
+    result, args = _heat_pump_short_of_its_target(enforce=True)
+
+    assert result.Q_ext_heat == pytest.approx(60.0)
+    assert hp_shared.heating_allowance(args) == pytest.approx(40.0)
+    assert result.feasibility_penalty == pytest.approx(
+        hp_shared._cycle_penalty(args=args, cycle_penalty_terms=[20.0])
+        * hp_shared.hpr_penalty_cost_scale(args)
+    )
+
+
+def test_a_heating_duty_is_not_enforced_by_default():
+    result, _ = _heat_pump_short_of_its_target(enforce=False)
+
+    assert result.feasibility_penalty == pytest.approx(0.0)

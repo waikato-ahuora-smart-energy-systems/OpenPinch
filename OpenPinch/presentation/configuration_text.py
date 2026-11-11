@@ -318,7 +318,9 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Annualise default utility capital", None,
         (
             "Include the annualised capital of the default hot utility and "
-            "refrigeration still needed in the HPR annual cost."
+            "refrigeration still needed in the HPR annual cost, so a heat pump is "
+            "credited for the plant it displaces. Off by default: a retrofit "
+            "keeps its existing plant."
         ),
     ),
     "COSTING_HPR_HOT_UTILITY_CAPITAL_COST": FieldText(
@@ -532,6 +534,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Duty for each period ID in period_values mode, capped at that period's "
             "available duty."
+        ),
+    ),
+    "HPR_ENFORCE_HEATING_DUTY": FieldText(
+        "Enforce the heat pump heating duty", None,
+        (
+            "Require a vapour compression heat pump to serve its whole targeted "
+            "heating duty regardless of economics, as a refrigerator must serve "
+            "its cooling: heating it leaves unserved is penalised, and a final "
+            "design still short of it is not a target."
         ),
     ),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": FieldText(

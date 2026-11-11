@@ -137,6 +137,7 @@ def construct_HPRTargetInputs(
         max_discharge_pressure_co2=hpr.max_discharge_pressure_co2 * 1e5,
         min_suction_pressure=hpr.screen_min_suction_pressure * 1e5,
         min_stage_lift=hpr.min_stage_lift,
+        enforce_heating_duty=hpr.enforce_heating_duty,
         T_env=environment.temperature,
         dt_env_cont=hpr.dt_env_cont,
         ambient_air_enabled=hpr.ambient_air_enabled,
