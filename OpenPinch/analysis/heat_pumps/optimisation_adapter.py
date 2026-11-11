@@ -415,15 +415,19 @@ def _design_signature(result: HPRBackendResult, args: HPRTargetInputs) -> tuple 
 
 def _alternative_designs(
     f_obj: HPRObjective,
-    args: HeatPumpTargetInputs,
+    args: HPRTargetInputs,
     selected: HPRBackendResult,
     designs: Sequence[tuple[tuple, OptimisationCandidate]],
+    *,
+    reject: Callable[[HPRBackendResult, HPRTargetInputs], HPRBackendResult] = (
+        reject_penalised_design
+    ),
 ) -> tuple[HPRAlternativeDesign, ...]:
     """Return distinct designs within ``ALTERNATIVE_DESIGN_GAP`` of the target.
 
     Each is the cheapest search point of a design (working stages and fluids)
-    other than the target's, re-evaluated in full; a design rejected then is
-    left out.
+    other than the target's, re-evaluated in full; a design ``reject`` turns
+    down then is left out.
     """
     objective = float(selected.obj)
     ceiling = objective + ALTERNATIVE_DESIGN_GAP * abs(objective)
@@ -435,7 +439,7 @@ def _alternative_designs(
             break
         if design == selected_signature or candidate.objective > ceiling:
             continue
-        result = reject_penalised_design(
+        result = reject(
             evaluate_hpr_candidate(objective=f_obj, point=candidate.point, args=args),
             args,
         )

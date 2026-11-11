@@ -43,7 +43,7 @@ Heat pumps and refrigeration
   - ``hpr_details.alternatives`` lists up to three distinct designs (other
     working stages or fluids) within 5% of the target's objective, with
     their topology and objective gap. Very different machines can cost
-    nearly the same.
+    nearly the same. Shared multiperiod targets report them too.
   - ``hpr_summary`` includes the topology label and the alternatives.
 
 - Penalised designs, wrong-side heat and the utility capital credit.
@@ -51,7 +51,9 @@ Heat pumps and refrigeration
   - A final vapour-compression heat pump design that still carries a
     feasibility penalty is no longer a target. The next candidate is tried,
     as refrigeration designs already were. Shared multiperiod designs, heat
-    pump or refrigeration, are now checked the same way.
+    pump or refrigeration, are now checked the same way, period by period:
+    a penalty in a lightly weighted period still rejects the design, and the
+    failure reports that period's served and targeted heating.
   - Heat a vapour-compression heat pump's condensers reject to ambient air is
     penalised as heat the process could not use. It was free, so a heat
     pump could deliver heat where no process needed it. Refrigerators still
