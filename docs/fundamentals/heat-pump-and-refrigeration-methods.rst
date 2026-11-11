@@ -89,8 +89,17 @@ one-evaporator configuration and one MVR stage where applicable, prove that the
 required service succeeds, and only then increase topology complexity or search
 allowances.
 
+The first restart starts from the warm start; the others start from Latin
+hypercube points across the search bounds, so they explore different designs.
+``HPR_SEARCH_SEED`` shifts the restart seeds and those points, for independent
+repetitions of a target.
+
 A successful target has ``hpr_success`` set and exposes finite accounting in
-``hpr_details``. A bounded search that finds no valid candidate raises
+``hpr_details``. ``hpr_details.effective_topology`` gives the stages the
+design actually uses against the layout requested (a 3x2 cascade may use one
+stage). ``hpr_details.alternatives`` lists up to three other designs, using
+other stages or fluids, within 5% of the target's objective, each with its
+topology and objective gap. A bounded search that finds no valid candidate raises
 ``HPRTargetingError`` with an ``HPRFailureSummary`` containing the configured
 budget, evaluated-candidate count, category counts, and at most sixteen
 representative failures. ``diagnostics.model_dump(mode="json")`` is the stable

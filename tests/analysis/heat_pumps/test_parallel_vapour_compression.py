@@ -198,6 +198,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
 
     class _FakeParallelSolved:
         solved = True
+        _subcycles = []  # no stages, so an empty effective topology
         work = 20.0
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])

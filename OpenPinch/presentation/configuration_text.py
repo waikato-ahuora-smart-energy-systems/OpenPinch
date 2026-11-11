@@ -751,7 +751,18 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HPR_MAX_MULTISTART": FieldText(
         "HPR optimiser restarts", None,
-        "Number of HPR optimiser runs from different starting points.",
+        (
+            "Number of HPR optimiser runs. The first starts from the warm start; "
+            "the rest start from Latin hypercube points across the bounds."
+        ),
+    ),
+    "HPR_SEARCH_SEED": FieldText(
+        "HPR search seed", None,
+        (
+            "Offset added to the restart seeds and used to draw the Latin "
+            "hypercube restart points, so independent repetitions of a target "
+            "can differ."
+        ),
     ),
     "HPR_ETA_PENALTY": FieldText(
         "HPR efficiency penalty weight", None,

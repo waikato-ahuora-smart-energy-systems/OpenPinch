@@ -258,6 +258,7 @@ class HprConfig:
     screen_critical_margin: float
     screen_max_stage_lift: float
     max_multistart: int
+    search_seed: int
     eta_penalty: float
     rho_penalty: float
     bb_minimiser: str

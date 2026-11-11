@@ -236,6 +236,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
 
     class _FakeCascadeSolved:
         solved = True
+        _subcycles = []  # no stages, so an empty effective topology
         work = 40.0
         work_arr = np.array([10.0, 30.0])
         Q_cool = 70.0
@@ -297,6 +298,7 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
 
     class _FakeCascadeSolved:
         solved = True
+        _subcycles = []  # no stages, so an empty effective topology
         work = 20.0
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])

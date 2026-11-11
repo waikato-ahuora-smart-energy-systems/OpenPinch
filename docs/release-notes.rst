@@ -14,6 +14,23 @@ Heat pumps and refrigeration
   suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
   Every heat pump and refrigeration target moves; set the three options to 0
   for the previous results.
+- Search and reporting.
+
+  - Each warm start now seeds one restart; the other restarts start from
+    Latin hypercube points across the bounds. Every restart used to start
+    from the Carnot warm start, so the restarts converged on one design.
+    New ``HPR_SEARCH_SEED`` (default 0) shifts the restart seeds and points.
+  - Vapour compression targets report ``hpr_details.effective_topology``: the
+    requested layout and the stages the design uses, with their fluids,
+    temperatures, pressure ratios, work and duties, and a one-line label such
+    as "... 3x2 requested; 1 of 4 stages used". A shared multiperiod design
+    counts a stage that works in any period.
+  - ``hpr_details.alternatives`` lists up to three distinct designs (other
+    working stages or fluids) within 5% of the target's objective, with
+    their topology and objective gap. Very different machines can cost
+    nearly the same.
+  - ``hpr_summary`` includes the topology label and the alternatives.
+
 - Penalised designs, wrong-side heat and the utility capital credit.
 
   - A final vapour-compression heat pump design that still carries a

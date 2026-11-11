@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import qmc
 
 from ...contracts.hpr import (
     INFEASIBLE_HEAT_PUMP_REASON,
@@ -18,7 +19,10 @@ from ...contracts.hpr import (
     ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
+    HPRActiveStage,
+    HPRAlternativeDesign,
     HPRBackendResult,
+    HPREffectiveTopology,
     HPREvaluationMode,
     HPRFailureCategory,
     HPRFailureDiagnostic,
@@ -58,16 +62,31 @@ class _HPRSearchBudgetExhausted(Exception):
     """Internal control flow; never translated into a physical failure."""
 
 
-class _HPRSearchCandidates(tuple):
-    """Tuple-compatible candidates carrying detached search evidence."""
+# A stage doing no more than this fraction of its design's work has no
+# compressor: it is idle, is not charged capital and is not an active stage.
+NEGLIGIBLE_STAGE_WORK_FRACTION = 1e-3
 
-    def __new__(cls, candidates, diagnostics):
+# Alternative designs reported beside a target: at most this many, each within
+# this fraction of the target's objective.
+MAX_ALTERNATIVE_DESIGNS = 3
+ALTERNATIVE_DESIGN_GAP = 0.05
+
+
+class _HPRSearchCandidates(tuple):
+    """Tuple-compatible candidates carrying detached search evidence.
+
+    ``designs`` holds the cheapest acceptable search point of each distinct
+    design (its working stages and their fluids), cheapest first.
+    """
+
+    def __new__(cls, candidates, diagnostics, designs=()):
         value = super().__new__(cls, candidates)
         value.diagnostics = diagnostics
+        value.designs = tuple(designs)
         return value
 
     def __getnewargs__(self):
-        return tuple(self), self.diagnostics
+        return tuple(self), self.diagnostics, self.designs
 
 
 @dataclass
@@ -80,6 +99,8 @@ class _CachedHPRScalarObjective:
     viable: dict[tuple[float, ...], OptimisationCandidate] = dataclass_field(
         default_factory=dict
     )
+    # The cheapest acceptable point of each distinct design signature.
+    designs: dict[tuple, OptimisationCandidate] = dataclass_field(default_factory=dict)
     exhausted: bool = False
     failure_count: int = 0
     failures: list[HPRFailureDiagnostic] = dataclass_field(default_factory=list)
@@ -102,6 +123,16 @@ class _CachedHPRScalarObjective:
             detail=f"{len(self.cache)} evaluations",
         )
 
+    def _record_design(
+        self, result: HPRBackendResult, key: tuple[float, ...], value: float
+    ) -> None:
+        signature = _design_signature(result, self.args)
+        if signature is None or not reject_penalised_design(result, self.args).success:
+            return
+        best = self.designs.get(signature)
+        if best is None or value < best.objective:
+            self.designs[signature] = OptimisationCandidate(objective=value, point=key)
+
     def __call__(self, point: Sequence[float] | np.ndarray) -> float:
         key = tuple(
             float(value) for value in np.asarray(point, dtype=float).reshape(-1)
@@ -123,6 +154,7 @@ class _CachedHPRScalarObjective:
             value = float(result.obj)
             if result.success and np.isfinite(value):
                 self.viable[key] = OptimisationCandidate(objective=value, point=key)
+                self._record_design(result, key, value)
                 # Keep bounded recovery candidates even if a backend discards minima.
                 self.viable = {
                     item.point: item for item in sorted(self.viable.values())[:16]
@@ -240,6 +272,11 @@ def solve_hpr_placement(
             best_objective=float(result.obj) if found else None,
         )
         if found:
+            result = result.with_updates(
+                alternatives=_alternative_designs(
+                    f_obj, args, result, getattr(candidates, "designs", ())
+                )
+            )
             return translate_hpr_result(result, ambient_args=args)
         failures.append((len(failures), result))
         if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
@@ -357,6 +394,63 @@ def raise_hpr_targeting_error(
     raise HPRTargetingError(message, diagnostics=diagnostics)
 
 
+def _design_signature(result: HPRBackendResult, args: HPRTargetInputs) -> tuple | None:
+    """Return which stages a design works and their fluids, or ``None``.
+
+    Carnot screens and designs without per-stage work have no signature.
+    """
+    if "Carnot" in str(getattr(args, "hpr_type", "")) or result.w_hpr is None:
+        return None
+    works = np.abs(np.asarray(result.w_hpr, dtype=float).ravel())
+    if not works.size:
+        return None
+    total = float(works.sum())
+    fluids = list(getattr(args, "refrigerant_ls", None) or [""])
+    return tuple(
+        (index, str(fluids[min(index, len(fluids) - 1)]))
+        for index, work in enumerate(works)
+        if work > NEGLIGIBLE_STAGE_WORK_FRACTION * total
+    )
+
+
+def _alternative_designs(
+    f_obj: HPRObjective,
+    args: HeatPumpTargetInputs,
+    selected: HPRBackendResult,
+    designs: Sequence[tuple[tuple, OptimisationCandidate]],
+) -> tuple[HPRAlternativeDesign, ...]:
+    """Return distinct designs within ``ALTERNATIVE_DESIGN_GAP`` of the target.
+
+    Each is the cheapest search point of a design (working stages and fluids)
+    other than the target's, re-evaluated in full; a design rejected then is
+    left out.
+    """
+    objective = float(selected.obj)
+    ceiling = objective + ALTERNATIVE_DESIGN_GAP * abs(objective)
+    selected_signature = _design_signature(selected, args)
+    alternatives = []
+    scale = max(abs(objective), 1.0)
+    for design, candidate in designs:
+        if len(alternatives) >= MAX_ALTERNATIVE_DESIGNS:
+            break
+        if design == selected_signature or candidate.objective > ceiling:
+            continue
+        result = reject_penalised_design(
+            evaluate_hpr_candidate(objective=f_obj, point=candidate.point, args=args),
+            args,
+        )
+        if not result.success or result.effective_topology is None:
+            continue
+        alternatives.append(
+            HPRAlternativeDesign(
+                topology=result.effective_topology,
+                objective=float(result.obj),
+                objective_gap=(float(result.obj) - objective) / scale,
+            )
+        )
+    return tuple(alternatives)
+
+
 def _is_no_beneficial_heat_pump(
     failures: Sequence[tuple[int, HPRBackendResult]],
 ) -> bool:
@@ -467,6 +561,13 @@ def run_hpr_candidate_search(
     warm_start_viable = False
     method = _resolve_hpr_optimisation_method(args.bb_minimiser)
     run_count = max(1, int(args.max_multi_start))
+    seed_offset = int(getattr(args, "search_seed", 0) or 0)
+    # Each warm start seeds one restart, first; the rest explore from Latin
+    # hypercube points, so the restarts do not all fall into one basin.
+    n_warm_runs = min(len(starts), run_count)
+    explore = _latin_hypercube_starts(
+        bound_array, run_count - n_warm_runs, seed=seed_offset
+    )
     try:
         for index, point in enumerate(starts, start=1):
             warm_start_candidates.append(
@@ -482,12 +583,16 @@ def run_hpr_candidate_search(
             cached_scalar.runs_done = run
             cached_scalar.report("search", run, run_count, "runs")
             try:
-                offset = run % len(starts) if starts else 0
-                run_problem = replace(
-                    problem, initial_points=starts[offset:] + starts[:offset]
+                run_starts = (
+                    starts[run:] + starts[:run]
+                    if run < n_warm_runs
+                    else [explore[run - n_warm_runs]]
                 )
+                run_problem = replace(problem, initial_points=run_starts)
                 result = optimiser(
-                    run_problem, method=method, options=replace(options, seed=run)
+                    run_problem,
+                    method=method,
+                    options=replace(options, seed=run + seed_offset),
                 )
                 backend_candidates.extend(result.candidates)
                 # The generic polishing pool owns private objective copies and
@@ -534,7 +639,22 @@ def run_hpr_candidate_search(
             backend_candidates, (*warm_start_candidates, *cached_scalar.viable.values())
         ),
         diagnostics,
+        sorted(cached_scalar.designs.items(), key=lambda item: item[1]),
     )
+
+
+def _latin_hypercube_starts(
+    bounds: np.ndarray, count: int, *, seed: int
+) -> list[tuple[float, ...]]:
+    """Return ``count`` Latin hypercube points across ``bounds``."""
+    if count <= 0:
+        return []
+    sample = qmc.LatinHypercube(d=len(bounds), rng=np.random.default_rng(seed)).random(
+        count
+    )
+    # Scaled by hand: fixed coordinates (zero-width bounds) are allowed.
+    points = bounds[:, 0] + sample * (bounds[:, 1] - bounds[:, 0])
+    return [tuple(float(value) for value in point) for point in points]
 
 
 def _can_finish_gradient(
@@ -701,6 +821,9 @@ def _validate_hpr_public_value(value: Any, *, active: set[int]) -> None:
                 HprTargetSimulationRecord,
                 HPRSimulationLoopRecord,
                 HPRSimulationStageRecord,
+                HPREffectiveTopology,
+                HPRActiveStage,
+                HPRAlternativeDesign,
             ),
         ):
             children = (getattr(value, name) for name in type(value).model_fields)
@@ -837,11 +960,39 @@ def aggregate_hpr_period_results(
         if weighted_total is not None:
             updates["hpr_total_annualized_cost"] = weighted_total
 
+    topology = _shared_effective_topology(ordered)
+    if topology is not None:
+        updates["effective_topology"] = topology
+
     shared_objective = _shared_candidate_objective(
         ordered, weights_array, loaded_share=loaded_share
     )
     updates["obj"] = shared_objective
     return ordered[0].with_updates(**updates), shared_objective
+
+
+def _shared_effective_topology(
+    results: list[HPRBackendResult],
+) -> HPREffectiveTopology | None:
+    """Return one topology for a shared design: a stage working in any period.
+
+    Each active stage is reported as it runs in the first period that uses it.
+    """
+    topologies = [r.effective_topology for r in results if r.effective_topology]
+    if not topologies:
+        return None
+    stages: dict[int, HPRActiveStage] = {}
+    for topology in topologies:
+        for stage in topology.active_stages:
+            stages.setdefault(stage.index, stage)
+    first = topologies[0]
+    return HPREffectiveTopology.from_stages(
+        cycle=first.cycle,
+        condensers=first.condensers,
+        evaporators=first.evaporators,
+        configured_stages=first.configured_stages,
+        active_stages=tuple(stages[index] for index in sorted(stages)),
+    )
 
 
 def relative_feasibility_penalty(relative_violations, *, rho: float) -> float:

@@ -295,6 +295,7 @@ class HeatPumpTargetInputs(BaseModel):
     refrigeration_capital_cost: float = 0.0
     is_heat_pumping: bool
     max_multi_start: int
+    search_seed: int = 0
     T_env: float
     dt_env_cont: float
     ambient_air_enabled: bool = True
@@ -356,9 +357,87 @@ class MultiPeriodHPRTargetInputs(BaseModel):
     selected_period_idx: int
     hpr_type: str
     max_multi_start: int
+    search_seed: int = 0
     bb_minimiser: str
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool = False
+
+
+class HPRActiveStage(BaseModel):
+    """One compressor stage a selected design uses; temperatures in degC."""
+
+    model_config = ConfigDict(frozen=True)
+
+    index: int = Field(ge=0)
+    role: Literal["vapour_compression", "mvr"]
+    fluid: str
+    evaporating_temperature: float
+    condensing_temperature: float
+    pressure_ratio: float | None = None
+    work: float
+    process_heat: float = 0.0
+    process_cooling: float = 0.0
+
+
+class HPREffectiveTopology(BaseModel):
+    """The requested layout against the stages the design actually uses.
+
+    A stage is active when it does more than a negligible share of the work
+    and lifts at least the minimum stage lift.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    cycle: str
+    condensers: int
+    evaporators: int
+    configured_stages: int
+    active_stages: tuple[HPRActiveStage, ...] = ()
+    label: str
+
+    @classmethod
+    def from_stages(
+        cls,
+        *,
+        cycle: str,
+        condensers: int,
+        evaporators: int,
+        configured_stages: int,
+        active_stages: tuple[HPRActiveStage, ...],
+    ) -> "HPREffectiveTopology":
+        """Build the topology with its label, e.g. '... 3x2 requested; 1 of 4 ...'."""
+        used = ", ".join(
+            f"{stage.fluid} {stage.evaporating_temperature:.1f} -> "
+            f"{stage.condensing_temperature:.1f} C"
+            for stage in active_stages
+        )
+        label = (
+            f"{cycle} {condensers}x{evaporators} requested; "
+            f"{len(active_stages)} of {configured_stages} stages used"
+            + (f": {used}" if used else "")
+        )
+        return cls(
+            cycle=cycle,
+            condensers=condensers,
+            evaporators=evaporators,
+            configured_stages=configured_stages,
+            active_stages=tuple(active_stages),
+            label=label,
+        )
+
+
+class HPRAlternativeDesign(BaseModel):
+    """A distinct design (other stages or fluids) close in cost to the target.
+
+    ``objective_gap`` is its objective's excess over the selected design's,
+    as a fraction of the selected objective.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    topology: HPREffectiveTopology
+    objective: float
+    objective_gap: float
 
 
 class HeatPumpTargetOutputs(BaseModel):
@@ -411,6 +490,8 @@ class HeatPumpTargetOutputs(BaseModel):
     period_weights: Optional[List[float]] = None
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     target_simulation_record: HprTargetSimulationRecord | None = None
+    effective_topology: HPREffectiveTopology | None = None
+    alternatives: tuple[HPRAlternativeDesign, ...] = ()
 
 
 class SimulatedHPRAnnualizedCostAccounting(BaseModel):
@@ -542,6 +623,8 @@ class HPRBackendResult(BaseModel):
     period_weights: list[float] | None = None
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     target_simulation_record: HprTargetSimulationRecord | None = None
+    effective_topology: HPREffectiveTopology | None = None
+    alternatives: tuple[HPRAlternativeDesign, ...] = ()
 
     @property
     def Q_ext(self) -> float:
@@ -627,6 +710,8 @@ class HPRBackendResult(BaseModel):
             "period_weights": self.period_weights,
             "simulation_backend": self.simulation_backend,
             "target_simulation_record": self.target_simulation_record,
+            "effective_topology": self.effective_topology,
+            "alternatives": self.alternatives,
         }
         return {key: value for key, value in output_values.items() if value is not None}
 
@@ -675,6 +760,9 @@ def _detach_hpr_output_value(value: Any) -> Any:
 
 __all__ = [
     "ZERO_USEFUL_DUTY_REASON",
+    "HPRActiveStage",
+    "HPRAlternativeDesign",
+    "HPREffectiveTopology",
     "HPREvaluationMode",
     "HPRFailureCategory",
     "HPRFailureDiagnostic",

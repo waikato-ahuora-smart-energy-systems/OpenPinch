@@ -26,6 +26,7 @@ from ....contracts.hpr import (
     HPRTopologyIdentifier,
 )
 from .shared import is_negligible_useful_duty, post_solve_error
+from .topology import effective_topology
 
 __all__ = ["_evaluate_multi_vc_objective"]
 
@@ -136,6 +137,11 @@ def _evaluate_multi_vc_objective(
                 "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
             ),
             target_simulation_record=record,
+            effective_topology=(
+                effective_topology(hp, args)
+                if artifact_mode is HPREvaluationMode.FINAL
+                else None
+            ),
         )
     except ValueError as exc:
         if cycle_evaluated:

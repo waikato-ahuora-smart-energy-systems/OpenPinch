@@ -30,6 +30,9 @@ from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..cycles.limits import CycleLimits
 from ..optimisation_adapter import (
+    NEGLIGIBLE_STAGE_WORK_FRACTION,
+)
+from ..optimisation_adapter import (
     build_hpr_accounting as _build_hpr_accounting,
 )
 from ..optimisation_adapter import (
@@ -218,12 +221,6 @@ def calc_hpr_machine_capital_costs(
             * f_T
         )
     return tuple(costs)
-
-
-# A cascade stage doing no more than this fraction of its machine's work has
-# no compressor, so it adds no stage capital (the same fraction as
-# NEGLIGIBLE_USEFUL_DUTY_FRACTION uses for duty).
-NEGLIGIBLE_STAGE_WORK_FRACTION = 1e-3
 
 
 def _single_cost_unit(

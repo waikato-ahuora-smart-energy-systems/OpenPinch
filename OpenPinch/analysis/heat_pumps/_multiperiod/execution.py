@@ -52,6 +52,7 @@ def get_multiperiod_hpr_targets(
         selected_period_idx=selected_period_idx,
         hpr_type=selected_case.args.hpr_type,
         max_multi_start=selected_case.args.max_multi_start,
+        search_seed=selected_case.args.search_seed,
         bb_minimiser=selected_case.args.bb_minimiser,
         simulation_backend=selected_case.args.simulation_backend,
         debug=selected_case.args.debug,

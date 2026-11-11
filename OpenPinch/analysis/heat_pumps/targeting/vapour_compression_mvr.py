@@ -38,6 +38,7 @@ from ..common.shared import (
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
+from ..common.topology import effective_topology
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
 from ..optimisation_adapter import (
     initialise_hpr_seed,
@@ -366,6 +367,11 @@ def _compute_vc_mvr_system_obj(
                 "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
             ),
             target_simulation_record=record,
+            effective_topology=(
+                effective_topology(hp, args)
+                if artifact_mode is HPREvaluationMode.FINAL
+                else None
+            ),
         )
     except ValueError as exc:
         if cycle_evaluated:

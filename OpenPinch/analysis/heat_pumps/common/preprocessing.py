@@ -145,6 +145,7 @@ def construct_HPRTargetInputs(
         eta_penalty=hpr.eta_penalty,
         rho_penalty=hpr.rho_penalty,
         max_multi_start=hpr.max_multistart,
+        search_seed=hpr.search_seed,
         bb_minimiser=hpr.bb_minimiser,
         allow_integrated_expander=hpr.integrated_expander_enabled,
         initialise_simulated_cycle=hpr.initialise_simulated_cycle,
