@@ -66,7 +66,7 @@ def _coordinator(fake: FakeHprTargetEvaluator) -> HprTargetEvaluatorCoordinator:
 def test_tespy_objective_uses_evaluator_power_cop_profiles_and_accounting(
     monkeypatch,
 ) -> None:
-    args, prepared = _prepared_args()
+    args, prepared = _prepared_args(dt_hp_ihx=3.0)
     fake = FakeHprTargetEvaluator(cop=5.0)
     coordinator = _coordinator(fake)
     monkeypatch.setattr(
@@ -108,6 +108,8 @@ def test_tespy_objective_uses_evaluator_power_cop_profiles_and_accounting(
     assert record.refrigerant_spec == request.working_fluid.source_spec
     assert record.nominal_useful_duty == pytest.approx(request.useful_duty)
     assert record.engine_version == "fake-1.0"
+    assert request.internal_hx_approach_temperature == 3.0
+    assert record.internal_hx_approach_temperature == 3.0
 
 
 @pytest.mark.parametrize("is_heat_pumping", [True, False])

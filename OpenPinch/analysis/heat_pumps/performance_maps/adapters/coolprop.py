@@ -82,6 +82,7 @@ class CoolPropHprPointSimulator:
                 eta_comp=context.basis.compressor_isentropic_efficiency,
                 refrigerant=context.working_fluid.source_spec,
                 dT_ihx_gas_side=(context.basis.internal_hx_gas_temperature_change),
+                dt_ihx=context.basis.internal_hx_approach_temperature,
                 Q_heat=(
                     point.requested_useful_duty * 1_000.0 if is_heat_pump else None
                 ),

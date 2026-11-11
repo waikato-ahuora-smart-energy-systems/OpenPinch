@@ -18,6 +18,11 @@ Heat pumps and refrigeration
   heat exchanger. The search varies it as for CoolProp, held to the
   ``HPR_DT_IHX`` approach; with no gas-side rise the network has none. TESPy
   design points match the CoolProp cycle's COP to 1e-4 with and without it.
+- Performance maps keep the target's ``HPR_DT_IHX`` approach at every point.
+  Target simulation records carry it as ``internal_hx_approach_temperature``.
+  At points with less lift than the target, the CoolProp map simulator ran
+  the internal heat exchanger with no approach, and the TESPy one could set
+  a suction gas hotter than the liquid heating it. Both overstated its duty.
 - Shared multiperiod designs now keep a minimum lift. Each
   vapour-compression stage lifts at least ``HPR_TURNDOWN`` (new, default
   0.25) of its design lift, its largest lift in any period, in every period.

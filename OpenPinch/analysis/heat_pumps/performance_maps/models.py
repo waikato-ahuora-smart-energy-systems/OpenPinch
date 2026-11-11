@@ -32,6 +32,7 @@ class HprTargetMapBasis:
     subcooling: float
     internal_hx_gas_temperature_change: float
     source_provenance: dict[str, JsonValue]
+    internal_hx_approach_temperature: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

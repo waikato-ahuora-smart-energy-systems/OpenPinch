@@ -236,8 +236,20 @@ class TespyHprPointSimulator:
         # temperature pair on the saturation line. The pressures fix the dew and
         # bubble points at the evaporating and condensing temperatures.
         # The evaporator superheats the gas and the internal heat exchanger,
-        # if any, heats it on by its gas-side temperature change.
-        ihx_rise = context.basis.internal_hx_gas_temperature_change
+        # if any, heats it on by its gas-side temperature change, held, as in
+        # the CoolProp cycle, the approach below the liquid entering it.
+        basis = context.basis
+        ihx_rise = min(
+            basis.internal_hx_gas_temperature_change,
+            max(
+                condensing_temperature
+                - basis.subcooling
+                - evaporating_temperature
+                - basis.superheat
+                - basis.internal_hx_approach_temperature,
+                0.0,
+            ),
+        )
         self._compressor_inlet.set_attr(
             p=evaporating_pressure,
             td_dew=context.basis.superheat + ihx_rise,

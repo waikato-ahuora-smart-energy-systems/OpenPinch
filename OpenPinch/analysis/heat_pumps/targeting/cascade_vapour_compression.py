@@ -472,6 +472,7 @@ def _compute_tespy_cascade_hp_system_obj(
             superheat=_TESPY_TARGET_SUPERHEAT,
             subcooling=float(state.dT_subcool[0]),
             internal_hx_gas_temperature_change=_tespy_ihx_gas_rise(state, args),
+            internal_hx_approach_temperature=float(getattr(args, "dt_hp_ihx", 0.0)),
             candidate_id=_tespy_candidate_id(x),
         )
     except (TypeError, ValueError) as exc:
