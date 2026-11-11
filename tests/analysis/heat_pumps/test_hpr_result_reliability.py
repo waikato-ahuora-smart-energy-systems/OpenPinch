@@ -248,7 +248,6 @@ def test_generalized_coolprop_record_preserves_ordered_detached_loops(
         n_evap=n_vc,
         n_mvr=n_mvr,
         refrigerant_ls=["R134A"] * n_vc,
-        mvr_fluid_ls=["Water"] * n_mvr,
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )

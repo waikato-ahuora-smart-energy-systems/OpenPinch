@@ -31,6 +31,15 @@ Heat pumps and refrigeration
   each layout has ``method``, ``stages``, ``n_fluid_sets`` and
   ``fluid_sets()``, and ``feasible_layouts`` keeps those with a fluid set.
   Explicit levels now need ``topology`` and take ``is_refrigeration``.
+- ``HPR_MVR_FLUIDS`` (``mvr_fluids=`` of ``mvr_heat_pump``) now names the
+  fluids of the vapour compression stages of a vapour compression plus MVR
+  cascade, one per stage, instead of the MVR stages' fluid. The MVR stages are
+  open cycles on process or utility steam and always run on water. The option
+  rejects water (``Water``, ``H2O``, ``R718``) and defaults to empty, which
+  keeps the vapour compression stages on ``HPR_REFRIGERANTS`` as before. Code
+  that set ``mvr_fluids=["Water"]`` should drop it; other values now choose the
+  vapour compression fluids. ``VapourCompressionMvrCascade.solve`` no longer
+  takes ``mvr_fluid``.
 - In the refrigerant screen, deep vacuum suction and over ratio limit now rule a
   fluid out of a stage, while near critical fluids stay feasible.
   ``HPR_SCREEN_CRITICAL_MARGIN`` defaults to 5 K instead of 15 K.

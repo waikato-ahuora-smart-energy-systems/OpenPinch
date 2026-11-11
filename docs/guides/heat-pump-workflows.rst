@@ -222,7 +222,6 @@ Simulated Models
        maximum_evaluations=50,
    )
    mvr_cascade = problem.target.mvr_heat_pump(
-       mvr_fluids=["Water"],
        mvr_stages=1,
        load_fraction=0.25,
        condensers=1,
@@ -248,6 +247,10 @@ uses them yet.
 Set ``is_cascade_cycle=False`` for Parallel vapour compression cycles. Use the
 separate ``mvr_heat_pump()`` method for Vapour compression with MVR cascade;
 MVR is not hidden behind a cycle selector.
+The MVR stages are open cycles on process or utility steam, so they always run
+on water. ``mvr_fluids`` (``HPR_MVR_FLUIDS``) names the fluids of the vapour
+compression stages below them and must not include water; when it is omitted,
+those stages take ``HPR_REFRIGERANTS``.
 
 Compressor efficiency models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

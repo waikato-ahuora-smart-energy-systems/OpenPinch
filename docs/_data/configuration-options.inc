@@ -172,7 +172,7 @@ Heat Pump and Refrigeration
    "``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``","boolean","``False``","","","Optimise one heat pump or refrigeration design across all periods, weighted by period, instead of one period."
    "``HPR_REFRIGERANTS``","string_list","``[""water"", ""ammonia""]``","","","Refrigerants for the vapour compression stages, one per stage."
    "``HPR_REFRIGERANT_SORT_ENABLED``","boolean","``True``","","","Assign refrigerants to stages from the highest critical temperature down instead of in the given order."
-   "``HPR_MVR_FLUIDS``","string_list","``[""Water""]``","","","Working fluids of the MVR stages in vapour compression with MVR cycles."
+   "``HPR_MVR_FLUIDS``","string_list","``[]``","","","Fluids of the vapour compression stages in vapour compression with MVR cycles, one per stage; empty uses HPR_REFRIGERANTS. Water is not allowed: the MVR stages always run on water."
    "``HPR_MVR_COUNT``","number","``1``","",">= 1","Number of MVR stages in vapour compression with MVR cycles."
    "``HPR_MVR_ETA_COMP``","number","``0.7``","","> 0 to 1","Isentropic efficiency of the MVR compressors in HPR cycles."
    "``HPR_MVR_COMPRESSOR_MODEL``","string","``constant``","","","Isentropic efficiency model of the MVR compressors: constant (HPR_MVR_ETA_COMP), pareto_front, wang_cleland or brendel, as for HPR_COMPRESSOR_MODEL."

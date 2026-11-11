@@ -39,9 +39,9 @@ from ..targeting.parallel_vapour_compression import (
 from ..targeting.vapour_compression_mvr import (
     _compute_vc_mvr_system_obj,
     _get_vc_mvr_opt_setup,
-    _normalise_fluid_list,
     _num_vc_stages,
     _parse_vc_mvr_state_variables,
+    use_mvr_cascade_fluids,
 )
 
 
@@ -138,11 +138,11 @@ def get_multiperiod_hpr_optimisation_setup(
             optimise_cascade_carnot_heat_pump_placement, selected_case.args
         )
         for case in period_cases:
+            use_mvr_cascade_fluids(case.args)
             case.args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(
                 n_vc,
                 case.args,
             )
-            case.args.mvr_fluid_ls = _normalise_fluid_list(case.args.mvr_fluid_ls)
         x0_ls, bounds = _get_vc_mvr_opt_setup(initial_result, selected_case.args)
         if selected_case.args.simulation_backend == "coolprop":
             point = representative_hpr_point(x0_ls, bounds)

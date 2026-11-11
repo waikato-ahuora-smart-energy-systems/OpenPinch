@@ -73,10 +73,10 @@ def optimise_vapour_compression_mvr_heat_pump_placement(
         )
 
     n_vc = _num_vc_stages(args)
+    use_mvr_cascade_fluids(args)
     preflight_coolprop_fluid_names(args, HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR)
     init_res = initialise_hpr_seed(optimise_cascade_carnot_heat_pump_placement, args)
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(n_vc, args)
-    args.mvr_fluid_ls = _normalise_fluid_list(getattr(args, "mvr_fluid_ls", ["Water"]))
     x0_ls, bnds = _get_vc_mvr_opt_setup(init_res, args)
     preflight_coolprop_hpr_targeting(
         args=args,
@@ -91,6 +91,17 @@ def optimise_vapour_compression_mvr_heat_pump_placement(
         bnds=bnds,
         args=args,
     )
+
+
+def use_mvr_cascade_fluids(args: HeatPumpTargetInputs) -> None:
+    """Let ``mvr_fluid_ls``, when given, replace the VC stage refrigerants.
+
+    The MVR stages always run on water; ``mvr_fluid_ls`` (``HPR_MVR_FLUIDS``)
+    names the fluids of the vapour compression stages below them.
+    """
+    fluids = _normalise_fluid_list(getattr(args, "mvr_fluid_ls", []))
+    if fluids:
+        args.refrigerant_ls = fluids
 
 
 def _num_vc_stages(args: HeatPumpTargetInputs) -> int:
@@ -265,7 +276,6 @@ def _compute_vc_mvr_system_obj(
             eta_motor=args.eta_mvr_motor,
             eta_vc_motor=args.eta_motor,
             refrigerant=args.refrigerant_ls,
-            mvr_fluid=args.mvr_fluid_ls,
             dt_cascade_hx=args.dt_cascade_hx,
             dtcont=args.dtcont_hp,
         )
@@ -397,7 +407,7 @@ def _normalise_fluid_list(values) -> list[str]:
     if isinstance(values, str):
         values = [values]
     fluids = [str(value).strip() for value in values if str(value).strip()]
-    return fluids or ["Water"]
+    return fluids
 
 
 def _derive_provisional_mvr_temperatures(

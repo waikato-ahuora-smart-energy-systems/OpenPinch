@@ -97,8 +97,18 @@ def coolprop_fluid_spelling(value: str) -> str:
     return upper
 
 
+_WATER_NAMES = frozenset({"WATER", "H2O", "R718"})
+
+
+def is_water(value: str) -> bool:
+    """Return whether ``value`` names water, with or without a ``HEOS::`` prefix."""
+    name = str(value).strip().upper().removeprefix("HEOS::")
+    return name in _WATER_NAMES
+
+
 __all__ = [
     "build_coolprop_abstract_state",
     "coolprop_fluid_spelling",
+    "is_water",
     "validate_coolprop_fluid_name",
 ]
