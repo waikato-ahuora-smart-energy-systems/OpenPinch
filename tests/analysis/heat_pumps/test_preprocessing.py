@@ -131,7 +131,7 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
         }
     )
 
-    T_out, H_out, z_amb, streams, untargeted = hp_pre._prepare_hpr_background_profile(
+    T_out, H_out, z_amb, streams = hp_pre._prepare_hpr_background_profile(
         Q_hpr_target=150.0,
         T_vals=np.array([120.0, 100.0, 80.0]),
         H_vals=np.array([200.0, 150.0, 0.0]),
@@ -143,7 +143,6 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
     assert np.max(H_out) <= 150.0
     assert z_amb.shape == T_out.shape
     assert isinstance(streams, StreamCollection)
-    assert untargeted is None  # only the refrigeration source side has a rest
 
 
 def test_construct_hpr_target_inputs_carries_penalty_options_from_config():

@@ -60,7 +60,7 @@ def construct_HPRTargetInputs(
         T_vals, hpr.dt_cont
     )
 
-    T_hot, H_hot, z_amb_hot, s_hot, s_hot_untargeted = _prepare_hpr_background_profile(
+    T_hot, H_hot, z_amb_hot, s_hot = _prepare_hpr_background_profile(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_hot,
         H_vals=H_hot,
@@ -68,7 +68,7 @@ def construct_HPRTargetInputs(
         is_heat_pumping=is_heat_pumping,
         is_cold=False,
     )
-    T_cold, H_cold, z_amb_cold, s_cold, _ = _prepare_hpr_background_profile(
+    T_cold, H_cold, z_amb_cold, s_cold = _prepare_hpr_background_profile(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_cold,
         H_vals=H_cold,
@@ -93,7 +93,6 @@ def construct_HPRTargetInputs(
         bckgrd_hot_streams=s_hot,
         bckgrd_cold_streams=s_cold,
         background_is_utility=background_is_utility,
-        untargeted_cooling_streams=s_hot_untargeted,
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
         period_idx=period_idx,
@@ -198,7 +197,6 @@ def _prepare_hpr_background_profile(
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, StreamCollection]:
     is_refrigeration_source = (not is_cold) and (not is_heat_pumping)
     background_streams = None
-    untargeted_streams = None
     if is_cold and is_heat_pumping:
         T_vals, H_vals = _get_reduced_bckgrd_cascade_till_Q_target(
             Q_hpr_target, T_vals, H_vals, is_cold=is_cold
@@ -209,13 +207,8 @@ def _prepare_hpr_background_profile(
         # warmer rest goes to cooling water and air, and any default
         # refrigeration that rest needs on its own is allowed for.
         background_streams = _background_streams(T_vals, H_vals, config)
-        (T_vals, H_vals), rest = _split_cooling_profile_at_coldest_Q_target(
+        (T_vals, H_vals), _rest = _split_cooling_profile_at_coldest_Q_target(
             Q_hpr_target, T_vals, H_vals
-        )
-        untargeted_streams = (
-            StreamCollection()
-            if rest is None
-            else _background_streams(rest[0], rest[1] - rest[1][0], config)
         )
 
     T_vals, H_vals, z_amb = _get_simplified_bckgrd_cascade_and_z_amb(
@@ -228,7 +221,7 @@ def _prepare_hpr_background_profile(
         background_streams = _create_stream_collection_of_background_profile(
             T_vals, H_vals
         )
-    return T_vals, H_vals, z_amb, background_streams, untargeted_streams
+    return T_vals, H_vals, z_amb, background_streams
 
 
 def _background_streams(

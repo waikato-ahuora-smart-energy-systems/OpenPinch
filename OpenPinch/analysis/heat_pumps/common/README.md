@@ -25,7 +25,8 @@ multi-stage vapour-compression objective, and residual utility accounting.
 
 ## Invariants
 - Background profiles are shifted by `hpr.dt_cont` (hot temperatures down, cold temperatures up) and extended by 10 K at each end; `Q_cool_max` is taken as minus the last hot enthalpy, so the hot enthalpy profile is expected to be negative. [preprocessing.py:construct_HPRTargetInputs] [preprocessing.py:_extend_profile_with_temperature_margin]
-- A refrigerator searches only the coldest `Q_hpr_target` of the cooling, while the warmer rest is kept as `untargeted_cooling_streams`. [preprocessing.py:_split_cooling_profile_at_coldest_Q_target]
+- A refrigerator searches only the coldest `Q_hpr_target` of the cooling and is evaluated against the full cooling profile. [preprocessing.py:_split_cooling_profile_at_coldest_Q_target]
+- The refrigeration allowance, the default refrigeration the warmer rest needs on its own, is the full cooling's need less `Q_hpr_target` (at least 0), on the cascade the designs are evaluated on, so the problem table's temperature rounding at the split cannot leave a design that serves its whole target short. [shared.py:refrigeration_allowance]
 - A zero target raises `ValueError` for heat pumping [preprocessing.py:_get_reduced_bckgrd_cascade_till_Q_target] and, when the cooling profile exceeds the target, for refrigeration [preprocessing.py:_split_cooling_profile_at_coldest_Q_target].
 - The default refrigeration price ratio is never below the cooling-water ratio. [preprocessing.py:default_refrigeration_to_power_ratio]
 - Stage duties are decoded as fractions in [0, 1] of each stage's available duty, so no stage can request more than it can deliver. [encoding.py:decode_available_fractions]

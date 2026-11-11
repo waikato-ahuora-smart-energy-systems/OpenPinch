@@ -359,34 +359,31 @@ def _annualized_utility_capital(
 def refrigeration_allowance(args: HeatPumpTargetInputs) -> float:
     """Return the default refrigeration the untargeted cooling needs on its own.
 
-    With a load fraction below 1, refrigeration targets the coldest part of the
-    cooling. The warmer rest may itself need some default refrigeration (when
-    it is below the cooling-water level); that is not a shortfall of the
-    design, so it is not penalised. Computed once and stored on ``args``.
+    With a load fraction below 1, refrigeration targets the coldest
+    ``Q_hpr_target`` of the cooling. The warmer rest may itself need some
+    default refrigeration (when it is below the cooling-water level); that is
+    not a shortfall of the design, so it is not penalised. The rest's need is
+    the full cooling's need less the target, on the same cascade the designs
+    are evaluated on: cascading the rest alone puts the split temperature on
+    the problem table, whose rounding on a near-isothermal profile would
+    leave a design that serves its whole target a fraction of a watt short.
+    Computed once and stored on ``args``.
     """
     if getattr(args, "is_heat_pumping", True):
         return 0.0
     cached = getattr(args, "refrigeration_allowance", None)
     if cached is not None:
         return float(cached)
-    streams = getattr(args, "untargeted_cooling_streams", None)
-    allowance = 0.0
-    if streams is not None and len(streams):
-        allowance = float(
-            _cascade_air_duties(
-                streams,
-                StreamCollection(),
-                args,
-                _ambient_source_temperature(args),
-                _ambient_sink_temperature(args),
-                _cooling_water_sink_temperature(args),
-                T_background=_cascade.get_process_heat_cascade(
-                    hot_streams=streams,
-                    is_shifted=True,
-                    period_idx=args.period_idx,
-                )[ProblemTableLabel.T],
-            ).Q_ext_bottom
-        )
+    full_need = _cascade_air_duties(
+        args.bckgrd_hot_streams,
+        StreamCollection(),
+        args,
+        _ambient_source_temperature(args),
+        _ambient_sink_temperature(args),
+        _cooling_water_sink_temperature(args),
+        T_background=args.T_hot,
+    ).Q_ext_bottom
+    allowance = max(float(full_need) - float(args.Q_hpr_target), 0.0)
     try:
         args.refrigeration_allowance = allowance
     except (AttributeError, TypeError, ValueError):
