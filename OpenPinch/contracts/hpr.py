@@ -196,6 +196,8 @@ class HprTargetSimulationRecord(BaseModel):
     superheat: float = Field(ge=0.0)
     subcooling: float = Field(ge=0.0)
     internal_hx_gas_temperature_change: float = Field(ge=0.0)
+    # The IHX hot-end approach: the gas leaves at least this below the liquid.
+    internal_hx_approach_temperature: float = Field(default=0.0, ge=0.0)
     evaporator_count: int = Field(ge=1)
     condenser_count: int = Field(ge=1)
     period_id: str | None = None
@@ -282,19 +284,13 @@ class HeatPumpTargetInputs(BaseModel):
     annual_op_time: float
     discount_rate: float
     serv_life: float
-    hpr_equipment_cost: float
-    hpr_installation_factor: float
-    hpr_cost_exp: float
-    hpr_cost_fixed_share: float
-    hpr_cost_stage_share: float
-    hpr_cost_temp_factor: float
-    hpr_cost_temp_base: float
     hpr_capital_recovery: bool = True
     utility_capital_recovery: bool = True
     hot_utility_capital_cost: float = 0.0
     refrigeration_capital_cost: float = 0.0
     is_heat_pumping: bool
     max_multi_start: int
+    search_seed: int = 0
     T_env: float
     dt_env_cont: float
     ambient_air_enabled: bool = True
@@ -312,11 +308,33 @@ class HeatPumpTargetInputs(BaseModel):
     # Refrigeration only: the default refrigeration that the cooling warmer
     # than the targeted coldest Q_hpr_target needs on its own.
     refrigeration_allowance: float | None = None
+    # Heat pumps that must serve their whole target (enforce_heating_duty):
+    # the hot utility the untargeted heating needs on its own.
+    enforce_heating_duty: bool = False
+    heating_allowance: float | None = None
+    # Shared multiperiod designs: each stage's lift in every period is at least
+    # turndown x its design lift; the search sets stage_lift_floor (K).
+    turndown: float = 0.0
+    # Capital costing: overall heat transfer coefficients (W/m2K) by the heat
+    # pump side's phase, the ambient air side's (in series with the heat pump
+    # side's), and the process streams' own approach (K).
+    u_two_phase: float = 2000.0
+    u_liquid: float = 1000.0
+    u_gas: float = 400.0
+    u_air: float = 50.0
+    process_dt_cont: float = 0.0
+    stage_lift_floor: np.ndarray | None = None
     bb_minimiser: str
     eta_penalty: float
     rho_penalty: float
     period_idx: int = 0
     max_pressure_ratio: float | None = None
+    # Practical stage limits; pressures in Pa, temperatures in K.
+    max_discharge_superheat: float | None = None
+    max_discharge_pressure: float | None = None
+    max_discharge_pressure_co2: float | None = None
+    min_suction_pressure: float | None = None
+    min_stage_lift: float = 0.0
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool
 
@@ -346,9 +364,87 @@ class MultiPeriodHPRTargetInputs(BaseModel):
     selected_period_idx: int
     hpr_type: str
     max_multi_start: int
+    search_seed: int = 0
     bb_minimiser: str
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool = False
+
+
+class HPRActiveStage(BaseModel):
+    """One compressor stage a selected design uses; temperatures in degC."""
+
+    model_config = ConfigDict(frozen=True)
+
+    index: int = Field(ge=0)
+    role: Literal["vapour_compression", "mvr"]
+    fluid: str
+    evaporating_temperature: float
+    condensing_temperature: float
+    pressure_ratio: float | None = None
+    work: float
+    process_heat: float = 0.0
+    process_cooling: float = 0.0
+
+
+class HPREffectiveTopology(BaseModel):
+    """The requested layout against the stages the design actually uses.
+
+    A stage is active when it does more than a negligible share of the work
+    and lifts at least the minimum stage lift.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    cycle: str
+    condensers: int
+    evaporators: int
+    configured_stages: int
+    active_stages: tuple[HPRActiveStage, ...] = ()
+    label: str
+
+    @classmethod
+    def from_stages(
+        cls,
+        *,
+        cycle: str,
+        condensers: int,
+        evaporators: int,
+        configured_stages: int,
+        active_stages: tuple[HPRActiveStage, ...],
+    ) -> "HPREffectiveTopology":
+        """Build the topology with its label, e.g. '... 3x2 requested; 1 of 4 ...'."""
+        used = ", ".join(
+            f"{stage.fluid} {stage.evaporating_temperature:.1f} -> "
+            f"{stage.condensing_temperature:.1f} C"
+            for stage in active_stages
+        )
+        label = (
+            f"{cycle} {condensers}x{evaporators} requested; "
+            f"{len(active_stages)} of {configured_stages} stages used"
+            + (f": {used}" if used else "")
+        )
+        return cls(
+            cycle=cycle,
+            condensers=condensers,
+            evaporators=evaporators,
+            configured_stages=configured_stages,
+            active_stages=tuple(active_stages),
+            label=label,
+        )
+
+
+class HPRAlternativeDesign(BaseModel):
+    """A distinct design (other stages or fluids) close in cost to the target.
+
+    ``objective_gap`` is its objective's excess over the selected design's,
+    as a fraction of the selected objective.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    topology: HPREffectiveTopology
+    objective: float
+    objective_gap: float
 
 
 class HeatPumpTargetOutputs(BaseModel):
@@ -401,6 +497,8 @@ class HeatPumpTargetOutputs(BaseModel):
     period_weights: Optional[List[float]] = None
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     target_simulation_record: HprTargetSimulationRecord | None = None
+    effective_topology: HPREffectiveTopology | None = None
+    alternatives: tuple[HPRAlternativeDesign, ...] = ()
 
 
 class SimulatedHPRAnnualizedCostAccounting(BaseModel):
@@ -467,6 +565,10 @@ ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
 INFEASIBLE_REFRIGERATION_REASON = (
     "Refrigeration candidate carries a feasibility penalty, such as unserved cooling."
 )
+INFEASIBLE_HEAT_PUMP_REASON = (
+    "Heat pump candidate carries a feasibility penalty, such as a stage outside "
+    "its limits."
+)
 """Final-evaluation failure reason for a design equivalent to no heat pump.
 
 During the search a zero-duty design is valid: it carries no penalty and its
@@ -528,6 +630,8 @@ class HPRBackendResult(BaseModel):
     period_weights: list[float] | None = None
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     target_simulation_record: HprTargetSimulationRecord | None = None
+    effective_topology: HPREffectiveTopology | None = None
+    alternatives: tuple[HPRAlternativeDesign, ...] = ()
 
     @property
     def Q_ext(self) -> float:
@@ -613,6 +717,8 @@ class HPRBackendResult(BaseModel):
             "period_weights": self.period_weights,
             "simulation_backend": self.simulation_backend,
             "target_simulation_record": self.target_simulation_record,
+            "effective_topology": self.effective_topology,
+            "alternatives": self.alternatives,
         }
         return {key: value for key, value in output_values.items() if value is not None}
 
@@ -661,6 +767,9 @@ def _detach_hpr_output_value(value: Any) -> Any:
 
 __all__ = [
     "ZERO_USEFUL_DUTY_REASON",
+    "HPRActiveStage",
+    "HPRAlternativeDesign",
+    "HPREffectiveTopology",
     "HPREvaluationMode",
     "HPRFailureCategory",
     "HPRFailureDiagnostic",

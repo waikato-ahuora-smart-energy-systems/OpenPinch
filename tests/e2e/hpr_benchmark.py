@@ -75,6 +75,11 @@ class HPRProfile:
                 else maximum_evaluations
             ),
         }
+        refrigerants = (
+            HPR_SENTINEL_REFRIGERANTS
+            if sentinel and self.profile_id in HPR_SENTINELS_WITH_AMMONIA
+            else self.refrigerants
+        )
         utility_key = (
             "is_utility_refrigeration"
             if self.service_name == "vapour_compression_refrigeration"
@@ -85,11 +90,11 @@ class HPRProfile:
             kwargs.update(
                 mvr_fluids=list(self.mvr_fluids),
                 mvr_stages=self.mvr_stages,
-                options={"HPR_REFRIGERANTS": list(self.refrigerants)},
+                options={"HPR_REFRIGERANTS": list(refrigerants)},
             )
         else:
             kwargs.update(
-                refrigerants=list(self.refrigerants),
+                refrigerants=list(refrigerants),
                 is_cascade_cycle=self.is_cascade_cycle,
             )
         if sentinel and self.profile_id in HPR_SENTINELS_WITHOUT_PRESSURE_RATIO_LIMIT:
@@ -97,10 +102,17 @@ class HPRProfile:
                 **kwargs.get("options", {}),
                 "HPR_MAX_PRESSURE_RATIO": 1e6,
             }
-        if sentinel and self.profile_id in HPR_SENTINELS_WITH_IDEAL_MOTOR:
+        if sentinel and self.profile_id in HPR_SENTINELS_WITHOUT_SUCTION_FLOOR:
+            kwargs["options"] = {
+                **kwargs.get("options", {}),
+                "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
+            }
+        if sentinel and self.profile_id in HPR_SENTINELS_WITHOUT_CAPITAL:
             kwargs["options"] = {
                 **kwargs.get("options", {}),
                 "HPR_ETA_MOTOR": 1.0,
+                "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
+                "COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED": True,
             }
         return kwargs
 
@@ -212,10 +224,35 @@ HPR_SENTINELS_WITHOUT_PRESSURE_RATIO_LIMIT = frozenset(
     }
 )
 
-# This sentinel's heat pump only just pays: with the default motor losses
-# (HPR_ETA_MOTOR 0.95) none improves on the baseline, so it runs with an ideal
-# motor to keep proving the search on a solvable problem.
-HPR_SENTINELS_WITH_IDEAL_MOTOR = frozenset({"utility-optimized-vc-mvr-heat-pump"})
+# These sentinels run water stages that evaporate below about 81 C, under the
+# 0.5 bar suction pressure floor; they prove the search, not the fluid.
+HPR_SENTINELS_WITHOUT_SUCTION_FLOOR = frozenset(
+    {
+        "direct-optimized-vc-mvr-heat-pump",
+        "utility-optimized-vc-mvr-heat-pump",
+    }
+)
+
+# Priced on its suction volume, a water stage evaporating below about 80 C is
+# far too dear to pay at these sentinels' duties (a 50 kW water heat pump on
+# Martinez-Rodriguez needs about 4,300 m3/h). Their closed stages run on
+# ammonia to keep proving the search on a solvable problem.
+HPR_SENTINEL_REFRIGERANTS = ("Ammonia",)
+HPR_SENTINELS_WITH_AMMONIA = frozenset(
+    {
+        "direct-cascade-vc-heat-pump",
+        "utility-parallel-vc-heat-pump",
+        "direct-optimized-vc-mvr-heat-pump",
+    }
+)
+
+# This sentinel's heat pump pays only on operating cost: its water stage needs
+# about 155,000 m3/h of suction (1 MW of shaft power), and no heat pump pays
+# its capital. Even then, with the default motor losses (HPR_ETA_MOTOR 0.95)
+# or without credit for the hot utility capital it displaces, none improves on
+# the baseline. It runs without heat pump capital, with an ideal motor and the
+# credit on, to keep proving the search on a solvable problem.
+HPR_SENTINELS_WITHOUT_CAPITAL = frozenset({"utility-optimized-vc-mvr-heat-pump"})
 
 # A utility refrigerator must lift heat from below ambient to the hot-utility
 # level. At such lifts no heat pump may pay, so these sentinels accept the
@@ -618,13 +655,16 @@ def observe_hpr_search() -> Iterator[list[SearchObservation]]:
                 for value in np.asarray(kwargs["point"], dtype=float).reshape(-1)
             )
             objective = float(result.obj)
+            # Viable means a final target could be this point: a design still
+            # carrying a penalty is rejected at the end, so it is not viable.
+            accepted = adapter.reject_penalised_design(result, kwargs["args"])
             observations.append(
                 SearchObservation(
                     point=point,
-                    success=bool(result.success and math.isfinite(objective)),
+                    success=bool(accepted.success and math.isfinite(objective)),
                     objective=(
                         objective
-                        if result.success and math.isfinite(objective)
+                        if accepted.success and math.isfinite(objective)
                         else None
                     ),
                     objective_name=getattr(kwargs.get("objective"), "__name__", None),

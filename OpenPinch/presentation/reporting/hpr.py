@@ -21,7 +21,9 @@ def hpr_summary(target: Any, label: str | None = None) -> dict[str, Any]:
 
     Returns:
         A dict with the backend, cycle, selected and achieved load, objective,
-        period ids and weights, design vector and simulated loop count.
+        period ids and weights, design vector, simulated loop count, the
+        effective topology's label and each alternative design's label and
+        objective gap.
     """
     details = target.hpr_details
     record = details.target_simulation_record
@@ -38,6 +40,18 @@ def hpr_summary(target: Any, label: str | None = None) -> dict[str, Any]:
         "period_weights": _floats(details.period_weights),
         "design_vector": _floats(details.design_vector),
         "loop_count": 0 if record is None else len(record.loops),
+        "effective_topology": (
+            None
+            if details.effective_topology is None
+            else details.effective_topology.label
+        ),
+        "alternatives": [
+            {
+                "design": alternative.topology.label,
+                "objective_gap": alternative.objective_gap,
+            }
+            for alternative in details.alternatives
+        ],
     }
 
 

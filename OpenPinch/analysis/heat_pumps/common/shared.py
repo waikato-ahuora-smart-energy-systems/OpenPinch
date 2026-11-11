@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Any
 
 import CoolProp.CoolProp as _coolprop
@@ -28,6 +27,7 @@ from ....domain.enums import ProblemTableLabel
 from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
+from ..cycles.limits import CycleLimits
 from ..optimisation_adapter import (
     build_hpr_accounting as _build_hpr_accounting,
 )
@@ -55,22 +55,26 @@ from ._shared.air import (
 from ._shared.air import (
     utility_bands as _utility_bands,
 )
+from .capital import installed_capital
+from .machine_capital import machine_components, process_side_areas
 
 __all__ = [
-    "HPRCostUnit",
     "SUBCRITICAL_CONDENSING_MARGIN_K",
-    "calc_hpr_capital_cost",
-    "calc_hpr_machine_capital_costs",
     "NEGLIGIBLE_USEFUL_DUTY_FRACTION",
     "cap_stage_condensing_temperatures",
+    "subcritical_stage_condensing_temperatures",
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
+    "cycle_limits",
+    "raise_cascade_lifts_to_floor",
+    "raise_parallel_lifts_to_floor",
     "floor_stage_evaporating_temperatures",
     "limit_cascade_pressure_ratios",
     "limit_parallel_pressure_ratios",
     "calc_simulated_hpr_annualized_costs",
     "hpr_penalty_cost_scale",
     "refrigeration_allowance",
+    "heating_allowance",
     "calc_carnot_heat_engine_eta",
     "calc_carnot_heat_pump_cop",
     "compute_entropic_mean_temperature",
@@ -148,124 +152,13 @@ def hpr_penalty_cost_scale(args: HeatPumpTargetInputs) -> float:
     return max(total, 1.0)
 
 
-@dataclass(frozen=True)
-class HPRCostUnit:
-    """One heat-pump machine for capital costing.
-
-    ``Q_cap`` is its heating-side capacity in kW: all the heat it rejects
-    outside itself (condensing, desuperheating and subcooling), whether to
-    the process or to air. ``T_hot_max`` is the highest temperature at which
-    it delivers heat, in degC. ``n_closed`` and ``n_mvr`` count its closed
-    refrigerant and open MVR compression stages.
-    """
-
-    Q_cap: float
-    T_hot_max: float
-    n_closed: int = 1
-    n_mvr: int = 0
-
-
-def calc_hpr_capital_cost(
-    units: Sequence[HPRCostUnit],
-    args: HeatPumpTargetInputs,
-) -> Value:
-    """Return the installed capital cost of the heat-pump machines.
-
-    This is the sum of :func:`calc_hpr_machine_capital_costs`.
-    """
-    return Value(sum(calc_hpr_machine_capital_costs(units, args)), "$")
-
-
-def calc_hpr_machine_capital_costs(
-    units: Sequence[HPRCostUnit],
-    args: HeatPumpTargetInputs,
-) -> tuple[float, ...]:
-    """Return the installed capital cost of each heat-pump machine, in $.
-
-    Each machine costs::
-
-        F_inst * C_eq * (Q_cap / 1 MW)^exp
-            * (fixed_share + stage_share * (n_closed + n_mvr)) * f_T
-
-    with ``f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K``.
-    The machines are costed separately, and a machine with no capacity costs
-    nothing.
-    """
-    costs = []
-    for unit in units:
-        Q_mw = max(float(unit.Q_cap), 0.0) / 1000.0
-        if Q_mw <= 0.0:
-            costs.append(0.0)
-            continue
-        stage_factor = float(args.hpr_cost_fixed_share) + float(
-            args.hpr_cost_stage_share
-        ) * (int(unit.n_closed) + int(unit.n_mvr))
-        f_T = (
-            1.0
-            + float(args.hpr_cost_temp_factor)
-            * max(0.0, float(unit.T_hot_max) - float(args.hpr_cost_temp_base))
-            / 100.0
-        )
-        costs.append(
-            float(args.hpr_installation_factor)
-            * float(args.hpr_equipment_cost)
-            * Q_mw ** float(args.hpr_cost_exp)
-            * stage_factor
-            * f_T
-        )
-    return tuple(costs)
-
-
-# A cascade stage doing no more than this fraction of its machine's work has
-# no compressor, so it adds no stage capital (the same fraction as
-# NEGLIGIBLE_USEFUL_DUTY_FRACTION uses for duty).
-NEGLIGIBLE_STAGE_WORK_FRACTION = 1e-3
-
-
-def _single_cost_unit(
-    state: HPRParsedState,
-    hpr_streams: StreamCollection,
-    work_arr: np.ndarray | None,
-    args: HeatPumpTargetInputs,
-) -> list[HPRCostUnit]:
-    """Treat all the stages as one machine (a cascade).
-
-    Each closed stage has its own compressor, so the stage count comes from
-    the solved stage works: a cascade with ``n_cond`` condenser and
-    ``n_evap`` evaporator levels has ``n_cond + n_evap - 1`` stages, more
-    than its ``n_cond`` condensing temperatures. A stage whose work is at
-    most ``NEGLIGIBLE_STAGE_WORK_FRACTION`` of the machine's work (merged
-    levels, or no duty) has no compressor and is not charged.
-    """
-    hot = hpr_streams.get_hot_utility_streams()
-    Q_cap = (
-        max(float(hot.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
-        if len(hot)
-        else 0.0
-    )
-    T_cond = np.asarray(state.T_cond, dtype=float).ravel()
-    works = np.abs(np.asarray(work_arr if work_arr is not None else [], dtype=float))
-    n_stages = (
-        int(np.count_nonzero(works > NEGLIGIBLE_STAGE_WORK_FRACTION * works.sum()))
-        if works.size
-        else T_cond.size
-    )
-    return [
-        HPRCostUnit(
-            Q_cap=Q_cap,
-            T_hot_max=float(T_cond.max()) if T_cond.size else 0.0,
-            n_closed=max(int(n_stages), 1),
-        )
-    ]
-
-
 def calc_simulated_hpr_annualized_costs(
     *,
     work: float,
     Q_ext_heat: float,
     Q_cooling_water: float,
     Q_refrigeration: float,
-    cost_units: Sequence[HPRCostUnit],
+    machine_capital: Sequence[float],
     penalty_weight: float,
     args: HeatPumpTargetInputs,
 ) -> SimulatedHPRAnnualizedCostAccounting:
@@ -290,7 +183,7 @@ def calc_simulated_hpr_annualized_costs(
         + compute_annual_energy_cost(Q_refrigeration, ref_price, annual_hours)
     ).to("$/y")
 
-    machine_capital = calc_hpr_machine_capital_costs(cost_units, args)
+    machine_capital = tuple(float(capital) for capital in machine_capital)
     machine_annualized_capital = tuple(
         float(
             compute_annual_capital_cost(
@@ -386,6 +279,34 @@ def refrigeration_allowance(args: HeatPumpTargetInputs) -> float:
     allowance = max(float(full_need) - float(args.Q_hpr_target), 0.0)
     try:
         args.refrigeration_allowance = allowance
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return allowance
+
+
+def heating_allowance(args: HeatPumpTargetInputs) -> float:
+    """Return the hot utility the untargeted heating needs on its own.
+
+    The heat pump counterpart of ``refrigeration_allowance``, used when
+    ``args.enforce_heating_duty`` asks a heat pump to serve its whole
+    ``Q_hpr_target``: the full heating's hot utility less the target, on the
+    same cascade the designs are evaluated on. Computed once and stored on
+    ``args``.
+    """
+    cached = getattr(args, "heating_allowance", None)
+    if cached is not None:
+        return float(cached)
+    full_need = _cascade_air_duties(
+        StreamCollection(),
+        args.bckgrd_cold_streams,
+        args,
+        _ambient_source_temperature(args),
+        _ambient_sink_temperature(args),
+        T_background=args.T_cold,
+    ).Q_ext_top
+    allowance = max(float(full_need) - float(args.Q_hpr_target), 0.0)
+    try:
+        args.heating_allowance = allowance
     except (AttributeError, TypeError, ValueError):
         pass
     return allowance
@@ -552,14 +473,15 @@ def evaluate_vapour_hpr_result(
     penalty_terms: list[float] | None = None,
     dT_subcool: np.ndarray | None = None,
     dT_superheat: np.ndarray | None = None,
-    cost_units: Sequence[HPRCostUnit] | None = None,
+    machines: Sequence[Sequence[Any]] | None = None,
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared simulated-vapour accounting, plotting, and result assembly.
 
-    ``cost_units`` lists the machines to cost; by default all the stages are
-    one machine.
+    ``machines`` lists each machine's solved stages for capital costing; by
+    default all the stages of ``model`` are one machine, and with no model
+    there is no machine to cost.
     """
     # Ambient air is a free utility in each cascade: it supplies heat below its
     # source temperature and takes heat above its sink temperature, only as
@@ -597,14 +519,34 @@ def evaluate_vapour_hpr_result(
     evap_wrong_side = evap.Q_ext_top
     Q_amb_hot = cond.Q_air_source + evap.Q_air_source
     Q_amb_cold = cond.Q_air_sink + evap.Q_air_sink
-    if cost_units is None:
-        cost_units = _single_cost_unit(state, hpr_streams, work_arr, args)
+    if machines is None:
+        machines = [] if model is None else [_model_stages(model)]
+    components = machine_components(
+        machines,
+        process_areas=process_side_areas(
+            hpr_streams,
+            args,
+            condensing_temperatures=np.atleast_1d(np.asarray(state.T_cond, float)),
+            air_duties=(cond.Q_air_sink, evap.Q_air_source),
+            wrong_side_duties=(cond_wrong_side, evap_wrong_side),
+        ),
+        args=args,
+    )
     all_penalty_terms = [
         *_normalise_hpr_penalty_terms(penalty_terms),
         cond_wrong_side,
         evap_wrong_side,
     ]
-    if not getattr(args, "is_heat_pumping", True):
+    if getattr(args, "is_heat_pumping", True):
+        # Heat a heat pump's condensers reject to air is heat the process could
+        # not use: wrong-side heat, though air takes it for free. A refrigerator
+        # rejecting to air is an ordinary air-cooled condenser.
+        all_penalty_terms.append(cond.Q_air_sink)
+        if getattr(args, "enforce_heating_duty", False):
+            # Hot utility beyond what the untargeted heating needs on its own
+            # is targeted heating the heat pump leaves unserved.
+            all_penalty_terms.append(max(Q_ext_heat - heating_allowance(args), 0.0))
+    else:
         # A refrigerator must serve the targeted coldest cooling. Cooling water
         # and air take the warmer rest for free; only default refrigeration
         # beyond what that rest needs on its own is unserved, so a zero-duty
@@ -621,7 +563,7 @@ def evaluate_vapour_hpr_result(
         Q_ext_heat=Q_ext_heat,
         Q_cooling_water=Q_cooling_water,
         Q_refrigeration=Q_refrigeration,
-        cost_units=cost_units,
+        machine_capital=[installed_capital(machine) for machine in components],
         penalty_weight=penalty_weight,
         args=args,
     )
@@ -691,6 +633,13 @@ def evaluate_vapour_hpr_result(
             else None
         ),
     )
+
+
+def _model_stages(model: Any) -> list[Any]:
+    """The solved stages of a cascade, parallel or VC+MVR model."""
+    if hasattr(model, "vc_cycles"):
+        return [*model.vc_cycles, *model.mvr_cycles]
+    return list(model._subcycles)
 
 
 def compute_entropic_mean_temperature(
@@ -765,11 +714,9 @@ def calc_carnot_heat_engine_eta(
     return eta.item() if eta.ndim == 0 else eta
 
 
-# Condensing temperatures within this margin of a refrigerant's critical
-# temperature have no usable saturation state (the cycle's pressure lookup
-# switches to the critical isochore there), so the search stays below it. TESPy
-# still solves inside the margin, but both backends share the limit so their
-# targets compare the same designs.
+# TESPy models subcritical cycles only, so its condensing search stays this far
+# below the refrigerant's critical temperature. CoolProp stages above the
+# critical point run transcritical, so their search is not capped.
 SUBCRITICAL_CONDENSING_MARGIN_K = 2.0
 
 
@@ -798,15 +745,17 @@ def condensing_temperature_search_range(
 ) -> tuple[float, float]:
     """Return the ``(hottest, coldest)`` condensing temperatures to search, in degC.
 
-    The range spans the heat-sink profile (``args.T_cold``) but is capped just
-    below the highest critical temperature among the candidate refrigerants:
-    a subcritical vapour-compression condenser cannot operate above it, and
-    every candidate there fails in CoolProp and TESPy. Without the cap the
-    search can spend its whole budget in that infeasible region. The range is
-    returned unchanged when the refrigerants' critical points are unknown or
-    when the cap would leave nothing to search.
+    The range spans the heat-sink profile (``args.T_cold``). A CoolProp stage
+    above its critical point runs transcritical, so CoolProp searches all of
+    it. TESPy models subcritical cycles only, so its range is capped just below
+    the highest critical temperature among the candidate refrigerants, where
+    every candidate would fail. The range is returned unchanged when the
+    refrigerants' critical points are unknown or when the cap would leave
+    nothing to search.
     """
     t_hot, t_cold = float(args.T_cold[0]), float(args.T_cold[-1])
+    if getattr(args, "simulation_backend", "coolprop") != "tespy":
+        return t_hot, t_cold
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
         t_crit = max(float(critical_point(ref)[0]) for ref in refrigerants)
@@ -834,13 +783,29 @@ def cap_stage_condensing_temperatures(
     T_cond: np.ndarray,
     args: HeatPumpTargetInputs,
 ) -> np.ndarray:
+    """Cap each TESPy stage's condensing temperature below its refrigerant's Tcrit.
+
+    CoolProp stages above their critical point run transcritical and are
+    returned unchanged. TESPy stages are capped as in
+    ``subcritical_stage_condensing_temperatures``.
+    """
+    if getattr(args, "simulation_backend", "coolprop") != "tespy":
+        return np.asarray(T_cond, dtype=float)
+    return subcritical_stage_condensing_temperatures(T_cond, args)
+
+
+def subcritical_stage_condensing_temperatures(
+    T_cond: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
     """Cap each stage's condensing temperature below its own refrigerant's Tcrit.
 
-    ``condensing_temperature_search_range`` caps the whole search at the
-    highest critical temperature among the refrigerants. A stage with a
-    lower-Tcrit refrigerant (R134a beside water, say) could still be decoded
-    above its own critical point, where every candidate fails. Stage ``i`` uses
-    ``args.refrigerant_ls[i]`` and keeps that pairing; the result is
+    TESPy decodes every candidate this way, and every warm start is seeded
+    this way, so a search starts subcritical. ``condensing_temperature_search_range``
+    caps a TESPy search at the highest critical temperature among the
+    refrigerants, but a stage with a lower-Tcrit refrigerant (R134a beside
+    water, say) could still be decoded above its own critical point. Stage
+    ``i`` uses ``args.refrigerant_ls[i]`` and keeps that pairing; the result is
     non-increasing (a capped stage pulls the colder stages down with it).
     """
     T_cond = np.asarray(T_cond, dtype=float)
@@ -909,13 +874,18 @@ def _coldest_evaporator_within_pressure_ratio(
 ) -> float:
     """Return the evaporating temperature (degC) at ``max_ratio`` below ``T_cond``.
 
-    Returns -inf where there is no such state, as for a condenser beyond the
-    critical point or a pressure below the triple point: those candidates fail
-    or are floored elsewhere.
+    The high pressure follows the cycle: saturation below the critical point,
+    the critical isochore within 1 K of it and above (transcritical). Returns
+    -inf where there is no such state, as for a pressure below the triple
+    point: those candidates fail or are floored elsewhere.
     """
     state = build_coolprop_abstract_state(refrigerant)
     try:
-        state.update(_coolprop.QT_INPUTS, 0.0, T_cond + 273.15)
+        t_crit, _, d_crit = critical_point(refrigerant)
+        if T_cond + 273.15 > t_crit - 1.0:
+            state.update(_coolprop.DmassT_INPUTS, d_crit, T_cond + 273.15)
+        else:
+            state.update(_coolprop.QT_INPUTS, 0.0, T_cond + 273.15)
         state.update(_coolprop.PQ_INPUTS, state.p() / max_ratio, 1.0)
     except ValueError:
         return -np.inf
@@ -938,9 +908,10 @@ def limit_parallel_pressure_ratios(
 ) -> np.ndarray:
     """Raise each machine's evaporator until its pressure ratio is within the limit.
 
-    Machine ``i`` uses ``args.refrigerant_ls[i]``. As with the evaporating
-    floor, limiting at decode keeps candidates evaluable; the result is
-    non-increasing (a raised machine lifts the warmer machines with it).
+    Machine ``i`` uses ``args.refrigerant_ls[i]``. The search penalises a
+    ratio over the limit; this places the warm start within it, so even a
+    small search starts from a design the penalty does not reject. The result
+    is non-increasing (a raised machine lifts the warmer machines with it).
     """
     T_evap = np.asarray(T_evap, dtype=float)
     max_ratio = _pressure_ratio_limit(args)
@@ -972,6 +943,7 @@ def limit_cascade_pressure_ratios(
     The levels run hottest first through ``T_cond`` then ``T_evap``, and stage
     ``i`` with ``args.refrigerant_ls[i]`` lifts from level ``i + 1`` to level
     ``i``. Working from the top lets each raised level set the stage below it.
+    Used to place the warm start within the limit, which the search penalises.
     """
     T_cond = np.asarray(T_cond, dtype=float)
     T_evap = np.asarray(T_evap, dtype=float)
@@ -993,6 +965,50 @@ def limit_cascade_pressure_ratios(
         lower = stage + 1
         levels[lower] = max(levels[lower], floor + (dt_hx if lower < n_cond else 0.0))
     return levels[:n_cond], levels[n_cond:]
+
+
+def raise_parallel_lifts_to_floor(
+    T_cond: np.ndarray, T_evap: np.ndarray, floors: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Raise each parallel machine's condenser until it lifts at least its floor.
+
+    A shared multiperiod machine cannot turn its lift down below its floor, so
+    in a period needing less it condenses higher, at a larger approach. The
+    condensers stay non-increasing (a raised machine lifts the warmer ones).
+    """
+    T_evap = np.asarray(T_evap, dtype=float)
+    T_cond = np.maximum(np.asarray(T_cond, dtype=float), T_evap + floors)
+    for index in range(T_cond.size - 2, -1, -1):
+        T_cond[index] = max(T_cond[index], T_cond[index + 1])
+    return T_cond, T_evap
+
+
+def raise_cascade_lifts_to_floor(
+    T_cond: np.ndarray, T_evap: np.ndarray, floors: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Raise a cascade's levels until every stage lifts at least its floor.
+
+    The levels run hottest first through ``T_cond`` then ``T_evap``, and stage
+    ``i`` lifts from level ``i + 1`` to level ``i``. Working from the bottom
+    up, raising a stage's upper level never lowers a lift already checked.
+    """
+    T_cond = np.asarray(T_cond, dtype=float)
+    levels = np.concatenate([T_cond, np.asarray(T_evap, dtype=float)])
+    for stage in range(levels.size - 2, -1, -1):
+        levels[stage] = max(levels[stage], levels[stage + 1] + floors[stage])
+    return levels[: T_cond.size], levels[T_cond.size :]
+
+
+def cycle_limits(args: HeatPumpTargetInputs) -> CycleLimits:
+    """Return the practical limits each vapour compression stage is held to."""
+    return CycleLimits(
+        max_discharge_superheat=getattr(args, "max_discharge_superheat", None),
+        max_pressure_ratio=getattr(args, "max_pressure_ratio", None),
+        max_discharge_pressure=getattr(args, "max_discharge_pressure", None),
+        max_discharge_pressure_co2=getattr(args, "max_discharge_pressure_co2", None),
+        min_suction_pressure=getattr(args, "min_suction_pressure", None),
+        min_lift=float(getattr(args, "min_stage_lift", 0.0) or 0.0),
+    )
 
 
 def validate_vapour_hp_refrigerant_ls(

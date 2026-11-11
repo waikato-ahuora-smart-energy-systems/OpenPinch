@@ -18,6 +18,7 @@ from OpenPinch.analysis.heat_pumps._multiperiod.state import (
 from OpenPinch.analysis.heat_pumps.optimisation_adapter import translate_hpr_output
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.hpr import (
+    INFEASIBLE_HEAT_PUMP_REASON,
     ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
@@ -507,7 +508,7 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
         lambda **_kwargs: None,
     )
 
-    def fake_solve_hpr_multiperiod_placement(*, f_obj, x0_ls, bnds, args):
+    def fake_solve_hpr_multiperiod_placement(*, f_obj, x0_ls, bnds, args, stage_lifts):
         captured["period_ids"] = [case.period_id for case in args.period_cases]
         captured["hpr_type"] = args.hpr_type
         captured["has_bounds"] = bool(bnds)
@@ -1093,3 +1094,227 @@ def test_multiperiod_vc_mvr_rejects_an_invalid_mvr_fluid_before_the_seed(
 
     with pytest.raises(HPRTargetingError):
         hp_setup.get_multiperiod_hpr_optimisation_setup(cases, selected_case=cases[0])
+
+
+def test_a_shared_design_still_carrying_a_penalty_is_not_a_target(monkeypatch):
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (OptimisationCandidate(objective=100.0, point=(1.0,)),),
+    )
+    vapour = HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+    cases = [
+        HPRPeriodCase(
+            period_id=f"p{idx}",
+            period_idx=idx,
+            weight=1.0,
+            args=_input_args(period_idx=idx, hpr_type=vapour),
+        )
+        for idx in (0, 1)
+    ]
+    mp_args = MultiPeriodHPRTargetInputs(
+        period_cases=cases,
+        selected_period_id="p0",
+        selected_period_idx=0,
+        hpr_type=vapour,
+        max_multi_start=1,
+        bb_minimiser="rbf_surrogate",
+    )
+
+    def objective(x, args, debug=False):
+        return _backend_result(
+            obj=100.0, utility_tot=1.0, period_idx=args.period_idx
+        ).with_updates(feasibility_penalty=1.0)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=mp_args,
+        )
+
+    assert any(
+        failure.summary == INFEASIBLE_HEAT_PUMP_REASON
+        for failure in raised.value.diagnostics.representative_failures
+    )
+
+
+def test_a_vapour_compression_setup_gives_the_stage_lifts_for_the_turndown(
+    monkeypatch,
+):
+    cases = _vc_mvr_period_cases(mvr_fluid_ls=["AMMONIA"])
+    monkeypatch.setattr(
+        hp_setup, "preflight_coolprop_hpr_targeting", lambda **_kwargs: None
+    )
+
+    *_, stage_lifts = hp_setup.get_multiperiod_hpr_optimisation_setup(
+        cases, selected_case=cases[0]
+    )
+
+    assert stage_lifts is hp_setup._vc_mvr_stage_lifts
+
+
+def test_a_carnot_setup_has_no_stage_lifts():
+    cases = [
+        HPRPeriodCase(
+            period_id="p0",
+            period_idx=0,
+            weight=1.0,
+            args=_input_args(
+                hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value
+            ),
+        )
+    ]
+
+    *_, stage_lifts = hp_setup.get_multiperiod_hpr_optimisation_setup(
+        cases, selected_case=cases[0]
+    )
+
+    assert stage_lifts is None
+
+
+def test_the_shared_design_search_gets_the_setups_stage_lifts(monkeypatch):
+    def lifts(x, args):
+        return np.zeros(1)
+
+    case = _PreparedHPRPeriodCase(
+        period_id="p0",
+        period_idx=0,
+        weight=1.0,
+        solver_case=HPRPeriodCase(
+            period_id="p0",
+            period_idx=0,
+            weight=1.0,
+            args=_input_args(
+                hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+            ),
+        ),
+        base_target=_base_target(_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])),
+        optimizer_pt=_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0]),
+    )
+    monkeypatch.setattr(
+        hp_execution,
+        "get_multiperiod_hpr_optimisation_setup",
+        lambda *_args, **_kwargs: (None, [(0.0, 1.0)], lambda *a, **k: None, lifts),
+    )
+    seen = {}
+
+    def solve(**kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(hp_execution, "solve_hpr_multiperiod_placement", solve)
+
+    with pytest.raises(RuntimeError, match="stop"):
+        hp_execution.get_multiperiod_hpr_targets(
+            period_cases=[case], selected_period_id="p0", selected_period_idx=0
+        )
+
+    assert seen["stage_lifts"] is lifts
+
+
+def _vapour_period_args(*, weights, selected="p0", **overrides):
+    vapour = HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+    cases = [
+        HPRPeriodCase(
+            period_id=f"p{idx}",
+            period_idx=idx,
+            weight=weight,
+            args=_input_args(period_idx=idx, hpr_type=vapour, **overrides),
+        )
+        for idx, weight in enumerate(weights)
+    ]
+    return MultiPeriodHPRTargetInputs(
+        period_cases=cases,
+        selected_period_id=selected,
+        selected_period_idx=int(selected[1:]),
+        hpr_type=vapour,
+        max_multi_start=1,
+        bb_minimiser="rbf_surrogate",
+    )
+
+
+def test_a_penalty_in_a_lightly_weighted_period_still_rejects_the_design(
+    monkeypatch,
+):
+    # The weighted penalty, 1 in 1001, is diluted below the tolerance; the
+    # design is still infeasible in p1.
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (OptimisationCandidate(objective=100.0, point=(1.0,)),),
+    )
+
+    def objective(x, args, debug=False):
+        return _backend_result(
+            obj=100.0, utility_tot=1.0, period_idx=args.period_idx
+        ).with_updates(feasibility_penalty=0.05 if args.period_idx == 1 else 0.0)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_vapour_period_args(weights=(1000.0, 1.0)),
+        )
+
+    assert any(
+        failure.summary.startswith(INFEASIBLE_HEAT_PUMP_REASON)
+        for failure in raised.value.diagnostics.representative_failures
+    )
+
+
+def test_an_unserved_heating_duty_is_reported_for_its_own_period(monkeypatch):
+    # p0 (selected) serves its 100 kW; p1 serves 50 of its 200 kW.
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (OptimisationCandidate(objective=100.0, point=(1.0,)),),
+    )
+    mp_args = _vapour_period_args(weights=(1.0, 1.0), enforce_heating_duty=True)
+    mp_args.period_cases[0].args.Q_hpr_target = 100.0
+    mp_args.period_cases[1].args.Q_hpr_target = 200.0
+
+    def objective(x, args, debug=False):
+        served = 100.0 if args.period_idx == 0 else 50.0
+        return _backend_result(
+            obj=100.0, utility_tot=1.0, period_idx=args.period_idx
+        ).with_updates(
+            Q_heat=np.array([served]),
+            feasibility_penalty=0.0 if args.period_idx == 0 else 10.0,
+        )
+
+    with pytest.raises(HPRTargetingError) as raised:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective, x0_ls=None, bnds=[(0.0, 1.0)], args=mp_args
+        )
+
+    summaries = [
+        failure.summary for failure in raised.value.diagnostics.representative_failures
+    ]
+    assert any("serves 50 of the 200 kW" in summary for summary in summaries)
+
+
+def test_a_shared_design_reports_its_alternatives(monkeypatch):
+    from functools import partial
+
+    import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
+
+    from .test_hpr_alternatives import _objective, _optimiser
+
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        partial(adapter.run_hpr_candidate_search, optimiser=_optimiser),
+    )
+
+    result = hp_execution.solve_hpr_multiperiod_placement(
+        f_obj=_objective,
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=_vapour_period_args(weights=(1.0, 1.0)),
+    )
+
+    assert result.obj == pytest.approx(100.0)
+    assert [a.objective for a in result.alternatives] == pytest.approx([102.0, 103.0])

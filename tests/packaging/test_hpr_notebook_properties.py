@@ -164,6 +164,8 @@ def test_target_summaries_are_finite_plain_and_preserve_periods(
             period_ids=period_ids,
             period_weights=weights,
             obj=objective,
+            effective_topology=None,
+            alternatives=(),
         ),
     )
 

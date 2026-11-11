@@ -23,10 +23,21 @@ from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_cycle import (
 # 3.2 Subcritical caps per stage
 
 
-def test_each_stage_is_capped_below_its_own_critical_temperature():
-    pytest.importorskip("CoolProp")
+def test_coolprop_stages_may_condense_above_their_critical_temperature():
+    # Above its critical point a CoolProp stage runs transcritical.
     args = SimpleNamespace(
         refrigerant_ls=["water", "R134a"], simulation_backend="coolprop"
+    )
+
+    capped = cap_stage_condensing_temperatures(np.array([150.0, 140.0]), args)
+
+    np.testing.assert_array_equal(capped, [150.0, 140.0])
+
+
+def test_each_tespy_stage_is_capped_below_its_own_critical_temperature():
+    pytest.importorskip("CoolProp")
+    args = SimpleNamespace(
+        refrigerant_ls=["water", "R134a"], simulation_backend="tespy"
     )
 
     capped = cap_stage_condensing_temperatures(np.array([150.0, 140.0]), args)
@@ -41,7 +52,7 @@ def test_capping_keeps_each_temperature_with_its_own_refrigerant():
     pytest.importorskip("CoolProp")
     # Unsorted refrigerants: R134a (Tcrit 101 degC) above water.
     args = SimpleNamespace(
-        refrigerant_ls=["R134a", "water"], simulation_backend="coolprop"
+        refrigerant_ls=["R134a", "water"], simulation_backend="tespy"
     )
 
     capped = cap_stage_condensing_temperatures(np.array([200.0, 150.0]), args)

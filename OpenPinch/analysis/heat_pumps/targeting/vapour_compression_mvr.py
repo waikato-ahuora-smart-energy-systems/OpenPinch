@@ -26,16 +26,19 @@ from ..common.encoding import (
 )
 from ..common.layout import HPRoptVectorLayout, clip_to_bounds
 from ..common.shared import (
-    HPRCostUnit,
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
+    cycle_limits,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     is_negligible_useful_duty,
     limit_parallel_pressure_ratios,
     post_solve_error,
+    raise_parallel_lifts_to_floor,
+    subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
+from ..common.topology import effective_topology
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
 from ..optimisation_adapter import (
     initialise_hpr_seed,
@@ -156,6 +159,25 @@ def _get_vc_mvr_opt_setup(
         1.0,
     )
     x_evap = map_T_arr_to_x_arr(T_evap_seed, args.T_hot[-1], args.T_hot[0])
+    # The search penalises a pressure ratio over the limit: seed the closed
+    # stages within it so even a small search starts unpenalised.
+    T_cond_limited = subcritical_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)),
+        args,
+    )
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(T_cond_limited, *condensing_temperature_search_range(args)),
+        0.0,
+        1.0,
+    )
+    T_evap_limited = limit_parallel_pressure_ratios(
+        T_cond_limited,
+        floor_stage_evaporating_temperatures(
+            map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
+        ),
+        args,
+    )
+    x_evap = map_T_arr_to_x_arr(T_evap_limited[::-1], args.T_hot[-1], args.T_hot[0])
     x_subcool = np.zeros(n_mvr + n_vc, dtype=float)
     x_ihx = np.zeros(n_vc, dtype=float)
     x_mvr_source_split = np.array([0.5], dtype=float)
@@ -197,7 +219,11 @@ def _parse_vc_mvr_state_variables(
         ),
         args,
     )
-    T_evap_vc = limit_parallel_pressure_ratios(T_cond_vc, T_evap_vc, args)
+    if getattr(args, "stage_lift_floor", None) is not None:
+        # A shared multiperiod machine cannot turn its lift below its floor.
+        T_cond_vc, T_evap_vc = raise_parallel_lifts_to_floor(
+            T_cond_vc, T_evap_vc, args.stage_lift_floor
+        )
     Q_heat_available = limit_available_duty(
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_cond_vc,
@@ -238,6 +264,12 @@ def _parse_vc_mvr_state_variables(
     )
 
 
+def _vc_mvr_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """Each vapour compression stage's lift as ``x`` decodes."""
+    parts = _unpack_vc_mvr_state(_parse_vc_mvr_state_variables(x, args), args)
+    return np.asarray(parts["T_cond_vc"]) - np.asarray(parts["T_evap_vc"])
+
+
 def _compute_vc_mvr_system_obj(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
@@ -272,6 +304,7 @@ def _compute_vc_mvr_system_obj(
             dT_subcool_mvr=parsed["dT_subcool_mvr"],
             dT_ihx_gas_side_vc=state_vars.dT_ihx_gas_side,
             dt_ihx=args.dt_hp_ihx,
+            limits=cycle_limits(args),
             eta_comp=args.eta_comp,
             eta_mvr_comp=args.eta_mvr_comp,
             eta_motor=args.eta_mvr_motor,
@@ -319,14 +352,7 @@ def _compute_vc_mvr_system_obj(
             model=hp,
             penalty_terms=hp.penalty,
             dT_subcool=solved_state.dT_subcool,
-            cost_units=[
-                HPRCostUnit(
-                    Q_cap=float(hp.Q_heat),
-                    T_hot_max=float(np.max(solved_state.T_cond)),
-                    n_closed=_num_vc_stages(args),
-                    n_mvr=_num_mvr_stages(args),
-                )
-            ],
+            machines=[[*hp.vc_cycles, *hp.mvr_cycles]],
             debug=debug,
             artifact_mode=artifact_mode,
         )
@@ -345,6 +371,11 @@ def _compute_vc_mvr_system_obj(
                 "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
             ),
             target_simulation_record=record,
+            effective_topology=(
+                effective_topology(hp, args)
+                if artifact_mode is HPREvaluationMode.FINAL
+                else None
+            ),
         )
     except ValueError as exc:
         if cycle_evaluated:

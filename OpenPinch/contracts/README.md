@@ -19,7 +19,7 @@ application layer builds on these models.
 - `split_report_value` (`report_units.py`): splits scalar, multiperiod or array report data into value and unit.
 - `GraphSet`, `Graph`, `Segment`, `DataPoint` (`graphs.py`): plot data.
 - `ValidationReport`, `ValidationIssue`, `ConfigurationFieldMetadata`, `PinchWorkspaceBundle`, `WorkspaceCaseBundleEntry`, `validate_workspace_case_name` (`workspace.py`): validation reports and persisted workspaces.
-- HPR (`hpr.py`): search budget, failure diagnostics and `HPRTargetingError`, `HprTargetSimulationRecord` with loop and stage records, `HeatPumpTargetInputs`, `HeatPumpTargetOutputs`, `MultiPeriodHPRTargetInputs`, `HPRBackendResult`, `ZERO_USEFUL_DUTY_REASON`, and internal state types.
+- HPR (`hpr.py`): search budget, failure diagnostics and `HPRTargetingError`, `HprTargetSimulationRecord` with loop and stage records, `HeatPumpTargetInputs`, `HeatPumpTargetOutputs`, `MultiPeriodHPRTargetInputs`, `HPRBackendResult`, `HPRActiveStage`, `HPREffectiveTopology` (built with `from_stages`, which writes its label), `HPRAlternativeDesign`, `ZERO_USEFUL_DUTY_REASON`, `INFEASIBLE_HEAT_PUMP_REASON`, and internal state types.
 - `HprPerformanceMap`, `HprPerformanceMapRequest`, `HprPerformanceMapUnits`, `HprPerformancePoint`, `JsonValue` (`hpr_performance_map.py`): versioned physical performance map.
 - Utility placement (`utility_placement.py`): `UtilityPlacementRequest`, `UtilityPlacementOptions`, `UtilityPlacementResult`, `UtilityPlacementModel`, templates, envelopes, candidates and enums.
 - `HeatRecoveryDtMinResult`, `HeatRecoveryDtMinStatus`, `HeatRecoveryQuantity` (`heat_recovery_dt_min.py`): inverse heat-recovery result.

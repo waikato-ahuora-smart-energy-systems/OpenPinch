@@ -6,9 +6,15 @@ import numpy as np
 import pytest
 
 import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
-from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
+from OpenPinch.contracts.hpr import (
+    INFEASIBLE_HEAT_PUMP_REASON,
+    INFEASIBLE_REFRIGERATION_REASON,
+    HPRBackendResult,
+    HPRTargetingError,
+    HPRThermoArtifacts,
+)
 from OpenPinch.domain import progress
-from OpenPinch.domain.enums import BB_Minimiser
+from OpenPinch.domain.enums import BB_Minimiser, HeatPumpAndRefrigerationCycle
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.value import Value
 from OpenPinch.optimisation.errors import NoOptimisationCandidatesError
@@ -486,3 +492,117 @@ def test_candidate_checks_report_candidates_checked_of_ranked_candidates():
     assert [
         (event.stage, event.done, event.total, event.best_objective) for event in events
     ] == [("candidates", 1, 3, None), ("candidates", 2, 3, 0.2)]
+
+
+def test_a_refrigerator_still_carrying_a_penalty_is_not_a_target():
+    args = _base_args(
+        is_heat_pumping=False,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+    )
+
+    def penalised(point, _args, debug=False):
+        return _result(100.0).with_updates(feasibility_penalty=1.0)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        adapter.solve_hpr_placement(
+            f_obj=penalised,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=args,
+            candidate_search=lambda **_kwargs: (
+                OptimisationCandidate(objective=100.0, point=(0.5,)),
+            ),
+        )
+
+    assert any(
+        failure.summary == INFEASIBLE_REFRIGERATION_REASON
+        for failure in raised.value.diagnostics.representative_failures
+    )
+
+
+def test_a_heat_pump_still_carrying_a_penalty_gives_way_to_the_next_candidate():
+    args = _base_args(hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value)
+    results = {
+        0.1: _result(100.0).with_updates(feasibility_penalty=1.0),
+        0.2: _result(120.0),
+    }
+
+    result = adapter.solve_hpr_placement(
+        f_obj=lambda point, _args, debug=False: results[float(point[0])],
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=args,
+        candidate_search=lambda **_kwargs: (
+            OptimisationCandidate(objective=100.0, point=(0.1,)),
+            OptimisationCandidate(objective=120.0, point=(0.2,)),
+        ),
+    )
+
+    assert result.obj == pytest.approx(120.0)
+
+
+def test_a_heat_pump_still_carrying_a_penalty_is_not_a_target():
+    args = _base_args(hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        adapter.solve_hpr_placement(
+            f_obj=lambda point, _args, debug=False: _result(100.0).with_updates(
+                feasibility_penalty=1.0
+            ),
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=args,
+            candidate_search=lambda **_kwargs: (
+                OptimisationCandidate(objective=100.0, point=(0.5,)),
+            ),
+        )
+
+    assert any(
+        failure.summary == INFEASIBLE_HEAT_PUMP_REASON
+        for failure in raised.value.diagnostics.representative_failures
+    )
+
+
+def test_a_carnot_heat_pump_screen_keeps_its_penalised_design():
+    # A Carnot design only seeds or screens; its objective is not a cost.
+    result = adapter.solve_hpr_placement(
+        f_obj=lambda point, _args, debug=False: _result(100.0).with_updates(
+            feasibility_penalty=1.0
+        ),
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=_base_args(),
+        candidate_search=lambda **_kwargs: (
+            OptimisationCandidate(objective=100.0, point=(0.5,)),
+        ),
+    )
+
+    assert result.obj == pytest.approx(100.0)
+
+
+def test_a_heat_pump_short_of_its_enforced_duty_says_what_it_serves():
+    args = _base_args(
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+        enforce_heating_duty=True,
+        Q_hpr_target=200.0,
+    )
+
+    with pytest.raises(HPRTargetingError) as raised:
+        adapter.solve_hpr_placement(
+            f_obj=lambda point, _args, debug=False: _result(100.0).with_updates(
+                feasibility_penalty=1.0, Q_heat=np.array([100.0, 50.0])
+            ),
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=args,
+            candidate_search=lambda **_kwargs: (
+                OptimisationCandidate(objective=100.0, point=(0.5,)),
+            ),
+        )
+
+    (failure,) = [
+        f
+        for f in raised.value.diagnostics.representative_failures
+        if f.summary.startswith(INFEASIBLE_HEAT_PUMP_REASON)
+    ]
+    assert "serves 150 of the 200 kW heating duty it must meet" in failure.summary

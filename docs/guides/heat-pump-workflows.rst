@@ -97,25 +97,46 @@ cooling without changing global defaults.
 Every ``HPR_*`` and ``COSTING_HPR_*`` option is listed in
 :doc:`../api/configuration-options`.
 
-Simulated (vapour-compression) targets also include annualized capital. Each
-heat-pump machine costs::
+Simulated (vapour-compression) targets also include annualized capital, priced
+from each machine's components. Purchased equipment cost follows
+``PEC = PEC_ref (X / X_ref)^a`` with the data of Ommen et al. (2015, Int. J.
+Refrig. 55, table 4):
 
-   C = F_inst * C_eq * (Q_cap / 1 MW)^exp
-       * (fixed_share + stage_share * (n_closed + n_mvr)) * f_T
-   f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K
+- screw compressors on suction volume flow, by fluid family (R134a and other
+  fluids, ammonia, hydrocarbons, CO2); a flow beyond the largest compressor
+  (280 m³/h, CO2 25.6 m³/h) takes several in parallel, each with its own
+  motor;
+- water vapour (closed water stages and MVR) on turbo compressors, which
+  Ommen does not cover: anchored on Zuhlsdorf et al. (2018, 13th IIR Gustav
+  Lorentzen Conference), where two of 1231 and 468 m³/h cost EUR 50,000 with
+  their motors, and scaled with the hydrocarbon exponent, one unit up to
+  280,000 m³/h;
+- compressor motors on shaft power (included with hydrocarbon and water
+  compressors);
+- plate heat exchangers on area.
 
-``Q_cap`` is the heat the machine rejects (heating side), ``n_closed`` and
-``n_mvr`` count its refrigerant and MVR stages, and ``T_hot_max`` is the
-maximum condensing temperature. Parallel cycles are costed as
-separate machines; cascades and VC+MVR systems as one. The defaults are
-``COSTING_HPR_EQUIPMENT_COST`` = 485,000 (equipment for 1 MW, one stage, at or
-below 75 °C; fitted to the IEA HPT Project 68 cost data and converted to 2025
-USD), ``COSTING_HPR_INSTALLATION_FACTOR`` = 2.3, ``COSTING_HPR_COST_EXP`` = 0.7,
-``COSTING_HPR_COST_FIXED_SHARE`` = 0.7, ``COSTING_HPR_COST_STAGE_SHARE`` = 0.3,
-``COSTING_HPR_COST_TEMP_FACTOR`` = 0.4 and ``COSTING_HPR_COST_TEMP_BASE`` =
-75 °C. Capital is annualized with ``COSTING_DISCOUNT_RATE`` and
-``COSTING_SERVICE_LIFE``; set ``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` to
-``False`` to leave it out of the objective.
+Suction volume makes water dear below about 80 °C: at sub-atmospheric
+suction a small water heat pump moves thousands of m³/h.
+
+Installed capital is 4.16 times the purchased cost (Bejan et al. 1996), scaled
+so that Ommen's 1 MW ammonia example costs the IEA HPT Annex 68 level for
+1 MW (2025 USD). Exchanger areas are duty / (U x LMTD), with ``U`` from
+``HPR_U_TWO_PHASE`` (default 2000 W/m²K), ``HPR_U_LIQUID`` (1000) and
+``HPR_U_GAS`` (400) by the heat pump side's phase, a stage's sensible
+sections counting as gas above its own condensing temperature and liquid
+below it. The IHX uses its own end
+temperatures and the cascade exchanger ``HPR_DT_CASCADE_HX``. The condensers
+and evaporators are matched interval by interval against the closest part of
+the sink below them and the source above them, with ``HPR_DT_CONT`` and the
+process streams' ``THERMAL_DT_CONT`` added. Heat a machine rejects to, or
+draws from, ambient air goes through an air cooler or heater sized against the
+air temperature, with ``HPR_U_AIR`` (default 50 W/m²K) in series with the heat
+pump side's ``U`` and ``HPR_DT_ENV_CONT`` added. Wrong-side heat, which is
+penalised, has no exchanger. Parallel cycles are costed as
+separate machines; cascades and VC+MVR systems as one. Capital is annualized
+with ``COSTING_DISCOUNT_RATE`` and ``COSTING_SERVICE_LIFE``; set
+``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` to ``False`` to leave it out of the
+objective.
 
 The default utilities the design still needs carry installed capital too:
 ``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $750/kW of hot utility) and

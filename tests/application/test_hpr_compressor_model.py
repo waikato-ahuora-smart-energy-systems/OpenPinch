@@ -19,6 +19,7 @@ _SHORT = dict(
     options={
         "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
         "HPR_MAX_PRESSURE_RATIO": 1e6,
+        "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
     },
 )
 

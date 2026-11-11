@@ -21,6 +21,7 @@ from ..targeting.cascade_carnot import (
     optimise_cascade_carnot_heat_pump_placement,
 )
 from ..targeting.cascade_vapour_compression import (
+    _cascade_stage_lifts,
     _cascade_stage_preflight_state,
     _compute_cascade_hp_system_obj,
     _get_cascade_hp_opt_setup,
@@ -34,6 +35,7 @@ from ..targeting.parallel_carnot import (
 from ..targeting.parallel_vapour_compression import (
     _compute_parallel_hp_system_obj,
     _get_parallel_hp_opt_setup,
+    _parallel_stage_lifts,
     _parse_parallel_hp_state_temperatures,
 )
 from ..targeting.vapour_compression_mvr import (
@@ -41,6 +43,7 @@ from ..targeting.vapour_compression_mvr import (
     _get_vc_mvr_opt_setup,
     _num_vc_stages,
     _parse_vc_mvr_state_variables,
+    _vc_mvr_stage_lifts,
     use_mvr_cascade_fluids,
 )
 
@@ -49,8 +52,12 @@ def get_multiperiod_hpr_optimisation_setup(
     period_cases: list[HPRPeriodCase],
     *,
     selected_case: HPRPeriodCase,
-) -> tuple[np.ndarray | None, list, Callable]:
-    """Return starts, bounds, and the period objective for one HPR cycle."""
+) -> tuple[np.ndarray | None, list, Callable, Callable | None]:
+    """Return starts, bounds, the period objective and the stage lifts.
+
+    The stage lifts (``x, args -> lifts``) let a shared design hold each
+    vapour compression stage at its turndown floor; Carnot cycles have none.
+    """
     hpr_type = selected_case.args.hpr_type
     topology = {
         HeatPumpAndRefrigerationCycle.CascadeVapourComp.value: (
@@ -70,14 +77,14 @@ def get_multiperiod_hpr_optimisation_setup(
                 preflight_coolprop_fluid_names(case.args, topology)
     if hpr_type == HeatPumpAndRefrigerationCycle.CascadeCarnot.value:
         x0_ls, bounds = _get_cascade_carnot_hp_opt_setup(selected_case.args)
-        return x0_ls, bounds, _compute_cascade_carnot_cycle_obj
+        return x0_ls, bounds, _compute_cascade_carnot_cycle_obj, None
 
     if hpr_type == HeatPumpAndRefrigerationCycle.ParallelCarnot.value:
         n_stages = max(selected_case.args.n_cond, selected_case.args.n_evap)
         for case in period_cases:
             case.args.n_cond = case.args.n_evap = n_stages
         x0_ls, bounds = _get_parallel_carnot_hp_opt_setup(selected_case.args)
-        return x0_ls, bounds, _compute_parallel_carnot_hp_opt_obj
+        return x0_ls, bounds, _compute_parallel_carnot_hp_opt_obj, None
 
     if hpr_type == HeatPumpAndRefrigerationCycle.CascadeVapourComp.value:
         num_stages = int(selected_case.args.n_cond + selected_case.args.n_evap - 1)
@@ -102,7 +109,7 @@ def get_multiperiod_hpr_optimisation_setup(
                     state=_cascade_stage_preflight_state(state, case.args),
                     topology_id="cascade_vapour_compression",
                 )
-        return x0_ls, bounds, _compute_cascade_hp_system_obj
+        return x0_ls, bounds, _compute_cascade_hp_system_obj, _cascade_stage_lifts
 
     if hpr_type == HeatPumpAndRefrigerationCycle.ParallelVapourComp.value:
         num_stages = max(selected_case.args.n_cond, selected_case.args.n_evap)
@@ -128,7 +135,7 @@ def get_multiperiod_hpr_optimisation_setup(
                     state=_parse_parallel_hp_state_temperatures(point, case.args),
                     topology_id="parallel_vapour_compression",
                 )
-        return x0_ls, bounds, _compute_parallel_hp_system_obj
+        return x0_ls, bounds, _compute_parallel_hp_system_obj, _parallel_stage_lifts
 
     if hpr_type == HeatPumpAndRefrigerationCycle.VapourCompMVR.value:
         if not selected_case.args.is_heat_pumping:
@@ -154,7 +161,7 @@ def get_multiperiod_hpr_optimisation_setup(
                     state=_parse_vc_mvr_state_variables(point, case.args),
                     topology_id="vapour_compression_mvr",
                 )
-        return x0_ls, bounds, _compute_vc_mvr_system_obj
+        return x0_ls, bounds, _compute_vc_mvr_system_obj, _vc_mvr_stage_lifts
 
     if hpr_type == HeatPumpAndRefrigerationCycle.Brayton.value:
         raise NotImplementedError(

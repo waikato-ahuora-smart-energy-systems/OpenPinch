@@ -78,6 +78,7 @@ class HprTargetThermodynamicRequest:
     subcooling: float
     internal_hx_gas_temperature_change: float
     candidate_id: str = field(compare=False, hash=False)
+    internal_hx_approach_temperature: float = 0.0
 
     def __post_init__(self) -> None:
         if self.mode not in {"heat_pump", "refrigeration"}:
@@ -100,6 +101,7 @@ class HprTargetThermodynamicRequest:
             "superheat",
             "subcooling",
             "internal_hx_gas_temperature_change",
+            "internal_hx_approach_temperature",
         ):
             _require_finite(name, getattr(self, name))
         if self.condensing_temperature <= self.evaporating_temperature:
@@ -114,6 +116,7 @@ class HprTargetThermodynamicRequest:
             "superheat",
             "subcooling",
             "internal_hx_gas_temperature_change",
+            "internal_hx_approach_temperature",
         ):
             if getattr(self, name) < 0.0:
                 raise ValueError(f"{name} must be nonnegative")

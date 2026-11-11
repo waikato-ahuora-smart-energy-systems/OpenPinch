@@ -4,16 +4,20 @@ from __future__ import annotations
 
 from functools import partial
 
+import CoolProp
 import numpy as np
 
 from ....contracts.hpr import (
     HeatPumpTargetInputs,
+    HPRActiveStage,
     HPRBackendResult,
+    HPREffectiveTopology,
     HPREvaluationMode,
     HPRParsedState,
     HPRTopologyIdentifier,
 )
 from ....domain.configuration import tol
+from ....domain.fluids import build_coolprop_abstract_state
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
@@ -33,12 +37,17 @@ from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
+    cycle_limits,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_cascade_pressure_ratios,
+    raise_cascade_lifts_to_floor,
+    subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
+from ..common.topology import topology_from_stages
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
+from ..cycles.vapour_compression_cycle import VapourCompressionCycle
 from ..optimisation_adapter import initialise_hpr_seed, solve_hpr_placement
 from ..performance_maps.coolprop_preflight import (
     preflight_coolprop_fluid_names,
@@ -175,9 +184,7 @@ def _get_cascade_hp_opt_setup(
         x_subcool=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
         x_cool_split=(0.0, 1.0),
-        x_ihx=(0.0, 0.0)
-        if getattr(args, "simulation_backend", "coolprop") == "tespy"
-        else (0.0, 1.0),
+        x_ihx=(0.0, 1.0),
     )
     if init_res is None:
         return None, bnds
@@ -191,6 +198,30 @@ def _get_cascade_hp_opt_setup(
     ).tolist()
     x_evap = map_T_arr_to_x_arr(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
+    ).tolist()
+    # Nor about pressure ratios, which the search penalises: seed within the
+    # limit so even a small search starts from an unpenalised design.
+    T_cond_seed, T_evap_seed = limit_cascade_pressure_ratios(
+        subcritical_stage_condensing_temperatures(
+            map_x_arr_to_T_arr(
+                np.asarray(x_cond), *condensing_temperature_search_range(args)
+            ),
+            args,
+        ),
+        floor_stage_evaporating_temperatures(
+            map_x_arr_to_T_arr(np.asarray(x_evap), args.T_hot[-1], args.T_hot[0]),
+            args,
+            first_stage=n_cond - 1,
+        ),
+        args,
+    )
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(T_cond_seed, *condensing_temperature_search_range(args)),
+        0.0,
+        1.0,
+    ).tolist()
+    x_evap = map_T_arr_to_x_arr(
+        T_evap_seed[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[1:]
@@ -256,7 +287,16 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
-    T_cond, T_evap = limit_cascade_pressure_ratios(T_cond, T_evap, args)
+    if getattr(args, "stage_lift_floor", None) is not None:
+        # A shared multiperiod machine cannot turn its lift below its floor.
+        # The floors are physical lifts; the levels are process levels, which
+        # the cascade exchangers widen.
+        T_cond, T_evap = raise_cascade_lifts_to_floor(
+            T_cond,
+            T_evap,
+            np.asarray(args.stage_lift_floor, dtype=float)
+            - _cascade_exchanger_lift(T_cond.size, T_evap.size, args),
+        )
     dT_subcool = map_x_arr_to_DT_arr(
         x_subcool,
         T_cond,
@@ -313,6 +353,36 @@ def _parse_cascade_hp_state_variables(
         Q_heat_available=Q_heat_available,
         Q_cool_available=Q_cool_available,
     )
+
+
+def _cascade_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """Each stage's physical lift as ``x`` decodes, hottest stage first.
+
+    That is the gap between its process levels plus any cascade exchanger
+    approach it lifts across.
+    """
+    state = _parse_cascade_hp_state_variables(x, args)
+    levels = np.concatenate([state.T_cond, state.T_evap])
+    return (
+        levels[:-1]
+        - levels[1:]
+        + _cascade_exchanger_lift(state.T_cond.size, state.T_evap.size, args)
+    )
+
+
+def _cascade_exchanger_lift(
+    n_cond: int, n_evap: int, args: HeatPumpTargetInputs
+) -> np.ndarray:
+    """The cascade exchanger approach each stage lifts across, hottest first.
+
+    A stage below a process condensing level evaporates ``dt_cascade_hx``
+    below it; a stage above a process evaporating level condenses that much
+    above it. The stage between the condensing and evaporating levels has no
+    cascade exchanger. See ``_cascade_stage_preflight_state``.
+    """
+    stage = np.arange(n_cond + n_evap - 1)
+    crosses = (stage + 1 < n_cond) | (stage >= n_cond)
+    return np.where(crosses, float(getattr(args, "dt_cascade_hx", 0.0)), 0.0)
 
 
 def _condenser_stage_evaporating_temperatures(
@@ -390,6 +460,7 @@ def _build_and_solve_cascade_cycle(
         dT_subcool=state_vars.dT_subcool,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
         dt_ihx=args.dt_hp_ihx,
+        limits=cycle_limits(args),
         eta_comp=args.eta_comp,
         eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,
@@ -434,7 +505,8 @@ def _compute_tespy_cascade_hp_system_obj(
             compressor_isentropic_efficiency=float(args.eta_comp),
             superheat=_TESPY_TARGET_SUPERHEAT,
             subcooling=float(state.dT_subcool[0]),
-            internal_hx_gas_temperature_change=float(state.dT_ihx_gas_side[0]),
+            internal_hx_gas_temperature_change=_tespy_ihx_gas_rise(state, args),
+            internal_hx_approach_temperature=float(getattr(args, "dt_hp_ihx", 0.0)),
             candidate_id=_tespy_candidate_id(x),
         )
     except (TypeError, ValueError) as exc:
@@ -449,6 +521,11 @@ def _compute_tespy_cascade_hp_system_obj(
     if not isinstance(evaluated, HprTargetThermodynamicResult):
         raise TypeError("HPR target evaluator coordinator returned an invalid value")
 
+    try:
+        replica = _coolprop_replica(request, args)
+    except ValueError as exc:
+        # No CoolProp cycle to cost, as below the fluid's minimum temperature.
+        return _tespy_candidate_failure(state, f"capital costing: {exc}")
     hpr_streams = _build_tespy_hpr_streams(evaluated, args)
     # TESPy returns shaft power; the motor losses leave the cycle.
     work = evaluated.compressor_power / args.eta_motor
@@ -465,6 +542,7 @@ def _compute_tespy_cascade_hp_system_obj(
         penalty_terms=[],
         dT_subcool=state.dT_subcool,
         dT_superheat=np.array([request.superheat], dtype=float),
+        machines=[[replica]],
         debug=debug,
         artifact_mode=artifact_mode,
     )
@@ -485,7 +563,79 @@ def _compute_tespy_cascade_hp_system_obj(
         if artifact_mode is HPREvaluationMode.FINAL
         else None,
         target_simulation_record=record,
+        effective_topology=(
+            _tespy_effective_topology(request, result, args)
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
+        ),
     )
+
+
+def _tespy_effective_topology(
+    request: HprTargetThermodynamicRequest,
+    result: HPRBackendResult,
+    args: HeatPumpTargetInputs,
+) -> HPREffectiveTopology:
+    """The single stage of a TESPy target, as a CoolProp target reports it."""
+    state = build_coolprop_abstract_state(request.working_fluid.source_spec)
+    state.update(CoolProp.QT_INPUTS, 1.0, request.evaporating_temperature + 273.15)
+    evaporating_pressure = state.p()
+    state.update(CoolProp.QT_INPUTS, 0.0, request.condensing_temperature + 273.15)
+    stage = HPRActiveStage(
+        index=0,
+        role="vapour_compression",
+        fluid=request.working_fluid.source_spec,
+        evaporating_temperature=request.evaporating_temperature,
+        condensing_temperature=request.condensing_temperature,
+        pressure_ratio=state.p() / evaporating_pressure,
+        work=float(result.w_net),
+        process_heat=float(result.Q_heat[0]),
+        process_cooling=float(result.Q_cool[0]),
+    )
+    return topology_from_stages([stage], args)
+
+
+def _tespy_ihx_gas_rise(state: HPRParsedState, args: HeatPumpTargetInputs) -> float:
+    """The IHX gas-side rise, held ``dt_hp_ihx`` below the liquid entering it.
+
+    The same limit as the CoolProp cycle: the gas leaves at most the liquid's
+    temperature (condensing less subcooling) less the approach.
+    """
+    ceiling = (
+        float(state.T_cond[0])
+        - float(state.dT_subcool[0])
+        - float(state.T_evap[0])
+        - _TESPY_TARGET_SUPERHEAT
+        - float(getattr(args, "dt_hp_ihx", 0.0))
+    )
+    return max(min(float(state.dT_ihx_gas_side[0]), ceiling), 0.0)
+
+
+def _coolprop_replica(
+    request: HprTargetThermodynamicRequest, args: HeatPumpTargetInputs
+) -> VapourCompressionCycle:
+    """The CoolProp cycle at a TESPy candidate's design point, for costing.
+
+    TESPy returns duties and power but no compressor or exchanger states; the
+    two backends agree at the design point.
+    """
+    cycle = VapourCompressionCycle()
+    is_heat_pump = request.mode == "heat_pump"
+    cycle.solve(
+        T_evap=request.evaporating_temperature,
+        T_cond=request.condensing_temperature,
+        dtcont=0.0,
+        dT_superheat=request.superheat,
+        dT_subcool=request.subcooling,
+        eta_comp=request.compressor_isentropic_efficiency,
+        eta_motor=args.eta_motor,
+        refrigerant=request.working_fluid.source_spec,
+        dT_ihx_gas_side=request.internal_hx_gas_temperature_change,
+        Q_heat=request.useful_duty if is_heat_pump else None,
+        Q_cool=None if is_heat_pump else request.useful_duty,
+        is_heat_pump=is_heat_pump,
+    )
+    return cycle
 
 
 def _tespy_primary_duty_allocation(

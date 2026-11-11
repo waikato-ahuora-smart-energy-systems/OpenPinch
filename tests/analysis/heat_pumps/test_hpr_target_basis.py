@@ -60,7 +60,8 @@ def _replace_details(target, **updates):
 
 def test_basis_is_field_exact_idempotent_and_deep_detached() -> None:
     record = _record(
-        assumptions={"anchor": "dew_bubble", "components": ["R32", "R125"]}
+        assumptions={"anchor": "dew_bubble", "components": ["R32", "R125"]},
+        internal_hx_approach_temperature=5.0,
     )
     target = _target(record)
     before = record.model_dump(mode="json")
@@ -77,6 +78,7 @@ def test_basis_is_field_exact_idempotent_and_deep_detached() -> None:
     assert first.model_id == record.model_id
     assert first.refrigerant_spec == record.refrigerant_spec
     assert first.nominal_useful_duty == record.nominal_useful_duty
+    assert first.internal_hx_approach_temperature == 5.0
     assert first.source_provenance is not second.source_provenance
     first.source_provenance["assumptions"]["components"].append("mutated")
     assert record.model_dump(mode="json") == before
