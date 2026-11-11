@@ -430,22 +430,40 @@ def test_real_tespy_wrapper_limitation_is_typed_without_fluid_allowlist():
     simulator.close()
 
 
+def _design_cop(simulator):
+    return abs(float(simulator._condenser.Q.val)) / float(simulator._compressor.P.val)
+
+
+def _coolprop_cop(dT_ihx):
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap=5.0,
+        T_cond=55.0,
+        dtcont=0.0,
+        dT_superheat=5.0,
+        dT_subcool=2.0,
+        eta_comp=0.75,
+        refrigerant="R134a",
+        dT_ihx_gas_side=dT_ihx,
+        Q_heat=1000.0,
+    )
+    return cycle.COP_h
+
+
 @pytest.mark.tespy
-def test_unmodeled_internal_heat_exchanger_fails_as_an_unsupported_model():
+@pytest.mark.parametrize("dT_ihx", [0.0, 10.0])
+def test_the_tespy_design_point_matches_coolprop_with_an_internal_heat_exchanger(
+    dT_ihx,
+):
     context = build_hpr_map_generation_context(
-        _basis(
-            simulation_backend="tespy",
-            internal_hx_gas_temperature_change=3.0,
-        ),
+        _basis(simulation_backend="tespy", internal_hx_gas_temperature_change=dT_ihx),
         _request(),
     )
     simulator = TespyHprPointSimulator()
 
-    with pytest.raises(HprSimulatorFailure) as raised:
-        simulator.prepare(context)
+    simulator.prepare(context)
 
-    assert raised.value.code == "unsupported_model"
-    assert raised.value.session_fatal is True
+    assert _design_cop(simulator) == pytest.approx(_coolprop_cop(dT_ihx), rel=1e-4)
     simulator.close()
 
 
@@ -614,3 +632,20 @@ def test_design_restoration_failure_is_session_fatal_and_cleanup_still_works(
     assert str(snapshot) not in str(raised.value)
     simulator.close()
     assert not snapshot.parent.exists()
+
+
+@pytest.mark.tespy
+def test_an_offdesign_point_converges_with_an_internal_heat_exchanger():
+    context = build_hpr_map_generation_context(
+        _basis(simulation_backend="tespy", internal_hx_gas_temperature_change=10.0),
+        _request(),
+    )
+    simulator = TespyHprPointSimulator()
+    simulator.prepare(context)
+
+    point = next(iter_hpr_operating_points(context))
+    simulation = simulator.simulate(point)
+
+    assert simulation.converged
+    assert simulation.q_sink > simulation.compressor_power > 0.0
+    simulator.close()

@@ -493,3 +493,18 @@ def test_target_candidate_solves_at_saturation_ends(
     assert result.cop == pytest.approx(
         (h_out - h_condensate) / (h_out - h_in), rel=1e-4
     )
+
+
+def test_a_real_tespy_target_candidate_can_use_an_internal_heat_exchanger() -> None:
+    _, coordinator, _, request = _coordinator()
+
+    plain = coordinator.evaluate(request)
+    with_ihx = coordinator.evaluate(
+        replace(request, internal_hx_gas_temperature_change=10.0, candidate_id="ihx")
+    )
+    coordinator.close()
+
+    assert isinstance(with_ihx, HprTargetThermodynamicResult)
+    assert with_ihx.q_sink == pytest.approx(request.useful_duty, abs=1e-5)
+    # The IHX moves heat inside the cycle, so the compressor work changes.
+    assert with_ihx.compressor_power != pytest.approx(plain.compressor_power)

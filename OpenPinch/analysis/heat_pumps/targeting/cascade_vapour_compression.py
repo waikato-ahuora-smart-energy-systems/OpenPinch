@@ -178,9 +178,7 @@ def _get_cascade_hp_opt_setup(
         x_subcool=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
         x_cool_split=(0.0, 1.0),
-        x_ihx=(0.0, 0.0)
-        if getattr(args, "simulation_backend", "coolprop") == "tespy"
-        else (0.0, 1.0),
+        x_ihx=(0.0, 1.0),
     )
     if init_res is None:
         return None, bnds
@@ -473,7 +471,7 @@ def _compute_tespy_cascade_hp_system_obj(
             compressor_isentropic_efficiency=float(args.eta_comp),
             superheat=_TESPY_TARGET_SUPERHEAT,
             subcooling=float(state.dT_subcool[0]),
-            internal_hx_gas_temperature_change=float(state.dT_ihx_gas_side[0]),
+            internal_hx_gas_temperature_change=_tespy_ihx_gas_rise(state, args),
             candidate_id=_tespy_candidate_id(x),
         )
     except (TypeError, ValueError) as exc:
@@ -525,6 +523,22 @@ def _compute_tespy_cascade_hp_system_obj(
         else None,
         target_simulation_record=record,
     )
+
+
+def _tespy_ihx_gas_rise(state: HPRParsedState, args: HeatPumpTargetInputs) -> float:
+    """The IHX gas-side rise, held ``dt_hp_ihx`` below the liquid entering it.
+
+    The same limit as the CoolProp cycle: the gas leaves at most the liquid's
+    temperature (condensing less subcooling) less the approach.
+    """
+    ceiling = (
+        float(state.T_cond[0])
+        - float(state.dT_subcool[0])
+        - float(state.T_evap[0])
+        - _TESPY_TARGET_SUPERHEAT
+        - float(getattr(args, "dt_hp_ihx", 0.0))
+    )
+    return max(min(float(state.dT_ihx_gas_side[0]), ceiling), 0.0)
 
 
 def _tespy_primary_duty_allocation(

@@ -14,6 +14,10 @@ Heat pumps and refrigeration
   suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
   Every heat pump and refrigeration target moves; set the three options to 0
   for the previous results.
+- TESPy single-stage targets and performance maps now model an internal
+  heat exchanger. The search varies it as for CoolProp, held to the
+  ``HPR_DT_IHX`` approach; with no gas-side rise the network has none. TESPy
+  design points match the CoolProp cycle's COP to 1e-4 with and without it.
 - Shared multiperiod designs now keep a minimum lift. Each
   vapour-compression stage lifts at least ``HPR_TURNDOWN`` (new, default
   0.25) of its design lift, its largest lift in any period, in every period.

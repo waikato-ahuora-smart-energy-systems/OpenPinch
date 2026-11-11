@@ -678,9 +678,8 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "HPR internal heat exchanger approach", "delta_degC",
         (
             "Minimum approach at the internal heat exchanger's hot end: the suction "
-            "gas leaves it at least this far below the liquid entering it. "
-            "CoolProp vapour compression only; TESPy targets have no internal heat "
-            "exchanger."
+            "gas leaves it at least this far below the liquid entering it, in the "
+            "CoolProp and TESPy vapour compression models."
         ),
     ),
     "HPR_MAX_PRESSURE_RATIO": FieldText(
