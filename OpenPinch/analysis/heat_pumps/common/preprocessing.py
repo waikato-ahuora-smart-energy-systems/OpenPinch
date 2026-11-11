@@ -138,6 +138,7 @@ def construct_HPRTargetInputs(
         min_suction_pressure=hpr.screen_min_suction_pressure * 1e5,
         min_stage_lift=hpr.min_stage_lift,
         enforce_heating_duty=hpr.enforce_heating_duty,
+        turndown=hpr.turndown,
         T_env=environment.temperature,
         dt_env_cont=hpr.dt_env_cont,
         ambient_air_enabled=hpr.ambient_air_enabled,

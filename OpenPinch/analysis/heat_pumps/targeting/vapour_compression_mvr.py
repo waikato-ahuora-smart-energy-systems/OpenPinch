@@ -35,6 +35,7 @@ from ..common.shared import (
     is_negligible_useful_duty,
     limit_parallel_pressure_ratios,
     post_solve_error,
+    raise_parallel_lifts_to_floor,
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -219,6 +220,11 @@ def _parse_vc_mvr_state_variables(
         ),
         args,
     )
+    if getattr(args, "stage_lift_floor", None) is not None:
+        # A shared multiperiod machine cannot turn its lift below its floor.
+        T_cond_vc, T_evap_vc = raise_parallel_lifts_to_floor(
+            T_cond_vc, T_evap_vc, args.stage_lift_floor
+        )
     Q_heat_available = limit_available_duty(
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_cond_vc,
@@ -257,6 +263,12 @@ def _parse_vc_mvr_state_variables(
         x_mvr_source_split=float(x_mvr_source_split),
         x_mvr_process_split=x_mvr_process_split,
     )
+
+
+def _vc_mvr_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """Each vapour compression stage's lift as ``x`` decodes."""
+    parts = _unpack_vc_mvr_state(_parse_vc_mvr_state_variables(x, args), args)
+    return np.asarray(parts["T_cond_vc"]) - np.asarray(parts["T_evap_vc"])
 
 
 def _compute_vc_mvr_system_obj(

@@ -37,6 +37,7 @@ from ..common.shared import (
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_cascade_pressure_ratios,
+    raise_cascade_lifts_to_floor,
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -282,6 +283,11 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
+    if getattr(args, "stage_lift_floor", None) is not None:
+        # A shared multiperiod machine cannot turn its lift below its floor.
+        T_cond, T_evap = raise_cascade_lifts_to_floor(
+            T_cond, T_evap, args.stage_lift_floor
+        )
     dT_subcool = map_x_arr_to_DT_arr(
         x_subcool,
         T_cond,
@@ -338,6 +344,13 @@ def _parse_cascade_hp_state_variables(
         Q_heat_available=Q_heat_available,
         Q_cool_available=Q_cool_available,
     )
+
+
+def _cascade_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """Each stage's lift, upper level less lower level, as ``x`` decodes."""
+    state = _parse_cascade_hp_state_variables(x, args)
+    levels = np.concatenate([state.T_cond, state.T_evap])
+    return levels[:-1] - levels[1:]
 
 
 def _condenser_stage_evaporating_temperatures(

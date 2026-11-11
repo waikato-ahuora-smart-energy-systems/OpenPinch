@@ -43,6 +43,12 @@ warmer stage, and the top stage rejects the remainder. A stage's subcooling heat
 must fit in its own process duty, so a stage that only passes heat up does not
 subcool.
 
+A shared multiperiod design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) is one
+machine. Each vapour-compression stage keeps at least ``HPR_TURNDOWN`` (default
+0.25) of its design lift, its largest lift in any period, in every period. A
+period that needs less lift runs at that floor, condensing higher at a worse
+COP.
+
 A CoolProp stage may condense above its fluid's critical temperature. It then
 runs transcritical: its high pressure is the critical isochore's pressure at
 the condensing temperature, and its gas cooler glides down to that temperature

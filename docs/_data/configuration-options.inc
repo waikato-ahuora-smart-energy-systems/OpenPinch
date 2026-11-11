@@ -171,6 +171,7 @@ Heat Pump and Refrigeration
    "``HPR_LOAD_PERIOD_VALUES``","object","``{}``","kW","","Duty for each period ID in period_values mode, capped at that period's available duty."
    "``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``","boolean","``False``","","","Optimise one heat pump or refrigeration design across all periods, weighted by period, instead of one period."
    "``HPR_ENFORCE_HEATING_DUTY``","boolean","``False``","","","Require a vapour compression heat pump to serve its whole targeted heating duty regardless of economics, as a refrigerator must serve its cooling: heating it leaves unserved is penalised, and a final design still short of it is not a target."
+   "``HPR_TURNDOWN``","number","``0.25``","","0 to 1","In a shared multiperiod design, each vapour compression stage lifts at least this share of its design lift (its largest lift in any period) in every period. A period needing less lift runs at the floor, condensing higher at a worse COP."
    "``HPR_REFRIGERANTS``","string_list","``[""water"", ""ammonia""]``","","","Refrigerants for the vapour compression stages, one per stage."
    "``HPR_REFRIGERANT_SORT_ENABLED``","boolean","``True``","","","Assign refrigerants to stages from the highest critical temperature down instead of in the given order."
    "``HPR_MVR_FLUIDS``","string_list","``[]``","","","Fluids of the vapour compression stages in vapour compression with MVR cycles, one per stage; empty uses HPR_REFRIGERANTS. Water is not allowed: the MVR stages always run on water."

@@ -31,6 +31,7 @@ from ..common.shared import (
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_parallel_pressure_ratios,
+    raise_parallel_lifts_to_floor,
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -192,6 +193,11 @@ def _parse_parallel_hp_state_temperatures(
     T_evap = floor_stage_evaporating_temperatures(
         map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
     )
+    if getattr(args, "stage_lift_floor", None) is not None:
+        # A shared multiperiod machine cannot turn its lift below its floor.
+        T_cond, T_evap = raise_parallel_lifts_to_floor(
+            T_cond, T_evap, args.stage_lift_floor
+        )
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_available = (
         limit_available_duty(
@@ -288,6 +294,12 @@ def _parallel_cost_units(
 
 def _parallel_topology_id(_args: HeatPumpTargetInputs) -> HPRTopologyIdentifier:
     return HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
+
+
+def _parallel_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """Each machine's lift as ``x`` decodes."""
+    state = _parse_parallel_hp_state_temperatures(x, args)
+    return np.asarray(state.T_cond) - np.asarray(state.T_evap)
 
 
 def _build_and_solve_parallel_cycles(

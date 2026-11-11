@@ -317,6 +317,10 @@ class HeatPumpTargetInputs(BaseModel):
     # the hot utility the untargeted heating needs on its own.
     enforce_heating_duty: bool = False
     heating_allowance: float | None = None
+    # Shared multiperiod designs: each stage's lift in every period is at least
+    # turndown x its design lift; the search sets stage_lift_floor (K).
+    turndown: float = 0.0
+    stage_lift_floor: np.ndarray | None = None
     bb_minimiser: str
     eta_penalty: float
     rho_penalty: float

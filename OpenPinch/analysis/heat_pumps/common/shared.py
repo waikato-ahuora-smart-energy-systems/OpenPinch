@@ -71,6 +71,8 @@ __all__ = [
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "cycle_limits",
+    "raise_cascade_lifts_to_floor",
+    "raise_parallel_lifts_to_floor",
     "floor_stage_evaporating_temperatures",
     "limit_cascade_pressure_ratios",
     "limit_parallel_pressure_ratios",
@@ -1054,6 +1056,38 @@ def limit_cascade_pressure_ratios(
         lower = stage + 1
         levels[lower] = max(levels[lower], floor + (dt_hx if lower < n_cond else 0.0))
     return levels[:n_cond], levels[n_cond:]
+
+
+def raise_parallel_lifts_to_floor(
+    T_cond: np.ndarray, T_evap: np.ndarray, floors: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Raise each parallel machine's condenser until it lifts at least its floor.
+
+    A shared multiperiod machine cannot turn its lift down below its floor, so
+    in a period needing less it condenses higher, at a larger approach. The
+    condensers stay non-increasing (a raised machine lifts the warmer ones).
+    """
+    T_evap = np.asarray(T_evap, dtype=float)
+    T_cond = np.maximum(np.asarray(T_cond, dtype=float), T_evap + floors)
+    for index in range(T_cond.size - 2, -1, -1):
+        T_cond[index] = max(T_cond[index], T_cond[index + 1])
+    return T_cond, T_evap
+
+
+def raise_cascade_lifts_to_floor(
+    T_cond: np.ndarray, T_evap: np.ndarray, floors: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Raise a cascade's levels until every stage lifts at least its floor.
+
+    The levels run hottest first through ``T_cond`` then ``T_evap``, and stage
+    ``i`` lifts from level ``i + 1`` to level ``i``. Working from the bottom
+    up, raising a stage's upper level never lowers a lift already checked.
+    """
+    T_cond = np.asarray(T_cond, dtype=float)
+    levels = np.concatenate([T_cond, np.asarray(T_evap, dtype=float)])
+    for stage in range(levels.size - 2, -1, -1):
+        levels[stage] = max(levels[stage], levels[stage + 1] + floors[stage])
+    return levels[: T_cond.size], levels[T_cond.size :]
 
 
 def cycle_limits(args: HeatPumpTargetInputs) -> CycleLimits:

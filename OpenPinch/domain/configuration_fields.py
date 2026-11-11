@@ -423,6 +423,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_LOAD_PERIOD_VALUES": _spec(dict[str, float], {}, "hpr", "load_period_values", validator=partial(_float_mapping, numeric_min=0.0)),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": _spec(bool, False, "hpr", "multiperiod_optimization_enabled"),
     "HPR_ENFORCE_HEATING_DUTY": _spec(bool, False, "hpr", "enforce_heating_duty"),
+    "HPR_TURNDOWN": _spec(float, 0.25, "hpr", "turndown", numeric_min=0.0, numeric_max=1.0),
     "HPR_REFRIGERANTS": _spec(List[str], ["water", "ammonia"], "hpr", "refrigerants"),
     "HPR_REFRIGERANT_SORT_ENABLED": _spec(bool, True, "hpr", "refrigerant_sort_enabled"),
     "HPR_MVR_FLUIDS": _spec(List[str], [], "hpr", "mvr_fluids", validator=_mvr_cascade_fluids),
