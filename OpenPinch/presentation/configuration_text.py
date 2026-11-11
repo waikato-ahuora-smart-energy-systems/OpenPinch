@@ -667,14 +667,42 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "HPR compressor pressure ratio limit", None,
         (
             "Largest ratio of condensing to evaporating pressure across one "
-            "vapour-compression compressor."
+            "vapour-compression compressor; a stage above it is penalised by its "
+            "condenser duty times the relative excess."
+        ),
+    ),
+    "HPR_MAX_DISCHARGE_SUPERHEAT": FieldText(
+        "HPR discharge superheat after liquid injection", "delta_degC",
+        (
+            "Condensate is injected into the compressor discharge until the gas "
+            "is at most this far above its dew point. The condenser rejects the "
+            "same heat and the compressor does the same work."
+        ),
+    ),
+    "HPR_MAX_DISCHARGE_PRESSURE": FieldText(
+        "HPR discharge pressure limit", "bar",
+        (
+            "Vapour compression stages discharging above this pressure are "
+            "penalised by their condenser duty times the relative excess."
+        ),
+    ),
+    "HPR_MAX_DISCHARGE_PRESSURE_CO2": FieldText(
+        "HPR discharge pressure limit for CO2", "bar",
+        "HPR_MAX_DISCHARGE_PRESSURE for carbon dioxide stages.",
+    ),
+    "HPR_MIN_STAGE_LIFT": FieldText(
+        "HPR minimum stage lift", "delta_degC",
+        (
+            "Vapour compression stages that carry flow and lift less than this "
+            "from evaporating to condensing are penalised."
         ),
     ),
     "HPR_SCREEN_MIN_SUCTION_PRESSURE": FieldText(
         "Refrigerant screen suction pressure floor", "bar",
         (
             "Refrigerant screening flags a fluid whose evaporating saturation "
-            "pressure is below this as deep vacuum suction."
+            "pressure is below this as deep vacuum suction, and targeting "
+            "penalises a closed vapour-compression stage whose suction is below it."
         ),
     ),
     "HPR_SCREEN_CRITICAL_MARGIN": FieldText(

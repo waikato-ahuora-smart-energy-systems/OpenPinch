@@ -33,6 +33,7 @@ from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
+    cycle_limits,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_cascade_pressure_ratios,
@@ -192,6 +193,30 @@ def _get_cascade_hp_opt_setup(
     x_evap = map_T_arr_to_x_arr(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
+    # Nor about pressure ratios, which the search penalises: seed within the
+    # limit so even a small search starts from an unpenalised design.
+    T_cond_seed, T_evap_seed = limit_cascade_pressure_ratios(
+        cap_stage_condensing_temperatures(
+            map_x_arr_to_T_arr(
+                np.asarray(x_cond), *condensing_temperature_search_range(args)
+            ),
+            args,
+        ),
+        floor_stage_evaporating_temperatures(
+            map_x_arr_to_T_arr(np.asarray(x_evap), args.T_hot[-1], args.T_hot[0]),
+            args,
+            first_stage=n_cond - 1,
+        ),
+        args,
+    )
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(T_cond_seed, *condensing_temperature_search_range(args)),
+        0.0,
+        1.0,
+    ).tolist()
+    x_evap = map_T_arr_to_x_arr(
+        T_evap_seed[::-1], args.T_hot[-1], args.T_hot[0]
+    ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[1:]
     init_cool = init_res.Q_evap[:n_cool] if is_heat_pumping else init_res.Q_evap
@@ -256,7 +281,6 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
-    T_cond, T_evap = limit_cascade_pressure_ratios(T_cond, T_evap, args)
     dT_subcool = map_x_arr_to_DT_arr(
         x_subcool,
         T_cond,
@@ -390,6 +414,7 @@ def _build_and_solve_cascade_cycle(
         dT_subcool=state_vars.dT_subcool,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
         dt_ihx=args.dt_hp_ihx,
+        limits=cycle_limits(args),
         eta_comp=args.eta_comp,
         eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,

@@ -97,6 +97,11 @@ class HPRProfile:
                 **kwargs.get("options", {}),
                 "HPR_MAX_PRESSURE_RATIO": 1e6,
             }
+        if sentinel and self.profile_id in HPR_SENTINELS_WITHOUT_SUCTION_FLOOR:
+            kwargs["options"] = {
+                **kwargs.get("options", {}),
+                "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
+            }
         if sentinel and self.profile_id in HPR_SENTINELS_WITH_IDEAL_MOTOR:
             kwargs["options"] = {
                 **kwargs.get("options", {}),
@@ -209,6 +214,17 @@ HPR_SENTINELS_WITHOUT_PRESSURE_RATIO_LIMIT = frozenset(
         "utility-parallel-vc-refrigeration",
         "direct-optimized-vc-mvr-heat-pump",
         "utility-optimized-vc-mvr-heat-pump",
+    }
+)
+
+# These sentinels run water stages that evaporate below about 81 C, under the
+# 0.5 bar suction pressure floor; they prove the search, not the fluid.
+HPR_SENTINELS_WITHOUT_SUCTION_FLOOR = frozenset(
+    {
+        "direct-cascade-vc-heat-pump",
+        "direct-optimized-vc-mvr-heat-pump",
+        "utility-optimized-vc-mvr-heat-pump",
+        "utility-parallel-vc-heat-pump",
     }
 )
 

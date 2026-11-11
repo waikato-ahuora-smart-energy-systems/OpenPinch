@@ -19,6 +19,7 @@ from ..common.compressor_efficiency import (
     CompressorConditions,
     evaluate_compressor_model,
 )
+from .limits import CycleLimits
 
 # Qualities this close to 0 or 1 are saturated liquid or vapour; differences
 # below it are CoolProp round-off and must not change the cycle's path.
@@ -55,6 +56,7 @@ class VapourCompressionCycle:
         self._eta_comp_applied: float = 1.0
         self._eta_motor: float = 1.0
         self._ihx_gas_dt: float = 0.0
+        self._injection_ratio: float = 0.0
         self._dtcont: float = 0.0
         # Default value used in piecewise approximation of non-linear T-h profiles.
         self._dt_diff_max: float = 0.5
@@ -331,6 +333,11 @@ class VapourCompressionCycle:
     def dT_ihx_gas_side(self) -> float:
         """Gas-side temperature change across the internal heat exchanger."""
         return self._ihx_gas_dt
+
+    @property
+    def liquid_injection_ratio(self) -> float:
+        """Condensate injected into the discharge per kg compressed."""
+        return self._injection_ratio
 
     @property
     def solved(self) -> bool:
@@ -631,6 +638,7 @@ class VapourCompressionCycle:
         Q_cool: float = None,
         Q_cas_cool: float = 0.0,
         is_heat_pump: bool = True,
+        limits: CycleLimits | None = None,
     ) -> float:
         """
         Solve the heat pump cycle for the provided operating point.
@@ -673,6 +681,10 @@ class VapourCompressionCycle:
             Used only for cascade refrigeration configurations.
         is_heat_pump : bool, optional
             Flag to indicate if the cycle is in heat pump or refrigeration mode.
+        limits : CycleLimits, optional
+            Practical limits: liquid injection to a maximum discharge superheat,
+            and penalties for the pressure ratio, discharge and suction
+            pressures and the lift. A two-phase discharge is always penalised.
 
         Returns
         -------
@@ -774,7 +786,12 @@ class VapourCompressionCycle:
         )
         self._save_cycle_state(state1, 1)
 
-        # Historical wet-compression penalty hook retained for future tuning.
+        # A compressor cannot discharge two-phase: penalise gas short of its
+        # dew point (a dry fluid compressed from saturated vapour, say).
+        if P_hi < self._p_crit:
+            h_dew_hi = self._compute_state_from_pressure_quality(P_hi, 1.0).hmass()
+            if state1.hmass() < h_dew_hi:
+                self._penalty.append(h_dew_hi - state1.hmass())
 
         # 2 - Condenser outlet / IHX inlet (source)
         h_cond_out_min = (
@@ -809,6 +826,7 @@ class VapourCompressionCycle:
             self._T_cond_sat_liq - state2.T()
         )  # Actual subcooling possible
         self._save_cycle_state(state2, 2)
+        self._injection_ratio = self._liquid_injection_ratio(state1, state2, limits)
 
         if (
             dT_ihx_gas_side > self._ihx_gas_dt
@@ -832,6 +850,7 @@ class VapourCompressionCycle:
                 Q_cool=Q_cool,
                 Q_cas_cool=Q_cas_cool,
                 is_heat_pump=is_heat_pump,
+                limits=limits,
             )
 
         if h_cond_out_min > h_cond_out_tar:
@@ -852,6 +871,10 @@ class VapourCompressionCycle:
 
         self._q_evap = state0.hmass() - state3.hmass()
         self._q_cond = state1.hmass() - state2.hmass()
+        self._penalty.extend(
+            self._q_cond * violation
+            for violation in self._limit_violations(P_lo, P_hi, limits)
+        )
         self._w_net = (self._q_cond - self._q_evap) / self._eta_motor
         if is_heat_pump:
             self._m_dot = self._Q_cond / self._q_cond
@@ -1010,6 +1033,59 @@ class VapourCompressionCycle:
         h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
         return (h_sat_liq - share * h_comp_in) / (1.0 - share)
 
+    def _limit_violations(
+        self, P_lo: float, P_hi: float, limits: CycleLimits | None
+    ) -> list[float]:
+        """Relative violations of the stage's pressure and lift limits."""
+        if limits is None:
+            return []
+        violations = []
+        if limits.max_pressure_ratio is not None:
+            violations.append(P_hi / P_lo / limits.max_pressure_ratio - 1.0)
+        max_discharge = (
+            limits.max_discharge_pressure_co2
+            if limits.max_discharge_pressure_co2 is not None
+            and self._get_fluid_state(self._refrigerant).fluid_names()
+            == ["CarbonDioxide"]
+            else limits.max_discharge_pressure
+        )
+        if max_discharge is not None:
+            violations.append(P_hi / max_discharge - 1.0)
+        if limits.min_suction_pressure is not None:
+            violations.append(limits.min_suction_pressure / P_lo - 1.0)
+        if limits.min_lift > 0.0:
+            lift = self._T_cond_sat_liq - self._T_evap_sat_vap
+            violations.append(1.0 - lift / limits.min_lift)
+        return [violation for violation in violations if violation > 0.0]
+
+    def _liquid_injection_ratio(
+        self,
+        discharge: CoolProp.AbstractState,
+        condensate: CoolProp.AbstractState,
+        limits: CycleLimits | None,
+    ) -> float:
+        """Condensate injected per kg compressed to hold the discharge superheat.
+
+        Condensate at the condenser outlet is mixed into the discharge gas
+        until the gas is ``max_discharge_superheat`` above its dew point. The
+        mixing is adiabatic, so the condenser rejects the same heat and the
+        compressor does the same work.
+        """
+        if limits is None or limits.max_discharge_superheat is None:
+            return 0.0
+        P_hi = discharge.p()
+        if P_hi >= self._p_crit:
+            return 0.0
+        T_cap = self._compute_state_from_pressure_quality(P_hi, 1.0).T() + float(
+            limits.max_discharge_superheat
+        )
+        if discharge.T() <= T_cap:
+            return 0.0
+        h_cap = self._compute_state_from_pressure_temperature(
+            P=P_hi, T=T_cap, phase=1
+        ).hmass()
+        return (discharge.hmass() - h_cap) / (h_cap - condensate.hmass())
+
     def _build_condenser_profile(self) -> np.ndarray:
         """
         Construct a four-point condenser T-h polyline in cycle units.
@@ -1024,7 +1100,12 @@ class VapourCompressionCycle:
         self._require_solution()
 
         # Read temperatures and enthalpies from the solved cycle
-        H = self.Hs  # [H0, H1, H2, H3] in J/kg
+        H = list(self.Hs)  # [H0, H1, H2, H3] in J/kg
+        # With liquid injection, (1 + r) kg flows through the condenser per kg
+        # compressed, so the profile is traced in condenser-flow enthalpy and
+        # stretched back to per kg compressed at the end.
+        stretch = 1.0 + self._injection_ratio
+        H[4] = H[2] + (H[4] - H[2]) / stretch
 
         # Use saturation points from the state if needed
         p_high = self.Ps[4]
@@ -1065,6 +1146,7 @@ class VapourCompressionCycle:
                 t_h_curve_points.append([h, float(state.T())])
 
         t_h_curve_points = np.array(t_h_curve_points)
+        t_h_curve_points[:, 0] = H[2] + (t_h_curve_points[:, 0] - H[2]) * stretch
 
         # Convert temperature to °C if not SI
         t_h_curve_points[:, 1] -= 273.15

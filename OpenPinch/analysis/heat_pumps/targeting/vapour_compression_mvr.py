@@ -29,6 +29,7 @@ from ..common.shared import (
     HPRCostUnit,
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
+    cycle_limits,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     is_negligible_useful_duty,
@@ -156,6 +157,19 @@ def _get_vc_mvr_opt_setup(
         1.0,
     )
     x_evap = map_T_arr_to_x_arr(T_evap_seed, args.T_hot[-1], args.T_hot[0])
+    # The search penalises a pressure ratio over the limit: seed the closed
+    # stages within it so even a small search starts unpenalised.
+    T_evap_limited = limit_parallel_pressure_ratios(
+        cap_stage_condensing_temperatures(
+            map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)),
+            args,
+        ),
+        floor_stage_evaporating_temperatures(
+            map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
+        ),
+        args,
+    )
+    x_evap = map_T_arr_to_x_arr(T_evap_limited[::-1], args.T_hot[-1], args.T_hot[0])
     x_subcool = np.zeros(n_mvr + n_vc, dtype=float)
     x_ihx = np.zeros(n_vc, dtype=float)
     x_mvr_source_split = np.array([0.5], dtype=float)
@@ -197,7 +211,6 @@ def _parse_vc_mvr_state_variables(
         ),
         args,
     )
-    T_evap_vc = limit_parallel_pressure_ratios(T_cond_vc, T_evap_vc, args)
     Q_heat_available = limit_available_duty(
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_cond_vc,
@@ -272,6 +285,7 @@ def _compute_vc_mvr_system_obj(
             dT_subcool_mvr=parsed["dT_subcool_mvr"],
             dT_ihx_gas_side_vc=state_vars.dT_ihx_gas_side,
             dt_ihx=args.dt_hp_ihx,
+            limits=cycle_limits(args),
             eta_comp=args.eta_comp,
             eta_mvr_comp=args.eta_mvr_comp,
             eta_motor=args.eta_mvr_motor,

@@ -14,6 +14,34 @@ Heat pumps and refrigeration
   suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
   Every heat pump and refrigeration target moves; set the three options to 0
   for the previous results.
+- Vapour-compression stages are now held to practical limits.
+
+  - Liquid injection: condensate is injected into the compressor discharge
+    until the gas is at most ``HPR_MAX_DISCHARGE_SUPERHEAT`` (new, default
+    50 K) above its dew point. The condenser rejects the same heat and the
+    compressor does the same work, but the hot gas no longer delivers heat at
+    discharge temperatures. These reached 400 to 600 °C for water stages and
+    220 to 425 °C for ammonia.
+  - Penalties, of the stage's condenser duty times the relative violation:
+    a pressure ratio above ``HPR_MAX_PRESSURE_RATIO`` (default 15), a
+    discharge pressure above ``HPR_MAX_DISCHARGE_PRESSURE`` (new, default
+    60 bar; ``HPR_MAX_DISCHARGE_PRESSURE_CO2``, new, 140 bar for carbon
+    dioxide), a suction pressure below ``HPR_SCREEN_MIN_SUCTION_PRESSURE``
+    (0.5 bar, previously used only by the refrigerant screen), and a lift
+    below ``HPR_MIN_STAGE_LIFT`` (new, default 5 K) on a stage that carries
+    flow.
+  - A two-phase compressor discharge, as dry fluids such as isopentane give
+    when compressed from saturated vapour, is penalised by the gas's shortfall
+    from its dew point.
+  - The pressure ratio limit was a clamp that raised evaporating temperatures
+    when a design was decoded. It is now a penalty, so the search sees a slope
+    instead of a plateau. The Carnot warm start is still placed within the
+    limit, so a small search starts from an unpenalised design.
+  - The Excel input template lists the new options and the new approach
+    temperature defaults.
+  - MVR stages on process vapour are not held to these limits, and TESPy
+    targets keep their own model.
+
 - ``HPR_DT_IHX`` is now the hot-end approach of the internal heat exchanger in
   the CoolProp vapour compression models (single stage, cascade, parallel and
   vapour compression plus MVR): the suction gas leaves it at least this far

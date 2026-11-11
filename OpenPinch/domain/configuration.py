@@ -249,6 +249,10 @@ class HprConfig:
     ambient_air_enabled: bool
     dt_env_cont: float
     max_pressure_ratio: float
+    max_discharge_superheat: float
+    max_discharge_pressure: float
+    max_discharge_pressure_co2: float
+    min_stage_lift: float
     screen_min_suction_pressure: float
     screen_critical_margin: float
     screen_max_stage_lift: float

@@ -8,6 +8,7 @@ import numpy as np
 
 from ..common.encoding import DutyAllocationRequest
 from ._multi_cycle_base import _MultiVapourCompressionCycleBase
+from .limits import CycleLimits
 from .vapour_compression_cycle import VapourCompressionCycle
 
 __all__ = ["CascadeVapourCompressionCycle"]
@@ -318,6 +319,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         duty_allocation: DutyAllocationRequest | None = None,
         dt_cascade_hx: float = 1.0,
         is_heat_pump: bool = True,
+        limits: CycleLimits | None = None,
     ) -> float:
         """
         Solve the heat pump cycle for the provided operating point.
@@ -344,6 +346,8 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             Delta-T on the gas side of the internal heat exchanger [K].
         dt_ihx : float, optional
             Minimum approach at each stage's internal heat exchanger hot end [K].
+        limits : CycleLimits, optional
+            Practical limits every stage is held to (see ``CycleLimits``).
         Q_heat : np.ndarray, optional
             Heat delivered to the process [W]. A scalar applies to each process
             condenser, and stages without one deliver none. Only the balancing
@@ -461,6 +465,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=ihx_gas_dt_all[i],
                 dt_ihx=dt_ihx,
+                limits=limits,
                 Q_heat=Q_heat_all[i],
                 Q_cas_heat=Q_cas_heat,
                 Q_cool=Q_cool_all[i],

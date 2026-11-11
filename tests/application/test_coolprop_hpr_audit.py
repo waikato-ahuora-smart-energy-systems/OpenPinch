@@ -48,11 +48,13 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
     ] = utility
     # A utility heat pump here lifts from about 5 C to the 260 C hot-utility
     # level, where its capital does not pay back and no single water compressor
-    # meets the pressure ratio limit. Leave capital recovery and the limit out so
-    # the search still has a beneficial design to return.
+    # meets the pressure ratio limit; water evaporating near 5 C is also far
+    # below the suction pressure floor. Leave capital recovery and both limits
+    # out so the search still has a beneficial design to return.
     options = {
         "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
         "HPR_MAX_PRESSURE_RATIO": 1e6,
+        "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
     }
     if mode == "mvr":
         kwargs["options"] = {**options, "HPR_REFRIGERANTS": ["Water"]}
@@ -139,6 +141,7 @@ def test_a_refrigerant_whose_upper_cased_name_coolprop_rejects_is_a_target():
         options={
             "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
             "HPR_MAX_PRESSURE_RATIO": 1e6,
+            "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
         },
     )
 

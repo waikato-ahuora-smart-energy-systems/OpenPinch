@@ -9,6 +9,7 @@ import numpy as np
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..common.encoding import DutyAllocationRequest
+from .limits import CycleLimits
 from .mechanical_vapour_recompression_cycle import MechanicalVapourRecompressionCycle
 from .vapour_compression_cycle import VapourCompressionCycle
 
@@ -238,6 +239,7 @@ class VapourCompressionMvrCascade:
         refrigerant: list[str] | str = "water",
         dt_cascade_hx: float = 0.0,
         dtcont: float = 0.0,
+        limits: CycleLimits | None = None,
     ) -> float:
         """Solve the VC+MVR cascade for serial MVR lift and split variables.
 
@@ -246,7 +248,8 @@ class VapourCompressionMvrCascade:
         ``eta_vc_motor`` that of the vapour compression stages. The MVR
         stages recompress process or utility steam, so they run on water.
         ``dt_ihx`` is the minimum hot-end approach of each vapour compression
-        stage's internal heat exchanger.
+        stage's internal heat exchanger, and ``limits`` the practical limits
+        each vapour compression stage is held to.
         """
         self._solved = False
         self._vc_cycles = []
@@ -339,6 +342,7 @@ class VapourCompressionMvrCascade:
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=dT_ihx_gas_side_vc[i],
                 dt_ihx=dt_ihx,
+                limits=limits,
                 Q_heat=self._direct_vc_heat[i],
                 Q_cas_heat=self._internal_heat[i],
                 Q_cool=None,

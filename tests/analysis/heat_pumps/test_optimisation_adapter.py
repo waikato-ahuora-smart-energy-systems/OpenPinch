@@ -6,9 +6,14 @@ import numpy as np
 import pytest
 
 import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
-from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
+from OpenPinch.contracts.hpr import (
+    INFEASIBLE_REFRIGERATION_REASON,
+    HPRBackendResult,
+    HPRTargetingError,
+    HPRThermoArtifacts,
+)
 from OpenPinch.domain import progress
-from OpenPinch.domain.enums import BB_Minimiser
+from OpenPinch.domain.enums import BB_Minimiser, HeatPumpAndRefrigerationCycle
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.value import Value
 from OpenPinch.optimisation.errors import NoOptimisationCandidatesError
@@ -486,3 +491,29 @@ def test_candidate_checks_report_candidates_checked_of_ranked_candidates():
     assert [
         (event.stage, event.done, event.total, event.best_objective) for event in events
     ] == [("candidates", 1, 3, None), ("candidates", 2, 3, 0.2)]
+
+
+def test_a_refrigerator_still_carrying_a_penalty_is_not_a_target():
+    args = _base_args(
+        is_heat_pumping=False,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+    )
+
+    def penalised(point, _args, debug=False):
+        return _result(100.0).with_updates(feasibility_penalty=1.0)
+
+    with pytest.raises(HPRTargetingError) as raised:
+        adapter.solve_hpr_placement(
+            f_obj=penalised,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=args,
+            candidate_search=lambda **_kwargs: (
+                OptimisationCandidate(objective=100.0, point=(0.5,)),
+            ),
+        )
+
+    assert any(
+        failure.summary == INFEASIBLE_REFRIGERATION_REASON
+        for failure in raised.value.diagnostics.representative_failures
+    )

@@ -28,6 +28,7 @@ from ....domain.enums import ProblemTableLabel
 from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
+from ..cycles.limits import CycleLimits
 from ..optimisation_adapter import (
     build_hpr_accounting as _build_hpr_accounting,
 )
@@ -65,6 +66,7 @@ __all__ = [
     "cap_stage_condensing_temperatures",
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
+    "cycle_limits",
     "floor_stage_evaporating_temperatures",
     "limit_cascade_pressure_ratios",
     "limit_parallel_pressure_ratios",
@@ -938,9 +940,10 @@ def limit_parallel_pressure_ratios(
 ) -> np.ndarray:
     """Raise each machine's evaporator until its pressure ratio is within the limit.
 
-    Machine ``i`` uses ``args.refrigerant_ls[i]``. As with the evaporating
-    floor, limiting at decode keeps candidates evaluable; the result is
-    non-increasing (a raised machine lifts the warmer machines with it).
+    Machine ``i`` uses ``args.refrigerant_ls[i]``. The search penalises a
+    ratio over the limit; this places the warm start within it, so even a
+    small search starts from a design the penalty does not reject. The result
+    is non-increasing (a raised machine lifts the warmer machines with it).
     """
     T_evap = np.asarray(T_evap, dtype=float)
     max_ratio = _pressure_ratio_limit(args)
@@ -972,6 +975,7 @@ def limit_cascade_pressure_ratios(
     The levels run hottest first through ``T_cond`` then ``T_evap``, and stage
     ``i`` with ``args.refrigerant_ls[i]`` lifts from level ``i + 1`` to level
     ``i``. Working from the top lets each raised level set the stage below it.
+    Used to place the warm start within the limit, which the search penalises.
     """
     T_cond = np.asarray(T_cond, dtype=float)
     T_evap = np.asarray(T_evap, dtype=float)
@@ -993,6 +997,18 @@ def limit_cascade_pressure_ratios(
         lower = stage + 1
         levels[lower] = max(levels[lower], floor + (dt_hx if lower < n_cond else 0.0))
     return levels[:n_cond], levels[n_cond:]
+
+
+def cycle_limits(args: HeatPumpTargetInputs) -> CycleLimits:
+    """Return the practical limits each vapour compression stage is held to."""
+    return CycleLimits(
+        max_discharge_superheat=getattr(args, "max_discharge_superheat", None),
+        max_pressure_ratio=getattr(args, "max_pressure_ratio", None),
+        max_discharge_pressure=getattr(args, "max_discharge_pressure", None),
+        max_discharge_pressure_co2=getattr(args, "max_discharge_pressure_co2", None),
+        min_suction_pressure=getattr(args, "min_suction_pressure", None),
+        min_lift=float(getattr(args, "min_stage_lift", 0.0) or 0.0),
+    )
 
 
 def validate_vapour_hp_refrigerant_ls(

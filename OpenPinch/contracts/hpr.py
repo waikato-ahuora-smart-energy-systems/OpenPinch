@@ -317,6 +317,12 @@ class HeatPumpTargetInputs(BaseModel):
     rho_penalty: float
     period_idx: int = 0
     max_pressure_ratio: float | None = None
+    # Practical stage limits; pressures in Pa, temperatures in K.
+    max_discharge_superheat: float | None = None
+    max_discharge_pressure: float | None = None
+    max_discharge_pressure_co2: float | None = None
+    min_suction_pressure: float | None = None
+    min_stage_lift: float = 0.0
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool
 

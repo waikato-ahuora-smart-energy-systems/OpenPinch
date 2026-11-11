@@ -41,8 +41,20 @@ process heat; the lower stages lift heat to the stage above. In multi-stage
 refrigeration each stage's condenser passes heat up to the evaporator of the
 warmer stage, and the top stage rejects the remainder. A stage's subcooling heat
 must fit in its own process duty, so a stage that only passes heat up does not
-subcool. Vapour-compression compressors are limited to a pressure ratio of
-``HPR_MAX_PRESSURE_RATIO`` (default 15).
+subcool.
+
+Each vapour-compression stage is held to practical limits. Condensate is
+injected into the compressor discharge until the gas is at most
+``HPR_MAX_DISCHARGE_SUPERHEAT`` (default 50 K) above its dew point; the
+condenser rejects the same heat and the compressor does the same work. A
+stage is penalised, by its condenser duty times the relative violation, when
+its pressure ratio is above ``HPR_MAX_PRESSURE_RATIO`` (default 15), its
+discharge pressure above ``HPR_MAX_DISCHARGE_PRESSURE`` (default 60 bar;
+``HPR_MAX_DISCHARGE_PRESSURE_CO2``, 140 bar, for carbon dioxide), its suction
+pressure below ``HPR_SCREEN_MIN_SUCTION_PRESSURE`` (default 0.5 bar), or its
+lift below ``HPR_MIN_STAGE_LIFT`` (default 5 K), and whenever the compressor
+discharges two-phase. MVR stages on process vapour are not held to these
+limits.
 
 Ambient air is a free heat source for heat pumps and a free heat sink for
 refrigeration unless ``HPR_AMBIENT_AIR_ENABLED`` is ``False``.

@@ -27,6 +27,7 @@ from ..common.shared import (
     HPRCostUnit,
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
+    cycle_limits,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_parallel_pressure_ratios,
@@ -121,6 +122,25 @@ def _get_parallel_hp_opt_setup(
     x_evap = map_T_arr_to_x_arr(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
+    # Nor about pressure ratios, which the search penalises: seed within the
+    # limit so even a small search starts from an unpenalised design.
+    T_cond_seed = cap_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(
+            np.asarray(x_cond), *condensing_temperature_search_range(args)
+        ),
+        args,
+    )
+    T_evap_seed = limit_parallel_pressure_ratios(
+        T_cond_seed,
+        floor_stage_evaporating_temperatures(
+            map_x_arr_to_T_arr(np.asarray(x_evap), args.T_hot[-1], args.T_hot[0]),
+            args,
+        ),
+        args,
+    )
+    x_evap = map_T_arr_to_x_arr(
+        T_evap_seed[::-1], args.T_hot[-1], args.T_hot[0]
+    ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     init_primary_duty = init_res.Q_cond if is_heat_pumping else init_res.Q_evap
     x_ihx = [0.0] * int(args.n_cond)
@@ -166,7 +186,6 @@ def _parse_parallel_hp_state_temperatures(
     T_evap = floor_stage_evaporating_temperatures(
         map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
     )
-    T_evap = limit_parallel_pressure_ratios(T_cond, T_evap, args)
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_available = (
         limit_available_duty(
@@ -281,6 +300,7 @@ def _build_and_solve_parallel_cycles(
         refrigerant=args.refrigerant_ls,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
         dt_ihx=args.dt_hp_ihx,
+        limits=cycle_limits(args),
         duty_allocation=DutyAllocationRequest.from_state(state_vars),
         is_heat_pump=is_heat_pumping,
     )
