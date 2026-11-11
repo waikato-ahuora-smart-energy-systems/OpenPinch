@@ -30,7 +30,7 @@ Internal to the directory:
 
 ## Side Effects
 - Zone target dictionaries are temporarily extended while period base targets are computed and restored on exit [preparation.py:_preserved_zone_targets].
-- `case.args` of each period case is mutated in place (`n_cond`, `n_evap`, `refrigerant_ls`; for VC+MVR a non-empty `mvr_fluid_ls` becomes `refrigerant_ls`) [setup.py:get_multiperiod_hpr_optimisation_setup].
+- `case.args` of each period case is mutated in place (`n_cond`, `n_evap`, `refrigerant_ls`; for VC+MVR a non-empty `mvr_fluid_ls` becomes `refrigerant_ls` before the fluid preflight and the Carnot seed) [setup.py:get_multiperiod_hpr_optimisation_setup].
 - CoolProp is queried by the fluid and state preflights when the backend is `coolprop` [setup.py:get_multiperiod_hpr_optimisation_setup].
 - Problem tables are deep-copied for direct targets [preparation.py:_optimizer_problem_table_for_hpr].
 - `_align_hpr_problem_tables` mutates each period's optimiser problem table by inserting shared temperature intervals [preparation.py:_align_hpr_problem_tables].

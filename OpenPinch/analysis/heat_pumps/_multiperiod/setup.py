@@ -61,6 +61,9 @@ def get_multiperiod_hpr_optimisation_setup(
         ),
         HeatPumpAndRefrigerationCycle.VapourCompMVR.value: "vapour_compression_mvr",
     }.get(hpr_type)
+    if hpr_type == HeatPumpAndRefrigerationCycle.VapourCompMVR.value:
+        for case in period_cases:
+            use_mvr_cascade_fluids(case.args)
     if topology is not None:
         for case in period_cases:
             if case.args.simulation_backend == "coolprop":
@@ -138,7 +141,6 @@ def get_multiperiod_hpr_optimisation_setup(
             optimise_cascade_carnot_heat_pump_placement, selected_case.args
         )
         for case in period_cases:
-            use_mvr_cascade_fluids(case.args)
             case.args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(
                 n_vc,
                 case.args,
