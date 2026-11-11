@@ -4,16 +4,20 @@ from __future__ import annotations
 
 from functools import partial
 
+import CoolProp
 import numpy as np
 
 from ....contracts.hpr import (
     HeatPumpTargetInputs,
+    HPRActiveStage,
     HPRBackendResult,
+    HPREffectiveTopology,
     HPREvaluationMode,
     HPRParsedState,
     HPRTopologyIdentifier,
 )
 from ....domain.configuration import tol
+from ....domain.fluids import build_coolprop_abstract_state
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
@@ -41,6 +45,7 @@ from ..common.shared import (
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
+from ..common.topology import topology_from_stages
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
 from ..optimisation_adapter import initialise_hpr_seed, solve_hpr_placement
 from ..performance_maps.coolprop_preflight import (
@@ -551,7 +556,36 @@ def _compute_tespy_cascade_hp_system_obj(
         if artifact_mode is HPREvaluationMode.FINAL
         else None,
         target_simulation_record=record,
+        effective_topology=(
+            _tespy_effective_topology(request, result, args)
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
+        ),
     )
+
+
+def _tespy_effective_topology(
+    request: HprTargetThermodynamicRequest,
+    result: HPRBackendResult,
+    args: HeatPumpTargetInputs,
+) -> HPREffectiveTopology:
+    """The single stage of a TESPy target, as a CoolProp target reports it."""
+    state = build_coolprop_abstract_state(request.working_fluid.source_spec)
+    state.update(CoolProp.QT_INPUTS, 1.0, request.evaporating_temperature + 273.15)
+    evaporating_pressure = state.p()
+    state.update(CoolProp.QT_INPUTS, 0.0, request.condensing_temperature + 273.15)
+    stage = HPRActiveStage(
+        index=0,
+        role="vapour_compression",
+        fluid=request.working_fluid.source_spec,
+        evaporating_temperature=request.evaporating_temperature,
+        condensing_temperature=request.condensing_temperature,
+        pressure_ratio=state.p() / evaporating_pressure,
+        work=float(result.w_net),
+        process_heat=float(result.Q_heat[0]),
+        process_cooling=float(result.Q_cool[0]),
+    )
+    return topology_from_stages([stage], args)
 
 
 def _tespy_ihx_gas_rise(state: HPRParsedState, args: HeatPumpTargetInputs) -> float:

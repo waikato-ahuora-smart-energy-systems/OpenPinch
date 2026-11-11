@@ -424,3 +424,38 @@ def test_a_tespy_request_caps_the_internal_heat_exchanger_at_its_approach() -> N
         - request.superheat
         - 5.0
     )
+
+
+def test_a_tespy_target_reports_its_effective_topology(monkeypatch) -> None:
+    import CoolProp.CoolProp as CP
+
+    args, prepared = _prepared_args()
+    fake = FakeHprTargetEvaluator(cop=5.0)
+    coordinator = _coordinator(fake)
+
+    result = cascade._compute_tespy_cascade_hp_system_obj(
+        _candidate(args),
+        args,
+        coordinator=coordinator,
+        prepared=prepared,
+    )
+    coordinator.close()
+
+    request = fake.requests[0]
+    topology = result.effective_topology
+    assert topology is not None
+    assert topology.configured_stages == 1
+    (stage,) = topology.active_stages
+    assert stage.role == "vapour_compression"
+    assert stage.fluid == request.working_fluid.source_spec
+    assert stage.evaporating_temperature == request.evaporating_temperature
+    assert stage.condensing_temperature == request.condensing_temperature
+    fluid = request.working_fluid.source_spec
+    assert stage.pressure_ratio == pytest.approx(
+        CP.PropsSI("P", "T", request.condensing_temperature + 273.15, "Q", 0, fluid)
+        / CP.PropsSI("P", "T", request.evaporating_temperature + 273.15, "Q", 1, fluid)
+    )
+    assert stage.work == pytest.approx(result.w_net)
+    assert stage.process_heat == pytest.approx(result.Q_heat[0])
+    assert stage.process_cooling == pytest.approx(result.Q_cool[0])
+    assert "1 of 1 stages used" in topology.label

@@ -40,7 +40,8 @@ Heat pumps and refrigeration
     requested layout and the stages the design uses, with their fluids,
     temperatures, pressure ratios, work and duties, and a one-line label such
     as "... 3x2 requested; 1 of 4 stages used". A shared multiperiod design
-    counts a stage that works in any period.
+    counts a stage that works in any period. TESPy targets report theirs
+    too, so their alternatives are reported as well.
   - ``hpr_details.alternatives`` lists up to three distinct designs (other
     working stages or fluids) within 5% of the target's objective, with
     their topology and objective gap. Very different machines can cost
