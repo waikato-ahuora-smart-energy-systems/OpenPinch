@@ -60,6 +60,7 @@ from ..targeting.provenance import (
     validate_base_target,
 )
 from ..targeting.state import (
+    commit_problem,
     prepared_period_state,
     snapshot_problem,
     target_transaction,
@@ -700,12 +701,20 @@ class _TargetAccessor:
         def solve(item):
             if item.mvr_stages is not None:
                 arguments["mvr_stages"] = item.mvr_stages
-            return method(
+            # A run that raises commits nothing; one that reports failure has
+            # committed, so the problem goes back to the last successful run.
+            before = snapshot_problem(self._problem)
+            period_states = dict(self._problem._period_states)
+            target = method(
                 **arguments,
                 refrigerants=list(item.fluids),
                 condensers=item.condensers,
                 evaporators=item.evaporators,
             )
+            if not target.hpr_success:
+                commit_problem(self._problem, before)
+                self._problem._period_states = period_states
+            return target
 
         return run_fluid_sets(plan, solve)
 

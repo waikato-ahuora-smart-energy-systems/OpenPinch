@@ -303,11 +303,12 @@ def test_a_sweep_keeps_the_other_arguments(calls):
 def test_a_real_screen_runs_through_the_coolprop_target():
     pytest.importorskip("CoolProp")
     problem = PinchProblem("basic_pinch.json")
+    # One fluid set: each run is a full search, slow in Pyodide.
     screen = problem.target.hpr_refrigerant_screen(
         T_evap=[40.0],
         T_cond=[100.0],
         topology="cascade",
-        refrigerants=["Ammonia", "n-Butane", "Isobutane"],
+        refrigerants=["n-Butane"],
     )
 
     runs = problem.target.vapour_compression_heat_pump(
@@ -343,3 +344,38 @@ def test_a_split_layout_runs_a_condenser_on_each_added_level(calls):
 
     assert [run.fluids for run in runs.runs] == [("n-Butane", "Ammonia")]
     assert (calls[0]["condensers"], calls[0]["evaporators"]) == (2, 1)
+
+
+def _committing_hpr(succeeds):
+    """An ``_hpr`` that commits its run, as a target transaction does."""
+
+    def fake_hpr(self, **kwargs):
+        fluids = kwargs["extra_configuration"]["HPR_REFRIGERANTS"]
+        self._problem._results = SimpleNamespace(fluids=list(fluids))
+        return SimpleNamespace(
+            hpr_success=succeeds(fluids),
+            hpr_total_annualized_cost=Value(1.0, "$/y"),
+        )
+
+    return fake_hpr
+
+
+def test_an_unsuccessful_run_leaves_the_last_successful_one(monkeypatch):
+    monkeypatch.setattr(
+        _TargetAccessor, "_hpr", _committing_hpr(lambda f: f == ["Ammonia"])
+    )
+    problem = PinchProblem()
+
+    runs = problem.target.vapour_compression_heat_pump(refrigerants=_screen(SINGLE_HOT))
+
+    assert [run.success for run in runs.runs] == [True, False]
+    assert problem.results.fluids == ["Ammonia"]
+
+
+def test_no_successful_run_leaves_the_problem_as_it_was(monkeypatch):
+    monkeypatch.setattr(_TargetAccessor, "_hpr", _committing_hpr(lambda f: False))
+    problem = PinchProblem()
+
+    problem.target.vapour_compression_heat_pump(refrigerants=_screen(SINGLE_HOT))
+
+    assert problem.results is None
