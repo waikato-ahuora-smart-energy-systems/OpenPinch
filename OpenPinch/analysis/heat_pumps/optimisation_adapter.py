@@ -640,7 +640,15 @@ def run_hpr_candidate_search(
     )
     return _HPRSearchCandidates(
         _merge_ranked_candidates(
-            backend_candidates, (*warm_start_candidates, *cached_scalar.viable.values())
+            backend_candidates,
+            (
+                *warm_start_candidates,
+                *cached_scalar.viable.values(),
+                # The cheapest acceptable point of each design: slightly
+                # penalised points can rank below it and fill ``viable``, and
+                # a penalised design is no target.
+                *cached_scalar.designs.values(),
+            ),
         ),
         diagnostics,
         sorted(cached_scalar.designs.items(), key=lambda item: item[1]),

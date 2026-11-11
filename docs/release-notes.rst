@@ -52,7 +52,10 @@ Heat pumps and refrigeration
 
   - A final vapour-compression heat pump design that still carries a
     feasibility penalty is no longer a target. The next candidate is tried,
-    as refrigeration designs already were. Shared multiperiod designs, heat
+    as refrigeration designs already were. The cheapest feasible point of
+    each design the search evaluated is now a candidate as well, so slightly
+    penalised points that rank cheaper can no longer leave a small search
+    with no target although it found a feasible design. Shared multiperiod designs, heat
     pump or refrigeration, are now checked the same way, period by period:
     a penalty in a lightly weighted period still rejects the design, and the
     failure reports that period's served and targeted heating.
