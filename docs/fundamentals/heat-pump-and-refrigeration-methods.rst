@@ -165,7 +165,9 @@ stage first, and its critical temperature never rises down the stages: the
 targets sort a refrigerant list that way, so a hotter stage never runs a fluid
 with a lower critical temperature. The same fluid may repeat. Each layout
 reports ``n_fluid_sets``, and ``fluid_sets()`` lists them; a layout whose MVR
-stage is infeasible has none.
+stage is infeasible has none. Passing the screen as ``refrigerants`` to a vapour
+compression target runs every fluid set of the layouts for that target's
+method and reports the cheapest by total annualized cost.
 
 The candidates default to every pure and pseudo-pure fluid in the installed
 CoolProp, so the list can differ between CoolProp versions;

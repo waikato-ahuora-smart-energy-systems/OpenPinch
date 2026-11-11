@@ -17,7 +17,7 @@ from ....analysis.heat_pumps.performance_maps.targeting import (
     normalize_hpr_simulation_backend,
 )
 from ....analysis.parallelism import supported_workers
-from ....contracts.hpr import HPRSearchBudget
+from ....contracts.hpr import HPRSearchBudget, HPRTopologyIdentifier
 from ....contracts.hpr_performance_map import (
     HprPerformanceMap,
     HprPerformanceMapRequest,
@@ -31,6 +31,11 @@ from ....domain.enums import (
 )
 from ....domain.progress import scope as progress_scope
 from ....domain.targets import BaseTargetModel
+from ...hpr_fluid_set_runs import (
+    is_screened,
+    plan_fluid_set_runs,
+    run_fluid_sets,
+)
 from ...targeting import (
     area_cost_targeting_service,
     direct_heat_integration_service,
@@ -100,6 +105,15 @@ def _load_options(
 def _set_if_not_none(options: dict[str, Any], key: str, value: Any) -> None:
     if value is not None:
         options[key] = value
+
+
+def _vapour_compression_methods(is_cascade_cycle: bool):
+    if is_cascade_cycle:
+        return (
+            HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
+            HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
+        )
+    return (HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,)
 
 
 class _AllPeriodsTargetAccessor:
@@ -663,6 +677,38 @@ class _TargetAccessor:
             indirect_service=indirect_service if is_utility else None,
         )
 
+    def _fluid_set_runs(
+        self,
+        surface: str,
+        arguments: Mapping[str, Any],
+        *,
+        methods,
+        is_heat_pumping: bool,
+    ):
+        """Run ``surface`` once per fluid set the screened refrigerants propose."""
+        arguments = {k: v for k, v in arguments.items() if k != "self"}
+        plan = plan_fluid_set_runs(
+            arguments.pop("refrigerants"),
+            methods=methods,
+            is_heat_pumping=is_heat_pumping,
+            condensers=arguments.pop("condensers"),
+            evaporators=arguments.pop("evaporators"),
+            mvr_stages=arguments.pop("mvr_stages", None),
+        )
+        method = getattr(self, surface)
+
+        def solve(item):
+            if item.mvr_stages is not None:
+                arguments["mvr_stages"] = item.mvr_stages
+            return method(
+                **arguments,
+                refrigerants=list(item.fluids),
+                condensers=item.condensers,
+                evaporators=item.evaporators,
+            )
+
+        return run_fluid_sets(plan, solve)
+
     def carnot_heat_pump(
         self,
         *,
@@ -778,6 +824,13 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
+        if is_screened(refrigerants):
+            return self._fluid_set_runs(
+                "vapour_compression_heat_pump",
+                locals(),
+                methods=_vapour_compression_methods(is_cascade_cycle),
+                is_heat_pumping=True,
+            )
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
         extra = {}
         for key, value in (
@@ -840,6 +893,13 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
+        if is_screened(refrigerants):
+            return self._fluid_set_runs(
+                "vapour_compression_refrigeration",
+                locals(),
+                methods=_vapour_compression_methods(is_cascade_cycle),
+                is_heat_pumping=False,
+            )
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
         extra = {}
         for key, value in (
@@ -953,6 +1013,7 @@ class _TargetAccessor:
         self,
         *,
         is_utility_heat_pump: bool = False,
+        refrigerants=None,
         mvr_fluids=None,
         mvr_compressor_efficiency=None,
         mvr_compressor_model=None,
@@ -973,8 +1034,16 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
+        if is_screened(refrigerants):
+            return self._fluid_set_runs(
+                "mvr_heat_pump",
+                locals(),
+                methods=(HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,),
+                is_heat_pumping=True,
+            )
         extra = {}
         for key, value in (
+            ("HPR_REFRIGERANTS", refrigerants),
             ("HPR_MVR_FLUIDS", mvr_fluids),
             ("HPR_MVR_ETA_COMP", mvr_compressor_efficiency),
             ("HPR_MVR_COUNT", mvr_stages),
