@@ -96,6 +96,11 @@ _SMALL_SEARCH = dict(
     maximum_iterations=2,
     maximum_evaluations=20,
 )
+# basic_pinch's sink needs a condenser near 177 C, above R1233zd(E)'s
+# critical point (165.7 C); with it this small search finds a single paying
+# design, and round-off on another platform loses it. Cyclopentane (critical
+# at 238.6 C) gives many, at every seed tried on macOS and Linux.
+_SUBCRITICAL_HYDROCARBON = "Cyclopentane"
 _PERMISSIVE = {
     "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
     "HPR_MAX_PRESSURE_RATIO": 1e6,
@@ -105,7 +110,7 @@ _PERMISSIVE = {
 
 def test_a_vapour_compression_target_reports_its_effective_topology():
     target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
-        refrigerants=["R1233zd(E)"],
+        refrigerants=[_SUBCRITICAL_HYDROCARBON],
         condensers=1,
         evaporators=1,
         options=_PERMISSIVE,
@@ -174,7 +179,7 @@ def test_a_shared_design_uses_every_stage_that_works_in_any_period():
 
 def test_the_summary_reports_the_effective_topology_and_alternatives():
     target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
-        refrigerants=["R1233zd(E)"],
+        refrigerants=[_SUBCRITICAL_HYDROCARBON],
         condensers=1,
         evaporators=1,
         options=_PERMISSIVE,
