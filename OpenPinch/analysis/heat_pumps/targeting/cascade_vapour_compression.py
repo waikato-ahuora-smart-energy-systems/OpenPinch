@@ -389,6 +389,7 @@ def _build_and_solve_cascade_cycle(
         duty_allocation=DutyAllocationRequest.from_state(state_vars),
         dT_subcool=state_vars.dT_subcool,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
+        dt_ihx=args.dt_hp_ihx,
         eta_comp=args.eta_comp,
         eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,

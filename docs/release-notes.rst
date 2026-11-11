@@ -7,6 +7,21 @@ Unreleased
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The heat pump exchangers now default to finite approach temperatures:
+  ``HPR_DT_IHX`` and ``HPR_DT_CASCADE_HX`` 5 K, and ``HPR_DT_CONT`` 1 K (all
+  were 0 K). With 0 K the internal and cascade heat exchangers were free
+  exchangers of unbounded area. A brewery search, for example, raised the
+  suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
+  Every heat pump and refrigeration target moves; set the three options to 0
+  for the previous results.
+- ``HPR_DT_IHX`` is now the hot-end approach of the internal heat exchanger in
+  the CoolProp vapour compression models (single stage, cascade, parallel and
+  vapour compression plus MVR): the suction gas leaves it at least this far
+  below the liquid entering it. It was previously read only by TESPy targeting,
+  which rejected a nonzero value; TESPy targets, which have no internal heat
+  exchanger, now accept and ignore it. The working-fluid approach
+  ``HPR_DT_CONT`` no longer limits the internal heat exchanger (it took twice
+  ``HPR_DT_CONT``).
 - Fixed refrigeration targets at a load fraction below 1 that failed with
   "failed to return an optimal result" although designs serving the whole
   target existed. The default refrigeration allowed for the untargeted warmer

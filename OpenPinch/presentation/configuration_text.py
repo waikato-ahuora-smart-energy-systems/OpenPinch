@@ -657,8 +657,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HPR_DT_IHX": FieldText(
         "HPR internal heat exchanger approach", "delta_degC",
         (
-            "Only checked by TESPy targeting, which rejects a nonzero value; no other "
-            "HPR model reads it."
+            "Minimum approach at the internal heat exchanger's hot end: the suction "
+            "gas leaves it at least this far below the liquid entering it. "
+            "CoolProp vapour compression only; TESPy targets have no internal heat "
+            "exchanger."
         ),
     ),
     "HPR_MAX_PRESSURE_RATIO": FieldText(

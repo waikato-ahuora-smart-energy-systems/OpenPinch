@@ -625,6 +625,7 @@ class VapourCompressionCycle:
         eta_motor: float = 1.0,
         refrigerant: str = "water",
         dT_ihx_gas_side: float = 10.0,
+        dt_ihx: float = 0.0,
         Q_heat: float = None,
         Q_cas_heat: float = 0.0,
         Q_cool: float = None,
@@ -655,6 +656,9 @@ class VapourCompressionCycle:
             Cycle refrigerant; supports multi-component fluids.
         dT_ihx_gas_side : float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
+        dt_ihx : float, optional
+            Minimum approach at the internal heat exchanger's hot end: the
+            suction gas leaves it at least this far below the entering liquid [K].
         Q_heat : float, optional
             Heat delivered to the process [W]. Used for heat-pump and cascade
             configurations only.
@@ -705,6 +709,8 @@ class VapourCompressionCycle:
         if not 0.0 < float(eta_motor) <= 1.0:
             raise ValueError("eta_motor must be in the interval (0, 1].")
         self._eta_motor = float(eta_motor)
+        # The suction gas leaves the IHX at least dt_ihx below the liquid
+        # entering it, which has left the condenser dT_subcool below T_cond.
         self._ihx_gas_dt = max(
             min(
                 dT_ihx_gas_side,
@@ -712,7 +718,7 @@ class VapourCompressionCycle:
                 - self._T_evap
                 - self._dT_subcool
                 - self._dT_superheat
-                - self._dtcont * 2,
+                - float(dt_ihx),
             ),
             0.0,
         )
@@ -820,6 +826,7 @@ class VapourCompressionCycle:
                 eta_motor=eta_motor,
                 refrigerant=refrigerant,
                 dT_ihx_gas_side=dT_ihx_gas_side,
+                dt_ihx=dt_ihx,
                 Q_heat=Q_heat,
                 Q_cas_heat=Q_cas_heat,
                 Q_cool=Q_cool,

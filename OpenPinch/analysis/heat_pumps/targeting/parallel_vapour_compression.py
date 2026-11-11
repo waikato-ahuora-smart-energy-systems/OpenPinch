@@ -280,6 +280,7 @@ def _build_and_solve_parallel_cycles(
         eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
+        dt_ihx=args.dt_hp_ihx,
         duty_allocation=DutyAllocationRequest.from_state(state_vars),
         is_heat_pump=is_heat_pumping,
     )

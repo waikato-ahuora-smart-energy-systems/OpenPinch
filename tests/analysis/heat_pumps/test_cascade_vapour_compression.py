@@ -458,6 +458,7 @@ def test_cascade_state_reports_the_subcooling_the_cycle_applied():
         eta_motor=1.0,
         refrigerant_ls=["Ammonia", "R1234ze(E)"],
         dt_cascade_hx=5.0,
+        dt_hp_ihx=0.0,
     )
 
     cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
@@ -500,6 +501,7 @@ def test_cascade_refrigeration_heat_controls_sit_below_the_top_stage():
         eta_motor=1.0,
         refrigerant_ls=["Ammonia", "Ammonia"],
         dt_cascade_hx=5.0,
+        dt_hp_ihx=0.0,
     )
     state = HPRParsedState.model_validate(
         {
@@ -536,6 +538,7 @@ def test_cascade_one_condenser_delivers_its_duty_once_with_two_evaporators():
         eta_motor=1.0,
         refrigerant_ls=["Ammonia", "Ammonia"],
         dt_cascade_hx=1.0,
+        dt_hp_ihx=0.0,
     )
     state = HPRParsedState.model_validate(
         {
