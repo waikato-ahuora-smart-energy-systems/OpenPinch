@@ -506,17 +506,23 @@ class VapourCompressionCycle:
     ) -> CompressorConditions:
         P_in = float(suction.p())
         evap_dew = self._compute_state_from_pressure_quality(P_in, 1.0)
-        cond_dew = self._compute_state_from_pressure_quality(P_out, 1.0)
+        if P_out >= suction.p_critical():
+            # A transcritical discharge has no dew point; the dew line ends at
+            # the critical point.
+            T_cond_dew, rho_cond_dew = suction.T_critical(), suction.rhomass_critical()
+        else:
+            cond_dew = self._compute_state_from_pressure_quality(P_out, 1.0)
+            T_cond_dew, rho_cond_dew = cond_dew.T(), cond_dew.rhomass()
         return CompressorConditions(
             refrigerant=self._refrigerant,
             P_suction=P_in / 1000.0,
             P_discharge=float(P_out) / 1000.0,
             T_suction=self._convert_K_to_C(float(suction.T())),
             T_evap_dew=self._convert_K_to_C(float(evap_dew.T())),
-            T_cond_dew=self._convert_K_to_C(float(cond_dew.T())),
+            T_cond_dew=self._convert_K_to_C(float(T_cond_dew)),
             rho_suction=float(suction.rhomass()),
             rho_evap_dew=float(evap_dew.rhomass()),
-            rho_cond_dew=float(cond_dew.rhomass()),
+            rho_cond_dew=float(rho_cond_dew),
         )
 
     def _compute_compressor_outlet_state(

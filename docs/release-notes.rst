@@ -76,7 +76,9 @@ Heat pumps and refrigeration
   limit. The warm start is still seeded subcritical, and TESPy targets stay
   subcritical. A stage with no subcooling now reports exactly zero, where
   round-off could give a tiny negative value that failed the simulation
-  record.
+  record. A compressor efficiency correlation (``HPR_COMPRESSOR_MODEL``) is
+  given the critical point as a transcritical stage's discharge dew point,
+  where it used to fail the candidate.
 - Vapour-compression stages are now held to practical limits.
 
   - Liquid injection: condensate is injected into the compressor discharge
