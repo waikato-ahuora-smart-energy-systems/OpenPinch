@@ -44,7 +44,8 @@ Heat pumps and refrigeration
   for that method: single-stage and cascade layouts for a cascade cycle,
   parallel layouts for a parallel cycle, and vapour compression plus MVR
   layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators
-  and MVR stages from its layout, unless given, when only layouts with those
+  and MVR stages from its layout (a split layout's added levels included),
+  unless given, when only layouts with those
   counts run; layouts asking for the same counts and fluids share one run. The
   result is an ``HprFluidSetRunsResult`` with every run, failures included,
   and ``best``, the successful run with the lowest total annualized cost. A

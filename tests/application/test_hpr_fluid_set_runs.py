@@ -326,3 +326,20 @@ def test_a_real_screen_runs_through_the_coolprop_target():
     settings = json.loads(runs.best.target.provenance.effective_settings_json)
     assert settings["HPR_REFRIGERANTS"] == list(runs.best.fluids)
     assert json.loads(runs.model_dump_json())["runs"][0]["fluids"]
+
+
+def test_a_split_layout_runs_a_condenser_on_each_added_level(calls):
+    split = _layout(
+        "cascade_vapour_compression",
+        [120.0, 60.0],
+        [0.0],
+        [_stage(55.0, 120.0, ["n-Butane"]), _stage(0.0, 60.0, ["Ammonia"])],
+        1,
+    ) | {"added_levels": [_quantity(60.0)]}
+
+    runs = PinchProblem().target.vapour_compression_heat_pump(
+        refrigerants=_screen(split)
+    )
+
+    assert [run.fluids for run in runs.runs] == [("n-Butane", "Ammonia")]
+    assert (calls[0]["condensers"], calls[0]["evaporators"]) == (2, 1)
