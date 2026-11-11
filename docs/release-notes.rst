@@ -21,6 +21,13 @@ Heat pumps and refrigeration
   ``HPR_ETA_MOTOR`` to 1.0 for the previous results, and with a compressor
   model that gives overall efficiency, such as ``brendel``, since that already
   includes the motor.
+- ``HprPerformanceMapRequest`` and ``HprPerformanceMap`` have a new
+  ``motor_efficiency`` field (default 1.0). At 1.0 a map's ``electric_power``
+  is compressor shaft power, as before. Set it, for example to the target's
+  ``HPR_ETA_MOTOR``, to map electrical power: ``electric_power`` is the shaft
+  power divided by it, the COP uses it, and each point satisfies
+  ``q_sink = q_source + motor_efficiency * electric_power``. Maps without the
+  field still validate.
 - New ``problem.target.hpr_refrigerant_screen()`` screens working fluids as
   single-stage cycles between the evaporating and condensing levels of a
   Carnot heat pump or refrigeration target (``target=...``), or between

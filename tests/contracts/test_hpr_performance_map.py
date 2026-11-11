@@ -196,6 +196,7 @@ def test_contract_has_the_exact_alpha_field_and_unit_sets() -> None:
         "provenance",
         "points",
         "cop_convention",
+        "motor_efficiency",
         "energy_balance_tolerance",
         "temperature_match_tolerance",
     }
@@ -409,6 +410,20 @@ def test_physical_inconsistency_rejects_the_complete_map(
         payload["points"][0]["q_source"] = 36.5
 
     with pytest.raises(ValidationError, match=message):
+        HprPerformanceMap.model_validate(payload)
+
+
+def test_motor_efficiency_relates_electric_power_to_the_shaft_energy_balance() -> None:
+    payload = _payload()
+    payload["motor_efficiency"] = 0.8
+    for point in payload["points"]:
+        point["electric_power"] = (point["q_sink"] - point["q_source"]) / 0.8
+        point["cop"] = point["q_sink"] / point["electric_power"]
+
+    assert HprPerformanceMap.model_validate(payload).motor_efficiency == 0.8
+    assert HprPerformanceMap.model_validate(_payload()).motor_efficiency == 1.0
+    payload["motor_efficiency"] = 0.9
+    with pytest.raises(ValidationError, match=r"q_sink = q_source \+ electric_power"):
         HprPerformanceMap.model_validate(payload)
 
 

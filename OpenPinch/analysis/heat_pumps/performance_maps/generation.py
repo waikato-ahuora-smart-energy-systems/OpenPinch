@@ -113,7 +113,8 @@ def _normalize_point(
             context,
             point,
         )
-    cop = useful_duty / simulation.compressor_power
+    electric_power = simulation.compressor_power / context.request.motor_efficiency
+    cop = useful_duty / electric_power
     return (
         HprPerformancePoint(
             name=point.name,
@@ -123,7 +124,7 @@ def _normalize_point(
             load_fraction=point.load_fraction,
             q_source=simulation.q_source,
             q_sink=simulation.q_sink,
-            electric_power=simulation.compressor_power,
+            electric_power=electric_power,
             cop=cop,
         ),
         None,
@@ -283,6 +284,7 @@ def generate_hpr_performance_map(
             q_sink="kW",
             electric_power="kW",
         ),
+        motor_efficiency=request.motor_efficiency,
         reference_capacity=context.reference_capacity,
         reference_capacity_basis=context.reference_capacity_basis,
         interpolation_topology="ordered_part_load_curve",

@@ -272,7 +272,12 @@ owns the off state.
 
 For every point::
 
-   q_sink = q_source + electric_power
+   q_sink = q_source + motor_efficiency * electric_power
+
+``motor_efficiency`` is a map field set by the map request. At its default of
+1.0, ``electric_power`` is compressor shaft power. Below 1.0 it is electrical
+power, with the motor losses leaving the cycle; set it to the target's
+``HPR_ETA_MOTOR`` to map the target's electrical power.
 
 The useful duty depends on the operating mode::
 

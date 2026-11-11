@@ -171,6 +171,13 @@
       "title": "Model Id",
       "type": "string"
     },
+    "motor_efficiency": {
+      "default": 1.0,
+      "exclusiveMinimum": 0.0,
+      "maximum": 1.0,
+      "title": "Motor Efficiency",
+      "type": "number"
+    },
     "points": {
       "items": {
         "$ref": "#/$defs/HprPerformancePoint"

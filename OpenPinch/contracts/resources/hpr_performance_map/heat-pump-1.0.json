@@ -5,6 +5,7 @@
   "map_id": "openpinch-golden-heat-pump-1.0",
   "mode": "heat_pump",
   "model_id": "reference-single-stage-heat-pump-v1",
+  "motor_efficiency": 1.0,
   "points": [
     {
       "cop": 4.0,

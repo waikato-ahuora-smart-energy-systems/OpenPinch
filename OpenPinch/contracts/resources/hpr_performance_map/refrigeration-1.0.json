@@ -5,6 +5,7 @@
   "map_id": "openpinch-golden-refrigeration-1.0",
   "mode": "refrigeration",
   "model_id": "reference-single-stage-refrigeration-v1",
+  "motor_efficiency": 1.0,
   "points": [
     {
       "cop": 3.3333333333333335,
