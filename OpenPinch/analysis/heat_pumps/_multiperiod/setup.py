@@ -39,9 +39,9 @@ from ..targeting.parallel_vapour_compression import (
 from ..targeting.vapour_compression_mvr import (
     _compute_vc_mvr_system_obj,
     _get_vc_mvr_opt_setup,
-    _normalise_fluid_list,
     _num_vc_stages,
     _parse_vc_mvr_state_variables,
+    use_mvr_cascade_fluids,
 )
 
 
@@ -61,6 +61,9 @@ def get_multiperiod_hpr_optimisation_setup(
         ),
         HeatPumpAndRefrigerationCycle.VapourCompMVR.value: "vapour_compression_mvr",
     }.get(hpr_type)
+    if hpr_type == HeatPumpAndRefrigerationCycle.VapourCompMVR.value:
+        for case in period_cases:
+            use_mvr_cascade_fluids(case.args)
     if topology is not None:
         for case in period_cases:
             if case.args.simulation_backend == "coolprop":
@@ -142,7 +145,6 @@ def get_multiperiod_hpr_optimisation_setup(
                 n_vc,
                 case.args,
             )
-            case.args.mvr_fluid_ls = _normalise_fluid_list(case.args.mvr_fluid_ls)
         x0_ls, bounds = _get_vc_mvr_opt_setup(initial_result, selected_case.args)
         if selected_case.args.simulation_backend == "coolprop":
             point = representative_hpr_point(x0_ls, bounds)

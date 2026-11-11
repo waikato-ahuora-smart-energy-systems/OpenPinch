@@ -50,18 +50,29 @@ def test_configuration_exposes_normalised_hpr_backend_options():
     cfg = Configuration(
         options={
             "HPR_REFRIGERANTS": ["water", "ammonia", "co2"],
-            "HPR_MVR_FLUIDS": ["Water", "R134A"],
+            "HPR_MVR_FLUIDS": ["ammonia", "r600a"],
             "HPR_HE_ETA_II_CARNOT": 0.4,
             "HPR_INTEGRATED_EXPANDER_ENABLED": True,
         }
     )
 
     assert cfg.hpr.normalised_refrigerants == ["WATER", "AMMONIA", "CO2"]
-    assert cfg.hpr.normalised_mvr_fluids == ["Water", "R134A"]
+    assert cfg.hpr.normalised_mvr_fluids == ["AMMONIA", "R600A"]
     assert cfg.hpr.effective_eta_ii_he_carnot == pytest.approx(0.4)
     assert not hasattr(cfg, "hpr_refrigerants")
     assert not hasattr(cfg, "hpr_mvr_fluids")
     assert not hasattr(cfg, "effective_eta_ii_he_carnot")
+
+
+def test_mvr_fluids_default_to_none_so_the_refrigerant_list_applies():
+    assert Configuration().hpr.mvr_fluids == []
+    assert Configuration().hpr.normalised_mvr_fluids == []
+
+
+@pytest.mark.parametrize("water", ["Water", " water ", "H2O", "R718", "HEOS::Water"])
+def test_mvr_fluids_reject_water_as_the_mvr_stages_always_use_it(water):
+    with pytest.raises(ValueError, match="HPR_MVR_FLUIDS.*water"):
+        Configuration(options={"HPR_MVR_FLUIDS": ["ammonia", water]})
 
 
 def test_configuration_refrigerant_names_resolve_in_coolprop():

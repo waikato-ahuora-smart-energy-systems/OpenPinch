@@ -41,10 +41,8 @@ def preflight_coolprop_fluid_names(args: HeatPumpTargetInputs, topology_id) -> N
     roles = ["vc"] * len(vc_fluids)
     fluids = vc_fluids
     if topology is HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR:
-        mvr_fluids = getattr(args, "mvr_fluid_ls", None) or ["Water"]
-        mvr_fluids = [mvr_fluids] if isinstance(mvr_fluids, str) else mvr_fluids
-        roles += ["mvr"] * len(mvr_fluids)
-        fluids += list(mvr_fluids)
+        roles += ["mvr"]
+        fluids += ["Water"]
     for ordinal, (role, fluid) in enumerate(zip(roles, fluids, strict=True)):
         try:
             parsed = parse_hpr_working_fluid(fluid)
@@ -161,18 +159,11 @@ def _stage_fluids(
     args: HeatPumpTargetInputs,
 ) -> tuple[str, ...]:
     vc_fluids = _normalize_fluids(args.refrigerant_ls, roles.count("vc"), "VC")
-    mvr_fluids = _normalize_fluids(
-        getattr(args, "mvr_fluid_ls", []),
-        roles.count("mvr"),
-        "MVR",
-    )
     vc_index = 0
-    mvr_index = 0
     result: list[str] = []
     for role in roles:
         if role == "mvr":
-            result.append(mvr_fluids[mvr_index])
-            mvr_index += 1
+            result.append("Water")
         else:
             result.append(vc_fluids[vc_index])
             vc_index += 1

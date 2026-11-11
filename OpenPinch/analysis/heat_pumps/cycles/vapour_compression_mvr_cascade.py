@@ -235,7 +235,6 @@ class VapourCompressionMvrCascade:
         eta_motor: float = 1.0,
         eta_vc_motor: float = 1.0,
         refrigerant: list[str] | str = "water",
-        mvr_fluid: list[str] | str = "Water",
         dt_cascade_hx: float = 0.0,
         dtcont: float = 0.0,
     ) -> float:
@@ -243,7 +242,8 @@ class VapourCompressionMvrCascade:
 
         A heat-side ``duty_allocation`` overrides ``Q_heat_vc``; its cool side
         is ignored. ``eta_motor`` is the motor efficiency of the MVR stages and
-        ``eta_vc_motor`` that of the vapour compression stages.
+        ``eta_vc_motor`` that of the vapour compression stages. The MVR
+        stages recompress process or utility steam, so they run on water.
         """
         self._solved = False
         self._vc_cycles = []
@@ -283,7 +283,6 @@ class VapourCompressionMvrCascade:
         )
         process_split = self._normalise_process_split(mvr_process_split, n_mvr)
         refrigerant_all = self._normalise_fluid_list(refrigerant, n_vc)
-        mvr_fluid_all = self._normalise_fluid_list(mvr_fluid, n_mvr)
 
         penalties = []
         penalties.extend(
@@ -384,7 +383,7 @@ class VapourCompressionMvrCascade:
                 dT_subcool=dT_subcool_mvr[j],
                 eta_mvr_comp=eta_mvr_comp,
                 eta_motor=eta_motor,
-                fluid=mvr_fluid_all[j],
+                fluid="Water",
                 process_split=self._process_split[j],
                 **solve_kwargs,
             )

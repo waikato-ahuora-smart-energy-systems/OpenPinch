@@ -184,7 +184,6 @@ def test_vc_mvr_heating_cop_never_exceeds_carnot(
         eta_comp=eta,
         eta_mvr_comp=eta,
         refrigerant=[refrigerant],
-        mvr_fluid=["Water"],
         dt_cascade_hx=2.0,
     )
     assert cycle.solved
@@ -208,7 +207,6 @@ def test_subcooling_heat_does_not_reach_the_mvr_train():
             eta_comp=0.7,
             eta_mvr_comp=0.7,
             refrigerant=["Ammonia"],
-            mvr_fluid=["Water"],
             dt_cascade_hx=2.0,
         )
         assert cycle.solved

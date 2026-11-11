@@ -272,8 +272,11 @@ class HprConfig:
 
     @property
     def normalised_mvr_fluids(self) -> list[str]:
-        """Return MVR fluid names normalised for thermodynamic backends."""
-        return self._normalise_config_list(self.mvr_fluids) or ["Water"]
+        """Return the VC+MVR vapour compression fluids normalised for backends."""
+        return [
+            coolprop_fluid_spelling(value)
+            for value in self._normalise_config_list(self.mvr_fluids)
+        ]
 
     @property
     def effective_eta_ii_he_carnot(self) -> float:

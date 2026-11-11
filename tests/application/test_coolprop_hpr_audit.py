@@ -73,11 +73,11 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
     assert monotonic() - started < 120.0  # generous smoke gate, not a runtime SLA
 
 
-def test_real_invalid_mvr_fluid_is_atomic_and_fails_before_search(monkeypatch):
+def test_real_invalid_mvr_cascade_fluid_is_atomic_and_fails_before_search(monkeypatch):
     import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 
     def forbidden(**kwargs):
-        pytest.fail("invalid MVR fluid entered optimization")
+        pytest.fail("invalid MVR cascade fluid entered optimization")
 
     monkeypatch.setattr(adapter, "run_hpr_candidate_search", forbidden)
     problem = PinchProblem("basic_pinch.json")

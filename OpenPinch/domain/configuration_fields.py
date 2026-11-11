@@ -14,6 +14,7 @@ from typing import Any, List, get_args, get_origin
 
 from .compressor_model import CustomCompressorModel
 from .enums import BB_Minimiser, HeatPumpAndRefrigerationCycle, TurbineModel, ZoneType
+from .fluids import is_water
 from .solver_options import validate_solver_option
 
 
@@ -162,6 +163,18 @@ def _compressor_model(name: str, value: Any) -> str:
             "problem.target HPR method; stored options take a model name."
         )
     return _string_choice(name, value, HPR_COMPRESSOR_MODEL_VALUES)
+
+
+def _mvr_cascade_fluids(name: str, value: Any) -> list[str]:
+    fluids = list(_sequence(name, value, allow_empty=True))
+    if not all(isinstance(item, str) for item in fluids):
+        raise ValueError(f"{name} values must be strings.")
+    if any(is_water(item) for item in fluids):
+        raise ValueError(
+            f"{name} names the vapour compression fluids of an MVR cascade and "
+            "must not include water: the MVR stages always run on water."
+        )
+    return fluids
 
 
 def _positive_float(name: str, value: Any) -> float:
@@ -411,7 +424,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": _spec(bool, False, "hpr", "multiperiod_optimization_enabled"),
     "HPR_REFRIGERANTS": _spec(List[str], ["water", "ammonia"], "hpr", "refrigerants"),
     "HPR_REFRIGERANT_SORT_ENABLED": _spec(bool, True, "hpr", "refrigerant_sort_enabled"),
-    "HPR_MVR_FLUIDS": _spec(List[str], ["Water"], "hpr", "mvr_fluids"),
+    "HPR_MVR_FLUIDS": _spec(List[str], [], "hpr", "mvr_fluids", validator=_mvr_cascade_fluids),
     "HPR_MVR_COUNT": _spec(int, 1, "hpr", "mvr_count", numeric_min=1.0),
     "HPR_MVR_ETA_COMP": _spec(float, 0.7, "hpr", "mvr_eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_MVR_COMPRESSOR_MODEL": _spec(str, "constant", "hpr", "mvr_compressor_model", validator=_compressor_model),

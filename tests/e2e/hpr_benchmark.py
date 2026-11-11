@@ -48,7 +48,7 @@ class HPRProfile:
     sentinel_maximum_search_observations: int | None = None
     sentinel_maximum_iterations: int | None = None
     refrigerants: tuple[str, ...] = ("Water",)
-    mvr_fluids: tuple[str, ...] = ("Water",)
+    mvr_fluids: tuple[str, ...] = ()
     mvr_stages: int = 1
 
     def invocation_kwargs(
