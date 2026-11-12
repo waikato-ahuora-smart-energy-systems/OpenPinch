@@ -45,8 +45,9 @@ DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
 CONVERGED_TERMINATION_CONDITIONS = frozenset(
     {"optimal", "locallyOptimal", "globallyOptimal", "feasible"}
 )
-# Solver statuses and termination conditions GEKKO's Pyomo extension accepts
-# (the others raise there); native Pyomo solves treat them the same way.
+# Solver statuses and termination conditions a native Pyomo solve accepts:
+# those GEKKO's Pyomo extension accepts (the others raise there), except
+# "unbounded" and "noSolution", which leave no solution to read.
 PASSING_SOLVER_STATUSES = frozenset({"ok", "warning"})
 PASSING_TERMINATION_CONDITIONS = CONVERGED_TERMINATION_CONDITIONS | frozenset(
     {
@@ -57,9 +58,7 @@ PASSING_TERMINATION_CONDITIONS = CONVERGED_TERMINATION_CONDITIONS | frozenset(
         "minStepLength",
         "maxEvaluations",
         "other",
-        "unbounded",
         "intermediateNonInteger",
-        "noSolution",
     }
 )
 GEKKO_NUMPY_ARRAY_COPY_DEPRECATION = (
@@ -260,19 +259,7 @@ def configure_gekko_solver(
                     IPOPT_OPTION_FILE,
                     effective_options,
                 )
-        pyomo = require_synthesis_dependency(
-            "pyomo.environ",
-            package="pyomo",
-            purpose=f"{solver_name} solver factory availability checks",
-        )
-        solver_factory = pyomo.SolverFactory(model.options.SOLVER)
-        available = solver_factory.available(exception_flag=False)
-        if not available:
-            raise MissingSynthesisSolverError(
-                f"The {model.options.SOLVER!r} Pyomo solver is not available. "
-                "Install the solver binary, confirm it is on PATH, and rerun "
-                "the heat exchanger network synthesis solver tests."
-            )
+        _require_pyomo_solver_available(solver_name, model.options.SOLVER)
 
     return SolverRun(
         name=solver_name,
@@ -351,24 +338,27 @@ def configure_pyomo_solver(
             COUENNE_OPTION_FILE if solver_name == "couenne" else IPOPT_OPTION_FILE,
             effective_options,
         )
-    pyomo = require_synthesis_dependency(
-        "pyomo.environ",
-        package="pyomo",
-        purpose=f"{solver_name} solver factory availability checks",
-    )
-    executable = PYOMO_SOLVER_BINARIES[solver_name]
-    if not pyomo.SolverFactory(executable).available(exception_flag=False):
-        raise MissingSynthesisSolverError(
-            f"The {executable!r} Pyomo solver is not available. Install the "
-            "solver binary, confirm it is on PATH, and rerun the heat "
-            "exchanger network synthesis solver tests."
-        )
+    _require_pyomo_solver_available(solver_name, PYOMO_SOLVER_BINARIES[solver_name])
     return SolverRun(
         name=solver_name,
         extension="pyomo",
         solver_options=effective_options or None,
         option_file=option_file,
     )
+
+
+def _require_pyomo_solver_available(solver_name: str, executable: str) -> None:
+    pyomo = require_synthesis_dependency(
+        "pyomo.environ",
+        package="pyomo",
+        purpose=f"{solver_name} solver factory availability checks",
+    )
+    if not pyomo.SolverFactory(executable).available(exception_flag=False):
+        raise MissingSynthesisSolverError(
+            f"The {executable!r} Pyomo solver is not available. Install the "
+            "solver binary, confirm it is on PATH, and rerun the heat "
+            "exchanger network synthesis solver tests."
+        )
 
 
 def solve_pyomo_model(

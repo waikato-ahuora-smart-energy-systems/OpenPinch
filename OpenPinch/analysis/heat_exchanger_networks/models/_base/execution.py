@@ -147,8 +147,13 @@ def setup_model(model) -> None:
 
 
 def setup_pyomo_model(model) -> None:
-    """Create a native Pyomo model and check its solver."""
+    """Create a native Pyomo model and check its solver.
 
+    The solver is checked first, so a missing binary is reported as such even
+    where Pyomo itself is not installed.
+    """
+
+    backend.require_solver_backend(model.solver)
     model.m = PyomoModel()
     model.mSuccess: int = 0
     model.solver_run = backend.configure_pyomo_solver(

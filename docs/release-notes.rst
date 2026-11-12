@@ -218,7 +218,9 @@ Heat exchanger network synthesis
   parses each equation recursively, and the pulp mill sample case failed
   with "maximum recursion depth exceeded" before any solve. ``apopt`` and
   ``ipopt-GEKKO`` still build GEKKO models, and the stage-wise and
-  fixed-structure models stay on GEKKO for now.
+  fixed-structure models stay on GEKKO for now. A native Pyomo solve that
+  ends without a solution ("noSolution" or "unbounded") is a failed solve,
+  so its start values are never ranked as a network.
 - Each pinch-design model now has exactly one objective. With more than one
   hot or cold utility on a side, GEKKO passed utility cost and the goal as
   two objectives, and Couenne and Ipopt optimised only the first, utility

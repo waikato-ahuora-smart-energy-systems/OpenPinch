@@ -31,7 +31,7 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 - A relaxed match (a fixed parameter, GEKKO or Pyomo) whose fixed end misses its approach forces the unit's duty to zero. [approach.py:_set_terminal_approach_equations, _is_parameter]
 
 ## Side Effects
-- Creates a local (non-remote) GEKKO model and configures its solver, or a native `PyomoModel` and checks its Pyomo solver. [execution.py:setup_model, setup_pyomo_model]
+- Creates a local (non-remote) GEKKO model and configures its solver, or checks its Pyomo solver (binary first, then Pyomo) and creates a native `PyomoModel`. [execution.py:setup_model, setup_pyomo_model]
 - `optimise` always removes the model's run directory afterwards; `cleanup_model` is safe to repeat. [execution.py:optimise] [execution.py:cleanup_model]
 - A solve that stopped before converging (`solver_run.converged` false) keeps `mSuccess` and its values, but is logged as a warning (`[Unconverged]`) rather than `[Success]`. [execution.py:_solve_and_post_process]
 - `get_alpha_values` writes the flow-fraction grids (`P_h`, `P_c`, `beta_h`, `beta_c`, `z_i`, `z_j`) and `alpha` onto the model. [alpha.py:get_alpha_values]

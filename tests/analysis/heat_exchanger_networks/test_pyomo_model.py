@@ -161,3 +161,28 @@ def test_pyomo_solver_options_go_to_an_option_file_removed_on_cleanup():
     assert x.value == pytest.approx(4.0, abs=1e-6)
     backend.cleanup_gekko_model(model)
     assert not option_file.parent.exists()
+
+
+@pytest.mark.parametrize("termination", ["noSolution", "unbounded"])
+def test_pyomo_solve_without_a_solution_is_failed(monkeypatch, termination):
+    # A warning that carries no solution must not be read as a solved network:
+    # the variables would still hold their start values.
+    model, _x, _y = _bounded_model(4.0)
+    results = type(
+        "Results",
+        (),
+        {"solver": type("Solver", (), {"status": "warning"})()},
+    )()
+    results.solver.termination_condition = termination
+
+    class _Solver:
+        def solve(self, *_args, **_kwargs):
+            return results
+
+    monkeypatch.setattr(pyo, "SolverFactory", lambda _name: _Solver())
+
+    run = backend.solve_pyomo_model(model, solver_name="couenne")
+
+    assert run.status == 0
+    assert run.objective_value is None
+    assert termination in run.failure_reason

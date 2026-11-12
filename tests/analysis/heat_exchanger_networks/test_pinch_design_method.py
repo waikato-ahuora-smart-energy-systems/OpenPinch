@@ -81,7 +81,7 @@ from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     arrays as arrays_module,
 )
-from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+from OpenPinch.analysis.heat_exchanger_networks.solver import backend, pyomo_model
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     pinch_design_decomposition as pdm_decomposition,
 )
@@ -1698,6 +1698,33 @@ def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) ->
         solver="couenne",
         dTmin=14.0,
         pinch_decompositions=decompositions,
+    )
+
+    with pytest.raises(MissingSynthesisSolverError, match="couenne.*synthesis solves"):
+        problem.load_model()
+
+
+def test_missing_pdm_solver_binary_is_reported_before_pyomo_is_needed(
+    monkeypatch,
+) -> None:
+    # Without the solver binary, the missing binary is the error to report,
+    # even where Pyomo itself is not installed (the Pyodide lane, for example).
+    def missing_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        raise MissingSynthesisSolverError(
+            f"The {binary_name!r} solver executable is required for {purpose}."
+        )
+
+    def missing_pyomo() -> None:
+        raise MissingSynthesisDependencyError("pyomo is not installed.")
+
+    monkeypatch.setattr(backend, "require_solver_binary", missing_binary)
+    monkeypatch.setattr(pyomo_model, "_pyomo", missing_pyomo)
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
+        framework="PDM",
+        solver="couenne",
+        dTmin=14.0,
+        pinch_decompositions=_pdm_decompositions(_four_stream_problem(), dTmin=14.0),
     )
 
     with pytest.raises(MissingSynthesisSolverError, match="couenne.*synthesis solves"):
