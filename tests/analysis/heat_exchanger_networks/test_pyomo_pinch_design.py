@@ -326,3 +326,61 @@ def test_a_linear_highs_pdm_stays_on_highs():
 
     assert model.solver == "highs"
     assert model.m.is_linear()
+
+
+def _side_utility(model, side: str) -> float:
+    duties = (
+        model.Q_hu_by_utility_by_period[0]
+        if side == "above"
+        else model.Q_cu_by_utility_by_period[0]
+    )
+    return sum(duties)
+
+
+def _side_target(model, side: str) -> float:
+    return (
+        model.HU_target_by_period[0]
+        if side == "above"
+        else model.CU_target_by_period[0]
+    )
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+@pytest.mark.parametrize("side", ["above", "below"])
+def test_min_units_pdm_keeps_its_side_at_the_utility_target(side: str):
+    # A side has no coolers above the pinch and no heaters below it, so its
+    # energy balance holds the utility at the target while units are
+    # minimised.
+    problem = _four_stream_problem()
+    utility_model = _built_pdm(problem, dTmin=14.0, side=side)
+    units_model = _built_pdm(problem, dTmin=14.0, side=side, goal="min units")
+
+    utility_model.optimise(False)
+    units_model.optimise(False)
+
+    assert units_model.mSuccess == 1
+    assert _side_utility(units_model, side) == pytest.approx(
+        _side_target(units_model, side), rel=1e-6, abs=1e-3
+    )
+    assert units_model.n_units <= utility_model.n_units
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_excluding_a_solved_unit_pattern_gives_a_different_network():
+    # Minimum-unit networks are collected one by one: each solved pattern of
+    # used units is cut from the next model with a no-good constraint.
+    problem = _four_stream_problem()
+    first = _built_pdm(problem, dTmin=14.0, side="below", goal="min units")
+    first.optimise(False)
+    pattern = first.used_units()
+
+    second = _built_pdm(problem, dTmin=14.0, side="below", goal="min units")
+    second.exclude_units(pattern)
+    second.optimise(False)
+
+    assert first.mSuccess == second.mSuccess == 1
+    assert second.used_units() != pattern
+    assert second.n_units >= first.n_units
+    assert sum(flag for group in pattern.values() for flag in group) == first.n_units

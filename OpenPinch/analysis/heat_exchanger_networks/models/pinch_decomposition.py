@@ -84,6 +84,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.set_obj()
         self._solve_nonlinear_models_with_couenne()
 
+    def used_units(self) -> dict[str, tuple[int, ...]]:
+        """Return the solved side's used recovery, heater and cooler units."""
+
+        return _equations.used_units(self)
+
+    def exclude_units(self, pattern: dict[str, tuple[int, ...]]) -> None:
+        """Cut ``pattern`` from this unsolved side with a no-good constraint."""
+
+        _equations.exclude_units(self, pattern)
+
     def _solve_nonlinear_models_with_couenne(self) -> None:
         """Send a model HiGHS cannot take to Couenne, without HiGHS options."""
 

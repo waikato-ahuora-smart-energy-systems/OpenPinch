@@ -373,3 +373,50 @@ def set_obj(owner) -> None:
         owner.m.Minimize(
             _utility_cost(owner) + _units(owner) if choice else _units(owner)
         )
+
+
+def _unit_index_sets(owner) -> dict[str, list[tuple[int, ...]]]:
+    return {
+        "z": [
+            (i, j, k)
+            for i in range(owner.I)
+            for j in range(owner.J)
+            for k in range(owner.S)
+        ],
+        "z_hu": [(j, u) for j in range(owner.J) for u in range(owner.NHU)],
+        "z_cu": [(i, u) for i in range(owner.I) for u in range(owner.NCU)],
+    }
+
+
+def _at(grid, index: tuple[int, ...]):
+    for position in index:
+        grid = grid[position]
+    return grid
+
+
+def used_units(owner) -> dict[str, tuple[int, ...]]:
+    """Return the solved side's used-unit flags: recovery, heaters, coolers.
+
+    Post-processing has replaced the binaries with ``[flag]`` lists of the
+    units that carry duty.
+    """
+
+    return {
+        name: tuple(int(_at(getattr(owner, name), index)[0]) for index in indices)
+        for name, indices in _unit_index_sets(owner).items()
+    }
+
+
+def exclude_units(owner, pattern: dict[str, tuple[int, ...]]) -> None:
+    """Add a no-good cut: at least one unit must differ from ``pattern``."""
+
+    owner.m.Equation(
+        sum(
+            (1 - _at(getattr(owner, name), index))
+            if flag
+            else _at(getattr(owner, name), index)
+            for name, indices in _unit_index_sets(owner).items()
+            for index, flag in zip(indices, pattern[name], strict=True)
+        )
+        >= 1
+    )
