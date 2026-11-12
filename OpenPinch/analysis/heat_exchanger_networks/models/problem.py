@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+import copy
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Mapping, Sequence
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -14,6 +15,7 @@ from ..extraction.service import (
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
+from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
@@ -50,6 +52,12 @@ class InternalHeatExchangerNetworkProblem:
     stages: int | None = None
     synthesis_task_id: str | None = None
     pinch_decompositions: Mapping[str, PinchDesignDecomposition] | None = None
+    # PDM only: how many extra networks to collect at the fewest units and at
+    # one more unit. Each becomes a problem in ``pdm_variants``.
+    pdm_network_limits: tuple[int, int] = (0, 0)
+    pdm_variants: list["InternalHeatExchangerNetworkProblem"] = field(
+        default_factory=list, init=False
+    )
 
     def load_model(
         self,
@@ -101,6 +109,8 @@ class InternalHeatExchangerNetworkProblem:
             if self.framework in {"PDM", "TDM"}:
                 unreduced_case = self.case
                 self.case = self.remove_unused_stages(self.case)
+            if self.framework == "PDM" and self.case.mSuccess == 1:
+                self.pdm_variants = self._solve_pdm_variants(model_factories)
             if evolution:
                 evolved = self.case.get_net_benefit_evolution(
                     print_output=print_output,
@@ -259,6 +269,129 @@ class InternalHeatExchangerNetworkProblem:
                 "tol": self.tol,
             }
         )
+
+    def _solve_pdm_variants(
+        self, model_factories: Mapping[str, Any] | None
+    ) -> list["InternalHeatExchangerNetworkProblem"]:
+        """Collect extra networks from minimum-unit side topologies.
+
+        Each required side is re-solved for the fewest units, with no-good
+        cuts excluding its minimum-utility topology and every one found, until
+        a side passes one unit over its minimum. Side pairs with the fewest
+        total units, then one more, become variants up to
+        ``pdm_network_limits``. Needs a solver that keeps integers.
+        """
+
+        at_minimum, one_more = self.pdm_network_limits
+        if at_minimum + one_more <= 0 or self.solver not in backend.INTEGER_SOLVERS:
+            return []
+        limit = at_minimum + one_more
+        sides = {
+            name: self._minimum_unit_sides(name, side, limit, model_factories)
+            for name, side in (("above", self.above), ("below", self.below))
+        }
+        pairs = sorted(
+            (
+                (_side_units(above) + _side_units(below), index_a + index_b, a, b)
+                for index_a, (a, above) in enumerate(enumerate(sides["above"]))
+                for index_b, (b, below) in enumerate(enumerate(sides["below"]))
+                if (a, b) != (0, 0)
+            ),
+            key=lambda pair: pair[:2] + (pair[2], pair[3]),
+        )
+        fewest = min(
+            min(_side_units(side) for side in sides["above"])
+            + min(_side_units(side) for side in sides["below"]),
+            pairs[0][0] if pairs else 0,
+        )
+        chosen = [pair for pair in pairs if pair[0] == fewest][:at_minimum] + [
+            pair for pair in pairs if pair[0] == fewest + 1
+        ][:one_more]
+        from ..reporting.ranking import network_structure_signature
+
+        seen = {
+            network_structure_signature(self.extract_network(run_id="pdm-variants"))
+        }
+        variants = []
+        for _units, _rank, a, b in chosen:
+            variant = self._pdm_variant(sides["above"][a], sides["below"][b])
+            if variant is None:
+                continue
+            signature = network_structure_signature(
+                variant.extract_network(run_id="pdm-variants")
+            )
+            if signature not in seen:
+                seen.add(signature)
+                variants.append(variant)
+        return variants
+
+    def _minimum_unit_sides(
+        self,
+        name: str,
+        primary,
+        limit: int,
+        model_factories: Mapping[str, Any] | None,
+    ) -> list:
+        """The primary side, then its minimum-unit and one-more-unit sides."""
+
+        if not primary.side_required or primary.mSuccess != 1:
+            return [primary]
+        factory = self._model_factory(
+            model_factories,
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        excluded = [primary.used_units()]
+        found = []
+        fewest = None
+        while len(found) < limit:
+            side = factory(
+                **(
+                    dict(self.args)
+                    | {
+                        "name": f"{name} pinch {self.dTmin} min units {len(found)}",
+                        "pinch_loc": name,
+                        "minimisation_goal": "min units",
+                        "pinch_decomposition": self.pinch_decompositions[name],
+                        "stage_selection": self.stage_selection,
+                    }
+                )
+            )
+            if not hasattr(side, "recovery_stage_active"):
+                # Without packing, topologies that differ only in which
+                # stages are empty amalgamate into the same network.
+                add_recovery_stage_packing_constraints(side)
+            for pattern in excluded:
+                side.exclude_units(pattern)
+            side.optimise(print_output=False)
+            if side.mSuccess != 1:
+                break
+            fewest = side.n_units if fewest is None else fewest
+            if side.n_units > fewest + 1:
+                break
+            found.append(side)
+            excluded.append(side.used_units())
+        return [primary, *found]
+
+    def _pdm_variant(
+        self, above, below
+    ) -> "InternalHeatExchangerNetworkProblem | None":
+        variant = copy.copy(self)
+        variant.above, variant.below = above, below
+        variant.pdm_variants = []
+        try:
+            variant.case = above.amalgamate_networks(below_case=below, above_case=above)
+        except ValueError:
+            return None
+        unreduced = variant.case
+        try:
+            variant._carry_unconverged_side_solve()
+            variant.case.get_post_process()
+            variant.case = variant.remove_unused_stages(variant.case)
+        finally:
+            _cleanup_model(unreduced)
+            _cleanup_model(variant.case)
+        return variant if variant.case.mSuccess == 1 else None
 
     def _carry_unconverged_side_solve(self) -> None:
         # The amalgamated model is built, not solved, so its own solver run
@@ -427,6 +560,12 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _side_units(side) -> int:
+    """A side's unit count; a side not on this side of the pinch has none."""
+
+    return int(side.n_units) if side.side_required and side.mSuccess == 1 else 0
 
 
 def _peak_recovery_duties(case) -> list:
