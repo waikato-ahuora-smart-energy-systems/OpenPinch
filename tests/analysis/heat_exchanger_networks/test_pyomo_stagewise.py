@@ -58,18 +58,18 @@ def _four_stream_problem() -> PinchProblem:
     return PinchProblem(source=payload, project_name="Four-stream")
 
 
-def _tdm(model_cls, *, stages: int, solver: str = "couenne"):
+def _tdm(model_cls, *, stages: int, goal: str = "hot utility"):
     problem = _four_stream_problem()
     return model_cls(
         name=f"TDM {stages}",
         framework="TDM",
-        solver=solver,
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(problem, 14.0),
         stages=stages,
         dTmin=14.0,
         z_restriction=None,
         min_dqda=0.0,
-        minimisation_goal="total cost",
+        minimisation_goal=goal,
         non_isothermal_model=False,
         integers=True,
         tol=1e-3,
@@ -87,3 +87,29 @@ def test_couenne_stagewise_is_a_native_pyomo_model_with_one_objective():
 
     assert isinstance(model.m, PyomoModel)
     assert len(list(model.m.model.component_data_objects(pyo.Objective))) == 1
+
+
+def _solution(model) -> dict[str, float]:
+    return {
+        "success": model.mSuccess,
+        "objective": model.solver_run.objective_value,
+        "recovery": model.Q_r_total,
+        "hot utility": sum(model.Q_hu_total_by_period),
+        "cold utility": sum(model.Q_cu_total_by_period),
+    }
+
+
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+@pytest.mark.parametrize("goal", ["hot utility", "total utility"])
+def test_pyomo_stagewise_matches_the_gekko_stagewise(goal: str):
+    pytest.importorskip("gekko")
+    pyomo_model = _tdm(StageWiseModel, stages=2, goal=goal)
+    gekko_model = _tdm(_GekkoStageWiseModel, stages=2, goal=goal)
+
+    pyomo_model.optimise(False)
+    gekko_model.optimise(False)
+
+    assert isinstance(gekko_model.m, PyomoModel) is False
+    assert pyomo_model.mSuccess == 1
+    assert _solution(pyomo_model) == pytest.approx(_solution(gekko_model), abs=1e-3)
