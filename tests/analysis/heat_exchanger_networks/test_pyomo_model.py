@@ -70,11 +70,13 @@ def test_model_has_exactly_one_objective():
         model.Minimize(x)
 
 
-def test_sum_of_many_terms_builds_without_recursion():
+def test_sum_of_many_terms_builds_without_recursion(caplog):
     model = PyomoModel()
     terms = [model.Var(value=1.0) for _ in range(5000)]
 
-    total = model.sum(terms)
+    with caplog.at_level("WARNING", logger="pyomo"):
+        total = model.sum(terms)
+    assert "deprecated" not in caplog.text
     model.Equation(total >= 0)
 
     assert pyo.value(total) == pytest.approx(5000.0)

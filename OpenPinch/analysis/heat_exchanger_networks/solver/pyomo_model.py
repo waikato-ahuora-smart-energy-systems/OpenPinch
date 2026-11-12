@@ -73,7 +73,7 @@ class PyomoModel:
         return expression
 
     def sum(self, values: Iterable[Any]) -> Any:
-        return _pyomo().quicksum(values, linear=False)
+        return _pyomo().quicksum(values)
 
     def Minimize(self, expression: Any) -> None:
         self._set_objective(expression, sense=_pyomo().minimize)
