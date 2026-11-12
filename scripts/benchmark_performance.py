@@ -2,7 +2,10 @@
 
 This script is intentionally non-gating. It runs the maintained OpenHENS public
 method at selected quality tiers and emits incremental JSON records that can be
-compared across changes.
+compared across changes. Each successful record carries acceptance metrics:
+target-meeting PDM networks, their distinct topologies and unit counts, and the
+best ranked total annual costs. ``--baseline-json`` compares them with an
+earlier run, for example one made on ``develop``.
 """
 
 from __future__ import annotations
@@ -33,8 +36,14 @@ from OpenPinch.analysis.heat_exchanger_networks.execution import (
 from OpenPinch.analysis.heat_exchanger_networks.execution import (
     settings as settings_module,
 )
+from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+    network_structure_signature,
+)
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     backend as solver_backend,
+)
+from OpenPinch.analysis.heat_exchanger_networks.solver import (
+    pinch_design_decomposition,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     open_hens_method,
@@ -47,6 +56,7 @@ from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _HENS_FIXTURE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "openhens"
+_SAMPLE_CASE_ROOT = _REPO_ROOT / "OpenPinch" / "tutorials" / "sample_cases"
 LocalSynthesisExecutor = executor_module.LocalSynthesisExecutor
 workflow_settings_from_problem = settings_module.workflow_settings_from_problem
 execute_open_hens_method = open_hens_method.execute_open_hens_method
@@ -65,6 +75,10 @@ HENS_BENCHMARK_OPTIONS = {
     "HENS_MAX_PARALLEL": HENS_MAX_PARALLEL,
     "HENS_OUTPUT_FORMATS": [],
 }
+ACCEPTANCE_TOP_N = 5
+# Utility off the pinch target that still counts as meeting it: solver noise.
+TARGET_ABSOLUTE_TOLERANCE_KW = 1e-3
+TARGET_RELATIVE_TOLERANCE = 1e-6
 SOLVER_STAGE_LABELS = (
     "pdm",
     "tdm",
@@ -233,6 +247,169 @@ def small_hens_benchmark_cases(
 HENS_BENCHMARK_CASES = small_hens_benchmark_cases()
 
 
+def resolve_hens_case(case_name: str) -> Path:
+    """Return an OpenHENS fixture, a packaged sample case, or a case file path."""
+
+    for root in (_HENS_FIXTURE_ROOT, _SAMPLE_CASE_ROOT):
+        candidate = root / case_name
+        if candidate.is_file():
+            return candidate
+    path = Path(case_name)
+    if path.is_file():
+        return path
+    raise FileNotFoundError(
+        f"{case_name} is not an OpenHENS fixture, a sample case or a file."
+    )
+
+
+def network_meets_pinch_targets(network, targets) -> bool:
+    """Return whether every period's hot and cold utility is at its target.
+
+    Utility above the target misses it; utility below it breaks the energy
+    balance. Either beyond the tolerance fails.
+    """
+
+    for target in targets:
+        for kind, utility_target in (
+            ("hot_utility", target.hot_utility_target),
+            ("cold_utility", target.cold_utility_target),
+        ):
+            duty = sum(
+                state.duty
+                for exchanger in network.exchangers
+                if exchanger.kind.value == kind
+                for state in exchanger.period_states
+                if state.period_idx == target.period_idx and state.active
+            )
+            allowance = max(
+                TARGET_ABSOLUTE_TOLERANCE_KW,
+                TARGET_RELATIVE_TOLERANCE * abs(utility_target),
+            )
+            if abs(duty - utility_target) > allowance:
+                return False
+    return True
+
+
+def _unit_count(network) -> int:
+    return sum(
+        1
+        for exchanger in network.exchangers
+        if any(state.active for state in exchanger.period_states)
+    )
+
+
+def pdm_topology_summary(entries) -> dict[str, Any]:
+    """Summarise PDM networks given as ``(network, meets_targets)`` pairs.
+
+    Topologies are distinct sets of active matches, recovery matches by stage,
+    whatever their duties, and only target-meeting networks count.
+    """
+
+    entries = list(entries)
+    unit_counts = {
+        network_structure_signature(network): _unit_count(network)
+        for network, meets_targets in entries
+        if meets_targets
+    }
+    by_unit_count = Counter(unit_counts.values())
+    return {
+        "pdm_network_count": len(entries),
+        "target_meeting_network_count": sum(1 for _, meets in entries if meets),
+        "distinct_target_meeting_topologies": len(unit_counts),
+        "topologies_by_unit_count": {
+            str(units): by_unit_count[units] for units in sorted(by_unit_count)
+        },
+        "min_units": min(by_unit_count) if by_unit_count else None,
+    }
+
+
+def acceptance_metrics(
+    problem,
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+    ranked_networks: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+    *,
+    top_n: int = ACCEPTANCE_TOP_N,
+) -> dict[str, Any]:
+    """Return the PDM topology summary and the best ranked total annual costs.
+
+    Each PDM network is checked against the pinch targets at its own approach
+    temperature.
+    """
+
+    targets_by_approach: dict[float, Any] = {}
+    entries = []
+    for outcome in outcomes:
+        if (
+            outcome.task.method != HeatExchangerNetworkDesignMethod.PinchDesign
+            or outcome.status != "success"
+            or outcome.network is None
+        ):
+            continue
+        approach = float(outcome.task.approach_temperature)
+        if approach not in targets_by_approach:
+            targets_by_approach[approach] = (
+                pinch_design_decomposition._calculate_openpinch_targets(
+                    problem, dTmin=approach
+                )
+            )
+        entries.append(
+            (
+                outcome.network,
+                network_meets_pinch_targets(
+                    outcome.network, targets_by_approach[approach]
+                ),
+            )
+        )
+    return pdm_topology_summary(entries) | {
+        "top_total_annual_costs": sorted(
+            float(outcome.objective_value)
+            for outcome in ranked_networks
+            if outcome.objective_value is not None
+        )[:top_n],
+    }
+
+
+def compare_acceptance(
+    baseline: dict[str, Any], variant: dict[str, Any]
+) -> dict[str, Any]:
+    """Compare a variant run's acceptance metrics with a baseline run's."""
+
+    comparison = {"name": variant["name"], "tier": variant["tier"]}
+    if not _successful_hens_result(baseline):
+        return comparison | {"status": "baseline_not_successful"}
+    if not _successful_hens_result(variant):
+        return comparison | {"status": "variant_not_successful"}
+    if "acceptance" not in baseline:
+        return comparison | {"status": "baseline_without_acceptance_metrics"}
+    before = baseline["acceptance"]
+    after = variant["acceptance"]
+    best_delta = float(variant["total_annual_cost"]) - float(
+        baseline["total_annual_cost"]
+    )
+    return comparison | {
+        "status": "success",
+        "best_total_annual_cost_no_worse": best_delta <= 0.0,
+        "best_total_annual_cost_delta": best_delta,
+        "distinct_topologies": (
+            before["distinct_target_meeting_topologies"],
+            after["distinct_target_meeting_topologies"],
+        ),
+        "min_units": (before["min_units"], after["min_units"]),
+        "topologies_by_unit_count": (
+            before["topologies_by_unit_count"],
+            after["topologies_by_unit_count"],
+        ),
+        "top_total_annual_cost_deltas": [
+            new - old
+            for old, new in zip(
+                before["top_total_annual_costs"],
+                after["top_total_annual_costs"],
+                strict=False,
+            )
+        ],
+    }
+
+
 def _hens_case_options(
     case_input: dict[str, Any],
     *,
@@ -398,7 +575,7 @@ def time_hens_tier_case(
     use_fixture_defaults: bool = False,
     progress_queue=None,
 ) -> dict[str, Any]:
-    fixture_path = _HENS_FIXTURE_ROOT / case_name
+    fixture_path = resolve_hens_case(case_name)
     case_input = copy.deepcopy(json.loads(fixture_path.read_text(encoding="utf-8")))
     run_id = f"benchmark-{fixture_path.stem}-tier-{tier}"
     case_input["options"] = _hens_case_options(
@@ -486,6 +663,7 @@ def time_hens_tier_case(
         "hot_utility_duty": network.total_duty(kind="hot_utility"),
         "cold_utility_duty": network.total_duty(kind="cold_utility"),
         "task_id": design.task_id,
+        "acceptance": acceptance_metrics(problem, workflow_result.outcomes, ranked),
         "selected_settings": _manifest_settings(manifest),
         "fallback_usage": _fallback_usage(network.summary_metrics),
         "diagnostics": diagnostics,
@@ -1583,10 +1761,21 @@ def main() -> None:
     )
     parser.add_argument("--tier", type=int, action="append", dest="tiers")
     parser.add_argument(
+        "--baseline-json",
+        type=Path,
+        help=(
+            "Results JSON from an earlier run (for example on develop) to compare "
+            "acceptance metrics with, case by case and tier by tier."
+        ),
+    )
+    parser.add_argument(
         "--hens-case",
         action="append",
         dest="hens_cases",
-        help="OpenHENS fixture filename to benchmark. May be passed multiple times.",
+        help=(
+            "OpenHENS fixture or packaged sample case filename, or a case file "
+            "path, to benchmark. May be passed multiple times."
+        ),
     )
     args = parser.parse_args()
 
@@ -1626,6 +1815,20 @@ def main() -> None:
         print("\nTier comparison vs tier 1", flush=True)
         for comparison in comparisons:
             print(_format_comparison_row(comparison), flush=True)
+
+    if args.baseline_json is not None:
+        baseline = {
+            (record["name"], record["tier"]): record
+            for record in json.loads(args.baseline_json.read_text(encoding="utf-8"))
+            if record.get("benchmark") == "hens_quality_tier"
+        }
+        print(f"\nAcceptance vs {args.baseline_json}", flush=True)
+        for result in results:
+            match = baseline.get((result["name"], result["tier"]))
+            if match is None:
+                print(f"{result['name']} tier {result['tier']}: no baseline record")
+                continue
+            print(json.dumps(compare_acceptance(match, result)), flush=True)
 
     if args.json is None:
         print(json.dumps(_results_data(results), indent=2))

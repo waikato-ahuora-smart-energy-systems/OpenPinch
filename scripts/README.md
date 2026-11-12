@@ -52,8 +52,12 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   OpenPinch on fixture cases and writes top-5 comparison CSV and Markdown reports.
 - `benchmark_performance.py` (`benchmark_performance.py`): `time_hens_tier_case`,
   `time_hens_tier_case_with_timeout`, `summarize_hens_tier_comparisons`,
-  `small_hens_benchmark_cases`, `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating
-  HEN synthesis quality-tier benchmark writing incremental JSON.
+  `small_hens_benchmark_cases`, `resolve_hens_case`, `acceptance_metrics`,
+  `network_meets_pinch_targets`, `pdm_topology_summary`, `compare_acceptance`,
+  `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating HEN synthesis quality-tier
+  benchmark writing incremental JSON. `--hens-case` takes an OpenHENS fixture, a packaged sample
+  case (for example `pulp_mill.json`, the large manual case) or a path; `--baseline-json`
+  compares acceptance metrics with an earlier run's JSON.
 - `benchmark_nine_stream.py` (`benchmark_nine_stream.py`): `compare_to_expected`; the live-solver
   nine-stream OpenHENS run with eight workers, checked against the expected values. Can take
   hours, no CI use.
@@ -75,6 +79,11 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   [optional_install_smoke.py:_check_core_surface].
 - The converter rejects OpenHENS cases whose exchange, heating and cooling economics differ, because
   OpenPinch costing has one set [convert_openhens_fixtures.py:_validate_costing_can_use_openpinch_configuration].
+- A benchmark record's acceptance metrics count only successful PDM networks whose hot and cold
+  utility in every period is within max(1e-3 kW, 1e-6 relative) of the pinch target, above or below, at that
+  network's own approach temperature; topologies are distinct sets of active matches (recovery
+  matches by stage), whatever their duties [benchmark_performance.py:network_meets_pinch_targets,
+  pdm_topology_summary].
 - The OpenHENS comparison needs an OpenHENS checkout that exposes the modules it imports
   [compare_openhens_openpinch_top5.py:_supported_openhens_checkout].
 - Public members of the target, all-period, design and plot accessors (and their batch counterparts) need a tutorial mapping or an entry in
