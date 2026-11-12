@@ -422,6 +422,9 @@ class _Variable:
 class _ReducedModel:
     def __init__(self, **kwargs):
         stages = kwargs["stages"]
+        self.solver = kwargs["solver"]
+        # Reduction picks HiGHS or Ipopt by the reduced model's linearity.
+        self.m = SimpleNamespace(is_linear=lambda: True)
 
         def grid(*shape):
             if not shape:

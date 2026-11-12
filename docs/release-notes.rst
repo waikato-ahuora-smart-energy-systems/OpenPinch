@@ -261,6 +261,10 @@ Heat exchanger network synthesis
   already did. The equations are unchanged; GEKKO's conversion is skipped,
   so large stage-wise models no longer risk its recursion limit. ``apopt``
   and ``ipopt-GEKKO`` still build GEKKO models.
+- Stage reduction after the pinch design and thermal derivative methods no
+  longer uses APOPT. The reduced network is solved with HiGHS when its model
+  is linear, as a pinch design reduction is, and with Ipopt otherwise. A
+  reduced network can drop a match whose duty an LP solution sets to zero.
 - The pinch design method can return several networks per approach
   temperature. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks
   with the fewest units at the utility targets to collect, and

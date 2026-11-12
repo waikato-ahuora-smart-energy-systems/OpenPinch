@@ -658,6 +658,9 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
 ):
     class ReducedCase:
         def __init__(self, **kwargs):
+            self.solver = kwargs["solver"]
+            # Reduction picks HiGHS or Ipopt by the reduced model's linearity.
+            self.m = SimpleNamespace(is_linear=lambda: True)
             self.S = kwargs["stages"]
             self.I = 1
             self.J = 1

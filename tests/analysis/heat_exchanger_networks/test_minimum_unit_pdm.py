@@ -220,3 +220,16 @@ def test_pdm_variants_seed_evolution_directly_and_skip_the_derivative_method():
     assert parents["thermal_derivative_method"]
     assert not variant_ids & parents["thermal_derivative_method"]
     assert variant_ids <= parents["network_evolution_method"]
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_pdm_stage_reduction_solves_its_linear_model_with_highs():
+    # The reduced PDM network fixes its topology, which leaves an LP: HiGHS
+    # solves it where APOPT used to.
+    problem = _problem(14.0, (0, 0))
+
+    problem.get_solution(print_output=False)
+
+    assert problem.case.name.startswith("reduced-")
+    assert problem.case.solver == "highs"
+    assert problem.case.mSuccess == 1

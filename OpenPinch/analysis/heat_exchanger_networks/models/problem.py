@@ -14,6 +14,10 @@ from ..extraction.service import (
 )
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
+from ..solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
 from ._base.execution import _assign_value, _set_value, _value
 from .stage_packing import add_recovery_stage_packing_constraints
@@ -435,10 +439,16 @@ class InternalHeatExchangerNetworkProblem:
 
         heaters_in_use = _used_in_any_period(case, "Q_h")
         coolers_in_use = _used_in_any_period(case, "Q_c")
+        try:
+            # HiGHS for a linear reduced model, Ipopt for the others.
+            backend.require_solver_backend("highs")
+            solver = "highs"
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            solver = "ipopt-pyomo"
         f_case = StageWiseModel(
             name=f"reduced-{case.name}",
             framework=case.framework,
-            solver="apopt",
+            solver=solver,
             solver_arrays=case.solver_arrays,
             stages=len(active_stages),
             dTmin=case.dTmin,
@@ -504,6 +514,9 @@ class InternalHeatExchangerNetworkProblem:
                     _assign(duties[index][u], _value(duty))
                     _assign_binary(flags[index][u], in_use[index][u])
 
+        if f_case.solver == "highs" and not f_case.m.is_linear():
+            f_case.solver = "ipopt-pyomo"
+            f_case.solver_run = backend.configure_pyomo_solver(f_case.m, f_case.solver)
         f_case.TAC_model = case.TAC_model
         f_case.TAC = case.TAC
         f_case.solve_time = case.solve_time
