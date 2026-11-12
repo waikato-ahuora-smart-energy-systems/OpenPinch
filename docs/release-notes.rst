@@ -272,6 +272,10 @@ Heat exchanger network synthesis
   longer uses APOPT. The reduced network is solved with HiGHS when its model
   is linear, as a pinch design reduction is, and with Ipopt otherwise. A
   reduced network can drop a match whose duty an LP solution sets to zero.
+- The post-optimisation alpha (flow-on) solve no longer stores the zero
+  coefficients of inactive matches. On the 64-stream pulp mill they made up
+  most of the sparse system, and its factorisation ran for over 20 minutes
+  before the pinch design method could finish; it now takes seconds.
 - Network evolution starts each candidate from its parent network's
   solution, then adds or removes the match, where each candidate started
   from default values. The local solves are nonconvex, so candidates can
