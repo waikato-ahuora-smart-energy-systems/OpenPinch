@@ -114,7 +114,10 @@ def _vapour_compression_methods(is_cascade_cycle: bool):
             HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
             HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
         )
-    return (HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,)
+    return (
+        HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
+        HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
+    )
 
 
 class _AllPeriodsTargetAccessor:

@@ -192,8 +192,8 @@ Heat pumps and refrigeration
   ``mvr_heat_pump`` take a refrigerant screen result, or one of its layouts,
   as ``refrigerants`` and run the target once for every fluid set it proposes
   for that method: single-stage and cascade layouts for a cascade cycle,
-  parallel layouts for a parallel cycle, and vapour compression plus MVR
-  layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators
+  single-stage and parallel layouts for a parallel cycle, and vapour
+  compression plus MVR layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators
   and MVR stages from its layout (a split layout's added levels included),
   unless given, when only layouts with those
   counts run; layouts asking for the same counts and fluids share one run. The
