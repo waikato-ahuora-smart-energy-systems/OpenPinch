@@ -80,7 +80,7 @@ OpenHENS migration and benchmarks (manual, not run in CI)
 - The converter rejects OpenHENS cases whose exchange, heating and cooling economics differ, because
   OpenPinch costing has one set [convert_openhens_fixtures.py:_validate_costing_can_use_openpinch_configuration].
 - A benchmark record's acceptance metrics count only successful PDM networks whose hot and cold
-  utility in every period is within max(1e-3 kW, 1e-6 relative) of the pinch target at that
+  utility in every period is within max(1e-3 kW, 1e-6 relative) of the pinch target, above or below, at that
   network's own approach temperature; topologies are distinct sets of active matches (recovery
   matches by stage), whatever their duties [benchmark_performance.py:network_meets_pinch_targets,
   pdm_topology_summary].

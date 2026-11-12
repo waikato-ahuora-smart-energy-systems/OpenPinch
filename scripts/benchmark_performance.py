@@ -76,7 +76,7 @@ HENS_BENCHMARK_OPTIONS = {
     "HENS_OUTPUT_FORMATS": [],
 }
 ACCEPTANCE_TOP_N = 5
-# Utility above the pinch target that still counts as meeting it: solver noise.
+# Utility off the pinch target that still counts as meeting it: solver noise.
 TARGET_ABSOLUTE_TOLERANCE_KW = 1e-3
 TARGET_RELATIVE_TOLERANCE = 1e-6
 SOLVER_STAGE_LABELS = (
@@ -263,7 +263,11 @@ def resolve_hens_case(case_name: str) -> Path:
 
 
 def network_meets_pinch_targets(network, targets) -> bool:
-    """Return whether every period's hot and cold utility is at its target."""
+    """Return whether every period's hot and cold utility is at its target.
+
+    Utility above the target misses it; utility below it breaks the energy
+    balance. Either beyond the tolerance fails.
+    """
 
     for target in targets:
         for kind, utility_target in (
@@ -281,7 +285,7 @@ def network_meets_pinch_targets(network, targets) -> bool:
                 TARGET_ABSOLUTE_TOLERANCE_KW,
                 TARGET_RELATIVE_TOLERANCE * abs(utility_target),
             )
-            if duty > utility_target + allowance:
+            if abs(duty - utility_target) > allowance:
                 return False
     return True
 
@@ -375,6 +379,8 @@ def compare_acceptance(
         return comparison | {"status": "baseline_not_successful"}
     if not _successful_hens_result(variant):
         return comparison | {"status": "variant_not_successful"}
+    if "acceptance" not in baseline:
+        return comparison | {"status": "baseline_without_acceptance_metrics"}
     before = baseline["acceptance"]
     after = variant["acceptance"]
     best_delta = float(variant["total_annual_cost"]) - float(

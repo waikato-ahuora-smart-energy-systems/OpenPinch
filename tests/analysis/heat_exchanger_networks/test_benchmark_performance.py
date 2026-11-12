@@ -389,6 +389,12 @@ def test_network_meets_pinch_targets_per_period_within_tolerance() -> None:
     assert benchmark.network_meets_pinch_targets(on_target, targets)
     assert benchmark.network_meets_pinch_targets(within_tolerance, targets)
     assert not benchmark.network_meets_pinch_targets(over_in_second_period, targets)
+    # Utility below the target breaks the energy balance, so it is not on target.
+    under_target = _benchmark_network(
+        ("hot_utility", "HU", "C1", None, (49.0, 80.0)),
+        ("cold_utility", "H1", "CU", None, (30.0, 0.0)),
+    )
+    assert not benchmark.network_meets_pinch_targets(under_target, targets)
 
 
 def test_pdm_topology_summary_counts_distinct_target_meeting_topologies() -> None:
@@ -490,6 +496,25 @@ def test_benchmark_acceptance_comparison_flags_regressions() -> None:
         "min_units": (5, 5),
         "topologies_by_unit_count": ({"5": 1, "6": 3}, {"5": 2, "6": 7}),
         "top_total_annual_cost_deltas": [1.0, -5.0, 5.0],
+    }
+
+
+def test_benchmark_acceptance_comparison_reports_a_baseline_without_metrics() -> None:
+    benchmark = _load_benchmark_module()
+    record = {
+        "name": "case.json",
+        "tier": 0,
+        "status": "success",
+        "total_seconds": 12.0,
+        "total_annual_cost": 100.0,
+    }
+    # A baseline written before acceptance metrics were recorded.
+    variant = record | {"acceptance": {}}
+
+    assert benchmark.compare_acceptance(record, variant) == {
+        "name": "case.json",
+        "tier": 0,
+        "status": "baseline_without_acceptance_metrics",
     }
 
 
