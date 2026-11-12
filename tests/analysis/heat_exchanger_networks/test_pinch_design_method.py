@@ -2110,6 +2110,9 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.alpha = [[[[1.0], [1.0]]]]
     model.get_alpha_values = lambda: [[[[1.0], [1.0]]]]
     model.m = SimpleNamespace(options=SimpleNamespace(objfcnval=123.45))
+    # The PDM reads its objective from the solve record, which a GEKKO solve
+    # fills from ``objfcnval``.
+    model.solver_run = backend.SolverRun(name="fake", objective_value=123.45)
     return model
 
 
@@ -3278,7 +3281,71 @@ def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
 
     model.set_obj()
 
-    assert model.m.actions[-1][0] == expected_action
+    assert [action for action, _expression in model.m.actions] == [expected_action]
+
+
+def _pdm_objective_model_with_a_utility_choice(goal: str) -> PinchDecompModel:
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.m = _AlgebraModel()
+    model.minimisation_goal = goal
+    model.N_periods = 1
+    model.I = 1
+    model.J = 1
+    model.S = 1
+    model.NHU = 2
+    model.NCU = 1
+    model.Q_h_by_period = [[[2.0, 7.0]]]
+    model.Q_c_by_period = [[[3.0]]]
+    model.Q_r_by_period = [[[[4.0]]]]
+    model.Qtot_sh_period = [[20.0]]
+    model.z = [[[1.0]]]
+    model.hu_cost_period = [[10.0, 1.0]]
+    model.cu_cost_period = [[5.0]]
+    model.HU_target_by_period = [9.0]
+    model.CU_target_by_period = [3.0]
+    model.period_weights = [1.0]
+    model.period_weight_sum = 1.0
+    return model
+
+
+# Utility cost: 10 * 2 + 1 * 7 for the heaters and 5 * 3 for the cooler.
+_CHOICE_UTILITY_COST = 42.0
+
+
+@pytest.mark.parametrize("goal", ["hot utility", "cold utility", "total utility"])
+def test_pinch_decomp_utility_goals_with_a_utility_choice_minimise_utility_cost(
+    goal: str,
+) -> None:
+    # Couenne optimised only the first of the utility-cost and utility-duty
+    # objectives GEKKO passed it, and the targets already fix the duty, so
+    # utility cost alone is the objective.
+    model = _pdm_objective_model_with_a_utility_choice(goal)
+
+    model.set_obj()
+
+    assert model.m.actions == [("minimize", pytest.approx(_CHOICE_UTILITY_COST))]
+
+
+@pytest.mark.parametrize(
+    "goal, goal_term",
+    [
+        # Unrecovered hot-stream heat, 20 - 4: minimising it maximises
+        # recovery and keeps the objective non-negative.
+        ("heat recovery", 16.0),
+        ("min units", 1.0),
+    ],
+)
+def test_pinch_decomp_other_goals_with_a_utility_choice_combine_one_objective(
+    goal: str,
+    goal_term: float,
+) -> None:
+    model = _pdm_objective_model_with_a_utility_choice(goal)
+
+    model.set_obj()
+
+    assert model.m.actions == [
+        ("minimize", pytest.approx(_CHOICE_UTILITY_COST + goal_term))
+    ]
 
 
 @pytest.mark.parametrize(

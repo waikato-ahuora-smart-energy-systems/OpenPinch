@@ -474,13 +474,20 @@ def test_match_restrictions_accept_supported_shapes_and_reject_invalid_shape():
         model.set_match_restrictions([[[[object()]]], None, None])
 
 
-def _solver_run(*, failure_reason=None):
+def _solver_run(*, failure_reason=None, status=1, objective_value=1.0):
     return backend.SolverRun(
         name="fake",
-        status=1,
-        objective_value=1.0,
+        status=status,
+        objective_value=objective_value,
         solve_time=0.25,
         failure_reason=failure_reason,
+    )
+
+
+def _solve_reporting_fake_options(m, **_kwargs):
+    # As solve_gekko_model does, report the model's status and objective.
+    return _solver_run(
+        status=m.options.SOLVESTATUS, objective_value=m.options.objfcnval
     )
 
 
@@ -500,7 +507,7 @@ def test_optimise_handles_failure_negative_success_and_unsolved_paths(monkeypatc
     monkeypatch.setattr(
         base_execution.backend,
         "solve_gekko_model",
-        lambda *args, **kwargs: _solver_run(),
+        _solve_reporting_fake_options,
     )
     model.m = _FakeModel(solve_status=1, objective=-1.0)
     model.optimise(print_output=False)
@@ -668,6 +675,7 @@ def test_output_to_cmd_line_logs_successful_solve(caplog):
 
     model.mSuccess = 1
     model.m = _FakeModel(objective=12.0)
+    model.solver_run = _solver_run(objective_value=12.0)
     _set_success_diagnostics(model)
 
     with caplog.at_level("INFO", logger=base_execution.logger.name):

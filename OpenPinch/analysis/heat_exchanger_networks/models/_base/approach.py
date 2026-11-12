@@ -404,12 +404,18 @@ def _set_terminal_approach_equations(
     relaxes both by big-M. A relaxed model fixes ``match``, so a unit whose
     fixed end falls short of its approach there can carry no duty.
     """
-    if type(match).__name__ != "GKParameter":
+    if not _is_parameter(match):
         model.m.Equation(-inlet_shortfall >= -big_m * (1 - match))
     elif inlet_shortfall > model.tol:
         model.m.Equation(duty == 0)
         return
     model.m.Equation(outlet_margin >= -big_m * (1 - match))
+
+
+def _is_parameter(value) -> bool:
+    """Return whether a model value is fixed: a GEKKO or ``PyomoModel`` parameter."""
+
+    return type(value).__name__ == "GKParameter" or bool(getattr(value, "fixed", False))
 
 
 def _weighted_state_average(model, values: Sequence[Any]) -> Any:

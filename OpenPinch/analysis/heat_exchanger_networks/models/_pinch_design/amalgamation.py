@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .._stagewise.verification import _value
 from ..stagewise import StageWiseModel
 
 if TYPE_CHECKING:
@@ -58,7 +59,7 @@ def amalgamate_networks(
             for k in range(above_case.K):
                 for n in range(amalgamated.N_periods):
                     value = (
-                        above_case.T_h_by_period[n][i][k][0]
+                        _value(above_case.T_h_by_period[n][i][k])
                         if above_case.z_i_active_period[n][i] > 0
                         else amalgamated.T_h_in_period[n][i]
                     )
@@ -67,7 +68,7 @@ def amalgamate_networks(
             for k in range(above_case.K):
                 for n in range(amalgamated.N_periods):
                     value = (
-                        above_case.T_c_by_period[n][j][k][0]
+                        _value(above_case.T_c_by_period[n][j][k])
                         if above_case.z_j_active_period[n][j] > 0
                         else amalgamated.T_c_out_period[n][j]
                     )
@@ -101,9 +102,9 @@ def amalgamate_networks(
                 for n in range(amalgamated.N_periods):
                     if below_case.z_i_active_period[n][i] > 0:
                         value = (
-                            below_case.T_h_by_period[n][i][k - above_case.K + 1][0]
+                            _value(below_case.T_h_by_period[n][i][k - above_case.K + 1])
                             if above_required
-                            else round(below_case.T_h_by_period[n][i][k][0], 5)
+                            else round(_value(below_case.T_h_by_period[n][i][k]), 5)
                         )
                     else:
                         value = amalgamated.T_h_out_period[n][i]
@@ -113,9 +114,9 @@ def amalgamate_networks(
                 for n in range(amalgamated.N_periods):
                     if below_case.z_j_active_period[n][j] > 0:
                         value = (
-                            below_case.T_c_by_period[n][j][k - above_case.K + 1][0]
+                            _value(below_case.T_c_by_period[n][j][k - above_case.K + 1])
                             if above_required
-                            else round(below_case.T_c_by_period[n][j][k][0], 5)
+                            else round(_value(below_case.T_c_by_period[n][j][k]), 5)
                         )
                     else:
                         value = amalgamated.T_c_in_period[n][j]
@@ -181,7 +182,7 @@ def _copy_utility_matches(
     for index, row in enumerate(target_flags):
         for u, flag in enumerate(row):
             for n in range(target.N_periods):
-                duty = source_duties[n][index][u][0]
+                duty = _value(source_duties[n][index][u])
                 target_duties[n][index][u].VALUE.value = [
                     duty if digits is None else round(duty, digits)
                 ]
@@ -212,7 +213,7 @@ def _copy_recovery_match(
         raise ValueError("PDM side period counts must match during amalgamation.")
     for n in range(target.N_periods):
         target.Q_r_by_period[n][i][j][target_stage].VALUE.value = [
-            source.Q_r_by_period[n][i][j][source_stage][0]
+            _value(source.Q_r_by_period[n][i][j][source_stage])
         ]
         target.theta_1_by_period[n][i][j][target_stage].VALUE.value = [
             source.theta_1_by_period[n][i][j][source_stage][0]

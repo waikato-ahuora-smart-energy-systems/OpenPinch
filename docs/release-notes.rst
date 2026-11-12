@@ -210,6 +210,26 @@ Heat exchanger network synthesis
   1e-11, and on the four-stream example the alpha solves take 0.08 s instead
   of 9 s. A system with no unique solution in [-1, 1] still falls back to
   neutral alpha.
+- The pinch design method builds its above- and below-pinch models directly
+  in Pyomo when they are solved with Couenne or Ipopt (``couenne``,
+  ``ipopt-pyomo``), instead of building them in GEKKO and converting them for
+  every solve. The equations are unchanged and the results match the GEKKO
+  models. Large cases no longer fail in the conversion: GEKKO's converter
+  parses each equation recursively, and the pulp mill sample case failed
+  with "maximum recursion depth exceeded" before any solve. ``apopt`` and
+  ``ipopt-GEKKO`` still build GEKKO models, and the stage-wise and
+  fixed-structure models stay on GEKKO for now.
+- Each pinch-design model now has exactly one objective. With more than one
+  hot or cold utility on a side, GEKKO passed utility cost and the goal as
+  two objectives, and Couenne and Ipopt optimised only the first, utility
+  cost. The utility goals ("hot utility", "cold utility", "total utility")
+  keep that behaviour, now stated directly: minimum utility cost under the
+  utility targets. "heat recovery" now minimises utility cost plus the heat
+  left unrecovered, and "min units" utility cost plus the number of recovery
+  matches, where both had minimised utility cost alone. With ``apopt`` and
+  ``ipopt-GEKKO``, which summed the objectives, the utility goals now
+  minimise utility cost alone. Sides with one hot and one cold utility are
+  unchanged.
 
 0.8.3 (2026-11-11)
 ------------------

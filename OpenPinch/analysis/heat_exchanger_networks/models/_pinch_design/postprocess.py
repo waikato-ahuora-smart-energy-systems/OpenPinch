@@ -107,7 +107,7 @@ def _get_multiperiod_post_process(owner) -> None:
 
     _area.set_utility_lmtd_and_areas(owner, q_h, q_c)
     set_period_totals_and_costs(owner, q_h, q_c, q_r)
-    owner.TAC_model = owner.m.options.objfcnval
+    owner.TAC_model = owner.solver_run.objective_value
     owner.TAC = owner.capital_cost_value + owner.weighted_operating_cost_value
 
 

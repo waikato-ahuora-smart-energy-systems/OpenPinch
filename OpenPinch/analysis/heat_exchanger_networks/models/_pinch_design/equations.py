@@ -237,114 +237,134 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     owner.alpha = []
 
 
+UTILITY_GOALS = frozenset({"hot utility", "cold utility", "total utility"})
+PDM_GOALS = UTILITY_GOALS | {"heat recovery", "min units"}
+
+
 def _total_duty(grid):
     """Return the summed duty of a ``[stream][utility]`` grid."""
     return sum(load for row in grid for load in row)
 
 
-def _set_utility_choice_objective(owner) -> None:
-    """Price the utilities when a side has a choice of them.
+def _has_utility_choice(owner) -> bool:
+    return owner.NHU > 1 or owner.NCU > 1
+
+
+def _utility_cost(owner):
+    """Return the weighted utility cost of both sides.
 
     The utility targets fix how much utility each side uses, but not which
     utility: with more than one, their cost picks the cheaper feasible ones.
     """
-    if owner.NHU <= 1 and owner.NCU <= 1:
-        return
-    owner.m.Minimize(
-        _approach._weighted_state_average(
-            owner,
-            [
-                sum(
-                    _piecewise._utility_cost_expression(
-                        owner,
-                        side,
-                        n,
-                        sum(row[u] for row in grid),
-                        utility=u,
-                        name=f"pdm_{side}_utility{u}_period_{n}",
-                    )
-                    for side, grid, count in (
-                        ("hot", owner.Q_h_by_period[n], owner.NHU),
-                        ("cold", owner.Q_c_by_period[n], owner.NCU),
-                    )
-                    for u in range(count)
+    return _approach._weighted_state_average(
+        owner,
+        [
+            sum(
+                _piecewise._utility_cost_expression(
+                    owner,
+                    side,
+                    n,
+                    sum(row[u] for row in grid),
+                    utility=u,
+                    name=f"pdm_{side}_utility{u}_period_{n}",
                 )
-                for n in range(owner.N_periods)
-            ],
-        )
+                for side, grid, count in (
+                    ("hot", owner.Q_h_by_period[n], owner.NHU),
+                    ("cold", owner.Q_c_by_period[n], owner.NCU),
+                )
+                for u in range(count)
+            )
+            for n in range(owner.N_periods)
+        ],
     )
 
 
-def set_obj(owner) -> None:
-    """Attach PDM objective expressions."""
+def _heat_recovery(owner, n: int):
+    return owner.m.sum(
+        [
+            owner.Q_r_by_period[n][i][j][k]
+            for i in range(owner.I)
+            for j in range(owner.J)
+            for k in range(owner.S)
+        ]
+    )
 
-    _set_utility_choice_objective(owner)
 
+def _units(owner):
+    return owner.m.sum(
+        [
+            owner.z[i][j][k]
+            for k in range(owner.S)
+            for j in range(owner.J)
+            for i in range(owner.I)
+        ]
+    )
+
+
+def _set_utility_target(owner, duty_grids, targets) -> None:
+    for n in range(owner.N_periods):
+        owner.m.Equation(_total_duty(duty_grids[n]) - targets[n] >= 0.0)
+
+
+def _goal_duty(owner, n: int):
+    """Return the period-``n`` utility duty a utility goal minimises."""
     if owner.minimisation_goal == "hot utility":
-        for n in range(owner.N_periods):
-            owner.m.Equation(
-                _total_duty(owner.Q_h_by_period[n]) - owner.HU_target_by_period[n]
-                >= 0.0
-            )
+        return _total_duty(owner.Q_h_by_period[n])
+    if owner.minimisation_goal == "cold utility":
+        return _total_duty(owner.Q_c_by_period[n])
+    return _total_duty(owner.Q_h_by_period[n]) + _total_duty(owner.Q_c_by_period[n])
+
+
+def set_obj(owner) -> None:
+    """Attach the one PDM objective.
+
+    With one hot and one cold utility the objective is the goal itself. With
+    a choice of utilities on either side, the utility goals minimise utility
+    cost under their targets (the targets already fix the duty), and heat
+    recovery and min units add utility cost to the goal in one minimised
+    objective. Heat recovery is then expressed as unrecovered hot-stream
+    heat, which keeps the objective non-negative.
+    """
+
+    goal = owner.minimisation_goal
+    if goal not in PDM_GOALS:
+        raise ValueError(
+            f"Unsupported pinch-decomposition minimisation goal: {goal!r}."
+        )
+    periods = range(owner.N_periods)
+    choice = _has_utility_choice(owner)
+
+    if goal == "hot utility":
+        _set_utility_target(owner, owner.Q_h_by_period, owner.HU_target_by_period)
+    elif goal == "cold utility":
+        _set_utility_target(owner, owner.Q_c_by_period, owner.CU_target_by_period)
+
+    if goal in UTILITY_GOALS:
         owner.m.Minimize(
-            _approach._weighted_state_average(
-                owner,
-                [_total_duty(owner.Q_h_by_period[n]) for n in range(owner.N_periods)],
+            _utility_cost(owner)
+            if choice
+            else _approach._weighted_state_average(
+                owner, [_goal_duty(owner, n) for n in periods]
             )
         )
-    elif owner.minimisation_goal == "cold utility":
-        for n in range(owner.N_periods):
-            owner.m.Equation(
-                _total_duty(owner.Q_c_by_period[n]) - owner.CU_target_by_period[n]
-                >= 0.0
-            )
-        owner.m.Minimize(
-            _approach._weighted_state_average(
-                owner,
-                [_total_duty(owner.Q_c_by_period[n]) for n in range(owner.N_periods)],
-            )
-        )
-    elif owner.minimisation_goal == "total utility":
-        owner.m.Minimize(
-            _approach._weighted_state_average(
-                owner,
-                [
-                    _total_duty(owner.Q_h_by_period[n])
-                    + _total_duty(owner.Q_c_by_period[n])
-                    for n in range(owner.N_periods)
-                ],
-            )
-        )
-    elif owner.minimisation_goal == "heat recovery":
+    elif goal == "heat recovery" and not choice:
         owner.m.Maximize(
             _approach._weighted_state_average(
-                owner,
-                [
-                    owner.m.sum(
-                        [
-                            owner.Q_r_by_period[n][i][j][k]
-                            for i in range(owner.I)
-                            for j in range(owner.J)
-                            for k in range(owner.S)
-                        ]
-                    )
-                    for n in range(owner.N_periods)
-                ],
+                owner, [_heat_recovery(owner, n) for n in periods]
             )
         )
-    elif owner.minimisation_goal == "min units":
+    elif goal == "heat recovery":
         owner.m.Minimize(
-            owner.m.sum(
+            _utility_cost(owner)
+            + _approach._weighted_state_average(
+                owner,
                 [
-                    owner.z[i][j][k]
-                    for k in range(owner.S)
-                    for j in range(owner.J)
-                    for i in range(owner.I)
-                ]
+                    sum(owner.Qtot_sh_period[n]) - _heat_recovery(owner, n)
+                    for n in periods
+                ],
             )
         )
     else:
-        raise ValueError(
-            "Unsupported pinch-decomposition minimisation goal: "
-            f"{owner.minimisation_goal!r}."
+        owner.m.Minimize(
+            _utility_cost(owner) + _units(owner) if choice else _units(owner)
         )

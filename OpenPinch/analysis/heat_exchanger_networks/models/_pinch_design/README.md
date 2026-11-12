@@ -17,10 +17,11 @@ Private helper modules for `PinchDecompModel` (`../pinch_decomposition.py`), whi
 - Stage count is `max(sum(z_i_active), sum(z_j_active))` unless the decomposition carries a manual selection. [preprocessing.py:_set_multiperiod_preprocessing]
 - A stream absent from this side in a period has zero duty and no recovery approach constraint in that period. [preprocessing.py:_set_multiperiod_preprocessing] [equations.py:_set_multiperiod_stage_wise_superstructure]
 - Supported goals are "hot utility", "cold utility", "total utility", "heat recovery" and "min units"; any other raises `ValueError`. The hot and cold utility goals also constrain total duty to be at least the target. [equations.py:set_obj]
-- With more than one utility on either side, utility cost is minimised in addition to the goal. [equations.py:_set_utility_choice_objective]
+- The model has exactly one objective. With one hot and one cold utility it is the goal. With more than one utility on either side, the utility goals minimise utility cost alone; heat recovery minimises utility cost plus unrecovered hot-stream heat (total hot-stream load less recovery); min units minimises utility cost plus the recovery binaries. [equations.py:set_obj]
 - Amalgamation stacks above-pinch stages first, then below-pinch stages; it raises `ValueError` if a required side did not solve, and requires equal period counts. [amalgamation.py:amalgamate_networks] [amalgamation.py:_copy_recovery_match]
 - The amalgamated model is created with `integers=True`, `tol=1e-3` and goal "total utility" (reduced to "hot utility" or "cold utility" when one side is not required); its `z_allowed` is every match with duty above `owner.tol`. [amalgamation.py:amalgamate_networks]
-- Post-processing LMTD and area use the shared exact-LMTD helper; design area is the maximum over periods. [postprocess.py:_get_multiperiod_post_process]
+- Post-processing LMTD and area use the shared exact-LMTD helper; design area is the maximum over periods. `TAC_model` is the solve's objective value. [postprocess.py:_get_multiperiod_post_process]
+- Amalgamation reads solved side values through `_stagewise.verification._value`, so GEKKO and native Pyomo sides amalgamate alike. [amalgamation.py:amalgamate_networks]
 
 ## Side Effects
 - `amalgamate_networks` constructs a `StageWiseModel` (a new GEKKO model) and writes solved values into its variables through `.VALUE.value`. [amalgamation.py:amalgamate_networks] [amalgamation.py:_copy_recovery_match]
@@ -29,4 +30,4 @@ Private helper modules for `PinchDecompModel` (`../pinch_decomposition.py`), whi
 - Imports `StageWiseModel` from `../stagewise` at module load and `_value` from `../_stagewise/verification`. [amalgamation.py] [postprocess.py]
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_pinch_design_method.py tests/analysis/heat_exchanger_networks/test_multiperiod_pinch_design.py` (no directory mirrors `models/_pinch_design`).
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_pinch_design_method.py tests/analysis/heat_exchanger_networks/test_multiperiod_pinch_design.py tests/analysis/heat_exchanger_networks/test_pyomo_pinch_design.py` (no directory mirrors `models/_pinch_design`). The last compares the native Pyomo PDM with the GEKKO PDM.
