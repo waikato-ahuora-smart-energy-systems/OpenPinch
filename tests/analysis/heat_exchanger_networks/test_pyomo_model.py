@@ -186,3 +186,56 @@ def test_pyomo_solve_without_a_solution_is_failed(monkeypatch, termination):
     assert run.status == 0
     assert run.objective_value is None
     assert termination in run.failure_reason
+
+
+def _highs_available() -> bool:
+    return _solver_available("highs")
+
+
+def _binary_model() -> tuple[PyomoModel, object, object]:
+    # Covering a demand of 3 needs the unit switched on.
+    model = PyomoModel()
+    duty = model.Var(value=0.0, lb=0.0, ub=10.0)
+    unit = model.Var(value=0, lb=0, ub=1, integer=True)
+    model.Equation(duty >= 3.0)
+    model.Equation(duty <= 10.0 * unit)
+    model.Minimize(duty + 0.5 * unit)
+    return model, duty, unit
+
+
+def test_highs_needs_highspy_and_no_solver_binary(monkeypatch):
+    def missing_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        raise MissingSynthesisSolverError(f"{binary_name} is missing")
+
+    monkeypatch.setattr(backend, "require_solver_binary", missing_binary)
+    monkeypatch.setattr(
+        backend,
+        "require_synthesis_dependency",
+        lambda import_name, **_kwargs: (
+            pytest.fail(import_name)
+            if import_name == "highspy"
+            else pytest.importorskip(import_name)
+        ),
+    )
+
+    with pytest.raises(pytest.fail.Exception, match="highspy"):
+        backend.require_solver_backend("highs")
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_highs_solves_a_milp_with_options_and_no_option_file():
+    model, duty, unit = _binary_model()
+
+    run = backend.configure_pyomo_solver(
+        model, "highs", solver_options={"time_limit": 30.0}
+    )
+    solved = backend.solve_pyomo_model(model, solver_name="highs")
+
+    assert run.option_file is None
+    assert model._path is None
+    assert solved.failure_reason is None
+    assert solved.status == 1
+    assert solved.termination_condition == "optimal"
+    assert solved.solver_options == {"time_limit": 30.0}
+    assert solved.objective_value == pytest.approx(3.5)
+    assert (duty.value, unit.value) == pytest.approx((3.0, 1.0))

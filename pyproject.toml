@@ -82,6 +82,7 @@ synthesis = [
   "openpyxl>=3.1.5",
   "wakepy>=1.0.0",
   "idaes-pse>=2.11.0",
+  "highspy>=1.11.0",
 ]
 notebook = [
   "ipykernel>=7.2.0",
@@ -103,6 +104,7 @@ full = [
   "kaleido>=1.3.0",
   "wakepy>=1.0.0",
   "idaes-pse>=2.11.0",
+  "highspy>=1.11.0",
 ]
 
 [dependency-groups]
@@ -139,6 +141,7 @@ dev = [
     "coverage>=7.14.3",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.0.0",
+    "highspy>=1.11.0",
 ]
 
 [tool.black]

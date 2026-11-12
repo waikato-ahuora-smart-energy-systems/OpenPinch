@@ -133,9 +133,10 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
         "openpyxl>=3.1.5",
         "wakepy>=1.0.0",
         "idaes-pse>=2.11.0",
+        "highspy>=1.11.0",
     ]
 
-    synthesis_only = {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse"}
+    synthesis_only = {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse", "highspy"}
     core_deps = {
         _dependency_name(dep) for dep in _read_pyproject()["project"]["dependencies"]
     }
@@ -367,3 +368,13 @@ def test_core_dependencies_have_tested_floors_and_major_ceilings():
         "pydantic>=2.12,<3",
         "scipy>=1.16.1,<2",
     ]
+
+
+def test_declared_synthesis_dependencies_match_the_synthesis_extra():
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        SYNTHESIS_DEPENDENCIES,
+    )
+
+    assert sorted(dependency.package for dependency in SYNTHESIS_DEPENDENCIES) == (
+        sorted(_dependency_name(dep) for dep in _optional_deps()["synthesis"])
+    )

@@ -25,6 +25,7 @@ The synthesis dependency set is:
 - ``openpyxl>=3.1.5``
 - ``wakepy>=1.0.0``
 - ``idaes-pse>=2.11.0``
+- ``highspy>=1.11.0``
 
 Optional Install
 ----------------
@@ -43,7 +44,7 @@ the synthesis stack:
    uv sync --frozen --group dev
 
 The ``full`` extra includes the synthesis stack (Pyomo, GEKKO, Kaleido, wakepy,
-and IDAES) together with the dashboard, notebook, TESPy, and Brayton-cycle
+IDAES and HiGHS) together with the dashboard, notebook, TESPy, and Brayton-cycle
 surfaces. External solver binaries are still installed separately.
 
 Test Marker Policy

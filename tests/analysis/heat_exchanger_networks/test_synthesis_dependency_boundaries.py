@@ -25,6 +25,7 @@ SYNTHESIS_ONLY_MODULES = [
     "openpyxl",
     "wakepy",
     "idaes",
+    "highspy",
 ]
 
 

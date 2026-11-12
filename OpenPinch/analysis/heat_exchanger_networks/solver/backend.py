@@ -21,11 +21,18 @@ from .dependencies import (
     require_synthesis_dependency,
 )
 
-PYOMO_SOLVERS = frozenset({"couenne", "ipopt-pyomo"})
+PYOMO_SOLVERS = frozenset({"couenne", "ipopt-pyomo", "highs"})
 GEKKO_SOLVERS = frozenset({"ipopt-GEKKO", "apopt"})
 PYOMO_SOLVER_BINARIES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
+}
+# Solvers run in-process through a Python package rather than an executable.
+PYOMO_SOLVER_MODULES = {"highs": "highspy"}
+PYOMO_SOLVER_FACTORY_NAMES = {
+    "couenne": "couenne",
+    "ipopt-pyomo": "ipopt",
+    "highs": "appsi_highs",
 }
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
@@ -178,11 +185,16 @@ def require_solver_backend(solver_name: str) -> None:
     """Validate optional Python packages and executables for one solver name."""
 
     if solver_name in PYOMO_SOLVERS:
-        binary_name = PYOMO_SOLVER_BINARIES[solver_name]
-        require_solver_binary(
-            binary_name,
-            purpose=f"{solver_name} heat exchanger network synthesis solves",
-        )
+        if solver_name in PYOMO_SOLVER_MODULES:
+            require_synthesis_dependency(
+                PYOMO_SOLVER_MODULES[solver_name],
+                purpose=f"{solver_name} heat exchanger network synthesis solves",
+            )
+        else:
+            require_solver_binary(
+                PYOMO_SOLVER_BINARIES[solver_name],
+                purpose=f"{solver_name} heat exchanger network synthesis solves",
+            )
         require_synthesis_dependency(
             "pyomo.environ",
             package="pyomo",
@@ -319,7 +331,8 @@ def configure_pyomo_solver(
 
     Couenne and Ipopt read options from ``couenne.opt`` or ``ipopt.opt`` in
     the working directory, so options go to a file in a run directory created
-    for the model and removed by ``cleanup_gekko_model``.
+    for the model and removed by ``cleanup_gekko_model``. HiGHS runs in
+    process and takes its options at solve time, with no file.
     """
 
     if solver_name not in PYOMO_SOLVERS:
@@ -330,7 +343,10 @@ def configure_pyomo_solver(
     require_solver_backend(solver_name)
     effective_options = _normalise_solver_options(solver_options)
     option_file = None
-    if effective_options:
+    if solver_name in PYOMO_SOLVER_MODULES:
+        # In-process solvers take their options at solve time.
+        model._openpinch_solver_options = effective_options or None
+    elif effective_options:
         if model._path is None:
             model._path = tempfile.mkdtemp(prefix="openpinch-pyomo-")
         option_file = _write_solver_option_file(
@@ -338,7 +354,9 @@ def configure_pyomo_solver(
             COUENNE_OPTION_FILE if solver_name == "couenne" else IPOPT_OPTION_FILE,
             effective_options,
         )
-    _require_pyomo_solver_available(solver_name, PYOMO_SOLVER_BINARIES[solver_name])
+    _require_pyomo_solver_available(
+        solver_name, PYOMO_SOLVER_FACTORY_NAMES[solver_name]
+    )
     return SolverRun(
         name=solver_name,
         extension="pyomo",
@@ -387,9 +405,12 @@ def solve_pyomo_model(
     failure_reason = None
     try:
         with _solver_working_directory(model, "pyomo"):
-            results = pyomo.SolverFactory(PYOMO_SOLVER_BINARIES[solver_name]).solve(
-                model.model, tee=disp
-            )
+            solver = pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
+            if solver_name in PYOMO_SOLVER_MODULES:
+                solver.options.update(
+                    getattr(model, "_openpinch_solver_options", None) or {}
+                )
+            results = solver.solve(model.model, tee=disp)
         solver_status = str(results.solver.status)
         termination_condition = str(results.solver.termination_condition)
         if solver_status not in PASSING_SOLVER_STATUSES:

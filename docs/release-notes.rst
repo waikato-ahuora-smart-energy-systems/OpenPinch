@@ -232,6 +232,11 @@ Heat exchanger network synthesis
   ``ipopt-GEKKO``, which summed the objectives, the utility goals now
   minimise utility cost alone. Sides with one hot and one cold utility are
   unchanged.
+- ``highs`` is a new pinch design method solver (``HENS_SOLVER_PDM``): the
+  HiGHS MILP solver, run in process through the ``highspy`` package, which
+  the ``synthesis`` extra now installs. It needs no solver executable, and
+  its ``HENS_SOLVER_OPTIONS_PDM`` are HiGHS options (``time_limit``, for
+  example).
 
 0.8.3 (2026-11-11)
 ------------------
