@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ...solver import backend
 from . import approach as _approach
 from . import execution as _execution
 
@@ -83,7 +84,7 @@ def _utility_cost_expression(
             cost,
             profile,
             name=name,
-            integer_capable=model.solver in {"apopt", "couenne"},
+            integer_capable=model.solver in backend.INTEGER_SOLVERS,
         ),
     )
     return cost
@@ -163,7 +164,7 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
         profile_from_solver_arrays,
     )
 
-    integer_capable = model.solver in {"apopt", "couenne"}
+    integer_capable = model.solver in backend.INTEGER_SOLVERS
     model.Q_coordinate_h_by_period = [
         [[None for _k in range(model.K)] for _i in range(model.I)]
         for _n in range(model.N_periods)
@@ -397,7 +398,7 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                             solved_outlet,
                             profile,
                             name=f"TQ_{tag}",
-                            integer_capable=model.solver in {"apopt", "couenne"},
+                            integer_capable=model.solver in backend.INTEGER_SOLVERS,
                             initial_segment=temperature_segment,
                         ),
                     )
@@ -502,7 +503,7 @@ def _set_piecewise_match_outlet_equations(model) -> None:
         profile_from_solver_arrays,
     )
 
-    integer_capable = model.solver in {"apopt", "couenne"}
+    integer_capable = model.solver in backend.INTEGER_SOLVERS
     model.Q_coordinate_h_out_x_by_period = [
         [
             [[None for _k in range(model.S)] for _j in range(model.J)]

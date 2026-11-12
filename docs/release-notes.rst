@@ -246,7 +246,8 @@ Heat exchanger network synthesis
   HiGHS MILP solver, run in process through the ``highspy`` package, which
   the ``synthesis`` extra now installs. It needs no solver executable, and
   its ``HENS_SOLVER_OPTIONS_PDM`` are HiGHS options (``time_limit``, for
-  example).
+  example). Like Couenne it keeps integers, so segmented streams and prices
+  use their exact interval binaries in one solve.
 
 0.8.3 (2026-11-11)
 ------------------

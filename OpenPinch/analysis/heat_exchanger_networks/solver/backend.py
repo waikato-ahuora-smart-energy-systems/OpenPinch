@@ -23,6 +23,8 @@ from .dependencies import (
 
 PYOMO_SOLVERS = frozenset({"couenne", "ipopt-pyomo", "highs"})
 GEKKO_SOLVERS = frozenset({"ipopt-GEKKO", "apopt"})
+# Solvers that keep integer variables integer; the others relax them.
+INTEGER_SOLVERS = frozenset({"apopt", "couenne", "highs"})
 PYOMO_SOLVER_BINARIES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",

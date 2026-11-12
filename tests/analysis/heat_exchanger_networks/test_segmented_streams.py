@@ -1089,3 +1089,53 @@ def test_apopt_pdm_clips_segment_profile_without_splitting_parent_identity():
     assert model.I == model.J == 1
     assert model.Q_r_total == pytest.approx(150.0)
     assert model.segment_area_contributions_by_period
+
+
+def _highs_available() -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_highs_pdm_maps_segments_with_integer_intervals_in_one_solve():
+    # HiGHS takes integers, so temperature and price profiles use the exact
+    # interval binaries rather than relaxed selectors re-solved until stable.
+    # Only the approach-contribution mappings stay relaxed, as with Couenne.
+    problem = _segmented_problem(segmented_utility=True)
+    model = PinchDecompModel(
+        name="segmented-pdm-above",
+        framework="PDM",
+        solver="highs",
+        solver_arrays=problem_to_solver_arrays(problem, 10.0),
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+        pinch_loc="above",
+        pinch_decomposition=build_pinch_design_decomposition(
+            problem, 10.0, pinch_location="above"
+        ),
+        stage_selection="automated",
+    )
+
+    model.optimise(False)
+
+    assert all(
+        "segment_index_at_heat" in mapping
+        for mapping in model._piecewise_active_mappings
+    )
+    assert model.mSuccess == 1
+    assert model.Q_r_total == pytest.approx(150.0, abs=1e-6)
