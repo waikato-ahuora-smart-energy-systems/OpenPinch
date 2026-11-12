@@ -4,6 +4,206 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.8.4 (2026-11-12)
+------------------
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The heat pump exchangers now default to finite approach temperatures:
+  ``HPR_DT_IHX`` and ``HPR_DT_CASCADE_HX`` 5 K, and ``HPR_DT_CONT`` 1 K (all
+  were 0 K). With 0 K the internal and cascade heat exchangers were free
+  exchangers of unbounded area. A brewery search, for example, raised the
+  suction gas by 75 K through an internal heat exchanger with a 0.1 K approach.
+  Every heat pump and refrigeration target moves; set the three options to 0
+  for the previous results.
+- Heat pump capital is now priced from each machine's components instead of
+  its heating duty. Installed capital is 4.16 times the purchased cost of the
+  compressors (on suction volume flow), motors (on shaft power) and plate heat
+  exchangers (on area), with the correlations of Ommen et al. (2015). It is
+  scaled so that Ommen's 1 MW ammonia example costs the IEA HPT Annex 68 level
+  the previous model used. Water vapour compressors (closed water stages and
+  MVR) are priced as turbo compressors anchored on Zuhlsdorf et al. (2018).
+
+  - Process exchangers are sized interval by interval against the closest
+    part of the sink or source each condenser or evaporator can reach. Heat
+    exchanged with ambient air goes through an air cooler or heater. Internal
+    and cascade exchangers are sized from their own approaches. A condenser
+    section counts as gas or liquid against its own stage's condensing
+    temperature, and parallel compressor units each have their own motor.
+  - New ``HPR_U_TWO_PHASE`` (2000 W/m²K), ``HPR_U_LIQUID`` (1000),
+    ``HPR_U_GAS`` (400) and ``HPR_U_AIR`` (50) set the heat transfer
+    coefficients.
+  - The ``COSTING_HPR_EQUIPMENT_COST``, ``COSTING_HPR_INSTALLATION_FACTOR``,
+    ``COSTING_HPR_COST_EXP``, ``COSTING_HPR_COST_FIXED_SHARE``,
+    ``COSTING_HPR_COST_STAGE_SHARE``, ``COSTING_HPR_COST_TEMP_FACTOR`` and
+    ``COSTING_HPR_COST_TEMP_BASE`` options are removed.
+  - Capital now grows with lift, low suction pressure and small approach
+    temperatures. Water below about 80 °C is far dearer than before: its
+    suction volume is large. Every heat pump target with capital recovery on
+    moves.
+
+- TESPy single-stage targets and performance maps now model an internal
+  heat exchanger. The search varies it as for CoolProp, held to the
+  ``HPR_DT_IHX`` approach; with no gas-side rise the network has none. TESPy
+  design points match the CoolProp cycle's COP to 1e-4 with and without it.
+- Performance maps keep the target's ``HPR_DT_IHX`` approach at every point.
+  Target simulation records carry it as ``internal_hx_approach_temperature``.
+  At points with less lift than the target, the CoolProp map simulator ran
+  the internal heat exchanger with no approach, and the TESPy one could set
+  a suction gas hotter than the liquid heating it. Both overstated its duty.
+- Shared multiperiod designs now keep a minimum lift. Each
+  vapour-compression stage lifts at least ``HPR_TURNDOWN`` (new, default
+  0.25) of its design lift, its largest lift in any period, in every period.
+  A period that needs less lift runs at the floor, condensing higher at a
+  worse COP, as a fixed machine at part load would. There is no separate
+  turndown penalty. A cascade stage's lift includes the cascade exchanger
+  approach it lifts across.
+- Search and reporting.
+
+  - Each warm start now seeds one restart; the other restarts start from
+    Latin hypercube points across the bounds. Every restart used to start
+    from the Carnot warm start, so the restarts converged on one design.
+    New ``HPR_SEARCH_SEED`` (default 0) shifts the restart seeds and points.
+  - Vapour compression targets report ``hpr_details.effective_topology``: the
+    requested layout and the stages the design uses, with their fluids,
+    temperatures, pressure ratios, work and duties, and a one-line label such
+    as "... 3x2 requested; 1 of 4 stages used". A shared multiperiod design
+    counts a stage that works in any period. TESPy targets report theirs
+    too, so their alternatives are reported as well.
+  - ``hpr_details.alternatives`` lists up to three distinct designs (other
+    working stages or fluids) within 5% of the target's objective, with
+    their topology and objective gap. Very different machines can cost
+    nearly the same. Shared multiperiod targets report them too.
+  - ``hpr_summary`` includes the topology label and the alternatives.
+
+- Penalised designs, wrong-side heat and the utility capital credit.
+
+  - A final vapour-compression heat pump design that still carries a
+    feasibility penalty is no longer a target. The next candidate is tried,
+    as refrigeration designs already were. The cheapest feasible point of
+    each design the search evaluated is now a candidate as well, so slightly
+    penalised points that rank cheaper can no longer leave a small search
+    with no target although it found a feasible design. Shared multiperiod designs, heat
+    pump or refrigeration, are now checked the same way, period by period:
+    a penalty in a lightly weighted period still rejects the design, and the
+    failure reports that period's served and targeted heating.
+  - Heat a vapour-compression heat pump's condensers reject to ambient air is
+    penalised as heat the process could not use. It was free, so a heat
+    pump could deliver heat where no process needed it. Refrigerators still
+    reject to air freely.
+  - ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` now defaults to
+    ``False``. A heat pump is no longer credited with the capital of the hot
+    utility and refrigeration plant it displaces, as a retrofit keeps that
+    plant. Set it to ``True`` for a new site.
+  - New ``HPR_ENFORCE_HEATING_DUTY`` (default ``False``): a vapour-compression
+    heat pump must serve its whole targeted heating duty regardless of
+    economics, as a refrigerator must serve its cooling. If no design meets
+    it, the target fails with the duty the best design serves.
+
+- CoolProp vapour-compression targets may now run a stage transcritical.
+  Condensing was capped 2 K below the fluid's critical temperature. A stage
+  condensing above it now takes its high pressure from the critical isochore
+  at the condensing temperature. Its gas cooler glides down to that
+  temperature less the subcooling, and it is held to the discharge pressure
+  limit. The warm start is still seeded subcritical, and TESPy targets stay
+  subcritical. A stage with no subcooling now reports exactly zero, where
+  round-off could give a tiny negative value that failed the simulation
+  record. A compressor efficiency correlation (``HPR_COMPRESSOR_MODEL``) is
+  given the critical point as a transcritical stage's discharge dew point,
+  where it used to fail the candidate.
+- Vapour-compression stages are now held to practical limits.
+
+  - Liquid injection: condensate is injected into the compressor discharge
+    until the gas is at most ``HPR_MAX_DISCHARGE_SUPERHEAT`` (new, default
+    50 K) above its dew point. The condenser rejects the same heat and the
+    compressor does the same work, but the hot gas no longer delivers heat at
+    discharge temperatures. These reached 400 to 600 °C for water stages and
+    220 to 425 °C for ammonia.
+  - Penalties, of the stage's condenser duty times the relative violation:
+    a pressure ratio above ``HPR_MAX_PRESSURE_RATIO`` (default 15), a
+    discharge pressure above ``HPR_MAX_DISCHARGE_PRESSURE`` (new, default
+    60 bar; ``HPR_MAX_DISCHARGE_PRESSURE_CO2``, new, 140 bar for carbon
+    dioxide), a suction pressure below ``HPR_SCREEN_MIN_SUCTION_PRESSURE``
+    (0.5 bar, previously used only by the refrigerant screen), and a lift
+    below ``HPR_MIN_STAGE_LIFT`` (new, default 5 K) on a stage that carries
+    flow.
+  - A two-phase compressor discharge, as dry fluids such as isopentane give
+    when compressed from saturated vapour, is penalised by the gas's shortfall
+    from its dew point.
+  - The pressure ratio limit was a clamp that raised evaporating temperatures
+    when a design was decoded. It is now a penalty, so the search sees a slope
+    instead of a plateau. The Carnot warm start is still placed within the
+    limit, so a small search starts from an unpenalised design.
+  - The Excel input template lists the new options and the new approach
+    temperature defaults.
+  - MVR stages on process vapour are not held to these limits, and TESPy
+    targets keep their own model.
+
+- ``HPR_DT_IHX`` is now the hot-end approach of the internal heat exchanger in
+  the CoolProp vapour compression models (single stage, cascade, parallel and
+  vapour compression plus MVR): the suction gas leaves it at least this far
+  below the liquid entering it. It was previously read only by TESPy targeting,
+  which rejected a nonzero value; TESPy targets, which have no internal heat
+  exchanger, now accept and ignore it. The working-fluid approach
+  ``HPR_DT_CONT`` no longer limits the internal heat exchanger (it took twice
+  ``HPR_DT_CONT``).
+- Fixed refrigeration targets at a load fraction below 1 that failed with
+  "failed to return an optimal result" although designs serving the whole
+  target existed. The default refrigeration allowed for the untargeted warmer
+  cooling was computed from a separate cascade of that cooling, which put the
+  split temperature on the problem table's rounded grid. On a near-isothermal
+  profile, such as a utility level, the rounding made the allowance a fraction
+  of a watt too small, and every design was rejected as leaving cooling
+  unserved. The allowance is now the full cooling's need less the target, on
+  the cascade the designs are evaluated on. Seen on the DTU brewery with
+  utility placement at 56.4% load.
+- ``hpr_refrigerant_screen`` now screens every layout a Carnot target's levels
+  allow, for the targeting method that would use it, instead of pairing every
+  evaporating level with every condensing level as single-stage cycles. Each
+  choice of ``n`` condensing and ``m`` evaporating levels gives a single-stage,
+  parallel or cascade layout, following the Carnot target's topology, and a
+  cascade heat pump also gives vapour compression plus MVR layouts, with the
+  MVR on water. Each stage screens the fluids at its own temperatures, so a
+  cascade's upper stage is judged on its own small lift. A fluid set takes one
+  feasible fluid per stage, with the critical temperature never rising from
+  the hottest stage down. The result has ``topology``, ``is_heat_pumping``,
+  ``dt_cascade_hx`` and ``layouts`` in place of ``rows`` and ``practical``;
+  each layout has ``method``, ``stages``, ``n_fluid_sets`` and
+  ``fluid_sets()``, and ``feasible_layouts`` keeps those with a fluid set.
+  Explicit levels now need ``topology`` and take ``is_refrigeration``.
+- A single-stage or cascade layout with a stage lifting more than the new
+  ``HPR_SCREEN_MAX_STAGE_LIFT`` (default 70 K) is also screened as a cascade
+  with that stage split into equal lifts within the limit; the inserted levels
+  are the layout's ``added_levels``.
+- ``HPR_MVR_FLUIDS`` (``mvr_fluids=`` of ``mvr_heat_pump``) now names the
+  fluids of the vapour compression stages of a vapour compression plus MVR
+  cascade, one per stage, instead of the MVR stages' fluid. The MVR stages are
+  open cycles on process or utility steam and always run on water. The option
+  rejects water (``Water``, ``H2O``, ``R718``) and defaults to empty, which
+  keeps the vapour compression stages on ``HPR_REFRIGERANTS`` as before. Code
+  that set ``mvr_fluids=["Water"]`` should drop it; other values now choose the
+  vapour compression fluids. ``VapourCompressionMvrCascade.solve`` no longer
+  takes ``mvr_fluid``.
+- In the refrigerant screen, deep vacuum suction and over ratio limit now rule a
+  fluid out of a stage, while near critical fluids stay feasible.
+  ``HPR_SCREEN_CRITICAL_MARGIN`` defaults to 5 K instead of 15 K.
+- ``vapour_compression_heat_pump``, ``vapour_compression_refrigeration`` and
+  ``mvr_heat_pump`` take a refrigerant screen result, or one of its layouts,
+  as ``refrigerants`` and run the target once for every fluid set it proposes
+  for that method: single-stage and cascade layouts for a cascade cycle,
+  single-stage and parallel layouts for a parallel cycle, and vapour
+  compression plus MVR layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators
+  and MVR stages from its layout (a split layout's added levels included),
+  unless given, when only layouts with those
+  counts run; layouts asking for the same counts and fluids share one run. The
+  result is an ``HprFluidSetRunsResult`` with every run, failures included,
+  and ``best``, the successful run with the lowest total annualized cost. A
+  refrigerant list, or one fluid set from ``fluid_sets()``, still returns the
+  target. ``mvr_heat_pump`` now takes ``refrigerants`` for its vapour
+  compression stages, and refuses ``mvr_fluids`` alongside a screen, since
+  the fluid sets choose those fluids.
+
 0.8.3 (2026-11-11)
 ------------------
 

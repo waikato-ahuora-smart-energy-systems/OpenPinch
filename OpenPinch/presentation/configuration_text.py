@@ -273,43 +273,6 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "temperature."
         ),
     ),
-    "COSTING_HPR_EQUIPMENT_COST": FieldText(
-        "HPR equipment cost at 1 MW", "$",
-        (
-            "Equipment cost of a 1 MW single-stage heat pump, scaled by capacity, "
-            "stages and temperature in HPR capital costs."
-        ),
-    ),
-    "COSTING_HPR_INSTALLATION_FACTOR": FieldText(
-        "HPR installation factor", None,
-        "Multiplies the HPR equipment cost to give the installed capital cost.",
-    ),
-    "COSTING_HPR_COST_EXP": FieldText(
-        "HPR capacity cost exponent", None,
-        "Exponent on each machine's capacity (in MW) in HPR capital costs.",
-    ),
-    "COSTING_HPR_COST_FIXED_SHARE": FieldText(
-        "HPR cost fixed share", None,
-        "Share of HPR capital that does not depend on the number of stages.",
-    ),
-    "COSTING_HPR_COST_STAGE_SHARE": FieldText(
-        "HPR cost share per stage", None,
-        "Share of HPR capital added for each compression stage, including MVR stages.",
-    ),
-    "COSTING_HPR_COST_TEMP_FACTOR": FieldText(
-        "HPR cost temperature factor", None,
-        (
-            "Fractional capital increase per 100 K that the hottest delivery "
-            "temperature exceeds the cost base temperature."
-        ),
-    ),
-    "COSTING_HPR_COST_TEMP_BASE": FieldText(
-        "HPR cost base temperature", "degC",
-        (
-            "Delivery temperature above which HPR capital cost rises with the "
-            "temperature factor."
-        ),
-    ),
     "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": FieldText(
         "Annualise HPR capital", None,
         "Include the annualised heat pump capital in the HPR total annual cost.",
@@ -318,7 +281,9 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Annualise default utility capital", None,
         (
             "Include the annualised capital of the default hot utility and "
-            "refrigeration still needed in the HPR annual cost."
+            "refrigeration still needed in the HPR annual cost, so a heat pump is "
+            "credited for the plant it displaces. Off by default: a retrofit "
+            "keeps its existing plant."
         ),
     ),
     "COSTING_HPR_HOT_UTILITY_CAPITAL_COST": FieldText(
@@ -534,6 +499,52 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "available duty."
         ),
     ),
+    "HPR_ENFORCE_HEATING_DUTY": FieldText(
+        "Enforce the heat pump heating duty", None,
+        (
+            "Require a vapour compression heat pump to serve its whole targeted "
+            "heating duty regardless of economics, as a refrigerator must serve "
+            "its cooling: heating it leaves unserved is penalised, and a final "
+            "design still short of it is not a target."
+        ),
+    ),
+    "HPR_U_TWO_PHASE": FieldText(
+        "HPR two-phase heat transfer coefficient", "W/m2K",
+        (
+            "Overall heat transfer coefficient for heat pump exchanger sections "
+            "where the working fluid condenses or evaporates, and for cascade "
+            "exchangers, in capital costing."
+        ),
+    ),
+    "HPR_U_LIQUID": FieldText(
+        "HPR liquid heat transfer coefficient", "W/m2K",
+        "Overall heat transfer coefficient for subcooling sections in capital costing.",
+    ),
+    "HPR_U_GAS": FieldText(
+        "HPR gas heat transfer coefficient", "W/m2K",
+        (
+            "Overall heat transfer coefficient for desuperheating sections and "
+            "internal heat exchangers in capital costing."
+        ),
+    ),
+    "HPR_U_AIR": FieldText(
+        "HPR air-side heat transfer coefficient", "W/m2K",
+        (
+            "Air-side heat transfer coefficient of the air coolers and heaters "
+            "through which a heat pump rejects heat to, or draws heat from, "
+            "ambient air, in capital costing. It acts in series with the "
+            "working fluid side's coefficient."
+        ),
+    ),
+    "HPR_TURNDOWN": FieldText(
+        "HPR turndown lift share", None,
+        (
+            "In a shared multiperiod design, each vapour compression stage lifts "
+            "at least this share of its design lift (its largest lift in any "
+            "period) in every period. A period needing less lift runs at the "
+            "floor, condensing higher at a worse COP."
+        ),
+    ),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": FieldText(
         "Shared multiperiod HPR design", None,
         (
@@ -553,8 +564,12 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         ),
     ),
     "HPR_MVR_FLUIDS": FieldText(
-        "MVR fluids", None,
-        "Working fluids of the MVR stages in vapour compression with MVR cycles.",
+        "MVR cascade fluids", None,
+        (
+            "Fluids of the vapour compression stages in vapour compression with "
+            "MVR cycles, one per stage; empty uses HPR_REFRIGERANTS. Water is "
+            "not allowed: the MVR stages always run on water."
+        ),
     ),
     "HPR_MVR_COUNT": FieldText(
         "MVR stage count", None,
@@ -653,22 +668,51 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HPR_DT_IHX": FieldText(
         "HPR internal heat exchanger approach", "delta_degC",
         (
-            "Only checked by TESPy targeting, which rejects a nonzero value; no other "
-            "HPR model reads it."
+            "Minimum approach at the internal heat exchanger's hot end: the suction "
+            "gas leaves it at least this far below the liquid entering it, in the "
+            "CoolProp and TESPy vapour compression models."
         ),
     ),
     "HPR_MAX_PRESSURE_RATIO": FieldText(
         "HPR compressor pressure ratio limit", None,
         (
             "Largest ratio of condensing to evaporating pressure across one "
-            "vapour-compression compressor."
+            "vapour-compression compressor; a stage above it is penalised by its "
+            "condenser duty times the relative excess."
+        ),
+    ),
+    "HPR_MAX_DISCHARGE_SUPERHEAT": FieldText(
+        "HPR discharge superheat after liquid injection", "delta_degC",
+        (
+            "Condensate is injected into the compressor discharge until the gas "
+            "is at most this far above its dew point. The condenser rejects the "
+            "same heat and the compressor does the same work."
+        ),
+    ),
+    "HPR_MAX_DISCHARGE_PRESSURE": FieldText(
+        "HPR discharge pressure limit", "bar",
+        (
+            "Vapour compression stages discharging above this pressure are "
+            "penalised by their condenser duty times the relative excess."
+        ),
+    ),
+    "HPR_MAX_DISCHARGE_PRESSURE_CO2": FieldText(
+        "HPR discharge pressure limit for CO2", "bar",
+        "HPR_MAX_DISCHARGE_PRESSURE for carbon dioxide stages.",
+    ),
+    "HPR_MIN_STAGE_LIFT": FieldText(
+        "HPR minimum stage lift", "delta_degC",
+        (
+            "Vapour compression stages that carry flow and lift less than this "
+            "from evaporating to condensing are penalised."
         ),
     ),
     "HPR_SCREEN_MIN_SUCTION_PRESSURE": FieldText(
         "Refrigerant screen suction pressure floor", "bar",
         (
             "Refrigerant screening flags a fluid whose evaporating saturation "
-            "pressure is below this as deep vacuum suction."
+            "pressure is below this as deep vacuum suction, and targeting "
+            "penalises a closed vapour-compression stage whose suction is below it."
         ),
     ),
     "HPR_SCREEN_CRITICAL_MARGIN": FieldText(
@@ -676,6 +720,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         (
             "Refrigerant screening flags a fluid that condenses within this of its "
             "critical temperature as near critical."
+        ),
+    ),
+    "HPR_SCREEN_MAX_STAGE_LIFT": FieldText(
+        "Refrigerant screen stage lift limit", "delta_degC",
+        (
+            "Refrigerant screening also screens a cascade for a single-stage or "
+            "cascade layout with a stage lifting more than this, splitting the "
+            "stage into equal lifts within it. Must exceed HPR_DT_CASCADE_HX."
         ),
     ),
     "HPR_DT_CASCADE_HX": FieldText(
@@ -698,7 +750,18 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HPR_MAX_MULTISTART": FieldText(
         "HPR optimiser restarts", None,
-        "Number of HPR optimiser runs from different starting points.",
+        (
+            "Number of HPR optimiser runs. The first starts from the warm start; "
+            "the rest start from Latin hypercube points across the bounds."
+        ),
+    ),
+    "HPR_SEARCH_SEED": FieldText(
+        "HPR search seed", None,
+        (
+            "Offset added to the restart seeds and used to draw the Latin "
+            "hypercube restart points, so independent repetitions of a target "
+            "can differ."
+        ),
     ),
     "HPR_ETA_PENALTY": FieldText(
         "HPR efficiency penalty weight", None,

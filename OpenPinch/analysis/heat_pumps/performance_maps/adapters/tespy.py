@@ -9,7 +9,13 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 import CoolProp
-from tespy.components import Compressor, CycleCloser, SimpleHeatExchanger, Valve
+from tespy.components import (
+    Compressor,
+    CycleCloser,
+    HeatExchanger,
+    SimpleHeatExchanger,
+    Valve,
+)
 from tespy.connections import Connection
 from tespy.networks import Network
 from tespy.tools.characteristics import CharLine
@@ -97,6 +103,7 @@ class TespyHprPointSimulator:
         self._evaporator: SimpleHeatExchanger | None = None
         self._compressor_inlet: Connection | None = None
         self._condenser_outlet: Connection | None = None
+        self._evaporator_outlet: Connection | None = None
 
     @staticmethod
     def _saturation_pressures(
@@ -148,10 +155,14 @@ class TespyHprPointSimulator:
             "in1",
             label="compressor outlet",
         )
+        # With an internal heat exchanger, the condensed liquid heats the
+        # evaporated gas on its way to the compressor.
+        has_ihx = context.basis.internal_hx_gas_temperature_change > 0.0
+        ihx = HeatExchanger("internal heat exchanger") if has_ihx else None
         condenser_outlet = Connection(
             condenser,
             "out1",
-            valve,
+            ihx if has_ihx else valve,
             "in1",
             label="condenser outlet",
         )
@@ -165,17 +176,24 @@ class TespyHprPointSimulator:
         evaporator_outlet = Connection(
             evaporator,
             "out1",
-            cycle_closer,
-            "in1",
+            ihx if has_ihx else cycle_closer,
+            "in2" if has_ihx else "in1",
             label="evaporator outlet",
         )
-        network.add_conns(
+        connections = [
             compressor_inlet,
             compressor_outlet,
             condenser_outlet,
             valve_outlet,
             evaporator_outlet,
-        )
+        ]
+        if has_ihx:
+            connections += [
+                Connection(ihx, "out1", valve, "in1", label="ihx liquid outlet"),
+                Connection(ihx, "out2", cycle_closer, "in1", label="ihx gas outlet"),
+            ]
+            ihx.set_attr(pr1=1.0, pr2=1.0)
+        network.add_conns(*connections)
         compressor.set_attr(
             eta_s=context.basis.compressor_isentropic_efficiency,
             eta_s_char=CharLine(x=list(x_values), y=list(y_values)),
@@ -194,6 +212,7 @@ class TespyHprPointSimulator:
         self._evaporator = evaporator
         self._compressor_inlet = compressor_inlet
         self._condenser_outlet = condenser_outlet
+        self._evaporator_outlet = evaporator_outlet if has_ihx else None
 
     def _apply_condition(
         self,
@@ -216,10 +235,27 @@ class TespyHprPointSimulator:
         # Differences from saturation, because CoolProp refuses a pressure and
         # temperature pair on the saturation line. The pressures fix the dew and
         # bubble points at the evaporating and condensing temperatures.
+        # The evaporator superheats the gas and the internal heat exchanger,
+        # if any, heats it on by its gas-side temperature change, held, as in
+        # the CoolProp cycle, the approach below the liquid entering it.
+        basis = context.basis
+        ihx_rise = min(
+            basis.internal_hx_gas_temperature_change,
+            max(
+                condensing_temperature
+                - basis.subcooling
+                - evaporating_temperature
+                - basis.superheat
+                - basis.internal_hx_approach_temperature,
+                0.0,
+            ),
+        )
         self._compressor_inlet.set_attr(
             p=evaporating_pressure,
-            td_dew=context.basis.superheat,
+            td_dew=context.basis.superheat + ihx_rise,
         )
+        if self._evaporator_outlet is not None:
+            self._evaporator_outlet.set_attr(td_dew=context.basis.superheat)
         self._condenser_outlet.set_attr(
             p=condensing_pressure,
             td_bubble=context.basis.subcooling,
@@ -252,16 +288,6 @@ class TespyHprPointSimulator:
                 "TESPy simulator received a context for a different backend",
                 session_fatal=True,
             )
-        if context.basis.internal_hx_gas_temperature_change != 0.0:
-            raise HprSimulatorFailure(
-                "unsupported_model",
-                (
-                    "the TESPy single-stage model does not include an internal "
-                    "heat exchanger"
-                ),
-                session_fatal=True,
-            )
-
         self._context = context
         self._temporary_directory = TemporaryDirectory(prefix="openpinch-hpr-tespy-")
         self._design_state_path = (
@@ -444,6 +470,7 @@ class TespyHprPointSimulator:
         self._evaporator = None
         self._compressor_inlet = None
         self._condenser_outlet = None
+        self._evaporator_outlet = None
         self._design_state_path = None
         self._temporary_directory = None
         self._state = "closed"
@@ -549,16 +576,6 @@ class TespyHprTargetEvaluator:
             raise HprTargetEvaluatorError(
                 "candidate_request_mismatch",
                 "TESPy candidate identity does not match prepared targeting intent",
-                session_fatal=True,
-            )
-        if request.internal_hx_gas_temperature_change != 0.0:
-            self._state = "fatal"
-            raise HprTargetEvaluatorError(
-                "unsupported_model",
-                (
-                    "TESPy single-stage targeting does not model an internal "
-                    "heat exchanger"
-                ),
                 session_fatal=True,
             )
 

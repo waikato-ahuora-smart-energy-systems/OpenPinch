@@ -222,7 +222,7 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
         Q_ext_heat=8.0,
         Q_cooling_water=4.0,
         Q_refrigeration=2.0,
-        cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
+        machine_capital=[600_000.0, 400_000.0],
         penalty_weight=2.0,
         args=args,
     )
@@ -233,9 +233,10 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
     # 10 kW power + 8 kW heat at 0.5 + 4 kW cooling water at 0.025
     # + 2 kW refrigeration at 0.5, at $100/MWh for 1000 h.
     assert costs.hpr_operating_cost.value == pytest.approx(1510.0)
-    # 2.3 x $485k x (1 MW)^0.7 x (0.7 + 0.3) x (1 + 0.4 x 0.75)
+    # The machines' installed capital adds up.
     assert costs.hpr_capital_cost.unit == "$"
-    assert costs.hpr_capital_cost.value == pytest.approx(2.3 * 485000.0 * 1.3)
+    assert costs.hpr_capital_cost.value == pytest.approx(1_000_000.0)
+    assert costs.hpr_machine_capital_costs == (600_000.0, 400_000.0)
     assert costs.hpr_total_annualized_cost.unit == "$/y"
     assert costs.feasibility_penalty.unit == "$/y"
     # The weight prices at the no-heat-pump cost of Q_hpr_target: 200 kW of
@@ -263,7 +264,7 @@ def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery()
             Q_ext_heat=8.0,
             Q_cooling_water=0.0,
             Q_refrigeration=2.0,
-            cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
+            machine_capital=[1_000_000.0],
             penalty_weight=0.0,
             args=_base_args(**kwargs, **flags),
         )
@@ -286,30 +287,6 @@ def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery()
 
     no_utility = costs(utility_capital_recovery=False)
     assert no_utility.hpr_utility_annualized_capital_cost.value == 0.0
-
-
-def test_hpr_capital_cost_scales_with_size_stages_and_temperature():
-    args = _base_args()
-    unit = hp_shared.HPRCostUnit(Q_cap=2000.0, T_hot_max=200.0, n_closed=2, n_mvr=1)
-
-    cost = hp_shared.calc_hpr_capital_cost([unit], args)
-
-    expected = 2.3 * 485000.0 * 2.0**0.7 * (0.7 + 0.3 * 3) * (1.0 + 0.4 * 1.25)
-    assert cost.unit == "$"
-    assert cost.value == pytest.approx(expected)
-
-
-def test_hpr_capital_cost_sums_machines_and_ignores_idle_ones():
-    args = _base_args()
-    cool = hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=60.0)
-    idle = hp_shared.HPRCostUnit(Q_cap=0.0, T_hot_max=180.0)
-
-    one = hp_shared.calc_hpr_capital_cost([cool], args).value
-    both = hp_shared.calc_hpr_capital_cost([cool, cool, idle], args).value
-
-    # Below the 75 C base there is no temperature factor.
-    assert one == pytest.approx(2.3 * 485000.0)
-    assert both == pytest.approx(2.0 * one)
 
 
 def test_default_refrigeration_ratio_uses_carnot_cop_to_cooling_water():
@@ -393,35 +370,6 @@ def test_vapour_refrigeration_penalises_unserved_cooling():
     assert refrigeration.Q_ext_cold == pytest.approx(100.0)
     assert refrigeration.feasibility_penalty > 0.0
     assert heat_pump.feasibility_penalty == pytest.approx(0.0)
-
-
-def test_cascade_cost_unit_counts_every_solved_stage():
-    args = _base_args()
-    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
-    state = HPRParsedState(T_cond=np.array([110.0, 90.0]))
-
-    (unit,) = hp_shared._single_cost_unit(
-        state, streams, np.array([10.0, 8.0, 6.0]), args
-    )
-
-    # Two condenser levels and two evaporator levels: three stages.
-    assert unit.n_closed == 3
-    assert unit.Q_cap == pytest.approx(500.0)
-    assert unit.T_hot_max == pytest.approx(110.0)
-
-
-def test_cascade_cost_unit_does_not_charge_a_stage_that_does_no_work():
-    """A stage with no work (merged levels, no duty) has no compressor to buy,
-    so a 3x2 cascade can collapse onto a cheaper 2x1 or 1x1 design."""
-    args = _base_args()
-    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
-    state = HPRParsedState(T_cond=np.array([110.0, 90.0, 90.0]))
-
-    (unit,) = hp_shared._single_cost_unit(
-        state, streams, np.array([10.0, 0.0, 6.0, 0.0]), args
-    )
-
-    assert unit.n_closed == 2
 
 
 def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():
@@ -670,21 +618,22 @@ def test_hpr_backend_result_derives_hot_and_cold_stream_views_from_combined_stre
     assert len(res.hpr_cold_streams) == 1
 
 
-def test_condensing_search_range_stays_below_the_refrigerant_critical_point():
-    # Ammonia's critical point is ~132.3 degC: condensing above it has no
-    # saturation state, so the search must not propose it (CI regression on
-    # notebooks 09/10, where every candidate failed in CoolProp's PQ flash).
+def test_coolprop_condensing_search_range_spans_the_whole_sink():
+    # Above ammonia's ~132.3 degC critical point a CoolProp stage runs
+    # transcritical, so the search covers the sink up to 200 degC.
     args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=["ammonia"])
-    hot, cold = hp_shared.condensing_temperature_search_range(args)
-    assert cold == 60.0
-    t_crit = hp_shared._coolprop.PropsSI("Tcrit", "ammonia") - 273.15
-    assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
+
+    assert hp_shared.condensing_temperature_search_range(args) == (200.0, 60.0)
 
 
 def test_condensing_caps_reuse_the_cached_mixture_critical_point():
     """A mixture critical point takes about 0.1 s, and the caps run per candidate."""
     spec = "R134a[0.5]&R245fa[0.5]"
-    args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=[spec])
+    args = SimpleNamespace(
+        T_cold=np.array([200.0, 60.0]),
+        refrigerant_ls=[spec],
+        simulation_backend="tespy",
+    )
     hp_shared.critical_point.cache_clear()
 
     hp_shared.condensing_temperature_search_range(args)
@@ -694,21 +643,19 @@ def test_condensing_caps_reuse_the_cached_mixture_critical_point():
     assert (info.misses, info.hits) == (1, 1)
 
 
-def test_tespy_condensing_search_range_has_the_coolprop_ceiling():
+def test_only_tespy_condensing_search_range_stays_below_the_critical_point():
+    # TESPy models subcritical cycles only (ammonia's Tcrit is ~132.3 degC).
     tespy = SimpleNamespace(
         T_cold=np.array([200.0, 60.0]),
         refrigerant_ls=["ammonia"],
         simulation_backend="tespy",
     )
-    coolprop = SimpleNamespace(
-        T_cold=np.array([200.0, 60.0]),
-        refrigerant_ls=["ammonia"],
-        simulation_backend="coolprop",
-    )
-    assert hp_shared.condensing_temperature_search_range(
-        tespy
-    ) == hp_shared.condensing_temperature_search_range(coolprop)
-    assert hp_shared.condensing_temperature_search_range(tespy)[0] < 200.0
+
+    hot, cold = hp_shared.condensing_temperature_search_range(tespy)
+
+    assert cold == 60.0
+    t_crit = hp_shared._coolprop.PropsSI("Tcrit", "ammonia") - 273.15
+    assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
 
 
 def test_condensing_search_range_is_unchanged_when_no_cap_applies():
@@ -751,3 +698,94 @@ def test_carnot_evaporator_cascade_gets_the_utility_bands(monkeypatch):
     condenser, evaporator = backgrounds
     np.testing.assert_allclose(condenser, args.T_cold)
     np.testing.assert_allclose(evaporator, args.T_hot)
+
+
+def _condenser_beyond_the_sink(is_heat_pumping):
+    # 100 kW of condenser heat at 120-100 C against a sink that takes 40 kW:
+    # air, a free sink at about 20 C, would take the other 60 kW.
+    args = _base_args(
+        T_hot=np.array([15.0, 5.0]),
+        H_hot=np.array([0.0, 0.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([40.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_heat_max=40.0,
+        Q_cool_max=0.0,
+        is_heat_pumping=is_heat_pumping,
+    )
+    hpr_streams = _sc(_stream("cond", 120.0, 100.0, 100.0, is_process_stream=False))
+    return hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([100.0]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=hpr_streams,
+    )
+
+
+def test_heat_pump_condenser_heat_rejected_to_air_is_penalised():
+    heat_pump = _condenser_beyond_the_sink(is_heat_pumping=True)
+
+    assert heat_pump.Q_amb_cold == pytest.approx(60.0)
+    assert heat_pump.feasibility_penalty == pytest.approx(
+        hp_shared._cycle_penalty(args=_base_args(), cycle_penalty_terms=[60.0])
+        * hp_shared.hpr_penalty_cost_scale(_base_args())
+    )
+
+
+def test_refrigerator_condenser_heat_rejected_to_air_is_free():
+    refrigerator = _condenser_beyond_the_sink(is_heat_pumping=False)
+
+    assert refrigerator.Q_amb_cold == pytest.approx(60.0)
+    assert refrigerator.feasibility_penalty == pytest.approx(0.0)
+
+
+def _heat_pump_short_of_its_target(enforce):
+    # The sink needs 100 kW at 95-45 C and the target is 60 kW of it; the heat
+    # pump delivers 40 kW at 120-100 C, leaving 60 kW of hot utility where
+    # the untargeted rest needs 40 kW on its own.
+    args = _base_args(
+        T_hot=np.array([15.0, 5.0]),
+        H_hot=np.array([0.0, 0.0]),
+        T_cold=np.array([95.0, 45.0]),
+        H_cold=np.array([100.0, 0.0]),
+        z_amb_hot=np.zeros(2),
+        z_amb_cold=np.zeros(2),
+        Q_hpr_target=60.0,
+        Q_heat_max=100.0,
+        Q_cool_max=0.0,
+        enforce_heating_duty=enforce,
+    )
+    hpr_streams = _sc(_stream("cond", 120.0, 100.0, 40.0, is_process_stream=False))
+    result = hp_shared.evaluate_vapour_hpr_result(
+        args=args,
+        state=HPRParsedState(),
+        work=0.0,
+        work_arr=np.array([]),
+        Q_heat=np.array([40.0]),
+        Q_cool=np.array([]),
+        cop_h=1.0,
+        hpr_streams=hpr_streams,
+    )
+    return result, args
+
+
+def test_an_enforced_heating_duty_penalises_the_heat_the_heat_pump_leaves():
+    result, args = _heat_pump_short_of_its_target(enforce=True)
+
+    assert result.Q_ext_heat == pytest.approx(60.0)
+    assert hp_shared.heating_allowance(args) == pytest.approx(40.0)
+    assert result.feasibility_penalty == pytest.approx(
+        hp_shared._cycle_penalty(args=args, cycle_penalty_terms=[20.0])
+        * hp_shared.hpr_penalty_cost_scale(args)
+    )
+
+
+def test_a_heating_duty_is_not_enforced_by_default():
+    result, _ = _heat_pump_short_of_its_target(enforce=False)
+
+    assert result.feasibility_penalty == pytest.approx(0.0)

@@ -1,3 +1,4 @@
+import inspect
 from types import SimpleNamespace
 
 import numpy as np
@@ -760,11 +761,11 @@ def test_vc_mvr_cascade_routes_split_and_excludes_internal_streams():
         eta_mvr_comp=0.75,
         eta_motor=0.9,
         refrigerant=["R134A", "R134A"],
-        mvr_fluid=["Water", "Water"],
         dt_cascade_hx=5.0,
     )
 
     assert cascade.solved is True
+    assert [cycle.refrigerant for cycle in cascade.mvr_cycles] == ["Water", "Water"]
     assert cascade.mvr_cycles[0].dT_superheat == pytest.approx(0.0)
     assert cascade.mvr_cycles[0].dT_subcool == pytest.approx(4.0)
     np.testing.assert_allclose(cascade.internal_heat, np.array([250.0, 0.0]))
@@ -824,7 +825,6 @@ def test_vc_mvr_cascade_propagates_post_injection_mass_and_component_heat():
         eta_mvr_comp=0.75,
         eta_motor=0.9,
         refrigerant=["R134A"],
-        mvr_fluid=["Water", "Water"],
         dt_cascade_hx=5.0,
     )
 
@@ -884,7 +884,6 @@ def test_vc_mvr_cascade_propagates_unsolved_vc_child_cycle(monkeypatch):
         dT_subcool_mvr=np.array([0.0]),
         dT_ihx_gas_side_vc=np.array([0.0]),
         refrigerant=["R134A"],
-        mvr_fluid=["Water"],
     )
 
     assert cascade.solved is False
@@ -1111,7 +1110,6 @@ def test_vc_mvr_optimise_prepares_seeded_setup(monkeypatch):
         n_mvr=2,
         initialise_simulated_cycle=True,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=" Water ",
     )
     init_res = SimpleNamespace(
         T_cond=np.array([120.0]),
@@ -1152,7 +1150,49 @@ def test_vc_mvr_optimise_prepares_seeded_setup(monkeypatch):
     assert captured["x0_ls"] is not None
     assert len(captured["bnds"]) == captured["x0_ls"].shape[0]
     assert args.refrigerant_ls == ["R134A", "R134A"]
-    assert args.mvr_fluid_ls == ["Water"]
+
+
+def test_vc_mvr_solve_takes_no_mvr_fluid_as_the_mvr_stages_run_on_water():
+    assert (
+        "mvr_fluid"
+        not in inspect.signature(VapourCompressionMvrCascade.solve).parameters
+    )
+
+
+@pytest.mark.parametrize(
+    ("mvr_fluid_ls", "expected"),
+    [(["AMMONIA"], ["AMMONIA", "AMMONIA"]), ([], ["R134A", "R134A"])],
+)
+def test_vc_mvr_vc_stages_take_mvr_fluids_else_the_refrigerant_list(
+    monkeypatch, mvr_fluid_ls, expected
+):
+    args = _base_args(
+        n_cond=2,
+        n_evap=1,
+        n_mvr=1,
+        refrigerant_ls=["R134A"],
+        mvr_fluid_ls=mvr_fluid_ls,
+    )
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0]),
+        Q_cond=np.array([100.0]),
+        T_evap=np.array([50.0]),
+        Q_amb_hot=1.0,
+        Q_amb_cold=2.0,
+    )
+    monkeypatch.setattr(
+        hp_vc_mvr, "preflight_coolprop_hpr_targeting", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        hp_vc_mvr,
+        "optimise_cascade_carnot_heat_pump_placement",
+        lambda _args: init_res,
+    )
+    monkeypatch.setattr(hp_vc_mvr, "solve_hpr_placement", lambda **_kwargs: None)
+
+    hp_vc_mvr.optimise_vapour_compression_mvr_heat_pump_placement(args)
+
+    assert args.refrigerant_ls == expected
 
 
 def test_vc_mvr_setup_and_small_helpers_cover_edge_cases():
@@ -1167,9 +1207,9 @@ def test_vc_mvr_setup_and_small_helpers_cover_edge_cases():
         hp_vc_mvr._fit_stage_array([2.0], 3),
         np.array([2.0, 2.0, 2.0]),
     )
-    assert hp_vc_mvr._normalise_fluid_list(" Water ") == ["Water"]
+    assert hp_vc_mvr._normalise_fluid_list(" AMMONIA ") == ["AMMONIA"]
     assert hp_vc_mvr._normalise_fluid_list(["", "R134A", "  "]) == ["R134A"]
-    assert hp_vc_mvr._normalise_fluid_list(["", "  "]) == ["Water"]
+    assert hp_vc_mvr._normalise_fluid_list(["", "  "]) == []
 
 
 def test_compute_vc_mvr_system_obj_rejects_refrigeration_without_parsing():
@@ -1189,7 +1229,6 @@ def test_compute_vc_mvr_system_obj_validates_dict_state_and_returns_finite_failu
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )
@@ -1262,7 +1301,6 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
         n_cond=2,
         n_evap=2,
         n_mvr=2,
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )
@@ -1338,7 +1376,6 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )
@@ -1354,8 +1391,31 @@ def test_compute_vc_mvr_system_obj_solved(monkeypatch):
         penalty = [0.0]
         T_cond_mvr = np.array([100.0])
         T_evap_mvr = np.array([90.0])
-        mvr_cycles = [SimpleNamespace(dT_subcool=1.0)]
-        vc_cycles = [SimpleNamespace(dT_subcool=2.0)]
+        mvr_cycles = [
+            SimpleNamespace(
+                dT_subcool=1.0,
+                Ps=[1.0e5, 1.5e5],
+                Hs=[2.675e6, 2.75e6],  # saturated steam at 1 bar, compressed
+                source_m_dot=0.05,
+                work=15.0,
+                eta_motor=1.0,
+                process_heat=120.0,
+            )
+        ]
+        vc_cycles = [
+            SimpleNamespace(
+                dT_subcool=2.0,
+                refrigerant="R134A",
+                T_evap_sat_vap=20.0,
+                T_cond_sat_liq=90.0,
+                Ps=[5.0e5, 30.0e5],
+                work=25.0,
+                suction_volume_flow=40.0,
+                shaft_power=25.0,
+                Q_heat=80.0,
+                Q_cool=90.0,
+            )
+        ]
 
         def solve(self, **kwargs):
             self.kwargs = kwargs
@@ -1389,7 +1449,6 @@ def test_compute_vc_mvr_system_obj_real_cascade_smoke():
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
         initialise_simulated_cycle=False,
@@ -1415,7 +1474,6 @@ def test_compute_vc_mvr_system_obj_debug_reraises(monkeypatch):
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )
@@ -1437,7 +1495,6 @@ def test_vc_mvr_refrigeration_rejected_clearly():
     args = _base_args(
         is_heat_pumping=False,
         n_mvr=1,
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )
@@ -1450,7 +1507,7 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
     config = Configuration(
         {
             "HPR_MVR_COUNT": 2,
-            "HPR_MVR_FLUIDS": ["Water", "R134A"],
+            "HPR_MVR_FLUIDS": ["ammonia", "R134A"],
             "HPR_MVR_ETA_COMP": 0.65,
         }
     )
@@ -1464,7 +1521,7 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
     )
 
     assert args.n_mvr == 2
-    assert args.mvr_fluid_ls == ["Water", "R134A"]
+    assert args.mvr_fluid_ls == ["AMMONIA", "R134A"]
     assert args.eta_mvr_comp == pytest.approx(0.65)
 
     _patch_output_model_validate(monkeypatch)
@@ -1544,7 +1601,6 @@ def test_vc_mvr_cascade_duty_is_a_fraction_of_availability_without_penalty():
         eta_comp=0.75,
         eta_mvr_comp=0.75,
         refrigerant=["R134A"],
-        mvr_fluid=["Water"],
         dt_cascade_hx=5.0,
     )
 
@@ -1560,7 +1616,6 @@ def test_vc_mvr_parse_floors_evaporation_at_the_refrigerant_minimum():
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["water"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
     )

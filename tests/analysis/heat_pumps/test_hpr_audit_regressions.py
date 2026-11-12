@@ -163,7 +163,6 @@ def test_asymmetric_vc_mvr_record_preserves_zero_duty_stage_and_roles():
         n_evap=2,
         n_mvr=1,
         refrigerant_ls=["R134a", "R123"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
         is_heat_pumping=True,
@@ -242,7 +241,6 @@ def test_final_record_validation_is_not_candidate_infeasibility(monkeypatch):
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_mvr_motor=0.95,
         initialise_simulated_cycle=False,
@@ -318,7 +316,7 @@ def test_invalid_warm_start_never_evaluates_objective(point):
         )
 
 
-def test_serial_restarts_rotate_prepared_starts_and_seeds():
+def test_serial_restarts_start_once_from_each_prepared_start_then_explore():
     observed = []
 
     def optimiser(problem, *, method, options):
@@ -332,7 +330,10 @@ def test_serial_restarts_rotate_prepared_starts_and_seeds():
         args=_base_args(max_multi_start=3),
         optimiser=optimiser,
     )
-    assert observed == [((0.2,), 0, 1), ((0.8,), 1, 1), ((0.2,), 2, 1)]
+    assert observed[:2] == [((0.2,), 0, 1), ((0.8,), 1, 1)]
+    (explored, seed, n_runs) = observed[2]
+    assert explored not in [(0.2,), (0.8,)]
+    assert (seed, n_runs) == (2, 1)
 
 
 def test_optional_seed_failure_does_not_abort_physical_search():

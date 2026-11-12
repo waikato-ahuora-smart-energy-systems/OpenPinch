@@ -217,7 +217,6 @@ def test_coolprop_preflight_covers_vc_and_mvr_stage_fluids(monkeypatch) -> None:
         n_evap=1,
         n_mvr=2,
         refrigerant_ls=["R134A"],
-        mvr_fluid_ls=["Water", "Water"],
     )
     state = HPRParsedState(
         T_evap=np.array([70.0, 90.0, 40.0]),

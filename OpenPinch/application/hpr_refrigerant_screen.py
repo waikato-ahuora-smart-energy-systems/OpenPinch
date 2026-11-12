@@ -1,4 +1,4 @@
-"""Problem orchestration for single-stage refrigerant screening."""
+"""Problem orchestration for refrigerant screening of HPR layouts."""
 
 from __future__ import annotations
 
@@ -8,16 +8,18 @@ from typing import TYPE_CHECKING, Any
 from ..analysis.heat_pumps.refrigerant_screen import (
     RefrigerantScreenThresholds,
     resolve_refrigerants,
-    screen_refrigerants,
+    screen_layouts,
 )
 from ..contracts.hpr_refrigerant_screen import (
     HprRefrigerantScreenResult,
+    RefrigerantScreenLayout,
     RefrigerantScreenQuantity,
     RefrigerantScreenRow,
+    RefrigerantScreenStage,
 )
 from ..contracts.units import coerce_output_value, standardise_input_value
 from ..domain.configuration import tol
-from ..domain.enums import HeatPumpAndRefrigerationCycle
+from ..domain.enums import HeatPumpAndRefrigerationCycle, TargetMethod
 from ..domain.targets import HeatPumpTargetBase
 from ..domain.value import Value
 from ._problem.arguments import temporary_zone_configuration
@@ -33,12 +35,10 @@ _PRESSURE = ("Pa", "hpr_screen_pressure")
 _VHC = ("kJ/m^3", "hpr_screen_suction_vhc")
 
 
-_CARNOT_CYCLES = frozenset(
-    {
-        HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
-        HeatPumpAndRefrigerationCycle.ParallelCarnot.value,
-    }
-)
+_CARNOT_TOPOLOGIES = {
+    HeatPumpAndRefrigerationCycle.CascadeCarnot.value: "cascade",
+    HeatPumpAndRefrigerationCycle.ParallelCarnot.value: "parallel",
+}
 
 
 def _placed_levels(levels, duties) -> list[float]:
@@ -52,10 +52,16 @@ def calculate_hpr_refrigerant_screen(
     target=None,
     T_evap=None,
     T_cond=None,
+    topology: str | None = None,
+    is_refrigeration: bool | None = None,
     refrigerants: str | Sequence[str] | None = None,
     options: Mapping[str, Any] | None = None,
 ) -> HprRefrigerantScreenResult:
-    """Screen candidate fluids between a Carnot target's or explicit levels."""
+    """Screen every layout of a Carnot target's or explicit levels.
+
+    A Carnot target sets the topology and whether it pumps heat; explicit
+    levels need ``topology`` and default to a heat pump.
+    """
     root = problem._build_execution_master_zone()
     zone, period_ids, prerequisites = root, tuple(problem.period_ids), ()
     given = (T_evap is not None, T_cond is not None)
@@ -64,10 +70,21 @@ def calculate_hpr_refrigerant_screen(
             "Refrigerant screening takes either a Carnot target or both T_evap and "
             "T_cond."
         )
+    if target is not None and (topology, is_refrigeration) != (None, None):
+        raise ValueError(
+            "Refrigerant screening topology and is_refrigeration come from the "
+            "Carnot target; pass them only with explicit levels."
+        )
+    if target is None and topology not in ("parallel", "cascade"):
+        raise ValueError(
+            "Refrigerant screening of explicit levels needs topology 'parallel' or "
+            f"'cascade', not {topology!r}."
+        )
+    is_heat_pumping = not is_refrigeration
     if target is not None:
         if (
             not isinstance(target, HeatPumpTargetBase)
-            or target.hpr_cycle not in _CARNOT_CYCLES
+            or target.hpr_cycle not in _CARNOT_TOPOLOGIES
         ):
             raise TypeError(
                 "Refrigerant screening needs a Carnot heat pump or refrigeration "
@@ -88,6 +105,8 @@ def calculate_hpr_refrigerant_screen(
         )
         period_ids = target.provenance.period_ids
         prerequisites = (target.provenance.identity,)
+        topology = _CARNOT_TOPOLOGIES[target.hpr_cycle]
+        is_heat_pumping = target.analysis_method != TargetMethod.Refrigeration.value
         details = target.hpr_details
         T_evap = _placed_levels(details.T_evap, details.Q_evap)
         T_cond = _placed_levels(details.T_cond, details.Q_cond)
@@ -107,15 +126,43 @@ def calculate_hpr_refrigerant_screen(
 
         def levels(value) -> tuple[float, ...]:
             items = value if isinstance(value, Sequence) else (value,)
-            return tuple(
+            standardised = (
                 float(standardise_input_value(v, field_name="t_supply", config=config))
                 for v in items
+            )
+            return tuple(sorted(dict.fromkeys(standardised), reverse=True))
+
+        def stage_contract(stage) -> RefrigerantScreenStage:
+            return RefrigerantScreenStage(
+                kind=stage.kind,
+                T_evap=quantity(stage.T_evap, _TEMPERATURE),
+                T_cond=quantity(stage.T_cond, _TEMPERATURE),
+                rows=tuple(
+                    RefrigerantScreenRow(
+                        fluid=e.fluid,
+                        T_crit=quantity(e.T_crit, _TEMPERATURE),
+                        p_evap=quantity(e.p_evap, _PRESSURE),
+                        p_cond=quantity(e.p_cond, _PRESSURE),
+                        pressure_ratio=e.pressure_ratio,
+                        suction_vhc=quantity(e.suction_vhc, _VHC),
+                        verdict=e.verdict,
+                        rank=e.rank,
+                    )
+                    for e in stage.entries
+                ),
             )
 
         thresholds = RefrigerantScreenThresholds.from_configuration(config)
         T_evap_levels, T_cond_levels = levels(T_evap), levels(T_cond)
         fluids = resolve_refrigerants(refrigerants)
-        entries = screen_refrigerants(T_evap_levels, T_cond_levels, fluids, thresholds)
+        layouts = screen_layouts(
+            T_evap_levels,
+            T_cond_levels,
+            fluids,
+            thresholds,
+            topology=topology,
+            is_heat_pumping=is_heat_pumping,
+        )
         return HprRefrigerantScreenResult(
             provenance=make_provenance(
                 problem,
@@ -127,29 +174,37 @@ def calculate_hpr_refrigerant_screen(
                     **config._values,
                     "T_evap": list(T_evap_levels),
                     "T_cond": list(T_cond_levels),
+                    "topology": topology,
+                    "is_heat_pumping": is_heat_pumping,
                     "refrigerants": list(fluids),
                 },
             ),
             source="explicit_levels" if target is None else "carnot_target",
+            topology=topology,
+            is_heat_pumping=is_heat_pumping,
             T_evap_levels=tuple(quantity(t, _TEMPERATURE) for t in T_evap_levels),
             T_cond_levels=tuple(quantity(t, _TEMPERATURE) for t in T_cond_levels),
             dt_cont=quantity(thresholds.dt_cont, _DIFFERENCE),
+            dt_cascade_hx=quantity(thresholds.dt_cascade_hx, _DIFFERENCE),
             max_pressure_ratio=thresholds.max_pressure_ratio,
             min_suction_pressure=quantity(thresholds.min_suction_pressure, _PRESSURE),
             critical_margin=quantity(thresholds.critical_margin, _DIFFERENCE),
-            rows=tuple(
-                RefrigerantScreenRow(
-                    fluid=e.fluid,
-                    T_evap=quantity(e.T_evap, _TEMPERATURE),
-                    T_cond=quantity(e.T_cond, _TEMPERATURE),
-                    T_crit=quantity(e.T_crit, _TEMPERATURE),
-                    p_evap=quantity(e.p_evap, _PRESSURE),
-                    p_cond=quantity(e.p_cond, _PRESSURE),
-                    pressure_ratio=e.pressure_ratio,
-                    suction_vhc=quantity(e.suction_vhc, _VHC),
-                    verdict=e.verdict,
-                    rank=e.rank,
+            max_stage_lift=quantity(thresholds.max_stage_lift, _DIFFERENCE),
+            layouts=tuple(
+                RefrigerantScreenLayout(
+                    method=layout.method,
+                    T_cond_levels=tuple(
+                        quantity(t, _TEMPERATURE) for t in layout.T_cond_levels
+                    ),
+                    T_evap_levels=tuple(
+                        quantity(t, _TEMPERATURE) for t in layout.T_evap_levels
+                    ),
+                    stages=tuple(stage_contract(stage) for stage in layout.stages),
+                    n_fluid_sets=layout.n_fluid_sets,
+                    added_levels=tuple(
+                        quantity(t, _TEMPERATURE) for t in layout.added_levels
+                    ),
                 )
-                for e in entries
+                for layout in layouts
             ),
         )

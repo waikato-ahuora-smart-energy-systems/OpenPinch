@@ -36,8 +36,9 @@ Capability Matrix
    * - Refrigerant screening
      - ``problem.target.hpr_refrigerant_screen()`` on a Carnot target or
        explicit levels
-     - non-mutating verdict, saturation pressures, pressure ratio and suction
-       volumetric heating capacity per fluid
+     - non-mutating fluid sets per single-stage, parallel, cascade and VC+MVR
+       layout, with each stage's verdict, saturation pressures, pressure ratio
+       and suction volumetric heating capacity per fluid
      - CoolProp
    * - HPR load selection
      - ``problem.target.hpr_load_kinks()`` and its ``all_periods`` mirror

@@ -48,11 +48,13 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
     ] = utility
     # A utility heat pump here lifts from about 5 C to the 260 C hot-utility
     # level, where its capital does not pay back and no single water compressor
-    # meets the pressure ratio limit. Leave capital recovery and the limit out so
-    # the search still has a beneficial design to return.
+    # meets the pressure ratio limit; water evaporating near 5 C is also far
+    # below the suction pressure floor. Leave capital recovery and both limits
+    # out so the search still has a beneficial design to return.
     options = {
         "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
         "HPR_MAX_PRESSURE_RATIO": 1e6,
+        "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
     }
     if mode == "mvr":
         kwargs["options"] = {**options, "HPR_REFRIGERANTS": ["Water"]}
@@ -73,11 +75,11 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
     assert monotonic() - started < 120.0  # generous smoke gate, not a runtime SLA
 
 
-def test_real_invalid_mvr_fluid_is_atomic_and_fails_before_search(monkeypatch):
+def test_real_invalid_mvr_cascade_fluid_is_atomic_and_fails_before_search(monkeypatch):
     import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 
     def forbidden(**kwargs):
-        pytest.fail("invalid MVR fluid entered optimization")
+        pytest.fail("invalid MVR cascade fluid entered optimization")
 
     monkeypatch.setattr(adapter, "run_hpr_candidate_search", forbidden)
     problem = PinchProblem("basic_pinch.json")
@@ -127,18 +129,25 @@ def test_real_public_multistage_records(topology):
 
 def test_a_refrigerant_whose_upper_cased_name_coolprop_rejects_is_a_target():
     problem = PinchProblem("basic_pinch.json")
+    # R1233zd(E) is the only CoolProp fluid whose upper-cased name CoolProp
+    # rejects. At 25% the target is the top of the sink, about 173 C, where a
+    # small search finds no unpenalised R1233zd(E) design. At 50% the paying
+    # designs are few: 20 evaluations find one on macOS but not on Linux,
+    # where round-off sends the search elsewhere; 40 find one at every seed
+    # tried on both.
     target = problem.target.vapour_compression_heat_pump(
-        load_fraction=0.25,
+        load_fraction=0.5,
         condensers=1,
         evaporators=1,
-        maximum_restarts=1,
-        maximum_iterations=2,
-        maximum_evaluations=20,
+        maximum_restarts=2,
+        maximum_iterations=3,
+        maximum_evaluations=40,
         refrigerants=["R1233zd(E)"],
         is_cascade_cycle=False,
         options={
             "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False,
             "HPR_MAX_PRESSURE_RATIO": 1e6,
+            "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.0,
         },
     )
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from ....contracts.hpr import (
@@ -24,12 +26,14 @@ from ..common.encoding import (
 from ..common.layout import HPRoptVectorLayout, clip_to_bounds
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
-    HPRCostUnit,
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
+    cycle_limits,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_parallel_pressure_ratios,
+    raise_parallel_lifts_to_floor,
+    subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.parallel_vapour_compression_cycles import (
@@ -121,6 +125,30 @@ def _get_parallel_hp_opt_setup(
     x_evap = map_T_arr_to_x_arr(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
+    # Nor about pressure ratios, which the search penalises: seed within the
+    # limit so even a small search starts from an unpenalised design.
+    T_cond_seed = subcritical_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(
+            np.asarray(x_cond), *condensing_temperature_search_range(args)
+        ),
+        args,
+    )
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(T_cond_seed, *condensing_temperature_search_range(args)),
+        0.0,
+        1.0,
+    ).tolist()
+    T_evap_seed = limit_parallel_pressure_ratios(
+        T_cond_seed,
+        floor_stage_evaporating_temperatures(
+            map_x_arr_to_T_arr(np.asarray(x_evap), args.T_hot[-1], args.T_hot[0]),
+            args,
+        ),
+        args,
+    )
+    x_evap = map_T_arr_to_x_arr(
+        T_evap_seed[::-1], args.T_hot[-1], args.T_hot[0]
+    ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     init_primary_duty = init_res.Q_cond if is_heat_pumping else init_res.Q_evap
     x_ihx = [0.0] * int(args.n_cond)
@@ -166,7 +194,11 @@ def _parse_parallel_hp_state_temperatures(
     T_evap = floor_stage_evaporating_temperatures(
         map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
     )
-    T_evap = limit_parallel_pressure_ratios(T_cond, T_evap, args)
+    if getattr(args, "stage_lift_floor", None) is not None:
+        # A shared multiperiod machine cannot turn its lift below its floor.
+        T_cond, T_evap = raise_parallel_lifts_to_floor(
+            T_cond, T_evap, args.stage_lift_floor
+        )
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_available = (
         limit_available_duty(
@@ -237,32 +269,25 @@ def _compute_parallel_hp_system_obj(
         build_record=build_coolprop_target_simulation_record,
         check_temperature_lift=True,
         result_state_fields=("dT_superheat",),
-        cost_units=_parallel_cost_units,
+        machines=_parallel_machines,
         debug=debug,
         artifact_mode=artifact_mode,
     )
 
 
-def _parallel_cost_units(
-    state_vars: HPRParsedState,
-    hp: ParallelVapourCompressionCycles,
-) -> list[HPRCostUnit]:
-    """Each parallel cycle is its own single-stage machine.
-
-    Its capacity is all the heat its condenser rejects, for a heat pump and a
-    refrigerator alike.
-    """
-    return [
-        HPRCostUnit(Q_cap=float(Q_cap), T_hot_max=float(T_cond))
-        for Q_cap, T_cond in zip(
-            np.asarray(hp.Q_cond_arr, dtype=float).ravel(),
-            np.asarray(state_vars.T_cond, dtype=float).ravel(),
-        )
-    ]
+def _parallel_machines(hp: ParallelVapourCompressionCycles) -> list[list[Any]]:
+    """Each parallel cycle is its own single-stage machine."""
+    return [[cycle] for cycle in hp._subcycles]
 
 
 def _parallel_topology_id(_args: HeatPumpTargetInputs) -> HPRTopologyIdentifier:
     return HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
+
+
+def _parallel_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """Each machine's lift as ``x`` decodes."""
+    state = _parse_parallel_hp_state_temperatures(x, args)
+    return np.asarray(state.T_cond) - np.asarray(state.T_evap)
 
 
 def _build_and_solve_parallel_cycles(
@@ -280,6 +305,8 @@ def _build_and_solve_parallel_cycles(
         eta_motor=args.eta_motor,
         refrigerant=args.refrigerant_ls,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
+        dt_ihx=args.dt_hp_ihx,
+        limits=cycle_limits(args),
         duty_allocation=DutyAllocationRequest.from_state(state_vars),
         is_heat_pump=is_heat_pumping,
     )

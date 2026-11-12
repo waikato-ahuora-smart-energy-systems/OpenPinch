@@ -9,6 +9,7 @@ import numpy as np
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..common.encoding import DutyAllocationRequest
+from .limits import CycleLimits
 from .mechanical_vapour_recompression_cycle import MechanicalVapourRecompressionCycle
 from .vapour_compression_cycle import VapourCompressionCycle
 
@@ -230,20 +231,25 @@ class VapourCompressionMvrCascade:
         dT_subcool_vc: np.ndarray | float = 0.0,
         dT_subcool_mvr: np.ndarray | float = 0.0,
         dT_ihx_gas_side_vc: np.ndarray | float = 0.0,
+        dt_ihx: float = 0.0,
         eta_comp: float = 0.7,
         eta_mvr_comp: float = 0.7,
         eta_motor: float = 1.0,
         eta_vc_motor: float = 1.0,
         refrigerant: list[str] | str = "water",
-        mvr_fluid: list[str] | str = "Water",
         dt_cascade_hx: float = 0.0,
         dtcont: float = 0.0,
+        limits: CycleLimits | None = None,
     ) -> float:
         """Solve the VC+MVR cascade for serial MVR lift and split variables.
 
         A heat-side ``duty_allocation`` overrides ``Q_heat_vc``; its cool side
         is ignored. ``eta_motor`` is the motor efficiency of the MVR stages and
-        ``eta_vc_motor`` that of the vapour compression stages.
+        ``eta_vc_motor`` that of the vapour compression stages. The MVR
+        stages recompress process or utility steam, so they run on water.
+        ``dt_ihx`` is the minimum hot-end approach of each vapour compression
+        stage's internal heat exchanger, and ``limits`` the practical limits
+        each vapour compression stage is held to.
         """
         self._solved = False
         self._vc_cycles = []
@@ -283,7 +289,6 @@ class VapourCompressionMvrCascade:
         )
         process_split = self._normalise_process_split(mvr_process_split, n_mvr)
         refrigerant_all = self._normalise_fluid_list(refrigerant, n_vc)
-        mvr_fluid_all = self._normalise_fluid_list(mvr_fluid, n_mvr)
 
         penalties = []
         penalties.extend(
@@ -336,6 +341,8 @@ class VapourCompressionMvrCascade:
                 eta_motor=eta_vc_motor,
                 refrigerant=refrigerant_all[i],
                 dT_ihx_gas_side=dT_ihx_gas_side_vc[i],
+                dt_ihx=dt_ihx,
+                limits=limits,
                 Q_heat=self._direct_vc_heat[i],
                 Q_cas_heat=self._internal_heat[i],
                 Q_cool=None,
@@ -384,7 +391,7 @@ class VapourCompressionMvrCascade:
                 dT_subcool=dT_subcool_mvr[j],
                 eta_mvr_comp=eta_mvr_comp,
                 eta_motor=eta_motor,
-                fluid=mvr_fluid_all[j],
+                fluid="Water",
                 process_split=self._process_split[j],
                 **solve_kwargs,
             )

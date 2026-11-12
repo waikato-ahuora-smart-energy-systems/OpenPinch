@@ -84,13 +84,17 @@ def test_refrigerant_screen_command_screens_explicit_levels():
             "arguments": {
                 "T_evap": 0.0,
                 "T_cond": {"value": 60.0, "unit": "degC"},
+                "topology": "cascade",
                 "refrigerants": "natural",
             },
         }
     )
 
     assert response["value"]["source"] == "explicit_levels"
-    assert response["value"]["rows"][0]["verdict"] == "practical"
+    (layout,) = response["value"]["layouts"]
+    assert layout["method"] == "single_stage_vapour_compression"
+    assert layout["n_fluid_sets"] > 0
+    assert layout["stages"][0]["rows"][0]["verdict"] == "practical"
 
 
 def test_command_runs_hpr_load_kinks_with_keyword_arguments():

@@ -39,7 +39,7 @@ def _target_args(**overrides) -> HeatPumpTargetInputs:
     data.setdefault("n_mvr", 1)
     data.setdefault("eta_mvr_comp", 0.7)
     data.setdefault("eta_mvr_motor", 0.95)
-    data.setdefault("mvr_fluid_ls", ["Water"])
+    data.setdefault("mvr_fluid_ls", [])
     return HeatPumpTargetInputs.model_validate(data)
 
 
@@ -75,6 +75,12 @@ def test_preflight_accepts_approved_single_stage_modes(is_heat_pumping: bool) ->
     assert prepared.working_fluid.source_spec == "R134a"
 
 
+def test_preflight_accepts_an_ihx_approach_since_tespy_targets_have_no_ihx() -> None:
+    prepared = preflight_tespy_hpr_targeting(_target_args(dt_hp_ihx=5.0))
+
+    assert isinstance(prepared, PreparedTespyHprTargeting)
+
+
 @pytest.mark.parametrize(
     ("overrides", "code"),
     [
@@ -99,7 +105,6 @@ def test_preflight_accepts_approved_single_stage_modes(is_heat_pumping: bool) ->
             "unsupported_cycle",
         ),
         ({"allow_integrated_expander": True}, "integrated_expander_unsupported"),
-        ({"dt_hp_ihx": 1.0}, "unsupported_model"),
         ({"eta_comp": lambda conditions: 0.7}, "unsupported_compressor_model"),
     ],
 )

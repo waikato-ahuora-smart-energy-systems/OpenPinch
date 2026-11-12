@@ -198,6 +198,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
 
     class _FakeParallelSolved:
         solved = True
+        _subcycles = []  # no stages, so an empty effective topology
         work = 20.0
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])
@@ -216,7 +217,9 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
         "ParallelVapourCompressionCycles",
         _FakeParallelSolved,
     )
-    seq = iter([_pt_with_hnet(1.0, 1.0), _pt_with_hnet(1.0, 1.0)])
+    # Condenser and evaporator cascades, then the full background for the
+    # refrigeration allowance.
+    seq = iter([_pt_with_hnet(1.0, 1.0) for _ in range(3)])
     monkeypatch.setattr(
         target_cascade, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )

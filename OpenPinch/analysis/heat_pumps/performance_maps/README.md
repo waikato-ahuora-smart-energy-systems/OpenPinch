@@ -34,7 +34,7 @@ Used by sibling packages but not re-exported:
 - Value dataclasses are frozen [models.py, targeting_models.py].
 - Candidate cache holds at most 512 entries, evicting the least recently used entry (the cache stores results and candidate-local failures), and is cleared on close; the coordinator moves through created, ready, evaluating, closing, closed, fatal and cleanup_failed states [targeting.py:HprTargetEvaluatorCoordinator].
 - Candidate acceptance checks backend, model, fluid, convergence, finiteness, energy balance, useful duty, COP and profile ordering with the named tolerances [targeting.py:validate_hpr_target_result, targeting.py:HprTargetValidationTolerances].
-- TESPy targeting is limited to one evaporator and one condenser, no integrated expander, no internal heat exchanger, a constant compressor efficiency (`unsupported_compressor_model` for a model), rejects multiperiod inputs, rejects any `hpr_type` other than `cascade_vapour_comp` (`unsupported_cycle`), and requires `tespy` to be importable [targeting.py:preflight_tespy_hpr_targeting].
+- TESPy targeting is limited to one evaporator and one condenser, no integrated expander, a constant compressor efficiency (`unsupported_compressor_model` for a model), rejects multiperiod inputs, rejects any `hpr_type` other than `cascade_vapour_comp` (`unsupported_cycle`), and requires `tespy` to be importable [targeting.py:preflight_tespy_hpr_targeting].
 - An unsupported seed state in the CoolProp preflight marks the stage unsupported but does not fail the search; an unsupported fluid identity does [coolprop_preflight.py:preflight_coolprop_hpr_targeting, coolprop_preflight.py:preflight_coolprop_fluid_names].
 
 ## Side Effects

@@ -153,7 +153,6 @@ def test_vc_mvr_cascade_applies_the_vapour_compression_motor_efficiency_to_its_v
             eta_mvr_comp=0.75,
             eta_motor=0.9,
             refrigerant=["R134A", "R134A"],
-            mvr_fluid=["Water", "Water"],
             dt_cascade_hx=5.0,
             **kwargs,
         )
@@ -266,7 +265,6 @@ def test_simulation_records_give_each_stage_its_motor_efficiency():
         n_evap=1,
         n_mvr=1,
         refrigerant_ls=["R134a"],
-        mvr_fluid_ls=["Water"],
         eta_mvr_comp=0.7,
         eta_motor=0.9,
         eta_mvr_motor=0.97,

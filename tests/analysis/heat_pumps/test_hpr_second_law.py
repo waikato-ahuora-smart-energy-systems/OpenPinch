@@ -70,11 +70,16 @@ def test_default_cascade_carnot_on_pulp_mill_generates_entropy():
 
 def test_single_stage_cascade_carnot_is_unchanged():
     # One condenser and one evaporator cannot pool across pairs, so the
-    # notebook 08 result is the same before and after the pairwise fix.
+    # notebook 08 result is the same before and after the pairwise fix. The
+    # pinned point predates the 1 K HPR_DT_CONT default, so it is held at 0 K.
     target = PinchProblem(
         f"{SAMPLE_CASES}/basic_pinch.json", project_name="C2"
     ).target.carnot_heat_pump(
-        load_fraction=0.25, condensers=1, evaporators=1, **SMALL_BUDGET
+        load_fraction=0.25,
+        condensers=1,
+        evaporators=1,
+        minimum_approach_temperature=0.0,
+        **SMALL_BUDGET,
     )
 
     # SMALL_BUDGET stops the search after 20 iterations, so the pinned point

@@ -78,7 +78,7 @@ Interaction Matrix
      - targeted
      - base; TESPy for ``simulation_backend="tespy"``
    * - ``target.hpr_refrigerant_screen``
-     - Screen fluids as single-stage cycles between a Carnot target's
+     - Screen fluids on every parallel or cascade layout of a Carnot target's
        saturation levels or explicit levels
      - frozen screening result
      - source unchanged
@@ -221,14 +221,17 @@ batch examples, and numerical interpretation are in
 Refrigerant Screening
 ---------------------
 
-``problem.target.hpr_refrigerant_screen`` screens candidate working fluids as
-single-stage cycles between the evaporating and condensing levels of a
-successful Carnot heat pump or refrigeration target. The target must be the
-problem's current one: a target from another problem, or one superseded or made
-stale by later changes, is rejected. Pass the target, or both
-``T_evap`` and ``T_cond`` (one level or a list; degC or ``{"value", "unit"}``)
-instead. The result has one row per fluid and level pair. It does not change
-the problem.
+``problem.target.hpr_refrigerant_screen`` screens candidate working fluids on
+every layout of the evaporating and condensing levels of a successful Carnot
+heat pump or refrigeration target: single stage, parallel or cascade (as the
+target's topology), and vapour compression plus MVR for a cascade heat pump.
+The target must be the problem's current one: a target from another problem,
+or one superseded or made stale by later changes, is rejected. Pass the target,
+or both ``T_evap`` and ``T_cond`` (one level or a list; degC or
+``{"value", "unit"}``) with ``topology`` (``"parallel"`` or ``"cascade"``) and,
+for refrigeration, ``is_refrigeration=True``. The result has one layout per
+method and choice of levels, each with its stages, ranked fluids and fluid
+sets. It does not change the problem.
 
 .. code-block:: python
 
@@ -236,9 +239,12 @@ the problem.
    screen = problem.target.hpr_refrigerant_screen(
        target=heat_pump, refrigerants="natural"
    )
-   [row.fluid for row in screen.practical]
+   for layout in screen.feasible_layouts:
+       layout.method, layout.n_fluid_sets, layout.fluid_sets()
 
-   problem.target.hpr_refrigerant_screen(T_evap=0.0, T_cond=85.0)
+   problem.target.hpr_refrigerant_screen(
+       T_evap=50.0, T_cond=[180.0, 120.0, 90.0], topology="cascade"
+   )
 
 ``refrigerants`` defaults to every fluid in the installed CoolProp; pass
 ``"natural"`` for water, ammonia, CO2 and the hydrocarbons, or a list of fluid
@@ -247,6 +253,39 @@ verdicts and thresholds.
 
 .. autoclass:: OpenPinch.contracts.hpr_refrigerant_screen.HprRefrigerantScreenResult
    :members:
+   :no-index:
+
+The vapour compression targets (``vapour_compression_heat_pump``,
+``vapour_compression_refrigeration`` and ``mvr_heat_pump``) take the screen, or
+one of its layouts, as ``refrigerants`` and run once for every fluid set it
+proposes for their method: single-stage and cascade layouts for a cascade
+cycle, single-stage and parallel layouts for a parallel cycle, and vapour
+compression plus MVR layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators and
+MVR stages from its layout, so a split layout runs one condenser on each of its
+``added_levels``; pass ``condensers`` or ``evaporators`` to run only the layouts
+with those counts. Layouts asking for the same counts and fluids
+share one run. A run that fails is kept with its error, and ``best`` is the
+successful run with the lowest total annualized cost. One fluid set from
+``fluid_sets()``, like a refrigerant list, runs once and returns the target.
+
+.. code-block:: python
+
+   runs = problem.target.vapour_compression_heat_pump(
+       refrigerants=screen, load_fraction=0.25
+   )
+   for run in runs.runs:
+       run.fluids, run.success, run.total_annualized_cost, run.error
+   best = runs.best.target
+
+Every run commits like a single target call, so afterwards the problem holds
+the last successful run; each run's ``target`` can still be passed on as
+``target=``.
+
+.. autoclass:: OpenPinch.contracts.hpr_fluid_set_runs.HprFluidSetRunsResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.hpr_fluid_set_runs.HprFluidSetRun
    :no-index:
 
 HPR Load Kinks

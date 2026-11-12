@@ -12,7 +12,7 @@ Converts solved targets and tables into external forms: report contracts and JSO
 - `problem_table_frame`, `export_problem_table` (`problem_table.py`): detached dataframe view of a `ProblemTable`; write one to an `.xlsx` file.
 - `write_text_as_plain_strings`, `FORMULA_LEADING_CHARACTERS` (`excel_text.py`): store text cells as strings and quote-prefix formula-like text.
 - `export_stream_collection` (`stream_collection.py`): write ordered streams as CSV.
-- `hpr_summary`, `hpr_failure_summary` (`hpr.py`): plain-JSON summaries of a solved HPR target and of an `HPRTargetingError`.
+- `hpr_summary`, `hpr_failure_summary` (`hpr.py`): plain-JSON summaries of a solved HPR target (including its effective topology label and alternative designs) and of an `HPRTargetingError`.
 - Subdirectories: none.
 
 ## Invariants

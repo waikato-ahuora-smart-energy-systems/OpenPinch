@@ -8,39 +8,85 @@ import pytest
 
 from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_pumps.refrigerant_screen import NATURAL_REFRIGERANTS
+from OpenPinch.contracts.hpr import HPRTopologyIdentifier
 from OpenPinch.contracts.hpr_refrigerant_screen import (
     HprRefrigerantScreenResult,
     RefrigerantScreenQuantity,
 )
 
 
-def test_explicit_levels_screen_the_selected_fluids():
+def test_explicit_levels_screen_every_layout_of_the_topology():
     problem = PinchProblem("basic_pinch.json", project_name="Site")
 
-    # Paper Carnot levels, brewery utility placement at 25% load.
     result = problem.target.hpr_refrigerant_screen(
-        T_evap=-0.048759,
-        T_cond=84.934468,
+        T_evap=50.0,
+        T_cond=[90.0, 180.0, 120.0],
+        topology="cascade",
         refrigerants="natural",
-        options={"HPR_DT_CONT": 5.0},
+        options={"HPR_DT_CONT": 5.0, "HPR_DT_CASCADE_HX": 5.0},
     )
 
     assert isinstance(result, HprRefrigerantScreenResult)
     assert result.source == "explicit_levels"
-    assert [row.fluid for row in result.practical] == [
-        "Ammonia",
-        "IsoButane",
-        "n-Butane",
-        "Neopentane",
+    assert result.topology == "cascade"
+    assert result.is_heat_pumping
+    assert [q.value for q in result.T_cond_levels] == [180.0, 120.0, 90.0]
+    assert [layout.n_fluid_sets for layout in result.layouts] == [
+        1,
+        6,
+        7,
+        17,
+        13,
+        34,
+        81,
+        6,
+        7,
+        7,
+        27,
+        7,
+        17,
+        66,
     ]
-    propane = next(row for row in result.rows if row.fluid == "n-Propane")
-    assert propane.T_cond == RefrigerantScreenQuantity(value=84.934468, unit="degC")
-    assert propane.p_evap.unit == "bar"
-    assert propane.p_evap.value == pytest.approx(4.737515, rel=1e-4)
-    assert propane.suction_vhc.unit == "kJ/m^3"
+    top = result.layouts[3].stages[0]
+    assert top.T_evap == RefrigerantScreenQuantity(value=115.0, unit="degC")
+    assert set(top.feasible) == {"Water", "n-Pentane", "Isopentane"}
+    water = next(row for row in top.rows if row.fluid == "Water")
+    assert water.p_evap.unit == "bar"
+    assert water.p_evap.value == pytest.approx(1.69, rel=1e-2)
+    assert water.suction_vhc.unit == "kJ/m^3"
     assert result.dt_cont == RefrigerantScreenQuantity(value=5.0, unit="delta_degC")
+    assert result.dt_cascade_hx == RefrigerantScreenQuantity(
+        value=5.0, unit="delta_degC"
+    )
+    assert result.critical_margin == RefrigerantScreenQuantity(
+        value=5.0, unit="delta_degC"
+    )
+    assert result.max_stage_lift == RefrigerantScreenQuantity(
+        value=70.0, unit="delta_degC"
+    )
+    assert [[q.value for q in layout.added_levels] for layout in result.layouts][
+        -2:
+    ] == [[117.5], [135.0]]
     assert result.min_suction_pressure == RefrigerantScreenQuantity(
         value=0.5, unit="bar"
+    )
+
+
+def test_explicit_refrigeration_levels_have_no_mvr_layouts():
+    problem = PinchProblem("basic_pinch.json", project_name="Site")
+
+    result = problem.target.hpr_refrigerant_screen(
+        T_evap=50.0,
+        T_cond=[180.0, 120.0],
+        topology="cascade",
+        is_refrigeration=True,
+        refrigerants="natural",
+    )
+
+    assert not result.is_heat_pumping
+    assert all(
+        layout.method is not HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR
+        for layout in result.layouts
     )
 
 
@@ -49,12 +95,14 @@ def test_screen_has_provenance_and_leaves_the_problem_unchanged():
     before = problem.to_problem_json()
 
     result = problem.target.hpr_refrigerant_screen(
-        T_evap=[0.0, 10.0], T_cond=60.0, refrigerants=["Ammonia"]
+        T_evap=[0.0, 10.0], T_cond=60.0, topology="parallel", refrigerants=["Ammonia"]
     )
 
+    assert result.provenance.effective_settings["topology"] == "parallel"
+    assert result.provenance.effective_settings["is_heat_pumping"] is True
     assert result.provenance.method_id == "target.hpr_refrigerant_screen"
     assert result.provenance.zone_address == "Site"
-    assert result.provenance.effective_settings["T_evap"] == [0.0, 10.0]
+    assert result.provenance.effective_settings["T_evap"] == [10.0, 0.0]
     assert result.provenance.effective_settings["refrigerants"] == ["Ammonia"]
     assert problem.to_problem_json() == before
     assert problem.results is None
@@ -78,13 +126,18 @@ def test_a_carnot_target_supplies_the_levels(carnot_heat_pump):
 
     details = target.hpr_details
     assert result.source == "carnot_target"
+    assert result.topology == "cascade"
+    assert result.is_heat_pumping
     assert [q.value for q in result.T_evap_levels] == pytest.approx(
         list(details.T_evap)
     )
     assert [q.value for q in result.T_cond_levels] == pytest.approx(
         list(details.T_cond)
     )
-    assert sorted(row.fluid for row in result.rows) == sorted(NATURAL_REFRIGERANTS)
+    (single,) = result.layouts
+    assert single.method is HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
+    rows = single.stages[0].rows
+    assert sorted(row.fluid for row in rows) == sorted(NATURAL_REFRIGERANTS)
     assert result.provenance.prerequisite_ids == (target.provenance.identity,)
     assert result.provenance.zone_address == target.provenance.zone_address
     assert result.provenance.period_ids == target.provenance.period_ids
@@ -107,7 +160,10 @@ def test_only_distinct_levels_that_carry_duty_are_screened():
     )
 
     def placed(levels, duties):
-        return list(dict.fromkeys(t for t, q in zip(levels, duties) if q > 0.0))
+        kept = dict.fromkeys(t for t, q in zip(levels, duties) if q > 0.0)
+        return sorted(kept, reverse=True)
+
+    assert result.topology == "parallel"
 
     assert [q.value for q in result.T_cond_levels] == pytest.approx(
         placed(details.T_cond, details.Q_cond)
@@ -115,6 +171,34 @@ def test_only_distinct_levels_that_carry_duty_are_screened():
     assert [q.value for q in result.T_evap_levels] == pytest.approx(
         placed(details.T_evap, details.Q_evap)
     )
+
+
+def test_a_carnot_refrigeration_target_screens_refrigeration_layouts():
+    problem = PinchProblem("basic_pinch.json", project_name="Site")
+    target = problem.target.carnot_refrigeration(
+        load_fraction=0.25, condensers=1, evaporators=1, maximum_restarts=1
+    )
+
+    result = problem.target.hpr_refrigerant_screen(
+        target=target, refrigerants=["Ammonia"]
+    )
+
+    assert result.topology == "cascade"
+    assert not result.is_heat_pumping
+
+
+def test_the_topology_comes_from_the_target_or_is_named(carnot_heat_pump):
+    problem, target = carnot_heat_pump
+    screen = problem.target.hpr_refrigerant_screen
+
+    with pytest.raises(ValueError, match="topology 'parallel' or 'cascade'"):
+        screen(T_evap=0.0, T_cond=60.0)
+    with pytest.raises(ValueError, match="'parallel' or 'cascade'"):
+        screen(T_evap=0.0, T_cond=60.0, topology="series")
+    with pytest.raises(ValueError, match="come from the Carnot target"):
+        screen(target=target, topology="cascade")
+    with pytest.raises(ValueError, match="come from the Carnot target"):
+        screen(target=target, is_refrigeration=False)
 
 
 def test_levels_come_from_exactly_one_successful_carnot_source(carnot_heat_pump):
@@ -125,7 +209,7 @@ def test_levels_come_from_exactly_one_successful_carnot_source(carnot_heat_pump)
     with pytest.raises(ValueError, match=message):
         screen()
     with pytest.raises(ValueError, match=message):
-        screen(T_evap=0.0)
+        screen(T_evap=0.0, topology="cascade")
     with pytest.raises(ValueError, match=message):
         screen(target=target, T_cond=60.0)
     with pytest.raises(TypeError, match="Carnot heat pump or refrigeration target"):
@@ -141,6 +225,7 @@ def test_explicit_levels_accept_units():
     result = problem.target.hpr_refrigerant_screen(
         T_evap={"value": 273.15, "unit": "K"},
         T_cond=[{"value": 140.0, "unit": "degF"}],
+        topology="parallel",
         refrigerants=["Ammonia"],
     )
 
@@ -157,6 +242,8 @@ def test_signature_is_keyword_only_and_only_the_active_case_mirrors_it():
         "target",
         "T_evap",
         "T_cond",
+        "topology",
+        "is_refrigeration",
         "refrigerants",
         "options",
     )
@@ -165,9 +252,9 @@ def test_signature_is_keyword_only_and_only_the_active_case_mirrors_it():
 
     workspace = PinchWorkspace("basic_pinch.json", project_name="Site")
     result = workspace.target.hpr_refrigerant_screen(
-        T_evap=0.0, T_cond=60.0, refrigerants=["Ammonia"]
+        T_evap=0.0, T_cond=60.0, topology="parallel", refrigerants=["Ammonia"]
     )
-    assert result.rows[0].fluid == "Ammonia"
+    assert result.layouts[0].stages[0].rows[0].fluid == "Ammonia"
     # A screen takes one target or explicit levels and has no period or case
     # dependence to mirror.
     assert not hasattr(workspace.target.all_periods, "hpr_refrigerant_screen")

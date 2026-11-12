@@ -73,6 +73,10 @@ def build_hpr_map_generation_context(
             basis.internal_hx_gas_temperature_change,
             "internal heat-exchanger temperature change",
         ),
+        (
+            basis.internal_hx_approach_temperature,
+            "internal heat-exchanger approach temperature",
+        ),
     ):
         if _finite(value, label) < 0.0:
             raise ValueError(f"{label} must be nonnegative")

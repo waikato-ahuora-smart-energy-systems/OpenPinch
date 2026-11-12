@@ -131,7 +131,7 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
         }
     )
 
-    T_out, H_out, z_amb, streams, untargeted = hp_pre._prepare_hpr_background_profile(
+    T_out, H_out, z_amb, streams = hp_pre._prepare_hpr_background_profile(
         Q_hpr_target=150.0,
         T_vals=np.array([120.0, 100.0, 80.0]),
         H_vals=np.array([200.0, 150.0, 0.0]),
@@ -143,7 +143,6 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
     assert np.max(H_out) <= 150.0
     assert z_amb.shape == T_out.shape
     assert isinstance(streams, StreamCollection)
-    assert untargeted is None  # only the refrigeration source side has a rest
 
 
 def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
@@ -152,7 +151,7 @@ def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
             "HPR_ETA_PENALTY": 0.123,
             "HPR_RHO_PENALTY": 4.5,
             "HPR_REFRIGERANTS": ["water", "r134a"],
-            "HPR_MVR_FLUIDS": ["Water", "R245FA"],
+            "HPR_MVR_FLUIDS": ["ammonia", "R245FA"],
             "HPR_HE_ETA_II_CARNOT": 0.42,
             "HPR_INTEGRATED_EXPANDER_ENABLED": True,
         }
@@ -169,7 +168,7 @@ def test_construct_hpr_target_inputs_carries_penalty_options_from_config():
     assert args.eta_penalty == pytest.approx(0.123)
     assert args.rho_penalty == pytest.approx(4.5)
     assert args.refrigerant_ls == ["WATER", "R134A"]
-    assert args.mvr_fluid_ls == ["Water", "R245FA"]
+    assert args.mvr_fluid_ls == ["AMMONIA", "R245FA"]
     assert args.eta_ii_he_carnot == pytest.approx(0.42)
     assert args.ambient_air_enabled is True
 

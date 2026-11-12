@@ -105,6 +105,7 @@ def build_hpr_target_map_basis(target: object) -> HprTargetMapBasis:
         superheat=record.superheat,
         subcooling=record.subcooling,
         internal_hx_gas_temperature_change=(record.internal_hx_gas_temperature_change),
+        internal_hx_approach_temperature=record.internal_hx_approach_temperature,
         source_provenance={
             "engine_version": record.engine_version,
             "power_boundary": record.power_boundary,

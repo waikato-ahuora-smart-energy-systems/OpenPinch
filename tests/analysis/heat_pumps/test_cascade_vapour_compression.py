@@ -236,6 +236,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
 
     class _FakeCascadeSolved:
         solved = True
+        _subcycles = []  # no stages, so an empty effective topology
         work = 40.0
         work_arr = np.array([10.0, 30.0])
         Q_cool = 70.0
@@ -272,7 +273,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
 
 
 def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch):
-    args = _base_args(n_cond=1, n_evap=1, is_heat_pumping=False)
+    args = _base_args(n_cond=1, n_evap=1, is_heat_pumping=False, dt_hp_ihx=4.0)
     captured = {}
     monkeypatch.setattr(
         hp_cascade,
@@ -297,6 +298,7 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
 
     class _FakeCascadeSolved:
         solved = True
+        _subcycles = []  # no stages, so an empty effective topology
         work = 20.0
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])
@@ -311,7 +313,9 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
             return _sc(_stream("HP", 90.0, 80.0, 10.0, is_process_stream=False))
 
     monkeypatch.setattr(hp_cascade, "CascadeVapourCompressionCycle", _FakeCascadeSolved)
-    seq = iter([_pt_with_hnet(1.0, 1.0), _pt_with_hnet(1.0, 1.0)])
+    # Condenser and evaporator cascades, then the full background for the
+    # refrigeration allowance.
+    seq = iter([_pt_with_hnet(1.0, 1.0) for _ in range(3)])
     monkeypatch.setattr(
         target_cascade, "get_process_heat_cascade", lambda **kwargs: next(seq)
     )
@@ -334,6 +338,8 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
     assert record.mode == "refrigeration"
     assert record.nominal_useful_duty == pytest.approx(80.0)
     assert record.refrigerant_spec == args.refrigerant_ls[0]
+    # A performance map keeps the internal heat exchanger's approach.
+    assert record.internal_hx_approach_temperature == 4.0
 
 
 def test_cascade_x0_branch_for_single_stage():
@@ -456,6 +462,7 @@ def test_cascade_state_reports_the_subcooling_the_cycle_applied():
         eta_motor=1.0,
         refrigerant_ls=["Ammonia", "R1234ze(E)"],
         dt_cascade_hx=5.0,
+        dt_hp_ihx=0.0,
     )
 
     cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
@@ -498,6 +505,7 @@ def test_cascade_refrigeration_heat_controls_sit_below_the_top_stage():
         eta_motor=1.0,
         refrigerant_ls=["Ammonia", "Ammonia"],
         dt_cascade_hx=5.0,
+        dt_hp_ihx=0.0,
     )
     state = HPRParsedState.model_validate(
         {
@@ -534,6 +542,7 @@ def test_cascade_one_condenser_delivers_its_duty_once_with_two_evaporators():
         eta_motor=1.0,
         refrigerant_ls=["Ammonia", "Ammonia"],
         dt_cascade_hx=1.0,
+        dt_hp_ihx=0.0,
     )
     state = HPRParsedState.model_validate(
         {

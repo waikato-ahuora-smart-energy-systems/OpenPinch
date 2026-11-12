@@ -54,6 +54,8 @@ class CompressorConditions:
     Pressures are in kPa, temperatures in degC and densities in kg/m3. The dew
     points are those of the refrigerant at the suction and discharge pressures,
     the basis of manufacturer maps in evaporating and condensing temperature.
+    A discharge above the critical pressure, which has no dew point, is given
+    the critical point.
     """
 
     refrigerant: str

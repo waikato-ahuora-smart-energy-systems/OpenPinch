@@ -108,7 +108,7 @@ def test_refrigerant_screen_has_specialist_report_adapter():
 
     p = PinchProblem(_two_period_payload(), project_name="Site")
     result = p.target.hpr_refrigerant_screen(
-        T_evap=0.0, T_cond=60.0, refrigerants=["Ammonia"]
+        T_evap=0.0, T_cond=60.0, topology="parallel", refrigerants=["Ammonia"]
     )
     report = adapt_analysis_result(result)
     assert report == result

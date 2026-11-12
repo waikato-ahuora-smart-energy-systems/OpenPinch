@@ -246,6 +246,9 @@ def test_heat_pump_cycle_penalties_precede_condenser_enthalpy_guard(monkeypatch)
     quality_states = iter(
         [
             _FakeState(T=280.0),
+            # Dew point at discharge pressure, at the discharge enthalpy: the
+            # discharge is dry, so it adds no wet-compression penalty.
+            _FakeState(h=100.0),
             _FakeState(h=110.0),
             _FakeState(T=330.0),
         ]
