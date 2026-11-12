@@ -201,6 +201,16 @@ Heat pumps and refrigeration
   compression stages, and refuses ``mvr_fluids`` alongside a screen, since
   the fluid sets choose those fluids.
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The flow-on (alpha) values that rank candidate exchangers in network
+  evolution are now solved directly as one sparse linear system instead of a
+  separate APOPT model per call. Results match the APOPT solve to within
+  1e-11, and on the four-stream example the alpha solves take 0.08 s instead
+  of 9 s. A system with no unique solution in [-1, 1] still falls back to
+  neutral alpha.
+
 0.8.3 (2026-11-11)
 ------------------
 
