@@ -7,6 +7,8 @@ import json
 from copy import deepcopy
 from types import SimpleNamespace
 
+import pytest
+
 from OpenPinch.analysis.heat_exchanger_networks.context import (
     ensure_target_results,
     finalise_design_result,
@@ -25,6 +27,14 @@ from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
+from OpenPinch.domain.enums import (
+    HeatExchangerKind,
+    HeatExchangerNetworkDesignMethod,
+    StreamID,
+)
+from OpenPinch.domain.heat_exchanger import HeatExchanger
+from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from tests.support.paths import FIXTURES_ROOT, REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -336,6 +346,190 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
     assert len(payload[0]["diagnostics"]["solver_calls"]) == 1
     assert payload[1]["benchmark"] == "hens_quality_tier_comparison"
     assert payload[1]["status"] == "missing_baseline"
+
+
+def test_benchmark_resolves_fixture_sample_case_and_path_names(tmp_path) -> None:
+    benchmark = _load_benchmark_module()
+    case_file = tmp_path / "own_case.json"
+    case_file.write_text("{}", encoding="utf-8")
+
+    assert benchmark.resolve_hens_case("Four-stream-Yee-and-Grossmann-1990-1.json") == (
+        FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    assert benchmark.resolve_hens_case("pulp_mill.json") == (
+        REPO_ROOT / "OpenPinch" / "tutorials" / "sample_cases" / "pulp_mill.json"
+    )
+    assert benchmark.resolve_hens_case(str(case_file)) == case_file
+    with pytest.raises(FileNotFoundError, match="no-such-case.json"):
+        benchmark.resolve_hens_case("no-such-case.json")
+
+
+def test_network_meets_pinch_targets_per_period_within_tolerance() -> None:
+    benchmark = _load_benchmark_module()
+    targets = (
+        SimpleNamespace(
+            period_idx=0, hot_utility_target=50.0, cold_utility_target=30.0
+        ),
+        SimpleNamespace(period_idx=1, hot_utility_target=80.0, cold_utility_target=0.0),
+    )
+    on_target = _benchmark_network(
+        ("hot_utility", "HU", "C1", None, (50.0, 80.0)),
+        ("cold_utility", "H1", "CU", None, (30.0, 0.0)),
+    )
+    # 1e-4 kW above target is solver noise, inside the 1e-3 kW allowance.
+    within_tolerance = _benchmark_network(
+        ("hot_utility", "HU", "C1", None, (50.0001, 80.0)),
+        ("cold_utility", "H1", "CU", None, (30.0, 0.0)),
+    )
+    over_in_second_period = _benchmark_network(
+        ("hot_utility", "HU", "C1", None, (50.0, 81.0)),
+        ("cold_utility", "H1", "CU", None, (30.0, 0.0)),
+    )
+
+    assert benchmark.network_meets_pinch_targets(on_target, targets)
+    assert benchmark.network_meets_pinch_targets(within_tolerance, targets)
+    assert not benchmark.network_meets_pinch_targets(over_in_second_period, targets)
+
+
+def test_pdm_topology_summary_counts_distinct_target_meeting_topologies() -> None:
+    benchmark = _load_benchmark_module()
+    two_units = _benchmark_network(
+        ("recovery", "H1", "C1", 1, (60.0,)),
+        ("hot_utility", "HU", "C1", None, (10.0,)),
+    )
+    # Same matches with other duties, as another approach temperature gives.
+    two_units_again = _benchmark_network(
+        ("recovery", "H1", "C1", 1, (55.0,)),
+        ("hot_utility", "HU", "C1", None, (15.0,)),
+    )
+    three_units = _benchmark_network(
+        ("recovery", "H1", "C1", 1, (40.0,)),
+        ("recovery", "H1", "C1", 2, (20.0,)),
+        ("hot_utility", "HU", "C1", None, (10.0,)),
+    )
+    off_target = _benchmark_network(("hot_utility", "HU", "C1", None, (70.0,)))
+
+    summary = benchmark.pdm_topology_summary(
+        [
+            (two_units, True),
+            (two_units_again, True),
+            (three_units, True),
+            (off_target, False),
+        ]
+    )
+
+    assert summary == {
+        "pdm_network_count": 4,
+        "target_meeting_network_count": 3,
+        "distinct_target_meeting_topologies": 2,
+        "topologies_by_unit_count": {"2": 1, "3": 1},
+        "min_units": 2,
+    }
+
+
+def test_benchmark_acceptance_metrics_cover_pdm_outcomes_and_top_tacs() -> None:
+    benchmark = _load_benchmark_module()
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 0})
+    target_output = ensure_target_results(problem, {}, None)
+    settings = workflow_settings_from_problem(problem)
+    workflow_result = execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    )
+    design = finalise_design_result(problem, target_output, workflow_result)
+
+    metrics = benchmark.acceptance_metrics(
+        problem, workflow_result.outcomes, design.ranked_networks, top_n=2
+    )
+
+    pdm_outcomes = [
+        outcome
+        for outcome in workflow_result.outcomes
+        if outcome.task.method == HeatExchangerNetworkDesignMethod.PinchDesign
+        and outcome.status == "success"
+    ]
+    assert metrics["pdm_network_count"] == len(pdm_outcomes) > 0
+    assert 0 <= metrics["target_meeting_network_count"] <= len(pdm_outcomes)
+    assert (
+        metrics["top_total_annual_costs"]
+        == sorted(outcome.objective_value for outcome in design.ranked_networks)[:2]
+    )
+
+
+def test_benchmark_acceptance_comparison_flags_regressions() -> None:
+    benchmark = _load_benchmark_module()
+    baseline = {
+        "name": "case.json",
+        "tier": 0,
+        "status": "success",
+        "total_seconds": 12.0,
+        "total_annual_cost": 100.0,
+        "acceptance": {
+            "distinct_target_meeting_topologies": 4,
+            "topologies_by_unit_count": {"5": 1, "6": 3},
+            "min_units": 5,
+            "top_total_annual_costs": [100.0, 110.0, 120.0],
+        },
+    }
+    variant = deepcopy(baseline)
+    variant["total_annual_cost"] = 101.0
+    variant["acceptance"] |= {
+        "distinct_target_meeting_topologies": 9,
+        "topologies_by_unit_count": {"5": 2, "6": 7},
+        "top_total_annual_costs": [101.0, 105.0, 125.0],
+    }
+
+    comparison = benchmark.compare_acceptance(baseline, variant)
+
+    assert comparison == {
+        "name": "case.json",
+        "tier": 0,
+        "status": "success",
+        "best_total_annual_cost_no_worse": False,
+        "best_total_annual_cost_delta": 1.0,
+        "distinct_topologies": (4, 9),
+        "min_units": (5, 5),
+        "topologies_by_unit_count": ({"5": 1, "6": 3}, {"5": 2, "6": 7}),
+        "top_total_annual_cost_deltas": [1.0, -5.0, 5.0],
+    }
+
+
+def _benchmark_network(*units) -> HeatExchangerNetwork:
+    kinds = {
+        "recovery": (HeatExchangerKind.RECOVERY, StreamID.Process, StreamID.Process),
+        "hot_utility": (
+            HeatExchangerKind.HOT_UTILITY,
+            StreamID.Utility,
+            StreamID.Process,
+        ),
+        "cold_utility": (
+            HeatExchangerKind.COLD_UTILITY,
+            StreamID.Process,
+            StreamID.Utility,
+        ),
+    }
+    exchangers = []
+    for kind, source, sink, stage, duties in units:
+        exchanger_kind, source_role, sink_role = kinds[kind]
+        exchangers.append(
+            HeatExchanger(
+                kind=exchanger_kind,
+                source_stream=source,
+                sink_stream=sink,
+                source_stream_role=source_role,
+                sink_stream_role=sink_role,
+                stage=stage,
+                period_states=tuple(
+                    HeatExchangerPeriodState(
+                        period_id=str(index),
+                        period_idx=index,
+                        duty=duty,
+                        active=duty > 0.0,
+                    )
+                    for index, duty in enumerate(duties)
+                ),
+            )
+        )
+    return HeatExchangerNetwork(exchangers=tuple(exchangers), stage_count=2)
 
 
 def _small_problem_with_options(options: dict) -> PinchProblem:
