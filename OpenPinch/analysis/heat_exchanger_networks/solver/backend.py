@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 import threading
 import time
 import warnings
@@ -43,6 +44,23 @@ DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
 # reports the solve as successful.
 CONVERGED_TERMINATION_CONDITIONS = frozenset(
     {"optimal", "locallyOptimal", "globallyOptimal", "feasible"}
+)
+# Solver statuses and termination conditions GEKKO's Pyomo extension accepts
+# (the others raise there); native Pyomo solves treat them the same way.
+PASSING_SOLVER_STATUSES = frozenset({"ok", "warning"})
+PASSING_TERMINATION_CONDITIONS = CONVERGED_TERMINATION_CONDITIONS | frozenset(
+    {
+        "unknown",
+        "maxTimeLimit",
+        "maxIterations",
+        "minFunctionValue",
+        "minStepLength",
+        "maxEvaluations",
+        "other",
+        "unbounded",
+        "intermediateNonInteger",
+        "noSolution",
+    }
 )
 GEKKO_NUMPY_ARRAY_COPY_DEPRECATION = (
     r"__array__ implementation doesn't accept a copy keyword.*"
@@ -301,6 +319,111 @@ def solve_gekko_model(
         solver_options=getattr(model, "_openpinch_solver_options", None),
         option_file=getattr(model, "_openpinch_solver_option_file", None),
         termination_condition=model._openpinch_termination_condition,
+    )
+
+
+def configure_pyomo_solver(
+    model: Any,
+    solver_name: str,
+    *,
+    solver_options: Mapping[str, Any] | Sequence[str] | None = None,
+) -> SolverRun:
+    """Check a Pyomo solver and write its option file for a ``PyomoModel``.
+
+    Couenne and Ipopt read options from ``couenne.opt`` or ``ipopt.opt`` in
+    the working directory, so options go to a file in a run directory created
+    for the model and removed by ``cleanup_gekko_model``.
+    """
+
+    if solver_name not in PYOMO_SOLVERS:
+        raise MissingSynthesisSolverError(
+            f"{solver_name!r} cannot solve a native Pyomo model. Supported "
+            f"solvers are: {', '.join(sorted(PYOMO_SOLVERS))}."
+        )
+    require_solver_backend(solver_name)
+    effective_options = _normalise_solver_options(solver_options)
+    option_file = None
+    if effective_options:
+        if model._path is None:
+            model._path = tempfile.mkdtemp(prefix="openpinch-pyomo-")
+        option_file = _write_solver_option_file(
+            model,
+            COUENNE_OPTION_FILE if solver_name == "couenne" else IPOPT_OPTION_FILE,
+            effective_options,
+        )
+    pyomo = require_synthesis_dependency(
+        "pyomo.environ",
+        package="pyomo",
+        purpose=f"{solver_name} solver factory availability checks",
+    )
+    executable = PYOMO_SOLVER_BINARIES[solver_name]
+    if not pyomo.SolverFactory(executable).available(exception_flag=False):
+        raise MissingSynthesisSolverError(
+            f"The {executable!r} Pyomo solver is not available. Install the "
+            "solver binary, confirm it is on PATH, and rerun the heat "
+            "exchanger network synthesis solver tests."
+        )
+    return SolverRun(
+        name=solver_name,
+        extension="pyomo",
+        solver_options=effective_options or None,
+        option_file=option_file,
+    )
+
+
+def solve_pyomo_model(
+    model: Any,
+    *,
+    solver_name: str,
+    disp: bool = False,
+) -> SolverRun:
+    """Solve a ``PyomoModel`` and normalise the result like a GEKKO solve.
+
+    Values are loaded onto the model's variables. A solver status or
+    termination condition GEKKO's Pyomo extension would reject becomes the
+    failure reason, with status 0.
+    """
+
+    pyomo = require_synthesis_dependency(
+        "pyomo.environ",
+        package="pyomo",
+        purpose=f"{solver_name} heat exchanger network synthesis solves",
+    )
+    _restore_run_directory(model)
+    start = time.time()
+    status = 0
+    objective_value = None
+    termination_condition = None
+    failure_reason = None
+    try:
+        with _solver_working_directory(model, "pyomo"):
+            results = pyomo.SolverFactory(PYOMO_SOLVER_BINARIES[solver_name]).solve(
+                model.model, tee=disp
+            )
+        solver_status = str(results.solver.status)
+        termination_condition = str(results.solver.termination_condition)
+        if solver_status not in PASSING_SOLVER_STATUSES:
+            failure_reason = f"Solver exited with status: {solver_status}"
+        elif termination_condition not in PASSING_TERMINATION_CONDITIONS:
+            failure_reason = f"Solver termination condition: {termination_condition}"
+        else:
+            status = 1
+            objective_value = _as_float_or_none(
+                pyomo.value(model.objective, exception=False)
+            )
+    except Exception as exc:  # Pyomo and solver exceptions become task metadata.
+        failure_reason = str(exc) or exc.__class__.__name__
+
+    return SolverRun(
+        name=solver_name,
+        extension="pyomo",
+        status=status,
+        objective_value=objective_value,
+        solve_time=time.time() - start,
+        failure_reason=failure_reason,
+        solver_options=getattr(model, "_openpinch_solver_options", None),
+        option_file=getattr(model, "_openpinch_solver_option_file", None),
+        termination_condition=termination_condition,
     )
 
 
