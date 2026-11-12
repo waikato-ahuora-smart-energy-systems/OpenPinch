@@ -25,6 +25,7 @@ The synthesis dependency set is:
 - ``wakepy>=1.0.0``
 - ``idaes-pse>=2.11.0``
 - ``highspy>=1.11.0``
+- ``pyscipopt>=5.5.0``
 
 Optional Install
 ----------------
@@ -42,8 +43,8 @@ the synthesis stack:
 
    uv sync --frozen --group dev
 
-The ``full`` extra includes the synthesis stack (Pyomo, Kaleido, wakepy, IDAES
-and HiGHS) together with the dashboard, notebook, TESPy, and Brayton-cycle
+The ``full`` extra includes the synthesis stack (Pyomo, Kaleido, wakepy, IDAES,
+HiGHS and SCIP) together with the dashboard, notebook, TESPy, and Brayton-cycle
 surfaces. External solver binaries are still installed separately.
 
 Test Marker Policy

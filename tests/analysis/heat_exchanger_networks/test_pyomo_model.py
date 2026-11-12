@@ -286,3 +286,92 @@ def test_ipopt_pyomo_starts_close_to_its_bounds_by_default(
     # no option file and no working-directory lock.
     assert run.option_file is None
     assert model._path is None
+
+
+def _requirements(monkeypatch, solver_name: str) -> list[str]:
+    """The packages and executables ``solver_name`` asks for."""
+    asked: list[str] = []
+
+    def binary(binary_name: str, *, purpose: str | None = None) -> str:
+        asked.append(f"binary {binary_name}")
+        return f"/bin/{binary_name}"
+
+    def dependency(import_name: str, **_kwargs):
+        asked.append(f"module {import_name}")
+
+    monkeypatch.setattr(backend, "require_solver_binary", binary)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", dependency)
+    backend.require_solver_backend(solver_name)
+    return asked
+
+
+def test_scip_needs_pyscipopt_and_no_solver_binary(monkeypatch):
+    assert _requirements(monkeypatch, "scip") == [
+        "module pyscipopt",
+        "module pyomo.environ",
+    ]
+
+
+def test_mindtpy_needs_highs_and_the_ipopt_binary(monkeypatch):
+    # Outer approximation: HiGHS solves the MILP masters, Ipopt the NLPs.
+    assert _requirements(monkeypatch, "mindtpy") == [
+        "module highspy",
+        "binary ipopt",
+        "module pyomo.environ",
+    ]
+
+
+def test_scip_and_mindtpy_keep_integers():
+    assert {"scip", "mindtpy"} <= backend.INTEGER_SOLVERS
+
+
+def _scip_available() -> bool:
+    return _solver_available("scip")
+
+
+@pytest.mark.skipif("not _scip_available()", reason="needs pyscipopt")
+def test_scip_solves_a_milp_quietly_with_its_options():
+    model, duty, unit = _binary_model()
+
+    run = backend.configure_pyomo_solver(
+        model, "scip", solver_options={"limits/time": 30}
+    )
+    solved = backend.solve_pyomo_model(model, solver_name="scip")
+
+    assert run.option_file is None
+    assert solved.solver_options == {"display/verblevel": 0, "limits/time": 30}
+    assert solved.status == 1
+    assert solved.termination_condition == "optimal"
+    assert solved.objective_value == pytest.approx(3.5)
+    assert (duty.value, unit.value) == pytest.approx((3.0, 1.0))
+
+
+def _minlp_model() -> tuple[PyomoModel, object]:
+    # A cube root, as in the stage-wise area terms, with a binary choice.
+    model = PyomoModel()
+    x = model.Var(value=2.0, lb=0.1, ub=10.0)
+    z = model.Var(value=0, lb=0, ub=1, integer=True)
+    model.Equation(x >= 3.0 * z + 1.0)
+    model.Equation((x * x) ** (1 / 3) >= 1.5)
+    model.Minimize(x + 2.0 * z)
+    return model, x
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not _solver_available('mindtpy')", reason="needs highspy and ipopt"
+)
+def test_mindtpy_solves_a_minlp_by_outer_approximation():
+    model, x = _minlp_model()
+
+    backend.configure_pyomo_solver(model, "mindtpy")
+    solved = backend.solve_pyomo_model(model, solver_name="mindtpy")
+
+    assert solved.status == 1
+    assert solved.solver_options == {
+        "strategy": "OA",
+        "mip_solver": "appsi_highs",
+        "nlp_solver": "ipopt",
+    }
+    assert solved.objective_value == pytest.approx(1.5**1.5, rel=1e-4)
+    assert x.value == pytest.approx(1.5**1.5, rel=1e-4)

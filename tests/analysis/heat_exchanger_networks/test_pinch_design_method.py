@@ -237,7 +237,7 @@ def _highs_available() -> bool:
 def test_solver_backend_rejects_removed_gekko_solver_names(solver_name) -> None:
     with pytest.raises(
         MissingSynthesisSolverError,
-        match=rf"Unsupported.*{solver_name}.*couenne, highs, ipopt-pyomo\.$",
+        match=rf"Unsupported.*{solver_name}.*couenne, highs, ipopt-pyomo, mindtpy, scip\.$",
     ):
         backend.require_solver_backend(solver_name)
 

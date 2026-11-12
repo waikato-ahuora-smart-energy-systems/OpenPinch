@@ -20,22 +20,27 @@ from .dependencies import (
     require_synthesis_dependency,
 )
 
-PYOMO_SOLVERS = frozenset({"couenne", "ipopt-pyomo", "highs"})
+PYOMO_SOLVERS = frozenset({"couenne", "ipopt-pyomo", "highs", "scip", "mindtpy"})
 # Solvers that keep integer variables integer; the others relax them.
-INTEGER_SOLVERS = frozenset({"couenne", "highs"})
+INTEGER_SOLVERS = frozenset({"couenne", "highs", "scip", "mindtpy"})
+# Executables a solver needs. MindtPy's outer approximation solves its NLP
+# subproblems with Ipopt and its MILP masters with HiGHS.
 PYOMO_SOLVER_BINARIES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
+    "mindtpy": "ipopt",
 }
-# Solvers run in-process through a Python package rather than an executable.
-PYOMO_SOLVER_MODULES = {"highs": "highspy"}
+# Python packages a solver needs, checked before any executable.
+PYOMO_SOLVER_MODULES = {"highs": "highspy", "scip": "pyscipopt", "mindtpy": "highspy"}
 # Solvers that take their options at solve time (in process, or on the
 # command line) rather than from an option file in the working directory.
-SOLVE_TIME_OPTION_SOLVERS = frozenset({"highs", "ipopt-pyomo"})
+SOLVE_TIME_OPTION_SOLVERS = frozenset({"highs", "ipopt-pyomo", "scip", "mindtpy"})
 PYOMO_SOLVER_FACTORY_NAMES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
     "highs": "appsi_highs",
+    "scip": "scip_direct",
+    "mindtpy": "mindtpy",
 }
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
@@ -45,6 +50,13 @@ DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {}
 DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
     "bound_push": 1e-6,
     "bound_frac": 1e-6,
+}
+# Defaults under the given options: SCIP prints nothing, and MindtPy runs
+# outer approximation with HiGHS masters and Ipopt subproblems.
+DEFAULT_SOLVER_OPTIONS: dict[str, dict[str, Any]] = {
+    "ipopt-pyomo": DEFAULT_IPOPT_PYOMO_OPTIONS,
+    "scip": {"display/verblevel": 0},
+    "mindtpy": {"strategy": "OA", "mip_solver": "appsi_highs", "nlp_solver": "ipopt"},
 }
 # Pyomo termination conditions of a converged solve. A solve that stops at
 # an iteration or time limit, for example, still passes, but is not converged.
@@ -116,7 +128,7 @@ def require_solver_backend(solver_name: str) -> None:
                 PYOMO_SOLVER_MODULES[solver_name],
                 purpose=f"{solver_name} heat exchanger network synthesis solves",
             )
-        else:
+        if solver_name in PYOMO_SOLVER_BINARIES:
             require_solver_binary(
                 PYOMO_SOLVER_BINARIES[solver_name],
                 purpose=f"{solver_name} heat exchanger network synthesis solves",
@@ -145,9 +157,9 @@ def configure_pyomo_solver(
 
     Couenne reads options from ``couenne.opt`` in the working directory, so
     its options go to a file in a run directory created for the model and
-    removed by ``cleanup_model_run_directory``. HiGHS (in process) and Ipopt (on its
-    command line) take their options at solve time, with no file. Ipopt
-    defaults to ``DEFAULT_IPOPT_PYOMO_OPTIONS`` under the given options.
+    removed by ``cleanup_model_run_directory``. HiGHS and SCIP (in process),
+    Ipopt (on its command line) and MindtPy (as solve arguments) take their
+    options at solve time, with no file, over ``DEFAULT_SOLVER_OPTIONS``.
     """
 
     if solver_name not in PYOMO_SOLVERS:
@@ -156,10 +168,8 @@ def configure_pyomo_solver(
             f"solvers are: {', '.join(sorted(PYOMO_SOLVERS))}."
         )
     require_solver_backend(solver_name)
-    effective_options = (
-        _merge_solver_options(DEFAULT_IPOPT_PYOMO_OPTIONS, solver_options)
-        if solver_name == "ipopt-pyomo"
-        else _normalise_solver_options(solver_options)
+    effective_options = _merge_solver_options(
+        DEFAULT_SOLVER_OPTIONS.get(solver_name, {}), solver_options
     )
     option_file = None
     if solver_name in SOLVE_TIME_OPTION_SOLVERS:
@@ -225,11 +235,14 @@ def solve_pyomo_model(
     try:
         with _solver_working_directory(model, "pyomo"):
             solver = pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
-            if solver_name in SOLVE_TIME_OPTION_SOLVERS:
-                solver.options.update(
-                    getattr(model, "_openpinch_solver_options", None) or {}
-                )
-            results = solver.solve(model.model, tee=disp)
+            options = getattr(model, "_openpinch_solver_options", None) or {}
+            if solver_name == "mindtpy":
+                # MindtPy takes its configuration as solve arguments.
+                results = solver.solve(model.model, tee=disp, **options)
+            else:
+                if solver_name in SOLVE_TIME_OPTION_SOLVERS:
+                    solver.options.update(options)
+                results = solver.solve(model.model, tee=disp)
         solver_status = str(results.solver.status)
         termination_condition = str(results.solver.termination_condition)
         if solver_status not in PASSING_SOLVER_STATUSES:

@@ -132,3 +132,16 @@ def test_valid_options_are_written_to_the_option_file(monkeypatch, tmp_path):
     assert Path(run.option_file).read_text(encoding="utf-8") == (
         "node_limit 50\ntime_limit 120.5\ndelete_redundant no\n"
     )
+
+
+def test_scip_and_mindtpy_option_names_are_allowed():
+    from OpenPinch.domain.solver_options import validate_solver_options
+
+    options = {
+        "limits/time": 60,
+        "limits/gap": 1e-4,
+        "strategy": "OA",
+        "iteration_limit": 20,
+    }
+
+    assert validate_solver_options(options) == options

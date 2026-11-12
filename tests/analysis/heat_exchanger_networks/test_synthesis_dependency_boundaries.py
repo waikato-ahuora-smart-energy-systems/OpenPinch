@@ -25,6 +25,7 @@ SYNTHESIS_ONLY_MODULES = [
     "wakepy",
     "idaes",
     "highspy",
+    "pyscipopt",
 ]
 
 

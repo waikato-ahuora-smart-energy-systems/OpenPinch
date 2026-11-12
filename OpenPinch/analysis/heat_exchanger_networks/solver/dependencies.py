@@ -37,6 +37,7 @@ SYNTHESIS_DEPENDENCIES: tuple[SynthesisDependency, ...] = (
     SynthesisDependency("wakepy", "wakepy", "long local solver runs"),
     SynthesisDependency("idaes-pse", "idaes", "IDAES solver binary discovery"),
     SynthesisDependency("highspy", "highspy", "HiGHS MILP solves"),
+    SynthesisDependency("pyscipopt", "pyscipopt", "SCIP MINLP solves"),
 )
 
 

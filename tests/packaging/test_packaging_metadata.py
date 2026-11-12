@@ -133,9 +133,17 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
         "wakepy>=1.0.0",
         "idaes-pse>=2.11.0",
         "highspy>=1.11.0",
+        "pyscipopt>=5.5.0",
     ]
 
-    synthesis_only = {"pyomo", "kaleido", "wakepy", "idaes-pse", "highspy"}
+    synthesis_only = {
+        "pyomo",
+        "kaleido",
+        "wakepy",
+        "idaes-pse",
+        "highspy",
+        "pyscipopt",
+    }
     core_deps = {
         _dependency_name(dep) for dep in _read_pyproject()["project"]["dependencies"]
     }

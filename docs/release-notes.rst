@@ -206,11 +206,19 @@ Heat exchanger network synthesis
 
 - ``apopt`` and ``ipopt-GEKKO`` are no longer accepted solver names: every
   heat exchanger network model is now a native Pyomo model, solved with
-  ``highs``, ``couenne`` or ``ipopt-pyomo``, and any other name raises
-  ``MissingSynthesisSolverError`` listing these three. The APOPT solver
+  ``highs``, ``couenne``, ``ipopt-pyomo``, ``scip`` or ``mindtpy``, and any
+  other name raises ``MissingSynthesisSolverError`` listing them. The APOPT solver
   options (``minlp_*``, ``nlp_maximum_iterations`` and the like) are no
   longer accepted, and the ``synthesis`` and ``full`` extras no longer
   install ``gekko``.
+- ``scip`` and ``mindtpy`` are new solver names, intended for the thermal
+  derivative method (``HENS_SOLVER_TDM``). ``scip`` is the SCIP global MINLP
+  solver through the ``pyscipopt`` package, which the ``synthesis`` extra now
+  installs; it needs no executable. ``mindtpy`` is Pyomo's MindtPy outer
+  approximation, with HiGHS for the MILP masters and Ipopt for the NLP
+  subproblems. SCIP limits (``limits/time``, ``limits/gap``) and MindtPy
+  settings (``strategy``, ``iteration_limit``) are accepted solver options.
+  The default stays ``couenne``.
 - The flow-on (alpha) values that rank candidate exchangers in network
   evolution are now solved directly as one sparse linear system instead of a
   separate APOPT model per call. Results match the APOPT solve to within

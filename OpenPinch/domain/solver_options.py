@@ -68,7 +68,32 @@ _COUENNE_OPTIONS = frozenset(
     }
 )
 
-ALLOWED_SOLVER_OPTION_NAMES = _IPOPT_OPTIONS | _COUENNE_OPTIONS
+# SCIP parameters and MindtPy settings.
+_SCIP_OPTIONS = frozenset(
+    {
+        "display/verblevel",
+        "limits/time",
+        "limits/gap",
+        "limits/absgap",
+        "limits/nodes",
+        "limits/solutions",
+        "numerics/feastol",
+    }
+)
+_MINDTPY_OPTIONS = frozenset(
+    {
+        "strategy",
+        "mip_solver",
+        "nlp_solver",
+        "iteration_limit",
+        "absolute_bound_tolerance",
+        "relative_bound_tolerance",
+    }
+)
+
+ALLOWED_SOLVER_OPTION_NAMES = (
+    _IPOPT_OPTIONS | _COUENNE_OPTIONS | _SCIP_OPTIONS | _MINDTPY_OPTIONS
+)
 
 # Integers as large as a solver's 64-bit settings, and short value text.
 _MAX_INTEGER = 2**63 - 1
