@@ -12,6 +12,7 @@ from typing import Any, Literal
 from ....parallelism import supported_workers
 from ...indexing import build_index_grid
 from .._base import approach as _approach
+from .._base.execution import _assign_value
 from .verification import _value
 
 logger = logging.getLogger(__name__)
@@ -609,13 +610,13 @@ def _build_and_solve_evolution(
     )
 
     if kind == "minus":
-        child.Q_r[i][j][k].VALUE.value = 0.0
-        child.z[i][j][k].VALUE.value = 0
+        _assign_value(child.Q_r[i][j][k], 0.0)
+        _assign_value(child.z[i][j][k], 0)
         approach = _approach._recovery_approach_temperature(owner, i, j)
-        child.theta_1[i][j][k].VALUE.value = approach
-        child.theta_2[i][j][k].VALUE.value = approach
+        _assign_value(child.theta_1[i][j][k], approach)
+        _assign_value(child.theta_2[i][j][k], approach)
     else:
-        child.z[i][j][k].VALUE.value = 1
+        _assign_value(child.z[i][j][k], 1)
 
     child.optimise(print_output=print_output)
     return child
@@ -677,7 +678,7 @@ def _set_recovery_binary_value(
     except IndexError:
         pass
     if hasattr(element, "VALUE"):
-        element.VALUE.value = int(value)
+        _assign_value(element, int(value))
         return
     z_values[i][j][k] = int(value)
 

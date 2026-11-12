@@ -384,3 +384,20 @@ def test_excluding_a_solved_unit_pattern_gives_a_different_network():
     assert second.used_units() != pattern
     assert second.n_units >= first.n_units
     assert sum(flag for group in pattern.values() for flag in group) == first.n_units
+
+
+@pytest.mark.synthesis
+def test_assign_value_sets_pyomo_values_without_clamping():
+    # Warm starts and amalgamation copy solved values in as they are, as the
+    # GEKKO models did through VALUE.
+    pytest.importorskip("pyomo.environ")
+    model = PyomoModel()
+    selector = model.Param(value=1.0)
+    duty = model.Var(value=1.0, lb=0.0, ub=10.0)
+
+    base_execution._assign_value(selector, [0.0])
+    base_execution._assign_value(duty, 12.0)
+
+    assert selector.fixed
+    assert selector.value == pytest.approx(0.0)
+    assert duty.value == pytest.approx(12.0)

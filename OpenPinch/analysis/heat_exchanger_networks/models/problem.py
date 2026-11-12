@@ -15,6 +15,7 @@ from ..extraction.service import (
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
+from ._base.execution import _assign_value, _set_value
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -605,10 +606,8 @@ def _cleanup_model(model: Any) -> None:
 
 
 def _assign(variable: Any, value: float) -> None:
-    if type(variable).__name__ != "GKParameter":
-        value = max(variable.lower, min(variable.upper, value))
-    variable.VALUE.value = value
+    _set_value(None, variable, value)
 
 
 def _assign_binary(variable: Any, value: float) -> None:
-    variable.VALUE.value = 1 if value > 0 else 0
+    _assign_value(variable, 1 if value > 0 else 0)

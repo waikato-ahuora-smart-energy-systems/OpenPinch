@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .._base import approach as _approach
 from .._base import execution as _execution
+from .verification import _value
 
 
 def set_initial_values_for_variables(
@@ -25,7 +26,7 @@ def set_initial_values_for_variables(
                     _execution._set_value(
                         owner,
                         owner.Q_r[i][j][k],
-                        init_solution.Q_r[i][j][k].VALUE[0],
+                        _value(init_solution.Q_r[i][j][k]),
                         brackets=brackets,
                     )
                     _execution._set_value(
@@ -37,13 +38,13 @@ def set_initial_values_for_variables(
                     _execution._set_value(
                         owner,
                         owner.theta_1[i][j][k],
-                        init_solution.theta_1[i][j][k].VALUE[0],
+                        _value(init_solution.theta_1[i][j][k]),
                         brackets=brackets,
                     )
                     _execution._set_value(
                         owner,
                         owner.theta_2[i][j][k],
-                        init_solution.theta_2[i][j][k].VALUE[0],
+                        _value(init_solution.theta_2[i][j][k]),
                         brackets=brackets,
                     )
                 else:
@@ -69,7 +70,7 @@ def set_initial_values_for_variables(
             _execution._set_value(
                 owner,
                 owner.T_h[i][k],
-                init_solution.T_h[i][k].VALUE[0],
+                _value(init_solution.T_h[i][k]),
                 brackets=brackets,
             )
     for j in range(owner.J):
@@ -77,7 +78,7 @@ def set_initial_values_for_variables(
             _execution._set_value(
                 owner,
                 owner.T_c[j][k],
-                init_solution.T_c[j][k].VALUE[0],
+                _value(init_solution.T_c[j][k]),
                 brackets=brackets,
             )
 
@@ -102,7 +103,7 @@ def set_initial_values_for_variables(
         for index, row in enumerate(allowed):
             for u, is_allowed in enumerate(row):
                 if is_allowed > 0:
-                    duty = source_duties[index][u].VALUE[0]
+                    duty = _value(source_duties[index][u])
                     flag = source_flags[index][u][0]
                 else:
                     duty, flag = 0.0, 0
@@ -118,25 +119,25 @@ def set_initial_values_for_variables(
                             _execution._set_value(
                                 owner,
                                 owner.X[i][j][k],
-                                init_solution.X[i][j][k].VALUE[0],
+                                _value(init_solution.X[i][j][k]),
                                 brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.Y[j][i][k],
-                                init_solution.Y[j][i][k].VALUE[0],
+                                _value(init_solution.Y[j][i][k]),
                                 brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h_out_x[i][j][k].VALUE[0],
+                                _value(init_solution.T_h_out_x[i][j][k]),
                                 brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c_out_y[j][i][k].VALUE[0],
+                                _value(init_solution.T_c_out_y[j][i][k]),
                                 brackets=brackets,
                             )
                         else:
@@ -149,27 +150,27 @@ def set_initial_values_for_variables(
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
+                                _value(init_solution.T_h[i][k + 1]),
                                 brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
+                                _value(init_solution.T_c[j][k]),
                                 brackets=brackets,
                             )
         else:
             for k in range(owner.S):
                 for i in range(owner.I):
                     sum_Q_r_i = sum(
-                        init_solution.Q_r[i][j][k].VALUE[0] for j in range(owner.J)
+                        _value(init_solution.Q_r[i][j][k]) for j in range(owner.J)
                     )
                     for j in range(owner.J):
                         sum_Q_r_j = sum(
-                            init_solution.Q_r[i][j][k].VALUE[0] for i in range(owner.I)
+                            _value(init_solution.Q_r[i][j][k]) for i in range(owner.I)
                         )
                         if owner.z_allowed[i][j][k] > 0:
-                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
+                            q_val = _value(init_solution.Q_r[i][j][k])
                             if q_val > 0.0:
                                 _execution._set_value(
                                     owner,
@@ -193,13 +194,13 @@ def set_initial_values_for_variables(
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
+                                _value(init_solution.T_h[i][k + 1]),
                                 brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
+                                _value(init_solution.T_c[j][k]),
                                 brackets=brackets,
                             )
                         else:
@@ -212,13 +213,13 @@ def set_initial_values_for_variables(
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
+                                _value(init_solution.T_h[i][k + 1]),
                                 brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
+                                _value(init_solution.T_c[j][k]),
                                 brackets=brackets,
                             )
 

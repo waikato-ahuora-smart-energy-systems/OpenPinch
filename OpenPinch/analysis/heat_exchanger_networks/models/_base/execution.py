@@ -171,6 +171,24 @@ def _solver_value(model, value: Any) -> float:
         return float(getattr(value, "value", value))
 
 
+def _assign_value(variable: Any, value: Any) -> None:
+    """Write a value onto a GEKKO or Pyomo variable or parameter, unclamped.
+
+    GEKKO values may be given bracketed (``[value]``); a Pyomo component
+    takes the plain number.
+    """
+
+    if hasattr(variable, "VALUE"):
+        variable.VALUE.value = value
+        return
+    if isinstance(value, list | tuple):
+        (value,) = value
+    if variable.fixed:
+        variable.fix(value)
+    else:
+        variable.set_value(value, skip_validation=True)
+
+
 def _set_value(model, variable: Any, value: float, *, brackets: bool = False) -> None:
     """Assign GEKKO or Pyomo values while preserving source bound-clamping behavior."""
 
