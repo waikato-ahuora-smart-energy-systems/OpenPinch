@@ -235,15 +235,47 @@ class LocalSynthesisExecutor:
                 internal_problem = None
             else:
                 _task, outcome, internal_problem = result
-            self.executed_tasks.append(task)
-            if (
-                internal_problem is not None
-                and outcome.status == "success"
-                and task.task_id is not None
-            ):
-                self.problems_by_task_id[task.task_id] = internal_problem
-            outcomes.append(outcome)
+            self._record(task, outcome, internal_problem, outcomes)
+            if internal_problem is not None and outcome.status == "success":
+                outcomes.extend(self._pdm_variant_outcomes(task, internal_problem))
         return tuple(outcomes)
+
+    def _record(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+        internal_problem: InternalHeatExchangerNetworkProblem | None,
+        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome],
+    ) -> None:
+        self.executed_tasks.append(task)
+        if (
+            internal_problem is not None
+            and outcome.status == "success"
+            and task.task_id is not None
+        ):
+            self.problems_by_task_id[task.task_id] = internal_problem
+        outcomes.append(outcome)
+
+    def _pdm_variant_outcomes(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        internal_problem: InternalHeatExchangerNetworkProblem,
+    ) -> list[HeatExchangerNetworkSynthesisTaskOutcome]:
+        """Give each extra PDM network its own task, outcome and problem.
+
+        Each variant is a seed for network evolution, which warm-starts from
+        the private problem registered under the variant's task id.
+        """
+
+        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome] = []
+        variants = getattr(internal_problem, "pdm_variants", None) or []
+        internal_problem.pdm_variants = []
+        for index, variant in enumerate(variants, start=1):
+            variant_task = _pdm_variant_task(task, index)
+            variant.synthesis_task_id = variant_task.task_id
+            outcome = _solved_outcome(variant_task, variant, variant.case)
+            self._record(variant_task, outcome, variant, outcomes)
+        return outcomes
 
     def _build_problem(
         self,
@@ -303,6 +335,14 @@ class LocalSynthesisExecutor:
             stages=task.stage_count,
             synthesis_task_id=task.task_id,
             pinch_decompositions=decompositions,
+            pdm_network_limits=(
+                (
+                    int(problem.master_zone.config.hens.pdm_min_unit_networks),
+                    int(problem.master_zone.config.hens.pdm_extra_unit_networks),
+                )
+                if decompositions is not None
+                else (0, 0)
+            ),
         )
 
     def _parent_problem(
@@ -406,37 +446,7 @@ def _solve_built_task(
                 "solver did not return a successful heat exchanger network model",
             )
             return task, _failed_task_outcome(task, reason), None
-        verify = getattr(solved, "verify", None)
-        if callable(verify):
-            is_valid, reasons = verify()
-            if not is_valid:
-                reason = "verification failed: " + ", ".join(
-                    str(reason) for reason in reasons
-                )
-                internal_problem.solution_failure_reason = reason
-                return task, _failed_task_outcome(task, reason), internal_problem
-
-        network = internal_problem.extract_network(run_id=task.run_id)
-        # An unconverged solve stays a success so downstream tasks can start
-        # from it; demote_infeasible_outcomes keeps it out of the ranking.
-        solver_run = getattr(solved, "solver_run", None)
-        diagnostics = (
-            {}
-            if getattr(solver_run, "converged", True)
-            else {"unconverged_termination": str(solver_run.termination_condition)}
-        )
-        return (
-            task,
-            HeatExchangerNetworkSynthesisTaskOutcome(
-                task=task,
-                status="success",
-                network=network,
-                objective_value=network.total_annual_cost,
-                solver_status=_solver_status(internal_problem),
-                diagnostics=diagnostics,
-            ),
-            internal_problem,
-        )
+        return task, _solved_outcome(task, internal_problem, solved), internal_problem
     except Exception as exc:
         logger.debug(
             "HEN synthesis task %s failed to solve: %s",
@@ -445,6 +455,53 @@ def _solve_built_task(
             exc_info=True,
         )
         return task, _failed_task_outcome(task, str(exc)), None
+
+
+def _solved_outcome(
+    task: HeatExchangerNetworkSynthesisTask,
+    internal_problem: InternalHeatExchangerNetworkProblem,
+    solved: Any,
+) -> HeatExchangerNetworkSynthesisTaskOutcome:
+    """Verify a solved model and extract its network as the task outcome."""
+
+    verify = getattr(solved, "verify", None)
+    if callable(verify):
+        is_valid, reasons = verify()
+        if not is_valid:
+            reason = "verification failed: " + ", ".join(
+                str(reason) for reason in reasons
+            )
+            internal_problem.solution_failure_reason = reason
+            return _failed_task_outcome(task, reason)
+
+    network = internal_problem.extract_network(run_id=task.run_id)
+    # An unconverged solve stays a success so downstream tasks can start
+    # from it; demote_infeasible_outcomes keeps it out of the ranking.
+    solver_run = getattr(solved, "solver_run", None)
+    diagnostics = (
+        {}
+        if getattr(solver_run, "converged", True)
+        else {"unconverged_termination": str(solver_run.termination_condition)}
+    )
+    return HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task,
+        status="success",
+        network=network,
+        objective_value=network.total_annual_cost,
+        solver_status=_solver_status(internal_problem),
+        diagnostics=diagnostics,
+    )
+
+
+def _pdm_variant_task(
+    task: HeatExchangerNetworkSynthesisTask, index: int
+) -> HeatExchangerNetworkSynthesisTask:
+    """The task record of a PDM task's ``index``-th extra network."""
+
+    return HeatExchangerNetworkSynthesisTask(
+        **task.model_dump(exclude={"task_id", "settings"}),
+        settings={**task.settings, "pdm_variant": index},
+    )
 
 
 def _build_and_solve_root_task(

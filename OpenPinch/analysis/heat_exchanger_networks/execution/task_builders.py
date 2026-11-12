@@ -33,6 +33,13 @@ def has_recovery_topology(
     )
 
 
+def is_pdm_variant_outcome(
+    outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+) -> bool:
+    """Return whether an outcome is one of a PDM task's extra networks."""
+    return "pdm_variant" in outcome.task.settings
+
+
 def is_utility_only_outcome(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
 ) -> bool:

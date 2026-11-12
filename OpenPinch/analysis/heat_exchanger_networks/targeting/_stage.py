@@ -58,7 +58,12 @@ def run_stage(
         parent_outcomes={} if parent_outcomes is None else parent_outcomes,
         max_parallel=settings.max_parallel,
     )
-    return tasks, outcomes
+    # The executor can add outcomes for tasks it derived, such as the extra
+    # networks of a pinch design task.
+    task_ids = {task.task_id for task in tasks}
+    return tasks + tuple(
+        outcome.task for outcome in outcomes if outcome.task.task_id not in task_ids
+    ), outcomes
 
 
 def run_single_method_workflow(

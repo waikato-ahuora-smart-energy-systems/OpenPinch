@@ -255,6 +255,16 @@ Heat exchanger network synthesis
   have the same objective, so designs from the default settings change. Set
   ``HENS_SOLVER_PDM`` to ``couenne`` for the previous behaviour. A missing
   Couenne binary no longer stops the pinch design method.
+- The pinch design method can return several networks per approach
+  temperature. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks
+  with the fewest units at the utility targets to collect, and
+  ``HENS_PDM_EXTRA_UNIT_NETWORKS`` how many with one unit more. Each pinch
+  side is re-solved for the fewest units, and no-good cuts exclude each
+  topology found so the next solve finds another. Every extra network is a
+  pinch design result of its own and seeds network evolution directly; the
+  thermal derivative method still refines only the minimum-utility network.
+  Collecting them needs an integer solver (``highs``, ``couenne`` or
+  ``apopt``).
 
 0.8.3 (2026-11-11)
 ------------------

@@ -131,6 +131,8 @@ Heat Exchanger Network Synthesis
    "``HENS_MIN_EXCHANGER_APPROACH_SHARE``","number","``0.0``","","","Smallest exchanger approach the thermal derivative and network evolution steps may choose, as a share of the requested approach temperature, from 0 up to but not including 1. Those steps choose approaches by cost, down to 0.1 K by default (0); at 0.5 a 10 K design keeps every exchanger at 5 K or more."
    "``HENS_SYNTHESIS_QUALITY_TIER``","number","``1``","","0 to 5","Search breadth from 0 to 5: 0 skips the thermal derivative method, 1 is standard OpenHENS, 2 to 5 search more widely."
    "``HENS_PDM_STAGE_PAIR_LIMIT``","number","``None``","","0 to 12","Number of extra pinch design candidates with set stage counts above and below the pinch, up to 12. None adds none."
+   "``HENS_PDM_MIN_UNIT_NETWORKS``","number","``0``","",">= 0","Extra pinch design networks per approach temperature with the fewest units at the utility targets. Each seeds network evolution. 0 adds none."
+   "``HENS_PDM_EXTRA_UNIT_NETWORKS``","number","``0``","",">= 0","Extra pinch design networks per approach temperature with one unit more than the fewest. Each seeds network evolution. 0 adds none."
    "``HENS_TDM_PARENT_LIMIT``","number","``None``","",">= 1","Recorded in the synthesis manifest; no current synthesis step reads it."
    "``HENS_STAGE_PACKING``","string","``auto``","","","Methods whose integer models keep active stages contiguous: none, pdm, tdm or all. auto currently means none."
    "``HENS_STAGE_SELECTION``","number_list","``[1, 2, 3]``","","","Stage counts for direct network evolution runs. Exactly two values also fix the pinch design stages above and below the pinch."

@@ -369,6 +369,20 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "below the pinch, up to 12. None adds none."
         ),
     ),
+    "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
+        "Pinch design minimum-unit networks", None,
+        (
+            "Extra pinch design networks per approach temperature with the fewest "
+            "units at the utility targets. Each seeds network evolution. 0 adds none."
+        ),
+    ),
+    "HENS_PDM_EXTRA_UNIT_NETWORKS": FieldText(
+        "Pinch design one-more-unit networks", None,
+        (
+            "Extra pinch design networks per approach temperature with one unit more "
+            "than the fewest. Each seeds network evolution. 0 adds none."
+        ),
+    ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
         "Thermal derivative parent limit", None,
         "Recorded in the synthesis manifest; no current synthesis step reads it.",

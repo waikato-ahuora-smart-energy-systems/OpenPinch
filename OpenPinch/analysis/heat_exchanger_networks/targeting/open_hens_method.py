@@ -13,7 +13,7 @@ from ..execution.fallbacks import (
     _warn_couenne_fallback,
 )
 from ..execution.settings import SynthesisWorkflowSettings
-from ..execution.task_builders import _outcome_map
+from ..execution.task_builders import _outcome_map, is_pdm_variant_outcome
 from ..results.assembly import (
     SynthesisWorkflowResult,
     build_synthesis_result,
@@ -80,12 +80,20 @@ def execute_open_hens_method(
     else:
         direct_esm_tasks = ()
         direct_esm_outcomes = ()
-        if settings.synthesis_quality_tier > 1:
+        # Above tier 1 every PDM network also seeds evolution directly; at
+        # tier 0 and 1 only the extra minimum-unit networks do, as they skip
+        # the thermal derivative method.
+        direct_pdm_outcomes = (
+            pdm_outcomes
+            if settings.synthesis_quality_tier > 1
+            else tuple(o for o in pdm_outcomes if is_pdm_variant_outcome(o))
+        )
+        if direct_pdm_outcomes:
             direct_esm_tasks, direct_esm_outcomes = (
                 execute_network_evolution_method_from_pinch_design_stage(
                     problem=problem,
                     settings=settings,
-                    pdm_outcomes=pdm_outcomes,
+                    pdm_outcomes=direct_pdm_outcomes,
                     parent_outcomes=pdm_outcome_map,
                     executor=executor,
                 )
