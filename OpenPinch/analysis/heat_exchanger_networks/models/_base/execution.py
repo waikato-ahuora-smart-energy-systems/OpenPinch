@@ -167,7 +167,8 @@ def _solver_value(model, value: Any) -> float:
     try:
         return float(value[0])
     except (TypeError, IndexError, KeyError):
-        return float(value)
+        # A Pyomo variable or parameter holds its number in ``value``.
+        return float(getattr(value, "value", value))
 
 
 def _set_value(model, variable: Any, value: float, *, brackets: bool = False) -> None:

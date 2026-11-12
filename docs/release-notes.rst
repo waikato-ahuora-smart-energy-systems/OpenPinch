@@ -232,6 +232,16 @@ Heat exchanger network synthesis
   ``ipopt-GEKKO``, which summed the objectives, the utility goals now
   minimise utility cost alone. Sides with one hot and one cold utility are
   unchanged.
+- The pinch design method switches each recovery, heater and cooler duty
+  on with a big-M constraint, ``Q <= Q_max * z``, where it required
+  ``Q * (1 - z) = 0``. M is the duty's own upper bound. The model is now
+  linear for unsegmented streams, and its relaxation is tighter for Couenne.
+  Couenne can pick a different network among those with the same objective:
+  on the four-stream example the best network has the same units and TAC in
+  2 stages instead of 3.
+- With ``ipopt-pyomo``, a pinch design model with segmented streams or
+  utilities failed on its first re-solve: the relaxed segment loop read the
+  solved values the GEKKO way.
 - ``highs`` is a new pinch design method solver (``HENS_SOLVER_PDM``): the
   HiGHS MILP solver, run in process through the ``highspy`` package, which
   the ``synthesis`` extra now installs. It needs no solver executable, and

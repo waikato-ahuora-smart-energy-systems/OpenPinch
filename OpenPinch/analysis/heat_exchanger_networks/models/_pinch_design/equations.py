@@ -140,11 +140,14 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
 
     create_match_binaries(owner)
     if owner.integers:
+        # Big-M switches, with each duty's own upper bound as M, keep the
+        # model linear for unsegmented streams.
         for n in range(owner.N_periods):
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_r_by_period[n][i][j][k] * (1 - owner.z[i][j][k]) == 0.0
+                        owner.Q_r_by_period[n][i][j][k]
+                        <= owner.Q_max_period[n][i][j] * owner.z[i][j][k]
                     )
                     if owner.z_allowed[i][j][k] > 0
                     else None
@@ -156,7 +159,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_c_by_period[n][i][u] * (1 - owner.z_cu[i][u]) == 0.0
+                        owner.Q_c_by_period[n][i][u]
+                        <= owner.Qtot_sh_period[n][i] * owner.z_cu[i][u]
                     )
                     if owner.z_cu_allowed[i][u] > 0
                     else None
@@ -167,7 +171,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_h_by_period[n][j][u] * (1 - owner.z_hu[j][u]) == 0.0
+                        owner.Q_h_by_period[n][j][u]
+                        <= owner.Qtot_sc_period[n][j] * owner.z_hu[j][u]
                     )
                     if owner.z_hu_allowed[j][u] > 0
                     else None

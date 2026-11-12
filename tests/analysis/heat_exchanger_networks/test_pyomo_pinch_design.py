@@ -231,3 +231,66 @@ def test_set_value_changes_pyomo_parameters_and_clamps_variables():
     assert selector.fixed
     assert selector.value == pytest.approx(0.0)
     assert duty.value == pytest.approx(10.0)
+
+
+def _highs_available() -> bool:
+    try:
+        from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+        backend.require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+def _built_pdm(problem, *, dTmin: float, side: str, goal: str | None = None):
+    return PinchDecompModel(
+        name=f"{side} pinch {dTmin}",
+        framework="PDM",
+        solver="highs",
+        solver_arrays=problem_to_solver_arrays(problem, dTmin),
+        dTmin=dTmin,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal=goal
+        or ("hot utility" if side == "above" else "cold utility"),
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc=side,
+        pinch_decomposition=build_pinch_design_decomposition(
+            problem, dTmin, pinch_location=side
+        ),
+        stage_selection="automated",
+    )
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+@pytest.mark.parametrize("side", ["above", "below"])
+def test_pdm_logic_constraints_are_big_m_so_the_model_is_linear(side: str):
+    # Duties are switched by their binaries through Q <= Q_max * z rather than
+    # Q * (1 - z) == 0, so a MILP solver can take the model.
+    pyo = pytest.importorskip("pyomo.environ")
+    from pyomo.core.expr import polynomial_degree
+
+    model = _built_pdm(_four_stream_problem(), dTmin=14.0, side=side)
+
+    degrees = {
+        polynomial_degree(constraint.body)
+        for constraint in model.m.model.component_data_objects(
+            pyo.Constraint, active=True
+        )
+    }
+    assert degrees <= {0, 1}
+    assert polynomial_degree(model.m.objective) <= 1
+
+
+@pytest.mark.synthesis
+def test_solver_value_reads_pyomo_variables_and_parameters():
+    # The relaxed segment loop reads solved heat coordinates between solves.
+    pytest.importorskip("pyomo.environ")
+    model = PyomoModel()
+
+    assert base_execution._solver_value(None, model.Var(value=4.0)) == 4.0
+    assert base_execution._solver_value(None, model.Param(value=2.5)) == 2.5
