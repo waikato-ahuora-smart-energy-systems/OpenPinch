@@ -130,20 +130,9 @@ class BaseHeatExchangerNetworkModel(ABC):
             for u, duty in enumerate(duties_by_utility)
         )
 
-    def get_alpha_values(self) -> list:
-        "Calculate source alpha flow-on values in a post-optimisation solve."
+    def get_alpha_values(self) -> list | None:
+        "Calculate source alpha flow-on values from the solved model."
         return _alpha.get_alpha_values(self)
-
-    def set_alpha_dqda_equations(
-        self,
-        *,
-        m: Any | None = None,
-        postoptimisation: bool = False,
-    ) -> None:
-        "Move the source alpha and dQ/dA equations without changing formulas."
-        return _alpha.set_alpha_dqda_equations(
-            self, m=m, postoptimisation=postoptimisation
-        )
 
     def set_blank_input_parameters(self) -> None:
         "Initialize the solver-array attributes expected by source equations."

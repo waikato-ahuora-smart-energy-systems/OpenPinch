@@ -332,8 +332,8 @@ def test_default_design_removes_every_gekko_run_directory(
     import tempfile
 
     # GEKKO creates one mkdtemp run directory per model: main solves, PDM
-    # sides, amalgamated and reduced cases, evolution candidates, alpha side
-    # models. None should outlive the design.
+    # sides, amalgamated and reduced cases, evolution candidates. None should
+    # outlive the design.
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     problem = PinchProblem(source=FIXTURE_ROOT / f"{FOUR_STREAM}.json")
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from contextlib import nullcontext
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -125,24 +124,6 @@ def _model() -> _Harness:
     return model
 
 
-def _configure_equation_state(model: _Harness, *, non_isothermal: bool) -> None:
-    model.I = 1
-    model.J = 1
-    model.S = 3
-    model.non_isothermal_model = non_isothermal
-    model.m = _FakeModel()
-    model.T_h = [[200.0, 180.0, 160.0, 140.0]]
-    model.T_c = [[50.0, 70.0, 90.0, 110.0]]
-    model.T_h_out_x = [[[190.0, 170.0, 150.0]]]
-    model.T_c_out_y = [[[60.0, 80.0, 100.0]]]
-    model.z = [[[1.0, 0.0, 1.0]]]
-    model.z_allowed = [[[1, 0, 1]]]
-    model.Q_r = [[[10.0, 0.0, 5.0]]]
-    model.theta_1 = [[[20.0, 20.0, 20.0]]]
-    model.theta_2 = [[[10.0, 10.0, 10.0]]]
-    model.U_r = [[1.0]]
-
-
 def _solver_arrays(**overrides):
     arrays = {
         "period_ids": ["base", "peak"],
@@ -172,20 +153,6 @@ def _solver_arrays(**overrides):
     }
     arrays.update(overrides)
     return SimpleNamespace(arrays=arrays)
-
-
-def _configure_postoptimisation_state(model: _Harness, *, non_isothermal: bool) -> None:
-    model.I = 1
-    model.J = 1
-    model.S = 3
-    model.non_isothermal_model = non_isothermal
-    model.T_h = [[[200.0], [180.0], [80.0], [70.0]]]
-    model.T_c = [[[50.0], [70.0], [90.0], [110.0]]]
-    model.T_h_out_x = [[[[190.0], [170.0], [75.0]]]]
-    model.T_c_out_y = [[[[60.0], [80.0], [95.0]]]]
-    model.z = [[[[1.0], [0.0], [1.0]]]]
-    model.Q_r = [[[[10.0], [0.0], [5.0]]]]
-    model.alpha = []
 
 
 def _set_success_diagnostics(model: _Harness) -> None:
@@ -299,90 +266,77 @@ def test_post_process_lmtd_uses_the_log_mean_at_the_approach_bound(ends):
     assert lmtd == pytest.approx(24.853, abs=1e-3)
 
 
-def test_get_alpha_values_uses_cached_values_and_warns_on_solver_failure(
-    monkeypatch, caplog
-):
+def _alpha_state(hot_temperatures, cold_temperatures) -> _Harness:
+    """One hot and one cold stream matched in every stage of a solved model."""
     model = _model()
-    model.alpha = [1.0]
-    assert model.get_alpha_values() == [1.0]
-
-    failing_model = _FakeModel(fail_solve=True)
+    model.I = 1
+    model.J = 1
+    model.S = len(hot_temperatures) - 1
+    model.non_isothermal_model = False
+    model.T_h = [[[t] for t in hot_temperatures]]
+    model.T_c = [[[t] for t in cold_temperatures]]
+    model.z = [[[[1.0] for _ in range(model.S)]]]
+    model.Q_r = [[[[10.0] for _ in range(model.S)]]]
     model.alpha = []
-    calls = []
-    cleaned = []
+    return model
 
+
+def test_get_alpha_values_solves_the_flow_on_system(monkeypatch):
+    # P_h at stage 1 is (150 - 100) / (150 - 50) = 0.5 and P_c at stage 0 is
+    # (180 - 120) / (200 - 120) = 0.75. Stage 0 has no cold flow-on and
+    # stage 1 no hot flow-on, so
+    #   alpha_0 = 1 - 0.5 * 0.5 * alpha_1 and alpha_1 = 1 - 0.5 * 0.75 * alpha_0,
+    # giving alpha_0 = 24/29 and alpha_1 = 20/29.
+    model = _alpha_state([200.0, 150.0, 100.0], [180.0, 120.0, 50.0])
+    # The system is linear: it is solved directly, with no solver model.
     monkeypatch.setattr(
-        base_alpha.backend, "create_gekko_model", lambda remote=False: failing_model
+        backend, "create_gekko_model", lambda **_: pytest.fail("built a GEKKO model")
     )
-    monkeypatch.setattr(
-        base_alpha.backend,
-        "suppress_gekko_numpy_array_copy_deprecation",
-        nullcontext,
-    )
-    monkeypatch.setattr(base_alpha.backend, "cleanup_gekko_model", cleaned.append)
 
-    def set_equations(**kwargs):
-        calls.append(kwargs)
-        model.alpha = [[[["unsolved guess"]]]]
+    alpha = model.get_alpha_values()
 
-    monkeypatch.setattr(model, "set_alpha_dqda_equations", set_equations)
+    assert alpha[0][0][0][0] == pytest.approx(24 / 29, abs=1e-6)
+    assert alpha[0][0][1][0] == pytest.approx(20 / 29, abs=1e-6)
+    assert model.alpha is alpha
+    assert base_alpha.alpha_value(model, 0, 0, 1) == pytest.approx(20 / 29, abs=1e-6)
+
+
+def test_get_alpha_values_returns_cached_values():
+    model = _model()
+    model.alpha = [[[[0.25]]]]
+
+    assert model.get_alpha_values() == [[[[0.25]]]]
+
+
+def test_a_single_stage_has_no_flow_on():
+    # One stage is both the last and the first: neither gamma takes flow-on.
+    model = _alpha_state([200.0, 150.0], [180.0, 120.0])
+
+    assert model.get_alpha_values()[0][0][0][0] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("hot_temperatures", "cold_temperatures"),
+    [
+        # P_h at stage 1 is 6 and P_c at stage 0 is 0, so alpha_0 = -2.
+        pytest.param([200.0, 150.0, 90.0], [140.0, 140.0, 140.0], id="out-of-range"),
+        # P_h at stage 1 and P_c at stage 0 are both 2: alpha_0 + alpha_1 = 1
+        # twice over, with no unique solution.
+        pytest.param([200.0, 150.0, 50.0], [250.0, 150.0, 100.0], id="singular"),
+    ],
+)
+def test_get_alpha_values_falls_back_to_neutral_alpha(
+    hot_temperatures, cold_temperatures, caplog
+):
+    model = _alpha_state(hot_temperatures, cold_temperatures)
 
     with caplog.at_level(logging.WARNING, logger=base_alpha.__name__):
         assert model.get_alpha_values() is None
-    assert calls == [{"m": failing_model, "postoptimisation": True}]
-    # The unsolved guesses are not cached, and the side model is cleaned up.
-    assert model.alpha == []
-    assert cleaned == [failing_model]
-    assert any(
-        record.levelno == logging.WARNING
-        and "alpha solve failed" in record.getMessage()
-        and record.exc_info is not None
-        for record in caplog.records
-    )
 
-
-def test_get_alpha_values_rejects_unsuccessful_status_and_retries(monkeypatch):
-    model = _model()
-    model.alpha = []
-    side_models = [_FakeModel(solve_status=0), _FakeModel(solve_status=1)]
-    created = list(side_models)
-    monkeypatch.setattr(
-        base_alpha.backend,
-        "create_gekko_model",
-        lambda remote=False: created.pop(0),
-    )
-    monkeypatch.setattr(
-        base_alpha.backend,
-        "suppress_gekko_numpy_array_copy_deprecation",
-        nullcontext,
-    )
-    cleaned = []
-    monkeypatch.setattr(base_alpha.backend, "cleanup_gekko_model", cleaned.append)
-
-    def set_equations(*, m, postoptimisation):
-        assert postoptimisation is True
-        model.alpha = [[[[0.25 if m is side_models[1] else 0.9]]]]
-
-    monkeypatch.setattr(model, "set_alpha_dqda_equations", set_equations)
-
-    # The solve returns without raising, but the solver status says it failed.
-    assert model.get_alpha_values() is None
+    # Nothing is cached, and ranking uses neutral alpha.
     assert model.alpha == []
     assert base_alpha.alpha_value(model, 0, 0, 0) == 1.0
-
-    # Nothing was cached, so the next call solves again and keeps the result.
-    assert model.get_alpha_values() == [[[[0.25]]]]
-    assert base_alpha.alpha_value(model, 0, 0, 0) == 0.25
-    assert model.get_alpha_values() == [[[[0.25]]]]
-    assert all(side.solved for side in side_models)
-    assert cleaned == side_models
-
-
-def test_set_alpha_dqda_equations_requires_model_for_postoptimisation():
-    model = _model()
-
-    with pytest.raises(ValueError, match="require a model"):
-        model.set_alpha_dqda_equations(postoptimisation=True)
+    assert any("neutral alpha" in record.getMessage() for record in caplog.records)
 
 
 def test_blank_and_solver_array_state_helpers_validate_static_arrays():
