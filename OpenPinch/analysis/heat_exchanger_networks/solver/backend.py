@@ -31,6 +31,9 @@ PYOMO_SOLVER_BINARIES = {
 }
 # Solvers run in-process through a Python package rather than an executable.
 PYOMO_SOLVER_MODULES = {"highs": "highspy"}
+# Solvers that take their options at solve time (in process, or on the
+# command line) rather than from an option file in the working directory.
+SOLVE_TIME_OPTION_SOLVERS = frozenset({"highs", "ipopt-pyomo"})
 PYOMO_SOLVER_FACTORY_NAMES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
@@ -39,6 +42,12 @@ PYOMO_SOLVER_FACTORY_NAMES = {
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
 DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {}
+# Ipopt pushes starting values off their bounds by 1e-2 relative to the bound
+# (about 3.5 K at 350 K), which undoes warm starts from solved networks.
+DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
+    "bound_push": 1e-6,
+    "bound_frac": 1e-6,
+}
 DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
     "tol": "1e-3",
     "acceptable_tol": "1e-2",
@@ -331,10 +340,11 @@ def configure_pyomo_solver(
 ) -> SolverRun:
     """Check a Pyomo solver and write its option file for a ``PyomoModel``.
 
-    Couenne and Ipopt read options from ``couenne.opt`` or ``ipopt.opt`` in
-    the working directory, so options go to a file in a run directory created
-    for the model and removed by ``cleanup_gekko_model``. HiGHS runs in
-    process and takes its options at solve time, with no file.
+    Couenne reads options from ``couenne.opt`` in the working directory, so
+    its options go to a file in a run directory created for the model and
+    removed by ``cleanup_gekko_model``. HiGHS (in process) and Ipopt (on its
+    command line) take their options at solve time, with no file. Ipopt
+    defaults to ``DEFAULT_IPOPT_PYOMO_OPTIONS`` under the given options.
     """
 
     if solver_name not in PYOMO_SOLVERS:
@@ -343,10 +353,13 @@ def configure_pyomo_solver(
             f"solvers are: {', '.join(sorted(PYOMO_SOLVERS))}."
         )
     require_solver_backend(solver_name)
-    effective_options = _normalise_solver_options(solver_options)
+    effective_options = (
+        _merge_solver_options(DEFAULT_IPOPT_PYOMO_OPTIONS, solver_options)
+        if solver_name == "ipopt-pyomo"
+        else _normalise_solver_options(solver_options)
+    )
     option_file = None
-    if solver_name in PYOMO_SOLVER_MODULES:
-        # In-process solvers take their options at solve time.
+    if solver_name in SOLVE_TIME_OPTION_SOLVERS:
         model._openpinch_solver_options = effective_options or None
     elif effective_options:
         if model._path is None:
@@ -408,7 +421,7 @@ def solve_pyomo_model(
     try:
         with _solver_working_directory(model, "pyomo"):
             solver = pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
-            if solver_name in PYOMO_SOLVER_MODULES:
+            if solver_name in SOLVE_TIME_OPTION_SOLVERS:
                 solver.options.update(
                     getattr(model, "_openpinch_solver_options", None) or {}
                 )

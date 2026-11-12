@@ -273,6 +273,12 @@ Heat exchanger network synthesis
   root of a negative number. A heater or cooler at zero duty leaves its
   approach temperatures free, which could make the base negative; it now
   passes through a smooth max with zero.
+- ``ipopt-pyomo`` now defaults to ``bound_push`` and ``bound_frac`` of 1e-6
+  (Ipopt's own default is 1e-2, relative to each bound, which is about 3.5 K
+  at 350 K and moves a warm start off its solved temperatures). Options set in
+  ``HENS_SOLVER_OPTIONS_EVM`` or ``HENS_SOLVER_OPTIONS_TDM`` take precedence.
+  Ipopt options now go on its command line rather than into an ``ipopt.opt``
+  file, so parallel evolution solves no longer wait on each other.
 - The pinch design method can return several networks per approach
   temperature. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks
   with the fewest units at the utility targets to collect, and

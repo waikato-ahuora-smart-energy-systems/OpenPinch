@@ -256,3 +256,35 @@ def test_is_linear_checks_constraints_and_objective():
     model.Equation(x * (1 - z) == 0.0)
 
     assert not model.is_linear()
+
+
+@pytest.mark.parametrize(
+    ("user_options", "expected"),
+    [
+        (None, {"bound_push": 1e-6, "bound_frac": 1e-6}),
+        (
+            {"bound_push": 1e-2, "max_iter": 50},
+            {"bound_push": 1e-2, "bound_frac": 1e-6, "max_iter": 50},
+        ),
+    ],
+)
+def test_ipopt_pyomo_starts_close_to_its_bounds_by_default(
+    monkeypatch, user_options, expected
+):
+    # Ipopt's default push of 1e-2 is relative to the bound, about 3.5 K at
+    # 350 K, which moves warm-started temperatures off their solved values.
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+    monkeypatch.setattr(
+        backend, "_require_pyomo_solver_available", lambda *_args: None
+    )
+    model, _x, _y = _bounded_model(4.0)
+
+    run = backend.configure_pyomo_solver(
+        model, "ipopt-pyomo", solver_options=user_options
+    )
+
+    assert run.solver_options == expected
+    # Options go on Ipopt's command line, so parallel evolution solves need
+    # no option file and no working-directory lock.
+    assert run.option_file is None
+    assert model._path is None
