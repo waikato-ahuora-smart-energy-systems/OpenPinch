@@ -141,6 +141,7 @@ def test_pinch_decomposition_setup_preserves_solver_construction_order() -> None
         "set_match_restrictions",
         "set_stage_wise_superstructure",
         "set_obj",
+        "_solve_nonlinear_models_with_couenne",
     )
     for method_name in ordered_steps:
         if method_name == "set_match_restrictions":
@@ -169,6 +170,7 @@ def test_pinch_decomposition_setup_preserves_solver_construction_order() -> None
         ("set_match_restrictions", ["allowed"]),
         "set_stage_wise_superstructure",
         "set_obj",
+        "_solve_nonlinear_models_with_couenne",
     ]
 
 

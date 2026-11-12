@@ -294,3 +294,35 @@ def test_solver_value_reads_pyomo_variables_and_parameters():
 
     assert base_execution._solver_value(None, model.Var(value=4.0)) == 4.0
     assert base_execution._solver_value(None, model.Param(value=2.5)) == 2.5
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_nonlinear_highs_pdm_is_solved_with_couenne(monkeypatch):
+    # HiGHS takes only linear models; one that is not linear (segmented
+    # streams that keep products, for example) goes to Couenne instead.
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    configured = []
+
+    def configure(model, solver_name, *, solver_options=None):
+        configured.append((solver_name, solver_options))
+        return backend.SolverRun(name=solver_name, extension="pyomo")
+
+    monkeypatch.setattr(PyomoModel, "is_linear", lambda self: False)
+    monkeypatch.setattr(backend, "configure_pyomo_solver", configure)
+
+    model = _built_pdm(_four_stream_problem(), dTmin=14.0, side="above")
+
+    assert model.solver == "couenne"
+    # HiGHS options do not apply to Couenne.
+    assert configured == [("highs", None), ("couenne", None)]
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_linear_highs_pdm_stays_on_highs():
+    model = _built_pdm(_four_stream_problem(), dTmin=14.0, side="above")
+
+    assert model.solver == "highs"
+    assert model.m.is_linear()

@@ -81,6 +81,28 @@ class PyomoModel:
     def Maximize(self, expression: Any) -> None:
         self._set_objective(expression, sense=_pyomo().maximize)
 
+    def is_linear(self) -> bool:
+        """True when every active constraint and the objective is linear.
+
+        Parameters are fixed variables, so a parameter times a variable
+        counts as linear.
+        """
+
+        pyo = _pyomo()
+        from pyomo.core.expr import polynomial_degree
+
+        expressions = [
+            constraint.body
+            for constraint in self.model.component_data_objects(
+                pyo.Constraint, active=True
+            )
+        ]
+        if self.objective is not None:
+            expressions.append(self.objective.expr)
+        return all(
+            polynomial_degree(expression) in (0, 1) for expression in expressions
+        )
+
     def _set_objective(self, expression: Any, *, sense: Any) -> None:
         if self.objective is not None:
             raise ValueError(

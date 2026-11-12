@@ -239,3 +239,20 @@ def test_highs_solves_a_milp_with_options_and_no_option_file():
     assert solved.solver_options == {"time_limit": 30.0}
     assert solved.objective_value == pytest.approx(3.5)
     assert (duty.value, unit.value) == pytest.approx((3.0, 1.0))
+
+
+def test_is_linear_checks_constraints_and_objective():
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0, ub=5.0)
+    z = model.Var(value=1, lb=0, ub=1, integer=True)
+    fixed = model.Param(value=2.0)
+    model.Equation(x <= 5.0 * z)
+    # A fixed parameter times a variable is still linear.
+    model.Equation(fixed * x >= 1.0)
+    model.Minimize(x)
+
+    assert model.is_linear()
+
+    model.Equation(x * (1 - z) == 0.0)
+
+    assert not model.is_linear()

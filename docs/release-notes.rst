@@ -247,7 +247,8 @@ Heat exchanger network synthesis
   the ``synthesis`` extra now installs. It needs no solver executable, and
   its ``HENS_SOLVER_OPTIONS_PDM`` are HiGHS options (``time_limit``, for
   example). Like Couenne it keeps integers, so segmented streams and prices
-  use their exact interval binaries in one solve.
+  use their exact interval binaries in one solve. A pinch design model that
+  is not linear is solved with Couenne instead, with a logged warning.
 
 0.8.3 (2026-11-11)
 ------------------

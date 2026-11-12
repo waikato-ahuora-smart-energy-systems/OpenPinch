@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -15,6 +16,8 @@ from ._pinch_design import postprocess as _postprocess
 from ._pinch_design import preprocessing as _preprocessing
 from .base import BaseHeatExchangerNetworkModel
 from .stagewise import StageWiseModel
+
+logger = logging.getLogger(__name__)
 
 
 class PinchDecompModel(BaseHeatExchangerNetworkModel):
@@ -79,6 +82,21 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.set_match_restrictions(self.z_restriction)
         self.set_stage_wise_superstructure()
         self.set_obj()
+        self._solve_nonlinear_models_with_couenne()
+
+    def _solve_nonlinear_models_with_couenne(self) -> None:
+        """Send a model HiGHS cannot take to Couenne, without HiGHS options."""
+
+        if self.solver != "highs" or self.m.is_linear():
+            return
+        logger.warning(
+            "[%s] The pinch design model is not linear, so Couenne solves it "
+            "instead of HiGHS.",
+            self.name,
+        )
+        self.solver = "couenne"
+        self.solver_options = None
+        self.solver_run = backend.configure_pyomo_solver(self.m, self.solver)
 
     def get_model_parameters_from_solver_arrays(self) -> None:
         super().get_model_parameters_from_solver_arrays()
