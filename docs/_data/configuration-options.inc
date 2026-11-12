@@ -134,7 +134,7 @@ Heat Exchanger Network Synthesis
    "``HENS_TDM_PARENT_LIMIT``","number","``None``","",">= 1","Recorded in the synthesis manifest; no current synthesis step reads it."
    "``HENS_STAGE_PACKING``","string","``auto``","","","Methods whose integer models keep active stages contiguous: none, pdm, tdm or all. auto currently means none."
    "``HENS_STAGE_SELECTION``","number_list","``[1, 2, 3]``","","","Stage counts for direct network evolution runs. Exactly two values also fix the pinch design stages above and below the pinch."
-   "``HENS_SOLVER_PDM``","string","``couenne``","","","Solver for the pinch design method models."
+   "``HENS_SOLVER_PDM``","string","``highs``","","","Solver for the pinch design method models."
    "``HENS_SOLVER_TDM``","string","``couenne``","","","Solver for the thermal derivative method models."
    "``HENS_SOLVER_EVM``","string","``ipopt-pyomo``","","","Solver for the network evolution method models."
    "``HENS_SOLVER_OPTIONS_PDM``","object","``{}``","","","Options passed to the pinch design solver: known tolerances, iteration limits and numeric settings, each a number, a boolean or one word."

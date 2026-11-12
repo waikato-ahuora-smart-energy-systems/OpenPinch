@@ -390,7 +390,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),
-    "HENS_SOLVER_PDM": _spec(str, "couenne", "hens", "solver_pdm", validator=_non_empty_string),
+    "HENS_SOLVER_PDM": _spec(str, "highs", "hens", "solver_pdm", validator=_non_empty_string),
     "HENS_SOLVER_TDM": _spec(str, "couenne", "hens", "solver_tdm", validator=_non_empty_string),
     "HENS_SOLVER_EVM": _spec(str, "ipopt-pyomo", "hens", "solver_evm", validator=_non_empty_string),
     "HENS_SOLVER_OPTIONS_PDM": _spec(dict[str, Any], {}, "hens", "solver_options_pdm", validator=_solver_options),

@@ -249,6 +249,12 @@ Heat exchanger network synthesis
   example). Like Couenne it keeps integers, so segmented streams and prices
   use their exact interval binaries in one solve. A pinch design model that
   is not linear is solved with Couenne instead, with a logged warning.
+- ``HENS_SOLVER_PDM`` now defaults to ``highs`` (it was ``couenne``). HiGHS
+  proves the same optimum as Couenne on the pinch design model and is much
+  faster on large cases, but it returns a different network where several
+  have the same objective, so designs from the default settings change. Set
+  ``HENS_SOLVER_PDM`` to ``couenne`` for the previous behaviour. A missing
+  Couenne binary no longer stops the pinch design method.
 
 0.8.3 (2026-11-11)
 ------------------
