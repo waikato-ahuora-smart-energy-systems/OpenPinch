@@ -12,8 +12,19 @@ from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
 
 
 class _Value:
+    """A Pyomo-shaped variable."""
+
     def __init__(self, value: float = 0.0) -> None:
-        self.VALUE = SimpleNamespace(value=value)
+        self.value = value
+        self.fixed = False
+        self.lb = None
+        self.ub = None
+
+    def is_variable_type(self) -> bool:
+        return True
+
+    def set_value(self, value, skip_validation: bool = False) -> None:
+        self.value = value
 
 
 class _RecordingModel:
@@ -26,14 +37,14 @@ class _RecordingModel:
         self.theta_1 = [[[_Value()]]]
         self.theta_2 = [[[_Value()]]]
 
-    def set_initial_values_for_variables(self, parent, *, brackets=False) -> None:
+    def set_initial_values_for_variables(self, parent) -> None:
         # The parent had the match off: copying it resets the move's values.
-        self.Q_r[0][0][0].VALUE.value = 0.0
-        self.z[0][0][0].VALUE.value = 0
+        self.Q_r[0][0][0].value = 0.0
+        self.z[0][0][0].value = 0
         self.events.append(("warm start", parent))
 
     def optimise(self, print_output: bool) -> None:
-        self.events.append(("solve", self.z[0][0][0].VALUE.value))
+        self.events.append(("solve", self.z[0][0][0].value))
 
 
 @pytest.mark.parametrize(("kind", "z_after_move"), [("plus", 1), ("minus", 0)])

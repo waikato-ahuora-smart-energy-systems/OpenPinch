@@ -24,13 +24,13 @@ Private helper modules for `PinchDecompModel` (`../pinch_decomposition.py`), whi
 - Amalgamation stacks above-pinch stages first, then below-pinch stages; it raises `ValueError` if a required side did not solve, and requires equal period counts. [amalgamation.py:amalgamate_networks] [amalgamation.py:_copy_recovery_match]
 - The amalgamated model is created with `integers=True`, `tol=1e-3` and goal "total utility" (reduced to "hot utility" or "cold utility" when one side is not required); its `z_allowed` is every match with duty above `owner.tol`. [amalgamation.py:amalgamate_networks]
 - Post-processing LMTD and area use the shared exact-LMTD helper; design area is the maximum over periods. `TAC_model` is the solve's objective value. [postprocess.py:_get_multiperiod_post_process]
-- Amalgamation reads solved side values through `_stagewise.verification._value`, so GEKKO and native Pyomo sides amalgamate alike. [amalgamation.py:amalgamate_networks]
+- Amalgamation reads solved side values through `_stagewise.verification._value`, so plain values and Pyomo components amalgamate alike. [amalgamation.py:amalgamate_networks]
 
 ## Side Effects
-- `amalgamate_networks` constructs a `StageWiseModel` (a new GEKKO model) and writes solved values into its variables through `_base.execution._assign_value`. [amalgamation.py:amalgamate_networks] [amalgamation.py:_copy_recovery_match]
+- `amalgamate_networks` constructs a `StageWiseModel` (a new Pyomo model) and writes solved values into its variables through `_base.execution._assign_value`. [amalgamation.py:amalgamate_networks] [amalgamation.py:_copy_recovery_match]
 - When the above side is not required but the below side is, `amalgamate_networks` sets `above_case.S` and `above_case.K` to 0, mutating its argument. [amalgamation.py:amalgamate_networks]
 - Post-processing sets many attributes on the model (`z`, `theta_*`, `LMTD_r`, `area_r`, `TAC`). [postprocess.py:_get_multiperiod_post_process]
 - Imports `StageWiseModel` from `../stagewise` at module load and `_value` from `../_stagewise/verification`. [amalgamation.py] [postprocess.py]
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_pinch_design_method.py tests/analysis/heat_exchanger_networks/test_multiperiod_pinch_design.py tests/analysis/heat_exchanger_networks/test_pyomo_pinch_design.py` (no directory mirrors `models/_pinch_design`). The last compares the native Pyomo PDM with the GEKKO PDM.
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_pinch_design_method.py tests/analysis/heat_exchanger_networks/test_multiperiod_pinch_design.py tests/analysis/heat_exchanger_networks/test_pyomo_pinch_design.py` (no directory mirrors `models/_pinch_design`). The last covers the native Pyomo PDM model.

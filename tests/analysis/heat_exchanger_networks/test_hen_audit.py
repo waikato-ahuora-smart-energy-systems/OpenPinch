@@ -209,9 +209,26 @@ def test_hen_costs_are_annualised_like_area_targeting():
 # verify() compares the solver's utility cost with a recomputation
 
 
+def _solver_available(solver_name: str) -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend(solver_name)
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 @pytest.mark.synthesis
-def test_apopt_stagewise_verify_compares_solver_utility_cost():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not _solver_available('ipopt-pyomo')", reason="needs ipopt and pyomo"
+)
+def test_stagewise_verify_compares_solver_utility_cost():
     import json
 
     from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
@@ -230,7 +247,7 @@ def test_apopt_stagewise_verify_compares_solver_utility_cost():
     model = StageWiseModel(
         name="verify-utility-cost",
         framework="TDM",
-        solver="apopt",
+        solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(
             PinchProblem(source=json.loads(fixture.read_text())), 2.0
         ),
@@ -249,8 +266,9 @@ def test_apopt_stagewise_verify_compares_solver_utility_cost():
 
     # A solver whose cost expression disagrees with its duties must fail,
     # even though post-processing recomputed hu_cost_total from the duties.
-    solved = model.hu_cost_solver_by_period[0]
-    solved.VALUE.value = [2.0 * verification._value(solved)]
+    model.hu_cost_solver_by_period[0] = 2.0 * verification._value(
+        model.hu_cost_solver_by_period[0]
+    )
 
     assert verification._check_utility_costs(model) is False
 
@@ -414,9 +432,18 @@ def test_isothermal_split_branches_report_mixing_outlets_and_split_fractions():
 
 
 class _Variable:
+    """A Pyomo-shaped variable."""
+
     def __init__(self):
-        self.lower, self.upper = -1e9, 1e9
-        self.VALUE = SimpleNamespace(value=None)
+        self.lb, self.ub = -1e9, 1e9
+        self.fixed = False
+        self.value = None
+
+    def is_variable_type(self) -> bool:
+        return True
+
+    def set_value(self, value, skip_validation: bool = False) -> None:
+        self.value = value
 
 
 class _ReducedModel:
@@ -448,9 +475,9 @@ class _ReducedModel:
     def optimise(self, print_output=False):
         self.mSuccess = 1
         type(self).flags_at_solve = {
-            "z": [[[f.VALUE.value for f in row] for row in hot] for hot in self.z],
-            "z_hu": [[f.VALUE.value for f in row] for row in self.z_hu],
-            "z_cu": [[f.VALUE.value for f in row] for row in self.z_cu],
+            "z": [[[f.value for f in row] for row in hot] for hot in self.z],
+            "z_hu": [[f.value for f in row] for row in self.z_hu],
+            "z_cu": [[f.value for f in row] for row in self.z_cu],
         }
 
     def verify(self):

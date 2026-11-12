@@ -7,7 +7,6 @@ import shutil
 import tempfile
 import threading
 import time
-import warnings
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -22,9 +21,8 @@ from .dependencies import (
 )
 
 PYOMO_SOLVERS = frozenset({"couenne", "ipopt-pyomo", "highs"})
-GEKKO_SOLVERS = frozenset({"ipopt-GEKKO", "apopt"})
 # Solvers that keep integer variables integer; the others relax them.
-INTEGER_SOLVERS = frozenset({"apopt", "couenne", "highs"})
+INTEGER_SOLVERS = frozenset({"couenne", "highs"})
 PYOMO_SOLVER_BINARIES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
@@ -48,24 +46,13 @@ DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
     "bound_push": 1e-6,
     "bound_frac": 1e-6,
 }
-DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
-    "tol": "1e-3",
-    "acceptable_tol": "1e-2",
-    "constr_viol_tol": "1e-2",
-    "acceptable_constr_viol_tol": "1e-1",
-    "compl_inf_tol": "1e-2",
-    "max_iter": 1000,
-    "print_level": 5,
-}
-# Pyomo termination conditions of a converged solve. GEKKO's Pyomo extension
-# only warns on the others (an iteration or time limit, for example) and still
-# reports the solve as successful.
+# Pyomo termination conditions of a converged solve. A solve that stops at
+# an iteration or time limit, for example, still passes, but is not converged.
 CONVERGED_TERMINATION_CONDITIONS = frozenset(
     {"optimal", "locallyOptimal", "globallyOptimal", "feasible"}
 )
-# Solver statuses and termination conditions a native Pyomo solve accepts:
-# those GEKKO's Pyomo extension accepts (the others raise there), except
-# "unbounded" and "noSolution", which leave no solution to read.
+# Solver statuses and termination conditions a Pyomo solve accepts. The
+# others, including "unbounded" and "noSolution", leave no solution to read.
 PASSING_SOLVER_STATUSES = frozenset({"ok", "warning"})
 PASSING_TERMINATION_CONDITIONS = CONVERGED_TERMINATION_CONDITIONS | frozenset(
     {
@@ -78,9 +65,6 @@ PASSING_TERMINATION_CONDITIONS = CONVERGED_TERMINATION_CONDITIONS | frozenset(
         "other",
         "intermediateNonInteger",
     }
-)
-GEKKO_NUMPY_ARRAY_COPY_DEPRECATION = (
-    r"__array__ implementation doesn't accept a copy keyword.*"
 )
 
 
@@ -109,87 +93,18 @@ class SolverRun:
         )
 
 
-def create_gekko_model(*, remote: bool = False) -> Any:
-    """Create a GEKKO model after the optional dependency has been requested.
-
-    The model records the Pyomo termination condition of each solve, which
-    GEKKO itself only prints.
-    """
-
-    require_synthesis_dependency(
-        "gekko",
-        package="gekko",
-        purpose="GEKKO heat exchanger network equation model construction",
-    )
-    return _termination_recording_class("_TerminationRecordingGEKKO")(remote=remote)
-
-
-def __getattr__(name: str) -> type:
-    # Pickle looks classes up by module and name, so unpickling a model in a
-    # process pool worker resolves the lazily built classes here.
-    if name in _TERMINATION_RECORDING_CLASS_NAMES:
-        return _termination_recording_class(name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-_TERMINATION_RECORDING_CLASS_NAMES = frozenset(
-    {"_TerminationRecordingGEKKO", "_TerminationRecordingPyomoConverter"}
-)
-_TERMINATION_RECORDING_CLASS_LOCK = threading.Lock()
-
-
-def _termination_recording_class(name: str) -> type:
-    """Return a GEKKO subclass published as a module attribute of this module.
-
-    The classes are built on first use, so importing this module does not
-    import gekko, and published once, so models pickle by reference to them.
-    """
-
-    with _TERMINATION_RECORDING_CLASS_LOCK:
-        if name not in globals():
-            _define_termination_recording_classes()
-    return globals()[name]
-
-
-def _define_termination_recording_classes() -> None:
-    from gekko import GEKKO
-    from gekko.gk_solver_extension_pyomo import PyomoConverter
-
-    class _TerminationRecordingPyomoConverter(PyomoConverter):
-        def handle_status(self, status_dict, status, status_string) -> None:
-            if isinstance(status, self.TerminationCondition):
-                self._gekko_model._openpinch_termination_condition = str(status)
-            super().handle_status(status_dict, status, status_string)
-
-    class _TerminationRecordingGEKKO(GEKKO):
-        def solver_extension_pyomo(self, disp=True):
-            self.solve_with_converter(_TerminationRecordingPyomoConverter, disp)
-
-    for cls in (_TerminationRecordingPyomoConverter, _TerminationRecordingGEKKO):
-        cls.__qualname__ = cls.__name__
-        globals()[cls.__name__] = cls
-
-
-def cleanup_gekko_model(model: Any) -> None:
-    """Remove a GEKKO model's temporary run directory, once.
+def cleanup_model_run_directory(model: Any) -> None:
+    """Remove a model's temporary run directory, once.
 
     Solved values stay on the model's variables, so this is safe once the
-    results have been read. Repeat calls and models whose directory is
-    already gone are no-ops (GEKKO's own ``cleanup`` prints when the
-    directory is missing).
+    results have been read. Models without a run directory, repeat calls and
+    models whose directory is already gone are no-ops.
     """
 
-    if model is None:
-        return
     path = getattr(model, "_path", None)
-    if isinstance(path, (str, os.PathLike)):
-        if os.path.isdir(path):
-            shutil.rmtree(path, ignore_errors=True)
-            model._openpinch_cleaned_up = True
-        return
-    cleanup = getattr(model, "cleanup", None)
-    if callable(cleanup):
-        cleanup()
+    if isinstance(path, (str, os.PathLike)) and os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
+        model._openpinch_cleaned_up = True
 
 
 def require_solver_backend(solver_name: str) -> None:
@@ -213,122 +128,10 @@ def require_solver_backend(solver_name: str) -> None:
         )
         return
 
-    if solver_name in GEKKO_SOLVERS:
-        require_synthesis_dependency(
-            "gekko",
-            package="gekko",
-            purpose=f"{solver_name} heat exchanger network synthesis solves",
-        )
-        return
-
     raise MissingSynthesisSolverError(
         "Unsupported heat exchanger network synthesis solver "
         f"{solver_name!r}. Supported solvers "
-        f"are: {', '.join(sorted(PYOMO_SOLVERS | GEKKO_SOLVERS))}."
-    )
-
-
-def configure_gekko_solver(
-    model: Any,
-    solver_name: str,
-    *,
-    solver_options: Mapping[str, Any] | Sequence[str] | None = None,
-) -> SolverRun:
-    """Apply GEKKO/Pyomo solver settings without eager imports."""
-
-    require_solver_backend(solver_name)
-
-    if solver_name in PYOMO_SOLVERS:
-        extension: str | int | None = "pyomo"
-    elif solver_name in GEKKO_SOLVERS:
-        extension = 0
-    else:
-        extension = getattr(model.options, "SOLVER_EXTENSION", None)
-
-    model.options.SOLVER_EXTENSION = extension
-    model.options.SOLVER = solver_name.split("-")[0]
-    effective_options: dict[str, Any] = {}
-    option_file = None
-
-    if solver_name == "ipopt-GEKKO":
-        effective_options = _merge_solver_options(
-            DEFAULT_IPOPT_GEKKO_OPTIONS,
-            solver_options,
-        )
-        model.solver_options = _format_solver_option_lines(effective_options)
-
-    if solver_name == "apopt":
-        model.options.MAX_ITER = 1000
-        model.options.RTOL = 1e-2
-        model.options.OTOL = 1e-2
-        effective_options = _normalise_solver_options(solver_options)
-        if effective_options:
-            model.solver_options = _format_solver_option_lines(effective_options)
-
-    if model.options.SOLVER_EXTENSION == "pyomo":
-        if solver_name == "couenne":
-            effective_options = _normalise_solver_options(solver_options)
-            if effective_options:
-                option_file = _write_solver_option_file(
-                    model,
-                    COUENNE_OPTION_FILE,
-                    effective_options,
-                )
-        else:
-            effective_options = _normalise_solver_options(solver_options)
-            if effective_options:
-                option_file = _write_solver_option_file(
-                    model,
-                    IPOPT_OPTION_FILE,
-                    effective_options,
-                )
-        _require_pyomo_solver_available(solver_name, model.options.SOLVER)
-
-    return SolverRun(
-        name=solver_name,
-        extension=extension,
-        solver_options=effective_options or None,
-        option_file=option_file,
-    )
-
-
-def solve_gekko_model(
-    model: Any,
-    *,
-    solver_name: str,
-    disp: bool = False,
-    debug: int = 0,
-) -> SolverRun:
-    """Run a configured GEKKO model and normalize solver-specific failures."""
-
-    extension = getattr(model.options, "SOLVER_EXTENSION", None)
-    _restore_run_directory(model)
-    model._openpinch_termination_condition = None
-    start = time.time()
-    failure_reason = None
-    try:
-        with _solver_working_directory(model, extension):
-            with suppress_gekko_numpy_array_copy_deprecation():
-                model.solve(disp=disp, debug=debug)
-    except Exception as exc:  # GEKKO/Pyomo exceptions become task metadata.
-        failure_reason = str(exc) or exc.__class__.__name__
-    solve_time = time.time() - start
-
-    status = getattr(model.options, "SOLVESTATUS", None)
-    objective_value = getattr(model.options, "objfcnval", None)
-    if failure_reason is None and status != 1:
-        failure_reason = f"solver status {status}"
-
-    return SolverRun(
-        name=solver_name,
-        extension=extension,
-        status=status,
-        objective_value=_as_float_or_none(objective_value),
-        solve_time=solve_time,
-        failure_reason=failure_reason,
-        solver_options=getattr(model, "_openpinch_solver_options", None),
-        option_file=getattr(model, "_openpinch_solver_option_file", None),
-        termination_condition=model._openpinch_termination_condition,
+        f"are: {', '.join(sorted(PYOMO_SOLVERS))}."
     )
 
 
@@ -342,7 +145,7 @@ def configure_pyomo_solver(
 
     Couenne reads options from ``couenne.opt`` in the working directory, so
     its options go to a file in a run directory created for the model and
-    removed by ``cleanup_gekko_model``. HiGHS (in process) and Ipopt (on its
+    removed by ``cleanup_model_run_directory``. HiGHS (in process) and Ipopt (on its
     command line) take their options at solve time, with no file. Ipopt
     defaults to ``DEFAULT_IPOPT_PYOMO_OPTIONS`` under the given options.
     """
@@ -400,11 +203,12 @@ def solve_pyomo_model(
     solver_name: str,
     disp: bool = False,
 ) -> SolverRun:
-    """Solve a ``PyomoModel`` and normalise the result like a GEKKO solve.
+    """Solve a ``PyomoModel`` and normalise the result into a ``SolverRun``.
 
-    Values are loaded onto the model's variables. A solver status or
-    termination condition GEKKO's Pyomo extension would reject becomes the
-    failure reason, with status 0.
+    Values are loaded onto the model's variables. A solver status outside
+    ``PASSING_SOLVER_STATUSES`` or a termination condition outside
+    ``PASSING_TERMINATION_CONDITIONS`` becomes the failure reason, with
+    status 0.
     """
 
     pyomo = require_synthesis_dependency(
@@ -451,19 +255,6 @@ def solve_pyomo_model(
         option_file=getattr(model, "_openpinch_solver_option_file", None),
         termination_condition=termination_condition,
     )
-
-
-@contextmanager
-def suppress_gekko_numpy_array_copy_deprecation():
-    """Suppress GEKKO's NumPy 2 array-copy deprecation during solver writes."""
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message=GEKKO_NUMPY_ARRAY_COPY_DEPRECATION,
-            category=DeprecationWarning,
-        )
-        yield
 
 
 def _as_float_or_none(value: Any) -> float | None:
@@ -538,7 +329,7 @@ def _write_solver_option_file(
     model_path = getattr(model, "_path", None)
     if model_path is None:
         raise RuntimeError(
-            f"Cannot write {filename}: GEKKO model does not expose a run path."
+            f"Cannot write {filename}: the model does not expose a run path."
         )
     directory = Path(model_path)
     directory.mkdir(parents=True, exist_ok=True)

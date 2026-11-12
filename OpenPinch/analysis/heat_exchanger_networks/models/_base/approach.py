@@ -414,13 +414,13 @@ def _set_terminal_approach_equations(
 
 
 def _is_parameter(value) -> bool:
-    """Return whether a model value is fixed: a GEKKO or ``PyomoModel`` parameter."""
+    """Return whether a model value is fixed: a ``PyomoModel`` parameter."""
 
-    return type(value).__name__ == "GKParameter" or bool(getattr(value, "fixed", False))
+    return bool(getattr(value, "fixed", False))
 
 
 def _weighted_state_average(model, values: Sequence[Any]) -> Any:
-    """Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for GEKKO expressions."""
+    """Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for model expressions."""
 
     return (
         sum(float(model.period_weights[n]) * values[n] for n in range(model.N_periods))
@@ -452,20 +452,6 @@ def set_match_restrictions(model, restrictions) -> None:
                 for i in range(model.I)
             ]
         elif isinstance(z_restriction[0][0][0], list):
-            model.z_allowed = [
-                [
-                    [
-                        1 if z_restriction[i][j][k][0] > model.tol else 0
-                        for k in range(model.S)
-                    ]
-                    for j in range(model.J)
-                ]
-                for i in range(model.I)
-            ]
-        elif type(z_restriction[0][0][0]).__name__ in {
-            "GKVariable",
-            "GKParameter",
-        }:
             model.z_allowed = [
                 [
                     [

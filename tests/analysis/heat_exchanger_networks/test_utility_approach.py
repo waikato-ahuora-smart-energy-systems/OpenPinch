@@ -83,13 +83,20 @@ def _fixed_topology(arrays):
     return [z, [[1], [1]], [[1], [1]]]
 
 
+def _ipopt_available() -> bool:
+    try:
+        require_solver_binary("ipopt", purpose="utility approach regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 def _solved_fixed_topology_model(non_isothermal_model: bool):
-    pytest.importorskip("gekko")
     arrays = problem_to_solver_arrays(_cross_problem(), D_TMIN)
     model = StageWiseModel(
         name=f"utility-cross-noniso-{non_isothermal_model}",
         framework="TDM",
-        solver="apopt",
+        solver="ipopt-pyomo",
         solver_arrays=arrays,
         stages=2,
         dTmin=D_TMIN,
@@ -106,9 +113,12 @@ def _solved_fixed_topology_model(non_isothermal_model: bool):
     return model, arrays
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _ipopt_available()", reason="needs the ipopt binary")
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
-def test_apopt_stagewise_utility_exchangers_keep_their_approach_temperature(
+def test_ipopt_stagewise_utility_exchangers_keep_their_approach_temperature(
     non_isothermal_model,
 ):
     model, _arrays = _solved_fixed_topology_model(non_isothermal_model)
@@ -119,8 +129,11 @@ def test_apopt_stagewise_utility_exchangers_keep_their_approach_temperature(
         assert min(hot_end, cold_end) >= required - 1e-4, (kind, index)
 
 
-@pytest.mark.synthesis
-def test_apopt_extracted_network_records_utility_approaches():
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _ipopt_available()", reason="needs the ipopt binary")
+def test_ipopt_extracted_network_records_utility_approaches():
     model, arrays = _solved_fixed_topology_model(non_isothermal_model=True)
 
     network = extract_heat_exchanger_network(model, arrays, run_id="utility")
@@ -250,17 +263,19 @@ def _recovery_only_problem() -> PinchProblem:
     )
 
 
-@pytest.mark.synthesis
-def test_apopt_relaxed_model_builds_with_an_unusable_heater():
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _ipopt_available()", reason="needs the ipopt binary")
+def test_ipopt_relaxed_model_builds_with_an_unusable_heater():
     # Stage reduction and evolution build relaxed models whose utility
     # binaries are fixed at 1. A heater whose fixed end cannot meet its
     # approach then carries no duty; construction used to raise on it.
-    pytest.importorskip("gekko")
     arrays = problem_to_solver_arrays(_recovery_only_problem(), 10.0)
     model = StageWiseModel(
         name="recovery-only-relaxed",
         framework="TDM",
-        solver="apopt",
+        solver="ipopt-pyomo",
         solver_arrays=arrays,
         stages=1,
         dTmin=10.0,

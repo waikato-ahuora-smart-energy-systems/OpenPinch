@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import tempfile
 from types import SimpleNamespace
 
 import pytest
@@ -116,36 +117,34 @@ def test_stagewise_setup_preserves_solver_construction_order():
     ]
 
 
-class _IndexedValue:
+class _SourceVariable:
     def __init__(self, value: float):
         self.value = value
 
-    def __getitem__(self, index):
-        if index == 0:
-            return self.value
-        raise IndexError(index)
 
+class _PyomoLikeVariable:
+    """A Pyomo-shaped variable: ``value``, bounds and ``set_value``/``fix``."""
 
-class _SourceVariable:
-    def __init__(self, value: float):
-        self.VALUE = _IndexedValue(value)
+    def __init__(self, value=None):
+        self.lb = -1e9
+        self.ub = 1e9
+        self.fixed = False
+        self.value = value
 
+    def is_variable_type(self) -> bool:
+        return True
 
-class GKVariable:
-    def __init__(self):
-        self.lower = -1e9
-        self.upper = 1e9
-        self.VALUE = SimpleNamespace(value=None)
+    def set_value(self, value, skip_validation: bool = False) -> None:
+        self.value = value
 
-    def __getitem__(self, index):
-        if index == 0:
-            return self.VALUE.value
-        raise IndexError(index)
+    def fix(self, value) -> None:
+        self.fixed = True
+        self.value = value
 
 
 def _variables(shape: tuple[int, ...]):
     if not shape:
-        return GKVariable()
+        return _PyomoLikeVariable()
     return [_variables(shape[1:]) for _ in range(shape[0])]
 
 
@@ -614,19 +613,19 @@ def test_stagewise_single_period_initial_values_cover_inactive_utilities_and_non
 
     model.set_initial_values_for_variables(source)
 
-    assert model.Q_r[0][0][0].VALUE.value == pytest.approx(10.0)
-    assert model.Q_r[0][0][1].VALUE.value == pytest.approx(0.0)
-    assert model.theta_1[0][0][1].VALUE.value == pytest.approx(model.dTmin)
-    assert model.Q_c[0][0].VALUE.value == pytest.approx(0.0)
-    assert model.z_cu[0][0].VALUE.value == 0
-    assert model.Q_h[0][0].VALUE.value == pytest.approx(0.0)
-    assert model.z_hu[0][0].VALUE.value == 0
-    assert model.X[0][0][0].VALUE.value == pytest.approx(0.25)
-    assert model.Y[0][0][0].VALUE.value == pytest.approx(0.35)
-    assert model.X[0][0][1].VALUE.value == pytest.approx(0.0)
-    assert model.Y[0][0][1].VALUE.value == pytest.approx(0.0)
-    assert model.T_h_out_x[0][0][1].VALUE.value == pytest.approx(90.0)
-    assert model.T_c_out_y[0][0][1].VALUE.value == pytest.approx(45.0)
+    assert model.Q_r[0][0][0].value == pytest.approx(10.0)
+    assert model.Q_r[0][0][1].value == pytest.approx(0.0)
+    assert model.theta_1[0][0][1].value == pytest.approx(model.dTmin)
+    assert model.Q_c[0][0].value == pytest.approx(0.0)
+    assert model.z_cu[0][0].value == 0
+    assert model.Q_h[0][0].value == pytest.approx(0.0)
+    assert model.z_hu[0][0].value == 0
+    assert model.X[0][0][0].value == pytest.approx(0.25)
+    assert model.Y[0][0][0].value == pytest.approx(0.35)
+    assert model.X[0][0][1].value == pytest.approx(0.0)
+    assert model.Y[0][0][1].value == pytest.approx(0.0)
+    assert model.T_h_out_x[0][0][1].value == pytest.approx(90.0)
+    assert model.T_c_out_y[0][0][1].value == pytest.approx(45.0)
 
 
 def test_stagewise_single_period_initial_values_derive_noniso_split_from_iso_source():
@@ -635,14 +634,14 @@ def test_stagewise_single_period_initial_values_derive_noniso_split_from_iso_sou
 
     model.set_initial_values_for_variables(source)
 
-    assert model.X[0][0][0].VALUE.value == pytest.approx(1.0)
-    assert model.Y[0][0][0].VALUE.value == pytest.approx(1.0)
-    assert model.X[0][0][1].VALUE.value == pytest.approx(0.0)
-    assert model.Y[0][0][1].VALUE.value == pytest.approx(0.0)
-    assert model.X[0][0][2].VALUE.value == pytest.approx(0.0)
-    assert model.Y[0][0][2].VALUE.value == pytest.approx(0.0)
-    assert model.T_h_out_x[0][0][2].VALUE.value == pytest.approx(85.0)
-    assert model.T_c_out_y[0][0][2].VALUE.value == pytest.approx(50.0)
+    assert model.X[0][0][0].value == pytest.approx(1.0)
+    assert model.Y[0][0][0].value == pytest.approx(1.0)
+    assert model.X[0][0][1].value == pytest.approx(0.0)
+    assert model.Y[0][0][1].value == pytest.approx(0.0)
+    assert model.X[0][0][2].value == pytest.approx(0.0)
+    assert model.Y[0][0][2].value == pytest.approx(0.0)
+    assert model.T_h_out_x[0][0][2].value == pytest.approx(85.0)
+    assert model.T_c_out_y[0][0][2].value == pytest.approx(50.0)
 
 
 def test_stagewise_multiperiod_initial_values_use_source_fallback_and_shared_area():
@@ -654,22 +653,22 @@ def test_stagewise_multiperiod_initial_values_use_source_fallback_and_shared_are
 
     model.set_initial_values_for_variables(source)
 
-    assert model.Q_r_by_period[0][0][0][0].VALUE.value == pytest.approx(10.0)
-    assert model.Q_r_by_period[1][0][0][0].VALUE.value == pytest.approx(10.0)
-    assert model.Q_r_by_period[0][0][0][1].VALUE.value == pytest.approx(0.0)
-    assert model.theta_1_by_period[0][0][0][1].VALUE.value == pytest.approx(model.dTmin)
-    assert model.Q_c_by_period[0][0][0].VALUE.value == pytest.approx(0.0)
-    assert model.Q_h_by_period[0][0][0].VALUE.value == pytest.approx(0.0)
-    assert model.z[0][0][0].VALUE.value == 1
-    assert model.z_cu[0][0].VALUE.value == 1
-    assert model.z_hu[0][0].VALUE.value == 1
-    assert model.area_r_shared[0][0][0].VALUE.value == pytest.approx(11.0)
-    assert model.area_hu_shared[0][0].VALUE.value == pytest.approx(13.0)
-    assert model.area_cu_shared[0][0].VALUE.value == pytest.approx(14.0)
-    assert model.X_by_period[1][0][0][0].VALUE.value == pytest.approx(0.25)
-    assert model.Y_by_period[1][0][0][0].VALUE.value == pytest.approx(0.35)
-    assert model.T_h_out_x_by_period[1][0][0][0].VALUE.value == pytest.approx(80.0)
-    assert model.T_c_out_y_by_period[1][0][0][0].VALUE.value == pytest.approx(60.0)
+    assert model.Q_r_by_period[0][0][0][0].value == pytest.approx(10.0)
+    assert model.Q_r_by_period[1][0][0][0].value == pytest.approx(10.0)
+    assert model.Q_r_by_period[0][0][0][1].value == pytest.approx(0.0)
+    assert model.theta_1_by_period[0][0][0][1].value == pytest.approx(model.dTmin)
+    assert model.Q_c_by_period[0][0][0].value == pytest.approx(0.0)
+    assert model.Q_h_by_period[0][0][0].value == pytest.approx(0.0)
+    assert model.z[0][0][0].value == 1
+    assert model.z_cu[0][0].value == 1
+    assert model.z_hu[0][0].value == 1
+    assert model.area_r_shared[0][0][0].value == pytest.approx(11.0)
+    assert model.area_hu_shared[0][0].value == pytest.approx(13.0)
+    assert model.area_cu_shared[0][0].value == pytest.approx(14.0)
+    assert model.X_by_period[1][0][0][0].value == pytest.approx(0.25)
+    assert model.Y_by_period[1][0][0][0].value == pytest.approx(0.35)
+    assert model.T_h_out_x_by_period[1][0][0][0].value == pytest.approx(80.0)
+    assert model.T_c_out_y_by_period[1][0][0][0].value == pytest.approx(60.0)
 
 
 @pytest.mark.parametrize("multiperiod", [False, True])
@@ -679,14 +678,14 @@ def test_warm_start_split_normalization_uses_fixed_stream_totals(multiperiod: bo
 
     x = model.X_by_period[1] if multiperiod else model.X
     y = model.Y_by_period[1] if multiperiod else model.Y
-    assert x[0][0][0].VALUE.value == pytest.approx(10.0 / 40.0)
-    assert x[0][1][0].VALUE.value == pytest.approx(30.0 / 40.0)
-    assert x[1][0][0].VALUE.value == pytest.approx(20.0 / 60.0)
-    assert x[1][1][0].VALUE.value == pytest.approx(40.0 / 60.0)
-    assert y[0][0][0].VALUE.value == pytest.approx(10.0 / 30.0)
-    assert y[0][1][0].VALUE.value == pytest.approx(20.0 / 30.0)
-    assert y[1][0][0].VALUE.value == pytest.approx(30.0 / 70.0)
-    assert y[1][1][0].VALUE.value == pytest.approx(40.0 / 70.0)
+    assert x[0][0][0].value == pytest.approx(10.0 / 40.0)
+    assert x[0][1][0].value == pytest.approx(30.0 / 40.0)
+    assert x[1][0][0].value == pytest.approx(20.0 / 60.0)
+    assert x[1][1][0].value == pytest.approx(40.0 / 60.0)
+    assert y[0][0][0].value == pytest.approx(10.0 / 30.0)
+    assert y[0][1][0].value == pytest.approx(20.0 / 30.0)
+    assert y[1][0][0].value == pytest.approx(30.0 / 70.0)
+    assert y[1][1][0].value == pytest.approx(40.0 / 70.0)
 
 
 def test_stagewise_candidate_helpers_cover_invalid_and_verified_paths():
@@ -721,18 +720,7 @@ def test_stagewise_candidate_helpers_cover_invalid_and_verified_paths():
 def test_stagewise_value_coercion_accepts_solver_like_shapes():
     assert stagewise_verification._value(1) == 1.0
     assert stagewise_verification._value([2.5]) == 2.5
-    assert stagewise_verification._value(SimpleNamespace(VALUE=[3.5])) == 3.5
-    assert stagewise_verification._value(SimpleNamespace(value=[4.5])) == 4.5
-    assert (
-        stagewise_verification._value(SimpleNamespace(VALUE=SimpleNamespace(value=5.5)))
-        == 5.5
-    )
-    assert (
-        stagewise_verification._value(
-            SimpleNamespace(VALUE=SimpleNamespace(value=_FloatOnly(6.5)))
-        )
-        == 6.5
-    )
+    assert stagewise_verification._value(SimpleNamespace(value=5.5)) == 5.5
     assert math.isclose(stagewise_verification._value(_FloatOnly(7.5)), 7.5)
 
 
@@ -744,7 +732,7 @@ def _evolution_model(*, tac: float = 100.0, success: int = 1) -> StageWiseModel:
     model.I = 1
     model.J = 1
     model.S = 1
-    model.m = SimpleNamespace(cleanup=lambda: setattr(model, "_cleaned", True))
+    model.m = SimpleNamespace(_path=tempfile.mkdtemp(prefix="openpinch-test-"))
     return model
 
 
@@ -764,7 +752,7 @@ def test_stagewise_evolution_skips_unsuccessful_and_empty_frontiers(monkeypatch)
         )
         is empty
     )
-    assert empty._cleaned is True
+    assert empty.m._openpinch_cleaned_up is True
 
 
 def test_stagewise_evolution_prunes_unusable_and_stale_candidates(monkeypatch):
@@ -803,7 +791,7 @@ def test_stagewise_evolution_prunes_unusable_and_stale_candidates(monkeypatch):
         )
         is model
     )
-    assert model._cleaned is True
+    assert model.m._openpinch_cleaned_up is True
 
 
 def test_stagewise_source_evolution_and_candidate_selection_edges():
@@ -920,8 +908,8 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
     target.J = 1
     target.S = 1
     calls = []
-    target.set_initial_values_for_variables = lambda best, brackets: calls.append(
-        ("initial", brackets)
+    target.set_initial_values_for_variables = lambda best: calls.append(
+        ("initial", None)
     )
     target.get_post_process = lambda: calls.append(("post", None))
     best = SimpleNamespace(
@@ -945,19 +933,15 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
 
     assert target.alpha == [[[[0.1]]]]
     assert target.z_allowed == [[[1]]]
-    assert calls == [("initial", True), ("post", None)]
+    assert calls == [("initial", None), ("post", None)]
 
     z_values = [[[[0]]]]
     _set_recovery_binary_value(target, z_values, (0, 0, 0), 1)
     assert z_values[0][0][0] == [1]
 
-    class ValueHolder:
-        def __init__(self):
-            self.VALUE = SimpleNamespace(value=0)
-
-    z_values = [[[ValueHolder()]]]
+    z_values = [[[_PyomoLikeVariable(0)]]]
     _set_recovery_binary_value(target, z_values, (0, 0, 0), 1)
-    assert z_values[0][0][0].VALUE.value == 1
+    assert z_values[0][0][0].value == 1
 
     class NoMutation:
         def __setitem__(self, key, value):
@@ -1055,7 +1039,7 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     target.J = 1
     target.S = 1
     target.alpha = [[[[0.5]]]]
-    target.set_initial_values_for_variables = lambda best, brackets: None
+    target.set_initial_values_for_variables = lambda best: None
     target.get_post_process = lambda: None
     best = SimpleNamespace(
         verify=lambda: (True, []),
@@ -1088,7 +1072,7 @@ def test_update_with_best_model_adopts_the_solver_run():
     target.J = 1
     target.S = 1
     target.solver_run = SimpleNamespace(converged=False)
-    target.set_initial_values_for_variables = lambda best, brackets: None
+    target.set_initial_values_for_variables = lambda best: None
     target.get_post_process = lambda: None
     best = SimpleNamespace(
         verify=lambda: (True, []),
@@ -1113,20 +1097,16 @@ def test_update_with_best_model_adopts_the_solver_run():
 def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
     created: list[dict] = []
 
-    class _Cell:
-        def __init__(self):
-            self.VALUE = SimpleNamespace(value=None)
-
     class _FakeChild:
         def __init__(self, **kwargs):
             created.append(kwargs)
-            self.Q_r = [[[_Cell()]]]
-            self.z = [[[_Cell()]]]
-            self.theta_1 = [[[_Cell()]]]
-            self.theta_2 = [[[_Cell()]]]
+            self.Q_r = [[[_PyomoLikeVariable()]]]
+            self.z = [[[_PyomoLikeVariable()]]]
+            self.theta_1 = [[[_PyomoLikeVariable()]]]
+            self.theta_2 = [[[_PyomoLikeVariable()]]]
             self.optimised = False
 
-        def set_initial_values_for_variables(self, parent, *, brackets=False):
+        def set_initial_values_for_variables(self, parent):
             # Candidates are warm-started from their parent before the move.
             pass
 
@@ -1148,7 +1128,7 @@ def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
     )
     prev_case = SimpleNamespace(
         framework="ESM",
-        solver="apopt",
+        solver="highs",
         solver_arrays=object(),
         stages=1,
         dTmin=10.0,
@@ -1171,11 +1151,11 @@ def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
     assert created[0]["solver"] == "couenne"
     assert created[0]["solver_options"] == {"max_iter": 7}
     assert created[0]["name"] == f"root-n_{kind} 1 evolution model 0"
-    assert child.z[0][0][0].VALUE.value == (0 if kind == "minus" else 1)
+    assert child.z[0][0][0].value == (0 if kind == "minus" else 1)
 
 
 def _unconverged_start_with_dearer_candidate(monkeypatch):
-    # IPOPT stopped at its iteration limit; GEKKO still reports success, and the
+    # IPOPT stopped at its iteration limit; the solve still passes, and the
     # objective (100) is lower than any real network can cost.
     model = _evolution_model(tac=100.0)
     model.solver_run = SimpleNamespace(converged=False)

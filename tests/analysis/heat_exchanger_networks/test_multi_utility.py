@@ -99,15 +99,22 @@ def _two_cold_utility_problem(hot_target: float, *, glycol_first: bool) -> Pinch
     )
 
 
+def _couenne_available() -> bool:
+    try:
+        require_solver_binary("couenne", purpose="multi-utility regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 def _solved_model(hot_target: float, *, glycol_first: bool):
-    pytest.importorskip("gekko")
     arrays = problem_to_solver_arrays(
         _two_cold_utility_problem(hot_target, glycol_first=glycol_first), D_TMIN
     )
     model = StageWiseModel(
         name=f"two-cold-utilities-{hot_target}",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=arrays,
         stages=1,
         dTmin=D_TMIN,
@@ -115,8 +122,8 @@ def _solved_model(hot_target: float, *, glycol_first: bool):
         min_dqda=0.0,
         minimisation_goal="total cost",
         non_isothermal_model=False,
-        # Relaxed match binaries: APOPT's branch and bound fails on the glycol
-        # case, which the relaxed model, IPOPT and Couenne all solve.
+        # Relaxed match binaries: with integer binaries Couenne reports this
+        # one-stage case infeasible, while the relaxed model solves.
         integers=False,
         tol=1e-6,
     )
@@ -133,13 +140,16 @@ def _cooler_duties(network) -> dict[str, float]:
     }
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _couenne_available()", reason="needs the couenne binary")
 @pytest.mark.parametrize("glycol_first", [False, True])
 @pytest.mark.parametrize(
     ("hot_target", "expected_utility"),
     [(30.0, "CW"), (5.0, "Glycol")],
 )
-def test_apopt_stagewise_cools_with_the_cheapest_feasible_utility(
+def test_couenne_stagewise_cools_with_the_cheapest_feasible_utility(
     hot_target, expected_utility, glycol_first
 ):
     model, arrays = _solved_model(hot_target, glycol_first=glycol_first)

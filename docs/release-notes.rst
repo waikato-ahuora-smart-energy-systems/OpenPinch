@@ -204,6 +204,13 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``apopt`` and ``ipopt-GEKKO`` are no longer accepted solver names: every
+  heat exchanger network model is now a native Pyomo model, solved with
+  ``highs``, ``couenne`` or ``ipopt-pyomo``, and any other name raises
+  ``MissingSynthesisSolverError`` listing these three. The APOPT solver
+  options (``minlp_*``, ``nlp_maximum_iterations`` and the like) are no
+  longer accepted, and the ``synthesis`` and ``full`` extras no longer
+  install ``gekko``.
 - The flow-on (alpha) values that rank candidate exchangers in network
   evolution are now solved directly as one sparse linear system instead of a
   separate APOPT model per call. Results match the APOPT solve to within

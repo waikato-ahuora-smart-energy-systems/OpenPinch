@@ -501,7 +501,7 @@ def _update_with_best_model(owner, best_model) -> None:
         lambda i, j, k: best_model.z_allowed[i][j][k],
         (owner.I, owner.J, owner.S),
     )
-    owner.set_initial_values_for_variables(best_model, brackets=True)
+    owner.set_initial_values_for_variables(best_model)
 
     owner.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
     owner.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
@@ -610,7 +610,7 @@ def _build_and_solve_evolution(
     )
 
     # Start from the parent's solution, then apply the move over it.
-    child.set_initial_values_for_variables(prev_case, brackets=True)
+    child.set_initial_values_for_variables(prev_case)
     if kind == "minus":
         _assign_value(child.Q_r[i][j][k], 0.0)
         _assign_value(child.z[i][j][k], 0)

@@ -1,11 +1,10 @@
 """Native Pyomo model built through the calls the shared HEN helpers make.
 
-The pinch-design equations and the helpers they share with the GEKKO
-stage-wise model create variables, parameters and equations with GEKKO's
-method names (``Var``, ``Param``, ``Equation`` and so on). ``PyomoModel``
-answers the same calls with Pyomo components, so those helpers build a native
-Pyomo model without a string conversion. Expressions are ordinary Pyomo
-expressions, so sums of any length build without recursion.
+The HEN model equations create variables, parameters and equations through a
+small modelling interface (``Var``, ``Param``, ``Equation`` and so on).
+``PyomoModel`` answers those calls with Pyomo components, so the equations
+build a native Pyomo model. Expressions are ordinary Pyomo expressions, so
+sums of any length build without recursion.
 """
 
 from __future__ import annotations

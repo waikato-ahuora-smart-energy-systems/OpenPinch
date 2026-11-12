@@ -33,7 +33,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 ## Side Effects
 - `finalise_design_result` assigns `problem._results` with the design attached [context.py:finalise_design_result].
 - `ensure_target_results` runs direct heat integration through `problem.target` when no matching targets are cached [context.py:ensure_target_results].
-- Synthesis runs solver models in a `ProcessPoolExecutor` through `LocalSynthesisExecutor` when more than one worker is available and the main script has a main guard (or the start method is fork); duty optimisation solves serially in-process through `FixedStructureDutyExecutor`. Both launch external solver executables via GEKKO/Pyomo [execution/executor.py:LocalSynthesisExecutor, duty_optimisation.py:FixedStructureDutyExecutor].
+- Synthesis runs solver models in a `ProcessPoolExecutor` through `LocalSynthesisExecutor` when more than one worker is available and the main script has a main guard (or the start method is fork); duty optimisation solves serially in-process through `FixedStructureDutyExecutor`. Both launch external solver executables via Pyomo [execution/executor.py:LocalSynthesisExecutor, duty_optimisation.py:FixedStructureDutyExecutor].
 - Controllability and indexing are pure.
 
 ## Verification

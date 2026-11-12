@@ -132,7 +132,7 @@ class InternalHeatExchangerNetworkProblem:
             self.solution_failure_reason = str(exc)
             return None
         finally:
-            # Results live on the model variables now; drop every GEKKO run
+            # Results live on the model variables now; drop every run
             # directory this solve created, including unsolved PDM sides and
             # the never-solved amalgamated network.
             for model in (
@@ -622,7 +622,7 @@ def _used_in_any_period(case, name: str) -> list[list[int]]:
 
 def _cleanup_model(model: Any) -> None:
     if model is not None:
-        backend.cleanup_gekko_model(getattr(model, "m", None))
+        backend.cleanup_model_run_directory(getattr(model, "m", None))
 
 
 def _assign(variable: Any, value: float) -> None:

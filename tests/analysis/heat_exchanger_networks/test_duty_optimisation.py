@@ -500,14 +500,14 @@ def test_fixed_structure_model_rejects_other_goals_before_building() -> None:
     with pytest.raises(ValueError, match="supports minimisation goals"):
         fixed_model.FixedStructureModel(
             name="x",
-            solver="apopt",
+            solver="ipopt-pyomo",
             solver_arrays=None,
             spec=fixed_model.FixedStructureSpec(1, (), ()),
             minimisation_goal="hot utility",
         )
 
 
-# --- solved with the SciPy test backend (no GEKKO) ---------------------------
+# --- solved with the SciPy test backend (no solver binary) -------------------
 
 
 def _small_payload(*, hot_cp=10.0, extra_hot_utility=None) -> dict:
@@ -1012,12 +1012,11 @@ def test_executor_reports_structure_errors_as_failed_outcomes() -> None:
     assert "'LPS' is not a hot utility stream" in outcome.error
 
 
-# --- live solver (GEKKO) ------------------------------------------------------
+# --- live solver (Ipopt) ------------------------------------------------------
 
 
 def _live_solver_available() -> bool:
     try:
-        require_synthesis_dependency("gekko", purpose="fixed-structure duty test")
         require_synthesis_dependency(
             "pyomo.environ", purpose="fixed-structure duty test"
         )
@@ -1031,7 +1030,7 @@ def _live_solver_available() -> bool:
 # does not import the solver packages.
 _needs_live_solver = pytest.mark.skipif(
     "not _live_solver_available()",
-    reason="needs the ipopt binary and the gekko and pyomo packages",
+    reason="needs the ipopt binary and the pyomo package",
 )
 
 
@@ -1466,12 +1465,12 @@ def test_live_solver_area_with_a_stream_off_in_one_period() -> None:
     assert all(state.duty <= 1100.0 + 1e-3 for state in heater.period_states)
 
 
-def test_numeric_unwraps_gekko_param_values() -> None:
+def test_numeric_unwraps_nested_solver_values() -> None:
     from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
         _numeric,
     )
 
-    class _Wrapped:  # GEKKO Param: .value is a GK_Value holding a scalar
+    class _Wrapped:  # .value holds a number, a list or another value
         def __init__(self, value):
             self.value = value
 

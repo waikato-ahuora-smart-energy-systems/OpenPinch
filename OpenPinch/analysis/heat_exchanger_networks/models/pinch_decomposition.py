@@ -27,7 +27,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         *,
         name: str,
         framework: Literal["PDM"],
-        solver: Literal["couenne", "ipopt-pyomo", "ipopt-GEKKO", "apopt"],
+        solver: Literal["couenne", "highs", "ipopt-pyomo"],
         solver_arrays: PreparedSolverArrays,
         dTmin: float,
         z_restriction: list | None,

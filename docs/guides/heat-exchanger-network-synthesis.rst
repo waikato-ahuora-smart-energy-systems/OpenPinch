@@ -270,7 +270,7 @@ identities. Stage balances advance a cumulative parent heat coordinate through
 the piecewise ``T(Q)`` profile. Pinch decomposition can split the active profile
 while preserving the one physical parent identity.
 
-APOPT and Couenne use interval-disjunctive piecewise mappings. IPOPT uses
+Couenne and HiGHS use interval-disjunctive piecewise mappings. IPOPT uses
 active-segment refinement and repeats the continuous solve until the selected
 intervals stabilize. An unresolved active-segment solve is rejected with solver
 guidance; OpenPinch does not silently substitute an average parent ``CP``.

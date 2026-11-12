@@ -328,22 +328,32 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
 
 
 @pytest.mark.solver
-def test_default_design_removes_every_gekko_run_directory(
+@pytest.mark.skipif(
+    "not _live_solver_environment_available()",
+    reason="needs the couenne and ipopt binaries and the pyomo package",
+)
+def test_default_design_removes_every_model_run_directory(
     monkeypatch, tmp_path
 ) -> None:
-    pytest.importorskip("gekko")
     import tempfile
 
-    # GEKKO creates one mkdtemp run directory per model: main solves, PDM
-    # sides, amalgamated and reduced cases, evolution candidates. None should
-    # outlive the design.
+    # Couenne options go to a run directory made with mkdtemp for each model
+    # solved with them (about 30 here: PDM sides, amalgamated and reduced
+    # cases). None should outlive the design.
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     problem = PinchProblem(source=FIXTURE_ROOT / f"{FOUR_STREAM}.json")
 
-    design = problem.design.heat_exchanger_network(max_parallel=1)
+    design = problem.design.heat_exchanger_network(
+        options={
+            "HENS_SOLVER_PDM": "couenne",
+            "HENS_SOLVER_OPTIONS_PDM": {"time_limit": 600},
+            "HENS_SOLVER_OPTIONS_TDM": {"time_limit": 600},
+        },
+        max_parallel=1,
+    )
 
     assert design.selected_network.exchangers
-    assert sorted(path.name for path in tmp_path.glob("*gk_model*")) == []
+    assert sorted(path.name for path in tmp_path.glob("openpinch-pyomo-*")) == []
 
 
 @pytest.mark.solver
@@ -358,7 +368,7 @@ def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None
 # is defined.
 @pytest.mark.skipif(
     "not _live_solver_environment_available()",
-    reason="needs the couenne and ipopt binaries and the gekko and pyomo packages",
+    reason="needs the couenne and ipopt binaries and the pyomo package",
 )
 def test_parallel_design_solves_tasks_in_worker_processes() -> None:
     # Pooled tasks are pickled to worker processes; the serial runs above
@@ -1061,10 +1071,6 @@ def _live_solver_environment_available() -> bool:
         )
         require_solver_binary(
             "ipopt",
-            purpose="HENS-11 live solver regression coverage",
-        )
-        require_synthesis_dependency(
-            "gekko",
             purpose="HENS-11 live solver regression coverage",
         )
         require_synthesis_dependency(

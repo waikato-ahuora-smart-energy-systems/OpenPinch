@@ -159,7 +159,7 @@ def test_pyomo_solver_options_go_to_an_option_file_removed_on_cleanup():
     assert solved.failure_reason is None
     assert solved.option_file == run.option_file
     assert x.value == pytest.approx(4.0, abs=1e-6)
-    backend.cleanup_gekko_model(model)
+    backend.cleanup_model_run_directory(model)
     assert not option_file.parent.exists()
 
 
@@ -274,9 +274,7 @@ def test_ipopt_pyomo_starts_close_to_its_bounds_by_default(
     # Ipopt's default push of 1e-2 is relative to the bound, about 3.5 K at
     # 350 K, which moves warm-started temperatures off their solved values.
     monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
-    monkeypatch.setattr(
-        backend, "_require_pyomo_solver_available", lambda *_args: None
-    )
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_args: None)
     model, _x, _y = _bounded_model(4.0)
 
     run = backend.configure_pyomo_solver(

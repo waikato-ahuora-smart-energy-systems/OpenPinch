@@ -289,6 +289,7 @@ def test_flat_utility_dt_cont_keeps_scalar_contribution():
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints():
     arrays = problem_to_solver_arrays(
         _segmented_problem(
@@ -303,7 +304,7 @@ def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints()
     model = StageWiseModel(
         name="utility-dt-cont",
         framework="TDM",
-        solver="apopt",
+        solver="highs",
         solver_arrays=arrays,
         stages=1,
         dTmin=10.0,
@@ -834,16 +835,32 @@ def test_verification_keeps_segment_failures_without_aggregate_cp_metadata():
     )
 
 
-@pytest.mark.synthesis
+def _binary_available(name: str) -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+        require_solver_binary,
+    )
+
+    try:
+        require_solver_binary(name, purpose="segmented-stream solves")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
-def test_apopt_stagewise_uses_parent_heat_coordinates_and_segment_area_totals(
+def test_couenne_stagewise_uses_parent_heat_coordinates_and_segment_area_totals(
     non_isothermal_model,
 ):
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name=f"segmented-parent-noniso-{non_isothermal_model}",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(_segmented_problem(), 10.0),
         stages=1,
         dTmin=10.0,
@@ -869,13 +886,13 @@ def test_apopt_stagewise_uses_parent_heat_coordinates_and_segment_area_totals(
     assert _check_area_costs(model)
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('ipopt')", reason="needs ipopt")
 def test_ipopt_stagewise_stabilises_or_reports_integer_solver_guidance():
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name="segmented-parent-ipopt",
         framework="TDM",
-        solver="ipopt-GEKKO",
+        solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(_segmented_problem(), 10.0),
         stages=1,
         dTmin=10.0,
@@ -890,19 +907,21 @@ def test_ipopt_stagewise_stabilises_or_reports_integer_solver_guidance():
     model.optimise(False)
 
     assert model._piecewise_active_mappings
-    if model.mSuccess == 1:
+    # Ipopt can stop short of convergence here (termination "other"), which
+    # keeps the values but is no optimum; only a converged solve is checked.
+    if model.solver_run.failure_reason is not None:
+        assert "use Couenne or HiGHS" in model.solver_run.failure_reason
+    elif model.solver_run.converged:
         assert model.Q_r_total == pytest.approx(150.0)
-    else:
-        assert "use APOPT or Couenne" in model.solver_run.failure_reason
 
 
-@pytest.mark.synthesis
-def test_apopt_utility_exchanger_uses_segment_area_contributions():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+def test_couenne_utility_exchanger_uses_segment_area_contributions():
     model = StageWiseModel(
         name="segmented-parent-utility",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(cold_second_duty=50.0),
             10.0,
@@ -915,6 +934,9 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
         non_isothermal_model=False,
         integers=True,
         tol=1e-6,
+        # Couenne finds this network at once but takes minutes to prove it
+        # optimal; the incumbent at the time limit is what is checked.
+        solver_options={"time_limit": 5},
     )
 
     model.optimise(False)
@@ -932,7 +954,8 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
     assert model.verify() == (True, [])
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
 @pytest.mark.parametrize(
     ("cold_second_duty", "expected_load", "expected_cost", "expected_segments"),
     [
@@ -940,17 +963,16 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
         (175.0, 75.0, 3000.0, 2),
     ],
 )
-def test_apopt_segmented_hot_utility_uses_exact_traversed_segment_cost(
+def test_couenne_segmented_hot_utility_uses_exact_traversed_segment_cost(
     cold_second_duty,
     expected_load,
     expected_cost,
     expected_segments,
 ):
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name="segmented-priced-hot-utility",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(
                 cold_second_duty=cold_second_duty,
@@ -983,13 +1005,13 @@ def test_apopt_segmented_hot_utility_uses_exact_traversed_segment_cost(
     )
 
 
-@pytest.mark.synthesis
-def test_apopt_segmented_cold_utility_uses_exact_traversed_segment_cost():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+def test_couenne_segmented_cold_utility_uses_exact_traversed_segment_cost():
     model = StageWiseModel(
         name="segmented-priced-cold-utility",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(
                 cold_second_duty=50.0,
@@ -1022,13 +1044,13 @@ def test_apopt_segmented_cold_utility_uses_exact_traversed_segment_cost():
     }
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('ipopt')", reason="needs ipopt")
 def test_ipopt_segmented_utility_cost_stabilises_or_reports_guidance():
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name="segmented-priced-hot-utility-ipopt",
         framework="TDM",
-        solver="ipopt-GEKKO",
+        solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(
                 cold_second_duty=150.0,
@@ -1049,16 +1071,17 @@ def test_ipopt_segmented_utility_cost_stabilises_or_reports_guidance():
     model.optimise(False)
 
     assert model._piecewise_active_mappings
-    if model.mSuccess == 1:
+    # As above, only a converged Ipopt solve is checked.
+    if model.solver_run.failure_reason is not None:
+        assert "use Couenne or HiGHS" in model.solver_run.failure_reason
+    elif model.solver_run.converged:
         assert model.Q_hu_total_by_period[0] == pytest.approx(50.0)
         assert model.hu_cost_total == pytest.approx(1000.0)
-    else:
-        assert "use APOPT or Couenne" in model.solver_run.failure_reason
 
 
-@pytest.mark.synthesis
-def test_apopt_pdm_clips_segment_profile_without_splitting_parent_identity():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+def test_couenne_pdm_clips_segment_profile_without_splitting_parent_identity():
     problem = _segmented_problem()
     arrays = problem_to_solver_arrays(problem, 10.0)
     decomposition = build_pinch_design_decomposition(
@@ -1069,7 +1092,7 @@ def test_apopt_pdm_clips_segment_profile_without_splitting_parent_identity():
     model = PinchDecompModel(
         name="segmented-pdm-above",
         framework="PDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=arrays,
         dTmin=10.0,
         z_restriction=None,

@@ -1,9 +1,7 @@
-"""The stage-wise model on native Pyomo, against its GEKKO conversion.
+"""The stage-wise model on native Pyomo.
 
-Couenne and Ipopt solve the stage-wise models (TDM, ESM and stage reduction)
-as native Pyomo models. While GEKKO remains for APOPT and the fixed-structure
-model, the same equations built through GEKKO's Pyomo conversion are the
-reference: both must reach the same solution.
+Couenne, HiGHS and Ipopt solve the stage-wise models (TDM, ESM and stage
+reduction) as native Pyomo models.
 """
 
 from __future__ import annotations
@@ -12,9 +10,6 @@ import json
 
 import pytest
 
-from OpenPinch.analysis.heat_exchanger_networks.models._base import (
-    execution as base_execution,
-)
 from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
     StageWiseModel,
 )
@@ -44,13 +39,6 @@ def _binary_available(name: str) -> bool:
     except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
         return False
     return True
-
-
-class _GekkoStageWiseModel(StageWiseModel):
-    """The stage-wise model built through GEKKO and its Pyomo conversion."""
-
-    def setup_model(self) -> None:
-        base_execution.setup_model(self)
 
 
 def _four_stream_problem() -> PinchProblem:
@@ -87,29 +75,3 @@ def test_couenne_stagewise_is_a_native_pyomo_model_with_one_objective():
 
     assert isinstance(model.m, PyomoModel)
     assert len(list(model.m.model.component_data_objects(pyo.Objective))) == 1
-
-
-def _solution(model) -> dict[str, float]:
-    return {
-        "success": model.mSuccess,
-        "objective": model.solver_run.objective_value,
-        "recovery": model.Q_r_total,
-        "hot utility": sum(model.Q_hu_total_by_period),
-        "cold utility": sum(model.Q_cu_total_by_period),
-    }
-
-
-@pytest.mark.solver
-@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
-@pytest.mark.parametrize("goal", ["hot utility", "total utility"])
-def test_pyomo_stagewise_matches_the_gekko_stagewise(goal: str):
-    pytest.importorskip("gekko")
-    pyomo_model = _tdm(StageWiseModel, stages=2, goal=goal)
-    gekko_model = _tdm(_GekkoStageWiseModel, stages=2, goal=goal)
-
-    pyomo_model.optimise(False)
-    gekko_model.optimise(False)
-
-    assert isinstance(gekko_model.m, PyomoModel) is False
-    assert pyomo_model.mSuccess == 1
-    assert _solution(pyomo_model) == pytest.approx(_solution(gekko_model), abs=1e-3)

@@ -227,9 +227,6 @@ def _optional_float(value: Any) -> float | None:
     value_attr = getattr(value, "value", None)
     if value_attr is not None:
         return _optional_float(value_attr)
-    value_attr = getattr(value, "VALUE", None)
-    if value_attr is not None:
-        return _optional_float(value_attr)
     return None
 
 

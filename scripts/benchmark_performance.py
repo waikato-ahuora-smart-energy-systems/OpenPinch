@@ -89,7 +89,7 @@ SOLVER_STAGE_LABELS = (
 
 
 class BenchmarkSolverCallTracer:
-    """Benchmark-local wrapper around the GEKKO and native Pyomo solve boundaries."""
+    """Benchmark-local wrapper around the native Pyomo solve boundary."""
 
     def __init__(self, *, case_name: str, tier: int, progress_queue=None) -> None:
         self.case_name = case_name
@@ -103,31 +103,17 @@ class BenchmarkSolverCallTracer:
 
     @contextmanager
     def patched_backend(self):
-        original_gekko_solve = solver_backend.solve_gekko_model
         original_pyomo_solve = solver_backend.solve_pyomo_model
-
-        def traced_gekko_solve(
-            model, *, solver_name: str, disp: bool = False, debug: int = 0
-        ):
-            return self._trace_solve(
-                original_gekko_solve,
-                model,
-                solver_name=solver_name,
-                disp=disp,
-                debug=debug,
-            )
 
         def traced_pyomo_solve(model, *, solver_name: str, disp: bool = False):
             return self._trace_solve(
                 original_pyomo_solve, model, solver_name=solver_name, disp=disp
             )
 
-        solver_backend.solve_gekko_model = traced_gekko_solve
         solver_backend.solve_pyomo_model = traced_pyomo_solve
         try:
             yield self
         finally:
-            solver_backend.solve_gekko_model = original_gekko_solve
             solver_backend.solve_pyomo_model = original_pyomo_solve
 
     @contextmanager

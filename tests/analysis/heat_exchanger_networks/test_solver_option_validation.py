@@ -26,7 +26,6 @@ OPTION_KEYS = (
         {"tol": 1e-6, "max_iter": 500, "print_level": 0},
         {"node_limit": 50, "time_limit": 120.5, "allowable_gap": "1e-4"},
         {"mu_strategy": "adaptive", "delete_redundant": "no"},
-        {"minlp_maximum_iterations": 4, "use_warm_start": True},
     ],
 )
 def test_allow_listed_solver_options_are_accepted(key, options):
@@ -62,8 +61,6 @@ def test_other_solver_option_names_and_values_are_rejected(key, options):
 
 class _Model:
     def __init__(self, path: Path) -> None:
-        self.options = SimpleNamespace(SOLVER=None, SOLVER_EXTENSION=None)
-        self.solver_options: list[str] = []
         self._path = str(path)
 
 
@@ -104,21 +101,9 @@ def test_option_files_are_written_only_from_validated_options(
     model = _Model(tmp_path / "run")
 
     with pytest.raises(ValueError, match="solver option"):
-        backend.configure_gekko_solver(model, solver, solver_options=solver_options)
+        backend.configure_pyomo_solver(model, solver, solver_options=solver_options)
 
     assert not (tmp_path / "run" / option_file).exists()
-
-
-@pytest.mark.parametrize("solver", ["ipopt-GEKKO", "apopt"])
-def test_gekko_solver_option_lines_are_validated(monkeypatch, tmp_path, solver):
-    _present_solver(monkeypatch)
-
-    with pytest.raises(ValueError, match="solver option"):
-        backend.configure_gekko_solver(
-            _Model(tmp_path / "run"),
-            solver,
-            solver_options={"not_a_solver_option": 1},
-        )
 
 
 def test_option_file_writer_rejects_unvalidated_options(tmp_path):
@@ -134,12 +119,16 @@ def test_valid_options_are_written_to_the_option_file(monkeypatch, tmp_path):
     _present_solver(monkeypatch)
     model = _Model(tmp_path / "run")
 
-    run = backend.configure_gekko_solver(
+    run = backend.configure_pyomo_solver(
         model,
-        "ipopt-pyomo",
-        solver_options={"tol": 1e-6, "max_iter": 50, "mu_strategy": "adaptive"},
+        "couenne",
+        solver_options={
+            "node_limit": 50,
+            "time_limit": 120.5,
+            "delete_redundant": "no",
+        },
     )
 
     assert Path(run.option_file).read_text(encoding="utf-8") == (
-        "tol 1e-06\nmax_iter 50\nmu_strategy adaptive\n"
+        "node_limit 50\ntime_limit 120.5\ndelete_redundant no\n"
     )

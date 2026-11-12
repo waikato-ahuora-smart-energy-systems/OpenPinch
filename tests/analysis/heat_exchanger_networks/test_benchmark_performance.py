@@ -210,7 +210,7 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
     class FakeModel:
         _path = "/tmp/openhens/fake-model"
 
-    def fake_solve(model, *, solver_name, disp=False, debug=0):
+    def fake_solve(model, *, solver_name, disp=False):
         return benchmark.solver_backend.SolverRun(
             name=solver_name,
             status=1,
@@ -218,7 +218,7 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
             solve_time=0.25,
         )
 
-    monkeypatch.setattr(benchmark.solver_backend, "solve_gekko_model", fake_solve)
+    monkeypatch.setattr(benchmark.solver_backend, "solve_pyomo_model", fake_solve)
     tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=2)
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
@@ -237,9 +237,9 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
 
     with tracer.patched_backend():
         with tracer.task_context(start_record):
-            run = benchmark.solver_backend.solve_gekko_model(
+            run = benchmark.solver_backend.solve_pyomo_model(
                 FakeModel(),
-                solver_name="apopt",
+                solver_name="highs",
             )
 
     assert run.status == 1
@@ -249,7 +249,7 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
     assert record["tier"] == 2
     assert record["task_id"] == "task-1"
     assert record["stage_label"] == "pdm"
-    assert record["solver_name"] == "apopt"
+    assert record["solver_name"] == "highs"
     assert record["solver_status"] == 1
     assert record["objective_value"] == 123.4
     assert record["solver_call_role"] == "pdm_above"
@@ -258,20 +258,20 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
 def test_benchmark_solver_tracer_records_effective_forced_solver(monkeypatch) -> None:
     benchmark = _load_benchmark_module()
 
-    def fake_solve(model, *, solver_name, disp=False, debug=0):
-        del model, solver_name, disp, debug
-        return benchmark.solver_backend.SolverRun(name="apopt", status=1)
+    def fake_solve(model, *, solver_name, disp=False):
+        del model, solver_name, disp
+        return benchmark.solver_backend.SolverRun(name="couenne", status=1)
 
-    monkeypatch.setattr(benchmark.solver_backend, "solve_gekko_model", fake_solve)
+    monkeypatch.setattr(benchmark.solver_backend, "solve_pyomo_model", fake_solve)
     tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=0)
 
     with tracer.patched_backend():
-        benchmark.solver_backend.solve_gekko_model(
+        benchmark.solver_backend.solve_pyomo_model(
             object(),
             solver_name="ipopt-pyomo",
         )
 
-    assert tracer.records[0]["solver_name"] == "apopt"
+    assert tracer.records[0]["solver_name"] == "couenne"
 
 
 def test_benchmark_solver_call_summaries_aggregate_by_layer() -> None:
@@ -315,7 +315,7 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
         {
             "stage_label": "pdm",
             "solver_call_role": "pdm_above",
-            "solver_name": "apopt",
+            "solver_name": "highs",
             "duration_seconds": 0.5,
         }
     )

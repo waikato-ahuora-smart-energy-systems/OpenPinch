@@ -36,9 +36,9 @@ Private accessor namespaces that `PinchProblem` exposes as `target`, `design`, `
 - Targeting methods mutate the owning problem: on success they commit the scratch zone tree, results, components and last run spec back to it; `target` methods record the run [target.py:_TargetAccessor._execute], `design` methods commit the snapshot and attach the synthesis result to `results.design` without recording [design.py:_DesignAccessor._run].
 - The generated `target.all_periods` forwarders replace `_period_results`, `_period_states` and `_period_result_states` on the problem and may solve periods in a `ThreadPoolExecutor`, each in a copy of the caller's context so progress is reported to the caller [target.py:_AllPeriodsTargetAccessor._run].
 - `design.multiperiod_heat_exchanger_network` may run all-period targeting and overwrites the design provenance on the problem's results [design.py:_DesignAccessor.multiperiod_heat_exchanger_network].
-- Lazy imports pull in analysis, presentation and optional synthesis code (GEKKO and the configured solvers, CoolProp-backed cycles) when a method is first called [design.py:_DesignAccessor.optimise_duties] [target.py:_TargetAccessor._hpr].
+- Lazy imports pull in analysis, presentation and optional synthesis code (Pyomo and the configured solvers, CoolProp-backed cycles) when a method is first called [design.py:_DesignAccessor.optimise_duties] [target.py:_TargetAccessor._hpr].
 - `add_process_mvr` adds a component to the problem's `_process_components` through `create_process_mvr_component` [component.py:_ComponentAccessor.add_process_mvr].
-- No file or network IO in this directory's own code; `design.*` methods run the HEN synthesis services, which launch external solvers through GEKKO [design.py:_DesignAccessor._run].
+- No file or network IO in this directory's own code; `design.*` methods run the HEN synthesis services, which launch external solvers through Pyomo [design.py:_DesignAccessor._run].
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/application/test_hen_design_view_data.py tests/application/test_hpr_performance_map_accessor.py tests/application/test_pinch_problem.py`

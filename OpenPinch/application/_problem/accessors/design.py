@@ -596,7 +596,7 @@ class _DesignAccessor:
         remaining exchanger carries duty. The result names removed exchangers
         in ``selected_network.summary_metrics["removed_exchangers"]``.
 
-        Requires the optional synthesis dependencies (GEKKO and the configured
+        Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (

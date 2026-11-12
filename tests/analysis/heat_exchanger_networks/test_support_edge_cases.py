@@ -145,10 +145,19 @@ def _settings(**overrides):
 
 
 class _Variable:
+    """A Pyomo-shaped variable."""
+
     def __init__(self, lower: float = -1e9, upper: float = 1e9):
-        self.lower = lower
-        self.upper = upper
-        self.VALUE = SimpleNamespace(value=None)
+        self.lb = lower
+        self.ub = upper
+        self.fixed = False
+        self.value = None
+
+    def is_variable_type(self) -> bool:
+        return True
+
+    def set_value(self, value, skip_validation: bool = False) -> None:
+        self.value = value
 
 
 class _IndexRejectingElement:
@@ -635,7 +644,7 @@ def test_pdm_amalgamated_case_keeps_an_unconverged_side_solve() -> None:
         )
 
     amalgamated = SimpleNamespace(
-        solver_run=backend.SolverRun(name="apopt"),
+        solver_run=backend.SolverRun(name="couenne"),
         get_post_process=lambda: None,
     )
     problem = InternalHeatExchangerNetworkProblem(
@@ -742,12 +751,9 @@ def test_stagewise_recovery_binary_and_scalar_value_fallbacks():
     assert z_values == [[[1]]]
 
     assert stagewise_verification._value(7.5) == pytest.approx(7.5)
-    assert stagewise_verification._value(
-        SimpleNamespace(VALUE=SimpleNamespace(value=8.5))
-    ) == pytest.approx(8.5)
-    assert stagewise_verification._value(
-        SimpleNamespace(value=SimpleNamespace(value=[9.5]))
-    ) == pytest.approx(9.5)
+    assert stagewise_verification._value(SimpleNamespace(value=8.5)) == pytest.approx(
+        8.5
+    )
 
     class FloatOnly:
         def __float__(self):

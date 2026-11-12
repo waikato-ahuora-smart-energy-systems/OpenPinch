@@ -1,6 +1,6 @@
 """Allow-listed solver option names and values for HEN synthesis solvers.
 
-Solver options are written into solver option files and GEKKO option lines,
+Solver options are written into solver option files or passed to the solver,
 so only known tolerances, iteration limits and numeric settings are accepted,
 each with a number, a boolean or one simple word as its value.
 """
@@ -12,7 +12,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-# IPOPT (through Pyomo or GEKKO).
+# IPOPT.
 _IPOPT_OPTIONS = frozenset(
     {
         "tol",
@@ -68,26 +68,7 @@ _COUENNE_OPTIONS = frozenset(
     }
 )
 
-# APOPT.
-_APOPT_OPTIONS = frozenset(
-    {
-        "minlp_maximum_iterations",
-        "minlp_max_iter_with_int_sol",
-        "minlp_as_nlp",
-        "minlp_branch_method",
-        "minlp_gap_tol",
-        "minlp_integer_tol",
-        "minlp_integer_max",
-        "minlp_integer_leaves",
-        "minlp_print_level",
-        "nlp_maximum_iterations",
-        "objective_convergence_tolerance",
-        "constraint_convergence_tolerance",
-        "use_warm_start",
-    }
-)
-
-ALLOWED_SOLVER_OPTION_NAMES = _IPOPT_OPTIONS | _COUENNE_OPTIONS | _APOPT_OPTIONS
+ALLOWED_SOLVER_OPTION_NAMES = _IPOPT_OPTIONS | _COUENNE_OPTIONS
 
 # Integers as large as a solver's 64-bit settings, and short value text.
 _MAX_INTEGER = 2**63 - 1

@@ -224,8 +224,8 @@ def test_pdm_variants_seed_evolution_directly_and_skip_the_derivative_method():
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_pdm_stage_reduction_solves_its_linear_model_with_highs():
-    # The reduced PDM network fixes its topology, which leaves an LP: HiGHS
-    # solves it where APOPT used to.
+    # The reduced PDM network fixes its topology, which leaves an LP that
+    # HiGHS solves.
     problem = _problem(14.0, (0, 0))
 
     problem.get_solution(print_output=False)

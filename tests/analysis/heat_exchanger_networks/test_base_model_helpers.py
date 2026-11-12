@@ -38,6 +38,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
     MissingSynthesisDependencyError,
     MissingSynthesisSolverError,
 )
+from OpenPinch.analysis.heat_exchanger_networks.solver.pyomo_model import PyomoModel
 
 
 class _Harness(base.BaseHeatExchangerNetworkModel):
@@ -57,26 +58,24 @@ class _Harness(base.BaseHeatExchangerNetworkModel):
         self.post_processed = True
 
 
-class GKVariable:
-    def __init__(self, *, lower=0.0, upper=10.0):
-        self.lower = lower
-        self.upper = upper
-        self.VALUE = SimpleNamespace(value=None)
+class _PyomoLikeVariable:
+    """A Pyomo variable's value interface; a fixed one is a parameter."""
 
-    def __getitem__(self, index):
-        if index == 0:
-            return self.VALUE.value if self.VALUE.value is not None else 0.0
-        raise IndexError(index)
+    def __init__(self, *, value, lb=None, ub=None, fixed=False):
+        self.value = value
+        self.lb = lb
+        self.ub = ub
+        self.fixed = fixed
 
+    def is_variable_type(self):
+        return True
 
-class GKParameter:
-    def __init__(self):
-        self.VALUE = SimpleNamespace(value=None)
+    def fix(self, value):
+        self.value = value
+        self.fixed = True
 
-    def __getitem__(self, index):
-        if index == 0:
-            return self.VALUE.value if self.VALUE.value is not None else 0.0
-        raise IndexError(index)
+    def set_value(self, value, skip_validation=False):
+        self.value = value
 
 
 class _FakeModel:
@@ -115,7 +114,7 @@ class _FakeModel:
 def _model() -> _Harness:
     model = object.__new__(_Harness)
     model.name = "base-helper"
-    model.solver = "apopt"
+    model.solver = "couenne"
     model.tol = 1e-6
     model.dTmin = 10.0
     model.min_dqda = 0.1
@@ -189,12 +188,15 @@ def test_constructor_configures_backend_and_runs_concrete_setup(monkeypatch):
 
     monkeypatch.setattr(
         base_execution.backend,
-        "create_gekko_model",
-        lambda remote=False: calls.append(("create", remote)) or fake_model,
+        "require_solver_backend",
+        lambda solver: calls.append(("require", solver)),
+    )
+    monkeypatch.setattr(
+        base_execution, "PyomoModel", lambda: calls.append(("create",)) or fake_model
     )
     monkeypatch.setattr(
         base_execution.backend,
-        "configure_gekko_solver",
+        "configure_pyomo_solver",
         lambda model, solver, solver_options=None: (
             calls.append(("configure", model, solver, solver_options)) or _solver_run()
         ),
@@ -203,7 +205,7 @@ def test_constructor_configures_backend_and_runs_concrete_setup(monkeypatch):
     model = _Harness(
         name="constructed",
         framework="PDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=_solver_arrays(),
         dTmin=8.0,
         z_restriction=None,
@@ -212,15 +214,16 @@ def test_constructor_configures_backend_and_runs_concrete_setup(monkeypatch):
         non_isothermal_model=False,
         integers=True,
         tol=1e-5,
-        solver_options=["MAX_ITER=10"],
+        solver_options={"time_limit": 10},
     )
 
     assert model.m is fake_model
     assert model.mSuccess == 0
     assert model.solver_run.name == "fake"
     assert calls == [
-        ("create", False),
-        ("configure", fake_model, "apopt", ["MAX_ITER=10"]),
+        ("require", "couenne"),
+        ("create",),
+        ("configure", fake_model, "couenne", {"time_limit": 10}),
     ]
 
 
@@ -230,15 +233,17 @@ def test_base_model_scalar_helpers_and_value_assignment():
     assert _solver_value(model, [3.5]) == pytest.approx(3.5)
     assert _solver_value(model, 4.5) == pytest.approx(4.5)
 
-    variable = GKVariable(lower=0.0, upper=10.0)
+    variable = _PyomoLikeVariable(value=5.0, lb=0.0, ub=10.0)
     _set_value(model, variable, 99.0)
-    assert variable.VALUE.value == pytest.approx(10.0)
-    _set_value(model, variable, -99.0, brackets=True)
-    assert variable.VALUE.value == [0.0]
+    assert variable.value == pytest.approx(10.0)
+    _set_value(model, variable, -99.0)
+    assert variable.value == pytest.approx(0.0)
 
-    parameter = GKParameter()
-    _set_value(model, parameter, 7.0, brackets=True)
-    assert parameter.VALUE.value == [7.0]
+    # A parameter (a fixed variable) takes the value unclamped and stays fixed.
+    parameter = _PyomoLikeVariable(value=1.0, fixed=True)
+    _set_value(model, parameter, 7.0)
+    assert parameter.value == pytest.approx(7.0)
+    assert parameter.fixed
 
     # Both ends positive: the true log-mean, whatever the old gate said.
     log_mean_20_10 = 10.0 / np.log(2.0)
@@ -290,7 +295,9 @@ def test_get_alpha_values_solves_the_flow_on_system(monkeypatch):
     model = _alpha_state([200.0, 150.0, 100.0], [180.0, 120.0, 50.0])
     # The system is linear: it is solved directly, with no solver model.
     monkeypatch.setattr(
-        backend, "create_gekko_model", lambda **_: pytest.fail("built a GEKKO model")
+        base_execution,
+        "PyomoModel",
+        lambda: pytest.fail("built a solver model"),
     )
 
     alpha = model.get_alpha_values()
@@ -465,11 +472,6 @@ def test_match_restrictions_accept_supported_shapes_and_reject_invalid_shape():
     assert model.z_hu_allowed == [[1]]
     assert model.z_cu_allowed == [[0, 1]]
 
-    model.set_match_restrictions(
-        [[[[GKVariable()]]], [[GKParameter()]], [[GKParameter(), GKParameter()]]]
-    )
-    assert model.z_allowed == [[[0]]]
-
     with pytest.raises(ValueError, match="Invalid restriction type"):
         model.set_match_restrictions([[[[object()]]], None, None])
 
@@ -485,7 +487,7 @@ def _solver_run(*, failure_reason=None, status=1, objective_value=1.0):
 
 
 def _solve_reporting_fake_options(m, **_kwargs):
-    # As solve_gekko_model does, report the model's status and objective.
+    # As solve_pyomo_model does, report the model's status and objective.
     return _solver_run(
         status=m.options.SOLVESTATUS, objective_value=m.options.objfcnval
     )
@@ -497,7 +499,7 @@ def test_optimise_handles_failure_negative_success_and_unsolved_paths(monkeypatc
 
     monkeypatch.setattr(
         base_execution.backend,
-        "solve_gekko_model",
+        "solve_pyomo_model",
         lambda *args, **kwargs: _solver_run(failure_reason="missing solver"),
     )
     model.optimise(print_output=False)
@@ -506,7 +508,7 @@ def test_optimise_handles_failure_negative_success_and_unsolved_paths(monkeypatc
 
     monkeypatch.setattr(
         base_execution.backend,
-        "solve_gekko_model",
+        "solve_pyomo_model",
         _solve_reporting_fake_options,
     )
     model.m = _FakeModel(solve_status=1, objective=-1.0)
@@ -535,7 +537,7 @@ def test_optimise_removes_run_directory_on_success_and_failure(monkeypatch, tmp_
         assert (tmp_path / m.name).is_dir()
         return _solver_run(failure_reason=None if m.name == "solved" else "bad")
 
-    monkeypatch.setattr(base_execution.backend, "solve_gekko_model", solve)
+    monkeypatch.setattr(base_execution.backend, "solve_pyomo_model", solve)
     for name in ("solved", "failed"):
         (tmp_path / name).mkdir()
         model.m = _FakeModel(solve_status=1, objective=1.0)
@@ -554,39 +556,34 @@ def test_optimise_removes_run_directory_on_success_and_failure(monkeypatch, tmp_
     (tmp_path / "crashed").mkdir()
     model.m = _FakeModel()
     model.m._path = str(tmp_path / "crashed")
-    monkeypatch.setattr(base_execution.backend, "solve_gekko_model", broken_solve)
+    monkeypatch.setattr(base_execution.backend, "solve_pyomo_model", broken_solve)
     with pytest.raises(RuntimeError, match="solver crashed"):
         model.optimise(print_output=False)
     assert not (tmp_path / "crashed").exists()
 
 
-def test_cleanup_gekko_model_is_idempotent_and_allows_a_resolve(tmp_path):
-    run_dir = tmp_path / "gk_model0"
+def test_cleanup_model_run_directory_is_idempotent_and_allows_a_resolve(
+    monkeypatch, tmp_path
+):
+    run_dir = tmp_path / "run"
     run_dir.mkdir()
-    (run_dir / "gk_model0.apm").write_text("model", encoding="utf-8")
-    model = SimpleNamespace(
-        _path=str(run_dir),
-        options=SimpleNamespace(SOLVER_EXTENSION=0, SOLVESTATUS=1, objfcnval=1.0),
-        solve=lambda **_kwargs: None,
-    )
+    model = SimpleNamespace(_path=str(run_dir))
 
-    backend.cleanup_gekko_model(model)
-    backend.cleanup_gekko_model(model)
-    backend.cleanup_gekko_model(None)
+    backend.cleanup_model_run_directory(model)
+    backend.cleanup_model_run_directory(model)
+    backend.cleanup_model_run_directory(None)
     assert not run_dir.exists()
 
     # A model solved again after cleanup gets its run directory back.
-    def solve(**_kwargs):
+    def factory(_name):
         assert run_dir.is_dir()
+        raise RuntimeError("stop after the directory check")
 
-    model.solve = solve
-    run = backend.solve_gekko_model(model, solver_name="apopt")
-    assert run.failure_reason is None
-
-    # Test doubles without a run path fall back to their own cleanup.
-    cleaned = []
-    backend.cleanup_gekko_model(SimpleNamespace(cleanup=lambda: cleaned.append(1)))
-    assert cleaned == [1]
+    pyomo = SimpleNamespace(SolverFactory=factory)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", lambda *a, **k: pyomo)
+    run = backend.solve_pyomo_model(model, solver_name="couenne")
+    assert run.failure_reason == "stop after the directory check"
+    assert run_dir.is_dir()
 
 
 def _ipopt_available() -> bool:
@@ -602,7 +599,7 @@ def _ipopt_available() -> bool:
 # does not import the solver packages.
 @pytest.mark.skipif(
     "not _ipopt_available()",
-    reason="needs the ipopt binary and the gekko and pyomo packages",
+    reason="needs the ipopt binary and the pyomo package",
 )
 @pytest.mark.parametrize(
     ("solver_options", "termination_condition", "converged"),
@@ -611,40 +608,24 @@ def _ipopt_available() -> bool:
 def test_pyomo_solve_records_whether_the_solver_converged(
     solver_options, termination_condition: str, converged: bool
 ):
-    model = backend.create_gekko_model()
+    model = PyomoModel()
     try:
         x = model.Var(value=5.0)
         y = model.Var(value=-3.0)
         model.Equation(x**2 + y**2 >= 2)
         model.Minimize((x - 1) ** 4 + (y - 2) ** 4 + x * y)
-        backend.configure_gekko_solver(
+        backend.configure_pyomo_solver(
             model, "ipopt-pyomo", solver_options=solver_options
         )
-        run = backend.solve_gekko_model(model, solver_name="ipopt-pyomo")
+        run = backend.solve_pyomo_model(model, solver_name="ipopt-pyomo")
     finally:
-        backend.cleanup_gekko_model(model)
+        backend.cleanup_model_run_directory(model)
 
-    # GEKKO reports both solves as successful.
+    # An iteration limit still passes, but is not converged.
     assert run.status == 1
     assert run.failure_reason is None
     assert run.termination_condition == termination_condition
     assert run.converged is converged
-
-
-def test_gekko_model_pickles_for_process_pool_tasks():
-    pytest.importorskip("gekko")
-    import pickle
-
-    # Built synthesis tasks carry their model to ProcessPoolExecutor workers.
-    model = backend.create_gekko_model()
-    try:
-        model.Var(value=5.0)
-        restored = pickle.loads(pickle.dumps(model))
-    finally:
-        backend.cleanup_gekko_model(model)
-
-    assert type(restored) is type(model)
-    assert len(restored._variables) == 1
 
 
 def test_optimise_warns_when_the_solver_stopped_before_converging(monkeypatch, caplog):
@@ -653,7 +634,7 @@ def test_optimise_warns_when_the_solver_stopped_before_converging(monkeypatch, c
     model.get_post_process = lambda: None
     monkeypatch.setattr(
         base_execution.backend,
-        "solve_gekko_model",
+        "solve_pyomo_model",
         lambda *args, **kwargs: replace(
             _solver_run(), termination_condition="maxIterations"
         ),

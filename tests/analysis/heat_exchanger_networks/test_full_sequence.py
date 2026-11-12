@@ -82,7 +82,6 @@ from tests.support.paths import REPOSITORY_ROOT
 REPO_ROOT = REPOSITORY_ROOT
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 FORBIDDEN_SOLVER_MODULES = [
-    "gekko",
     "pyomo",
     "pyomo.environ",
     "pyomo.opt",
@@ -1094,7 +1093,7 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
 # does not import the solver packages.
 @pytest.mark.skipif(
     "not _live_solver_environment_available()",
-    reason="needs the couenne and ipopt binaries and the gekko and pyomo packages",
+    reason="needs the couenne and ipopt binaries and the pyomo package",
 )
 def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
     single_period = _single_state_no_sweep_problem()
@@ -1568,10 +1567,6 @@ def _live_solver_environment_available() -> bool:
         )
         require_solver_binary(
             "ipopt",
-            purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
-        )
-        require_synthesis_dependency(
-            "gekko",
             purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
         require_synthesis_dependency(

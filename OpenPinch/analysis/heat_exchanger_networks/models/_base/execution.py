@@ -21,7 +21,7 @@ def _pyomo_value(expression: Any) -> Any:
 def optimise(model, print_output: bool) -> None:
     """Solve the concrete model and extract plain result data on success.
 
-    The GEKKO run directory is removed afterwards: post-processing has read
+    The model's run directory is removed afterwards: post-processing has read
     the solved values onto the model's variables by then.
     """
 
@@ -36,17 +36,7 @@ def _solve_and_post_process(model, print_output: bool) -> None:
     piecewise_mappings = getattr(model, "_piecewise_active_mappings", [])
     active_mapping_stable = not piecewise_mappings or getattr(model, "integers", False)
     for _attempt in range(8):
-        if isinstance(model.m, PyomoModel):
-            model.solver_run = backend.solve_pyomo_model(
-                model.m, solver_name=model.solver
-            )
-        else:
-            model.solver_run = backend.solve_gekko_model(
-                model.m,
-                solver_name=model.solver,
-                disp=False,
-                debug=0,
-            )
+        model.solver_run = backend.solve_pyomo_model(model.m, solver_name=model.solver)
         total_solve_time += float(model.solver_run.solve_time or 0.0)
         if model.solver_run.failure_reason is not None:
             break
@@ -72,7 +62,7 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             solve_time=total_solve_time,
             failure_reason=(
                 f"{model.solver_run.failure_reason}; segmented-stream active "
-                "interval solve was unresolved, so use APOPT or Couenne"
+                "interval solve was unresolved, so use Couenne or HiGHS"
             ),
         )
 
@@ -84,8 +74,8 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             objective_value=model.solver_run.objective_value,
             solve_time=total_solve_time,
             failure_reason=(
-                "piecewise active segments did not stabilise; use APOPT or "
-                "Couenne for interval-disjunctive segmented-stream solving"
+                "piecewise active segments did not stabilise; use Couenne or "
+                "HiGHS for interval-disjunctive segmented-stream solving"
             ),
         )
 
@@ -135,24 +125,12 @@ def _solve_and_post_process(model, print_output: bool) -> None:
 
 
 def cleanup_model(model) -> None:
-    """Remove the model's GEKKO run directory; safe to call more than once."""
+    """Remove the model's run directory; safe to call more than once."""
 
-    backend.cleanup_gekko_model(getattr(model, "m", None))
+    backend.cleanup_model_run_directory(getattr(model, "m", None))
 
 
 def setup_model(model) -> None:
-    """Create and configure the GEKKO model behind optional guards."""
-
-    model.m = backend.create_gekko_model(remote=False)
-    model.mSuccess: int = 0
-    model.solver_run = backend.configure_gekko_solver(
-        model.m,
-        model.solver,
-        solver_options=model.solver_options,
-    )
-
-
-def setup_pyomo_model(model) -> None:
     """Create a native Pyomo model and check its solver.
 
     The solver is checked first, so a missing binary is reported as such even
@@ -178,7 +156,7 @@ def _solver_value(model, value: Any) -> float:
 
 
 def _value(value) -> float:
-    """Read a number from a GEKKO value, a ``[value]`` list, or a Pyomo component."""
+    """Read a number from a plain number, a ``[value]`` list, or a Pyomo component."""
 
     if hasattr(value, "is_expression_type") and value.is_expression_type():
         # A Pyomo expression, such as an Intermediate of a PyomoModel.
@@ -189,34 +167,17 @@ def _value(value) -> float:
         return float(value[0])
     except (TypeError, IndexError, KeyError):
         pass
-    for attr in ("VALUE", "value"):
-        if not hasattr(value, attr):
-            continue
-        raw = getattr(value, attr)
-        try:
-            return float(raw[0])
-        except (TypeError, IndexError, KeyError):
-            pass
-        raw_value = getattr(raw, "value", raw)
-        if isinstance(raw_value, int | float):
-            return float(raw_value)
-        try:
-            return float(raw_value[0])
-        except (TypeError, IndexError, KeyError):
-            return float(raw_value)
+    if hasattr(value, "value"):
+        return float(value.value)
     return float(value)
 
 
 def _assign_value(variable: Any, value: Any) -> None:
-    """Write a value onto a GEKKO or Pyomo variable or parameter, unclamped.
+    """Write a value onto a Pyomo variable or parameter, unclamped.
 
-    GEKKO values may be given bracketed (``[value]``); a Pyomo component
-    takes the plain number.
+    The value may be given bracketed (``[value]``).
     """
 
-    if hasattr(variable, "VALUE"):
-        variable.VALUE.value = value
-        return
     if isinstance(value, list | tuple):
         (value,) = value
     if variable.fixed:
@@ -225,19 +186,9 @@ def _assign_value(variable: Any, value: Any) -> None:
         variable.set_value(value, skip_validation=True)
 
 
-def _set_value(model, variable: Any, value: float, *, brackets: bool = False) -> None:
-    """Assign GEKKO or Pyomo values while preserving source bound-clamping behavior."""
+def _set_value(model, variable: Any, value: float) -> None:
+    """Assign Pyomo values while preserving source bound-clamping behavior."""
 
-    if type(variable).__name__ == "GKVariable":
-        if variable.lower is not None:
-            value = max(variable.lower, value)
-        if variable.upper is not None:
-            value = min(variable.upper, value)
-        variable.VALUE.value = [value] if brackets else value
-        return
-    if type(variable).__name__ == "GKParameter":
-        variable.VALUE.value = [value] if brackets else value
-        return
     if getattr(variable, "is_variable_type", lambda: False)():
         # A PyomoModel variable, or a parameter (a fixed variable).
         if variable.fixed:
