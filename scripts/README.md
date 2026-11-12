@@ -107,7 +107,7 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   `sys.modules`, prepends `~/.idaes/bin` to `PATH` without restoring it, uses temporary directories, and spawns
   multiprocessing workers [compare_openhens_openpinch_top5.py:_configure_solver_path].
 - `benchmark_performance.py` forks worker processes (POSIX only: it requests the `fork` start method), monkeypatches
-  `solver_backend.solve_gekko_model` while tracing, runs solvers, and writes the JSON results file
+  `solver_backend.solve_gekko_model` and `solver_backend.solve_pyomo_model` while tracing, runs solvers, and writes the JSON results file
   (default under `results/`) [benchmark_performance.py:BenchmarkSolverCallTracer.patched_backend].
 - `benchmark_nine_stream.py` runs the full OpenHENS workflow with the local solvers and imports the
   helpers in `tests/analysis/heat_exchanger_networks/test_solver_regressions.py` when run.

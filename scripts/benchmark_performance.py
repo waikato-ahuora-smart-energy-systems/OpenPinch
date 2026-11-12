@@ -89,7 +89,7 @@ SOLVER_STAGE_LABELS = (
 
 
 class BenchmarkSolverCallTracer:
-    """Benchmark-local wrapper around the concrete GEKKO/Pyomo solve boundary."""
+    """Benchmark-local wrapper around the GEKKO and native Pyomo solve boundaries."""
 
     def __init__(self, *, case_name: str, tier: int, progress_queue=None) -> None:
         self.case_name = case_name
@@ -103,24 +103,32 @@ class BenchmarkSolverCallTracer:
 
     @contextmanager
     def patched_backend(self):
-        original_solve = solver_backend.solve_gekko_model
+        original_gekko_solve = solver_backend.solve_gekko_model
+        original_pyomo_solve = solver_backend.solve_pyomo_model
 
-        def traced_solve(
+        def traced_gekko_solve(
             model, *, solver_name: str, disp: bool = False, debug: int = 0
         ):
             return self._trace_solve(
-                original_solve,
+                original_gekko_solve,
                 model,
                 solver_name=solver_name,
                 disp=disp,
                 debug=debug,
             )
 
-        solver_backend.solve_gekko_model = traced_solve
+        def traced_pyomo_solve(model, *, solver_name: str, disp: bool = False):
+            return self._trace_solve(
+                original_pyomo_solve, model, solver_name=solver_name, disp=disp
+            )
+
+        solver_backend.solve_gekko_model = traced_gekko_solve
+        solver_backend.solve_pyomo_model = traced_pyomo_solve
         try:
             yield self
         finally:
-            solver_backend.solve_gekko_model = original_solve
+            solver_backend.solve_gekko_model = original_gekko_solve
+            solver_backend.solve_pyomo_model = original_pyomo_solve
 
     @contextmanager
     def task_context(self, record: dict[str, Any]):
@@ -139,19 +147,13 @@ class BenchmarkSolverCallTracer:
         model,
         *,
         solver_name: str,
-        disp: bool,
-        debug: int,
+        **solve_options: Any,
     ):
         start = time.perf_counter()
         solver_run = None
         error = None
         try:
-            solver_run = solve_function(
-                model,
-                solver_name=solver_name,
-                disp=disp,
-                debug=debug,
-            )
+            solver_run = solve_function(model, solver_name=solver_name, **solve_options)
             return solver_run
         except BaseException as exc:
             error = exc

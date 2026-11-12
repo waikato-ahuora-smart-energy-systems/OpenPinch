@@ -659,3 +659,25 @@ def test_nine_stream_script_accepts_the_expected_result() -> None:
     )
 
     assert failures == []
+
+
+def test_benchmark_solver_tracer_records_native_pyomo_solves(monkeypatch) -> None:
+    # The pinch-design model solves through solve_pyomo_model with Couenne
+    # and Ipopt, so the tracer must see those calls too.
+    benchmark = _load_benchmark_module()
+
+    def fake_solve(model, *, solver_name, disp=False):
+        del model, disp
+        return benchmark.solver_backend.SolverRun(name=solver_name, status=1)
+
+    monkeypatch.setattr(benchmark.solver_backend, "solve_pyomo_model", fake_solve)
+    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=0)
+
+    with tracer.patched_backend():
+        run = benchmark.solver_backend.solve_pyomo_model(
+            object(), solver_name="couenne"
+        )
+
+    assert run.status == 1
+    assert [record["solver_name"] for record in tracer.records] == ["couenne"]
+    assert benchmark.solver_backend.solve_pyomo_model is fake_solve
