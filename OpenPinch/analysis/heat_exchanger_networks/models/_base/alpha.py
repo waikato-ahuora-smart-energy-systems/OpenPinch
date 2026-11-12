@@ -77,6 +77,11 @@ def _solve_flow_on_system(model) -> np.ndarray | None:
     right_hand_side = np.zeros(3 * count)
 
     def add(row: int, column: int, coefficient: float) -> None:
+        # Inactive matches give zero flow-on coefficients. Storing them makes
+        # the LU factorisation fill in: on a 64-stream network most of the
+        # matrix would be stored zeros.
+        if coefficient == 0.0:
+            return
         rows.append(row)
         columns.append(column)
         coefficients.append(coefficient)
