@@ -294,8 +294,9 @@ Heat exchanger network synthesis
   now an unknown option, and the design accessor's ``approach_temperatures``
   argument is gone. Synthesis tasks, outcomes, manifests and networks record
   ``dt_cont_multiplier`` (manifests ``dt_cont_multipliers``) and no longer an
-  approach temperature or ``solver_dTmin``; the benchmark script reports per
-  multiplier. To convert an approach-temperature grid, use
+  approach temperature or ``solver_dTmin`` (a duty-optimised network records
+  its least recovery approach as ``minimum_recovery_approach``); the benchmark
+  script reports per multiplier. To convert an approach-temperature grid, use
   multiplier = dTmin / (2 x ``THERMAL_DT_CONT``), so 14 K at the 5 K default is
   1.4; the OpenHENS fixtures and sample case are converted this way and solve
   as before. The OpenPinch-WASM app's HEN calls need updating at its next

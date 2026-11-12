@@ -715,7 +715,7 @@ def test_network_feasibility_checks_minimum_approach_temperature() -> None:
     network = _feasible_balance_network(
         "low-approach",
         source_metadata={
-            "solver_dTmin": 175.0,
+            "minimum_recovery_approach": 175.0,
             "hot_stream_heat_capacity_flowrates": [10.0],
             "cold_stream_heat_capacity_flowrates": [10.0],
             "hot_stream_supply_temperatures": [500.0],

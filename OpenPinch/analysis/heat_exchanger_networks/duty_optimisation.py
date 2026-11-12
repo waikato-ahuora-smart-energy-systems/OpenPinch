@@ -851,7 +851,9 @@ def _source_metadata(model, solver_arrays) -> dict[str, Any]:
         "solver_model_name": getattr(model, "name", None),
         "solver_framework": "ESM",
         "solver_non_isothermal_model": True,
-        "solver_dTmin": min(recovery_limits) if recovery_limits else None,
+        "minimum_recovery_approach": (
+            min(recovery_limits) if recovery_limits else None
+        ),
         "segment_profile_version": SEGMENT_PROFILE_VERSION,
         "hot_stream_heat_capacity_flowrates": first("f_h_period"),
         "hot_stream_heat_capacity_flowrates_by_period": by_period("f_h_period"),
