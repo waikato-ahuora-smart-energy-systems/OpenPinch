@@ -46,6 +46,8 @@ class InternalHeatExchangerNetworkProblem:
     framework: FrameworkName = "TDM"
     solver: str = "couenne"
     dTmin: float = 0.1
+    # The synthesis task's dt_cont multiplier, recorded on extracted networks.
+    dt_cont_multiplier: float | None = None
     min_dqda: float = 0.0
     z_restriction: list | None = None
     minimisation_goal: str = "hot utility"
@@ -154,6 +156,7 @@ class InternalHeatExchangerNetworkProblem:
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self.framework,
+            dt_cont_multiplier=self.dt_cont_multiplier,
             stage_count=getattr(
                 self.case, "stages", getattr(self.case, "S", self.stages)
             ),

@@ -444,7 +444,7 @@ def test_task_records_structure_and_request() -> None:
     request = _request(min_approach_temperature=8.0)
     settings = SimpleNamespace(
         run_id="run",
-        approach_temperatures=(10.0,),
+        dt_cont_multipliers=(1.0,),
         problem_id=None,
         workspace_variant=None,
         period_id=None,
@@ -452,12 +452,15 @@ def test_task_records_structure_and_request() -> None:
 
     task = duty_optimisation_task(request, settings)
 
-    assert task.approach_temperature == 8.0
+    # The requested approach is recorded in the task settings; contributions
+    # use the first configured multiplier.
+    assert task.dt_cont_multiplier == 1.0
+    assert task.settings["min_approach_temperature"] == 8.0
     assert task.stage_count == 2
     assert task.settings["fixed_structure"] is True
     assert task.seed_network == request.network
     assert len(task.topology_restrictions) == 4
-    assert duty_optimisation_task(_request(), settings).approach_temperature == 10.0
+    assert duty_optimisation_task(_request(), settings).dt_cont_multiplier == 1.0
 
 
 # --- model helpers -----------------------------------------------------------
@@ -524,7 +527,7 @@ def _small_payload(*, hot_cp=10.0, extra_hot_utility=None) -> dict:
             "COSTING_HX_AREA_COEFF": 150.0,
             "COSTING_HX_AREA_EXP": 1.0,
             "COSTING_HX_UNIT_COST": 5500.0,
-            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
             "HENS_SOLVER_EVM": "ipopt-pyomo",
             "HENS_SOLVE_TOLERANCE": 0.001,
         },
@@ -750,7 +753,7 @@ def _scripted_task(request):
         request,
         SimpleNamespace(
             run_id="run",
-            approach_temperatures=(10.0,),
+            dt_cont_multipliers=(1.0,),
             problem_id=None,
             workspace_variant=None,
             period_id=None,
@@ -769,7 +772,7 @@ def test_executor_removes_zero_duty_exchangers_and_resolves(monkeypatch) -> None
         request,
         SimpleNamespace(
             run_id="run",
-            approach_temperatures=(10.0,),
+            dt_cont_multipliers=(1.0,),
             problem_id=None,
             workspace_variant=None,
             period_id=None,
@@ -900,7 +903,7 @@ def test_executor_reports_solver_failure_after_removals() -> None:
         request,
         SimpleNamespace(
             run_id="run",
-            approach_temperatures=(10.0,),
+            dt_cont_multipliers=(1.0,),
             problem_id=None,
             workspace_variant=None,
             period_id=None,
@@ -997,7 +1000,7 @@ def test_executor_reports_structure_errors_as_failed_outcomes() -> None:
     request = _request(_four_stream_structure(hot_utility="LPS"))
     settings = SimpleNamespace(
         run_id="run",
-        approach_temperatures=(10.0,),
+        dt_cont_multipliers=(1.0,),
         problem_id=None,
         workspace_variant=None,
         period_id=None,

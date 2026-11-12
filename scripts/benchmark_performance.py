@@ -45,6 +45,9 @@ from OpenPinch.analysis.heat_exchanger_networks.solver import (
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     pinch_design_decomposition,
 )
+from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+    nominal_approach_temperature,
+)
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     open_hens_method,
 )
@@ -68,7 +71,7 @@ DEFAULT_HENS_BENCHMARK_JSON = (
 HENS_BENCHMARK_CASES = ()
 HENS_QUALITY_TIERS = (0, 1, 2, 3, 4)
 HENS_BENCHMARK_OPTIONS = {
-    "HENS_APPROACH_TEMPERATURES": [10.0],
+    "HENS_DT_CONT_MULTIPLIERS": [1.0],
     "HENS_DERIVATIVE_THRESHOLDS": [0.5],
     "HENS_STAGE_SELECTION": [3],
     "HENS_BEST_SOLUTIONS_TO_SAVE": 3,
@@ -191,7 +194,7 @@ class BenchmarkSolverCallTracer:
                 ),
                 "parent_task_id": context.get("parent_task_id"),
                 "parent_method": context.get("parent_method"),
-                "approach_temperature": context.get("approach_temperature"),
+                "dt_cont_multiplier": context.get("dt_cont_multiplier"),
                 "derivative_threshold": context.get("derivative_threshold"),
                 "stage_count": context.get("stage_count"),
                 "settings": context.get("settings") or {},
@@ -320,11 +323,12 @@ def acceptance_metrics(
 ) -> dict[str, Any]:
     """Return the PDM topology summary and the best ranked total annual costs.
 
-    Each PDM network is checked against the pinch targets at its own approach
-    temperature.
+    Each PDM network is checked against the pinch targets at its own dt_cont
+    multiplier.
     """
 
-    targets_by_approach: dict[float, Any] = {}
+    config = problem.master_zone.config
+    targets_by_multiplier: dict[float, Any] = {}
     entries = []
     for outcome in outcomes:
         if (
@@ -333,18 +337,19 @@ def acceptance_metrics(
             or outcome.network is None
         ):
             continue
-        approach = float(outcome.task.approach_temperature)
-        if approach not in targets_by_approach:
-            targets_by_approach[approach] = (
+        multiplier = float(outcome.task.dt_cont_multiplier)
+        if multiplier not in targets_by_multiplier:
+            targets_by_multiplier[multiplier] = (
                 pinch_design_decomposition._calculate_openpinch_targets(
-                    problem, dTmin=approach
+                    problem,
+                    dTmin=nominal_approach_temperature(config, multiplier),
                 )
             )
         entries.append(
             (
                 outcome.network,
                 network_meets_pinch_targets(
-                    outcome.network, targets_by_approach[approach]
+                    outcome.network, targets_by_multiplier[multiplier]
                 ),
             )
         )
@@ -961,7 +966,7 @@ def _task_start_record(
         "stage_index": stage_index,
         "parent_task_id": task.parent_task_id,
         "parent_method": _parent_method(task, parent_outcomes),
-        "approach_temperature": task.approach_temperature,
+        "dt_cont_multiplier": task.dt_cont_multiplier,
         "derivative_threshold": task.derivative_threshold,
         "stage_count": task.stage_count,
         "settings": dict(task.settings),
@@ -1015,7 +1020,7 @@ def _task_record(
         "stage_index": stage_index,
         "parent_task_id": task.parent_task_id,
         "parent_method": _parent_method(task, parent_outcomes),
-        "approach_temperature": task.approach_temperature,
+        "dt_cont_multiplier": task.dt_cont_multiplier,
         "derivative_threshold": task.derivative_threshold,
         "stage_count": task.stage_count,
         "settings": dict(task.settings),

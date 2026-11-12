@@ -52,6 +52,9 @@ ESM_ATTEMPT_WEIGHT = 11
 
 FOUR_STREAM = "Four-stream-Yee-and-Grossmann-1990-1"
 NINE_STREAM = "Nine-stream-Linnhoff-and-Ahmad-1999-1"
+# The OpenHENS records are keyed on dTmin; the converted fixtures keep the
+# default THERMAL_DT_CONT, so a dt_cont multiplier m is OpenHENS's 2 * 5 K * m.
+OPENHENS_THERMAL_DT_CONT = 5.0
 
 BASELINE_EXPECTATIONS = {
     FOUR_STREAM: {
@@ -69,7 +72,7 @@ BASELINE_EXPECTATIONS = {
         "within_2_percent": 37,
         "within_5_percent": 64,
         "within_10_percent": 100,
-        "best_dTmin": 14,
+        "best_dt_cont_multiplier": 1.4,
         "best_min_dQ": 0.5,
         "best_stages": 3,
         "best_recovery_units": 3,
@@ -88,7 +91,7 @@ BASELINE_EXPECTATIONS = {
         "within_2_percent": 46,
         "within_5_percent": 68,
         "within_10_percent": 70,
-        "best_dTmin": 18,
+        "best_dt_cont_multiplier": 1.8,
         "best_min_dQ": 1.7,
         "best_stages": 4,
         "best_recovery_units": 11,
@@ -137,13 +140,17 @@ def test_openhens_baseline_summary_preserves_solver_metric_contract(
         )
     for field in INTEGER_SUMMARY_FIELDS:
         assert summary[field] == expected[field]
-    assert summary["best_dTmin"] == expected["best_dTmin"]
+    assert summary["best_dTmin"] == pytest.approx(
+        _openhens_d_tmin(expected["best_dt_cont_multiplier"])
+    )
     assert summary["best_min_dQ"] == expected["best_min_dQ"]
 
     assert best_row["Method"] == "ESM"
     assert best_row["Task ID"] == snapshot["task_id"]
     assert float(best_row["ESM TAC"]) == pytest.approx(expected["best_solution"])
-    assert float(best_row["dTmin"]) == expected["best_dTmin"]
+    assert float(best_row["dTmin"]) == pytest.approx(
+        _openhens_d_tmin(expected["best_dt_cont_multiplier"])
+    )
     assert float(best_row["min_dQ"]) == expected["best_min_dQ"]
     assert int(best_row["Stages"]) == expected["best_stages"]
     assert int(best_row["N Recovery Units"]) == expected["best_recovery_units"]
@@ -167,7 +174,9 @@ def test_best_esm_network_snapshot_matches_identity_labelled_network(
     tolerances = snapshot["tolerances"]
 
     assert expected["total_annual_cost"] == source_summary["best_solution"]
-    assert expected["best_dTmin"] == source_summary["best_dTmin"]
+    assert _openhens_d_tmin(expected["best_dt_cont_multiplier"]) == pytest.approx(
+        source_summary["best_dTmin"]
+    )
     assert expected["best_derivative_threshold"] == source_summary["best_min_dQ"]
     assert expected["stage_count"] == source_summary["best_stages"]
     assert expected["recovery_unit_count"] == source_summary["best_recovery_units"]
@@ -271,7 +280,7 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
     problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
-        approach_temperatures=(expected["best_dTmin"],),
+        dt_cont_multipliers=(expected["best_dt_cont_multiplier"],),
         derivative_thresholds=(expected["best_min_dQ"],),
         best_solutions_to_save=1,
         max_parallel=1,
@@ -323,7 +332,7 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
         FOUR_STREAM,
         network,
         expected_total=corrected_total,
-        d_tmin=expected["best_dTmin"],
+        d_tmin=_openhens_d_tmin(expected["best_dt_cont_multiplier"]),
     )
 
 
@@ -377,7 +386,7 @@ def test_parallel_design_solves_tasks_in_worker_processes() -> None:
     problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
-        approach_temperatures=(14, 20),
+        dt_cont_multipliers=(1.4, 2.0),
         derivative_thresholds=(0.5,),
         best_solutions_to_save=1,
         max_parallel=2,
@@ -464,7 +473,7 @@ def _assert_live_solver_case_matches_checked_in_summary(
         case_id,
         network,
         expected_total=expected["best_solution"],
-        d_tmin=expected["best_dTmin"],
+        d_tmin=_openhens_d_tmin(expected["best_dt_cont_multiplier"]),
     )
 
 
@@ -494,7 +503,7 @@ def _assert_artifact_solver_case_matches_checked_in_summary(case_id: str) -> Non
         case_id,
         network,
         expected_total=expected["best_solution"],
-        d_tmin=expected["best_dTmin"],
+        d_tmin=_openhens_d_tmin(expected["best_dt_cont_multiplier"]),
     )
 
 
@@ -612,7 +621,9 @@ def _network_context(
         OPENHENS_SOLVER_RUN_ROOT / snapshot["source_solver_run_summary_artifact"]
     )
     fixture = _fixture(case_id)
-    arrays = _source_artifact_solver_arrays(fixture, snapshot["expected"]["best_dTmin"])
+    arrays = _source_artifact_solver_arrays(
+        fixture, _openhens_d_tmin(snapshot["expected"]["best_dt_cont_multiplier"])
+    )
     solution = _snapshot_solution(snapshot, arrays)
     network = extract_heat_exchanger_network(
         _artifact_solved_model(solution, arrays),
@@ -694,7 +705,10 @@ def _source_artifact_solver_arrays(
                 for index, utility in enumerate(hot_utilities)
             },
         },
-        configuration={"active_dTmin": float(d_tmin)},
+        configuration={
+            "active_dt_cont_multiplier": float(d_tmin)
+            / (2.0 * OPENHENS_THERMAL_DT_CONT)
+        },
         preparation={
             "artifact_decoder": "OpenHENS source artifact order",
             "pinch_problem_class": "PinchProblem",
@@ -767,7 +781,7 @@ def _snapshot_solution(
     return {
         "task_id": snapshot["task_id"],
         "stages": expected["stage_count"],
-        "dTmin": expected["best_dTmin"],
+        "dTmin": _openhens_d_tmin(expected["best_dt_cont_multiplier"]),
         "recovery_heat_duties": solution_arrays["Q_r"],
         "hot_utility_duties": solution_arrays["Q_h"],
         "cold_utility_duties": solution_arrays["Q_c"],
@@ -824,7 +838,9 @@ def _snapshot_solution_arrays(
             stage_index = exchanger["stage"] - 1
             q_r[hot_index][cold_index][stage_index] = exchanger["duty"]
             area_r[hot_index][cold_index][stage_index] = exchanger["area"]
-            theta[hot_index][cold_index][stage_index] = expected["best_dTmin"]
+            theta[hot_index][cold_index][stage_index] = _openhens_d_tmin(
+                expected["best_dt_cont_multiplier"]
+            )
         elif kind == "hot_utility":
             cold_index = cold_axis[exchanger["sink_stream"]]
             utility_index = hot_utility_axis[exchanger["source_stream"]]
@@ -949,17 +965,24 @@ def _assert_temperature_feasibility(
             assert min(approach_temperatures) + TEMPERATURE_ABS_TOL >= d_tmin
 
 
+def _openhens_d_tmin(dt_cont_multiplier: float) -> float:
+    """The OpenHENS dTmin a dt_cont multiplier corresponds to, K."""
+    return 2.0 * OPENHENS_THERMAL_DT_CONT * float(dt_cont_multiplier)
+
+
 def _network_solver_d_tmin(
     network: HeatExchangerNetwork,
     *,
     fallback: float,
 ) -> float:
-    if not network.source_metadata:
+    """The least recovery approach the solver required, else ``fallback``."""
+    by_period = network.source_metadata.get("recovery_minimum_approach_by_period")
+    values = [
+        float(value) for matrix in by_period or () for row in matrix for value in row
+    ]
+    if not values:
         return fallback
-    value = network.source_metadata.get("solver_dTmin")
-    if value is None:
-        return fallback
-    return float(value)
+    return min(values)
 
 
 def _assert_cost_recomputation(

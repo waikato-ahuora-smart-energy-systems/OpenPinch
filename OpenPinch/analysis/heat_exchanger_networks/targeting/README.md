@@ -19,10 +19,10 @@ Orchestrates the HEN synthesis methods: it builds the task graph for pinch desig
 - `run_stage` returns the stage's tasks followed by the tasks the executor derived for extra outcomes, so every outcome's task is in the returned tasks [_stage.py:run_stage].
 - When Couenne is missing for every PDM task, ESM runs directly; when it is missing for every TDM task and no ESM tasks exist yet, ESM runs from the PDM outcomes; a warning is emitted in both cases [open_hens_method.py:execute_open_hens_method].
 - Evolution tasks built from outcomes or directly, with no pathway metadata, carry the branch breadth of the run, so they agree with the manifest whatever tier is stored in the configuration; seeded tasks have no call-local tier and leave breadth to the configuration [network_evolution_method.py:_run_breadth_settings].
-- Tier 0 pathways run the configured approach temperatures scaled by the pathway multiplier (1.0 unless `dt_cont_multipliers` is set), and tier 1 uses them unchanged; expanded quality routes run multiples of the first one only [pinch_design_method.py:_pathway_approach_temperatures].
+- Tasks carry a dt_cont multiplier, never an approach temperature. Tier 0 runs one compact PDM task per configured multiplier and tier 1 one standard PDM task per configured multiplier; the expanded quality routes run their own multipliers (the tier's defaults unless `HENS_DT_CONT_MULTIPLIERS` is set), and pathways sharing a PDM mode and multiplier share one task [pinch_design_method.py:_build_pathway_pinch_design_method_tasks].
 - Stage-pair PDM candidates come from a fixed ordered sweep truncated to the requested count [pinch_design_method.py:_PDM_STAGE_PAIR_SWEEP].
 - Canonical restrictions drop empty stage gaps, keep matches sharing a hot or cold stream in one stage, and split independent groups into consecutive stages [topology.py:canonical_topology_restrictions].
-- Seeded quality tasks are de-duplicated on approach temperature and canonical topology, plus derivative threshold when thresholds are distinct [_stage.py:build_seeded_quality_tasks].
+- Seeded quality tasks are de-duplicated on dt_cont multiplier and canonical topology, plus derivative threshold when thresholds are distinct [_stage.py:build_seeded_quality_tasks].
 - Single-method workflows replace `method_sequence` and `design_method` in the settings [_stage.py:run_single_method_workflow].
 
 ## Side Effects

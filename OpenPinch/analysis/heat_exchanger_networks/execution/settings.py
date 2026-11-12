@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ....domain.configuration import hen_approach_temperatures
+from ....domain.configuration_fields import CONFIG_FIELD_SPECS
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from .pathways import tier_evm_branch_breadth, tier_pdm_multipliers
 
@@ -25,8 +25,7 @@ class SynthesisWorkflowSettings:
     """Resolved synthesis controls read from a prepared OpenPinch problem."""
 
     run_id: str
-    approach_temperatures: tuple[float, ...]
-    dt_cont_multipliers: tuple[float, ...] | None = None
+    dt_cont_multipliers: tuple[float, ...] = (1.0,)
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
     method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...]
@@ -108,22 +107,14 @@ class SynthesisWorkflowSettings:
         if self.synthesis_quality_tier <= 1:
             return ()
         if self.user_dt_cont_multipliers:
-            return tuple(float(value) for value in self.dt_cont_multipliers or ())
+            return tuple(float(value) for value in self.dt_cont_multipliers)
         return tier_pdm_multipliers(int(self.synthesis_quality_tier))
 
     @property
-    def quality_pdm_approach_temperatures(self) -> tuple[float, ...]:
-        """Return concrete PDM dTmin values for tier multiplier candidates."""
+    def quality_pdm_dt_cont_multipliers(self) -> tuple[float, ...]:
+        """Return the distinct PDM multipliers of the tier candidates."""
 
-        if not self.quality_dt_cont_multipliers:
-            return ()
-        base_approach = float(self.approach_temperatures[0])
-        return tuple(
-            dict.fromkeys(
-                base_approach * float(multiplier)
-                for multiplier in self.quality_dt_cont_multipliers
-            )
-        )
+        return tuple(dict.fromkeys(self.quality_dt_cont_multipliers))
 
     @property
     def quality_pdm_stage_pair_count(self) -> int:
@@ -180,15 +171,10 @@ def workflow_settings_from_problem(
         )
     config = zone.config
     hens = config.hens
-    dt_cont_multipliers = getattr(hens, "dt_cont_multipliers", None)
+    dt_cont_multipliers = tuple(float(value) for value in hens.dt_cont_multipliers)
     return SynthesisWorkflowSettings(
         run_id=str(hens.run_id),
-        approach_temperatures=hen_approach_temperatures(config),
-        dt_cont_multipliers=(
-            None
-            if dt_cont_multipliers is None
-            else tuple(float(value) for value in dt_cont_multipliers)
-        ),
+        dt_cont_multipliers=dt_cont_multipliers,
         derivative_thresholds=tuple(
             float(value) for value in hens.derivative_thresholds
         ),
@@ -214,7 +200,9 @@ def workflow_settings_from_problem(
         evm_n_rm_branches=(
             None if hens.evm_n_rm_branches is None else int(hens.evm_n_rm_branches)
         ),
-        user_dt_cont_multipliers=dt_cont_multipliers is not None,
+        # The default sweep does not count as set, so tiers 2-5 add their own.
+        user_dt_cont_multipliers=list(dt_cont_multipliers)
+        != CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default,
         pdm_solver=str(hens.solver_pdm),
         tdm_solver=str(hens.solver_tdm),
         evm_solver=str(hens.solver_evm),

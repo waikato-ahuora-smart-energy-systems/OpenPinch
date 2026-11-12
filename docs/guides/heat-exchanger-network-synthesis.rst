@@ -21,7 +21,7 @@ Ranked Synthesis
        project_name="Four Stream",
    )
    design = problem.design.heat_exchanger_network(
-       approach_temperatures=[10.0, 14.0, 18.0],
+       dt_cont_multipliers=[1.0, 1.4, 1.8],
        stages=[3],
        best_solutions=3,
    )
@@ -37,27 +37,39 @@ utility duty, and ``utility(name)``. Serialize the complete result with
 Exchanger Approach Temperatures
 -------------------------------
 
-``approach_temperatures`` (``HENS_APPROACH_TEMPERATURES``) sets the approach of
-the pinch design step: the energy targets the seed networks meet and the
-minimum approach of their exchangers. The thermal derivative and network
-evolution steps that follow minimise total annual cost and choose each
-exchanger's approach from the cost settings, down to 0.1 K. With cheap area,
-exchangers can close well below the requested approach; with dear area, they
-open up and the network uses more utility than the target.
+Synthesis runs once per ``dt_cont_multipliers`` value
+(``HENS_DT_CONT_MULTIPLIERS``, default ``[1.0]``). A multiplier scales every
+stream's, segment's and utility's ΔT contribution, as a zone ``dt_cont``
+multiplier does in targeting, so 1.0 designs at the contributions the pinch
+targets use, and a match between two streams needs the sum of their scaled
+contributions. A stream whose ``dt_cont`` multiplier is locked keeps its own
+contribution, as in targeting. A contribution of 0 runs at 0.1 K times the
+multiplier. Results, manifests and networks record the multiplier; to reuse
+an older approach-temperature grid, use multiplier = dTmin / (2 x
+``THERMAL_DT_CONT``), so 14 K at the 5 K default is 1.4.
 
-``HENS_MIN_EXCHANGER_APPROACH_SHARE`` raises that floor to a share of the
-requested approach. It defaults to 0, which keeps the 0.1 K floor. At 0.5, a
-10 K design keeps every exchanger at 5 K or more:
+The multipliers set the pinch design step: the energy targets the seed
+networks meet and the minimum approach of their exchangers. The thermal
+derivative and network evolution steps that follow minimise total annual cost
+and choose each exchanger's approach from the cost settings, down to 0.1 K.
+With cheap area, exchangers can close well below the pinch design approach;
+with dear area, they open up and the network uses more utility than the
+target.
+
+``HENS_MIN_EXCHANGER_APPROACH_SHARE`` raises that floor to a share of twice
+the scaled ``THERMAL_DT_CONT``. It defaults to 0, which keeps the 0.1 K floor.
+At 0.5, a multiplier of 1.0 with the 5 K default keeps every exchanger at 5 K
+or more:
 
 .. code-block:: python
 
    design = problem.design.heat_exchanger_network(
-       approach_temperatures=[10.0],
+       dt_cont_multipliers=[1.0],
        options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.5},
    )
 
 The share must be below 1: at 1, evolution cannot start from a pinch design
-network whose exchangers sit exactly at the requested approach.
+network whose exchangers sit exactly at that approach.
 ``verify_network_feasibility`` still checks approaches against the 0.1 K
 floor, not against this share.
 

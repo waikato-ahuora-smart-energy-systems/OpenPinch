@@ -75,7 +75,7 @@ def test_synthesis_task_generates_stable_id_from_static_fixture():
     [
         ({"run_id": "-bad"}, "run_id must start"),
         ({"problem_id": " "}, "identity fields"),
-        ({"approach_temperature": 0.0}, "finite and positive"),
+        ({"dt_cont_multiplier": 0.0}, "finite and positive"),
         ({"stage_count": 0}, "positive integer"),
         ({"seed_network_index": -1}, "non-negative"),
     ],
@@ -130,7 +130,7 @@ def test_export_record_and_manifest_accept_static_fixture_values():
 @pytest.mark.parametrize(
     ("updates", "message"),
     [
-        ({"approach_temperatures": []}, "grid values"),
+        ({"dt_cont_multipliers": []}, "grid values"),
         ({"derivative_thresholds": [math.inf]}, "finite and positive"),
         ({"stage_selection": []}, "at least one stage"),
         ({"stage_selection": [0]}, "positive integers"),

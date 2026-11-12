@@ -16,7 +16,11 @@ from ....optimisation.execution import _main_module_reruns_in_workers
 from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
-from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
+from ..solver.arrays import (
+    PreparedSolverArrays,
+    nominal_approach_temperature,
+    problem_to_solver_arrays,
+)
 from .pathways import pathways_from_metadata, tier_evm_branch_breadth
 
 logger = logging.getLogger(__name__)
@@ -285,9 +289,12 @@ class LocalSynthesisExecutor:
         parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
     ) -> InternalHeatExchangerNetworkProblem:
         parent_problem = self._parent_problem(task, parent_outcomes)
+        config = problem.master_zone.config
+        nominal_approach = nominal_approach_temperature(config, task.dt_cont_multiplier)
         dTmin = _task_model_approach_temperature(
             task,
-            min_approach_share=problem.master_zone.config.hens.min_exchanger_approach_share,
+            nominal_approach,
+            min_approach_share=config.hens.min_exchanger_approach_share,
         )
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _pdm_stage_selection(problem, task)
@@ -301,13 +308,13 @@ class LocalSynthesisExecutor:
             decompositions = {
                 "above": build_pinch_design_decomposition(
                     problem,
-                    task.approach_temperature,
+                    nominal_approach,
                     pinch_location="above",
                     stage_selection=stage_selection,
                 ),
                 "below": build_pinch_design_decomposition(
                     problem,
-                    task.approach_temperature,
+                    nominal_approach,
                     pinch_location="below",
                     stage_selection=stage_selection,
                 ),
@@ -319,6 +326,7 @@ class LocalSynthesisExecutor:
             framework=_model_framework(task.method),
             solver=_solver_for_task(problem, task.method),
             dTmin=dTmin,
+            dt_cont_multiplier=task.dt_cont_multiplier,
             min_dqda=(
                 0.0
                 if task.derivative_threshold is None
@@ -583,26 +591,29 @@ def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
 
 def _task_model_approach_temperature(
     task: HeatExchangerNetworkSynthesisTask,
+    nominal_approach: float,
     *,
     min_approach_share: float = 0.0,
 ) -> float:
     """Return the model's minimum approach temperature.
 
-    The pinch design step uses the task's approach. The thermal derivative and
-    evolution steps minimise cost down to 0.1 K, or to ``min_approach_share``
-    (``HENS_MIN_EXCHANGER_APPROACH_SHARE``) times the task's approach if larger.
+    ``nominal_approach`` is the task multiplier's internal approach,
+    ``2 * THERMAL_DT_CONT * dt_cont_multiplier``. The pinch design step uses
+    it. The thermal derivative and evolution steps minimise cost down to
+    0.1 K, or to ``min_approach_share`` (``HENS_MIN_EXCHANGER_APPROACH_SHARE``)
+    times it if larger.
     """
     if task.method in {
         HeatExchangerNetworkDesignMethod.ThermalDerivative,
         HeatExchangerNetworkDesignMethod.NetworkEvolution,
     }:
-        return max(0.1, min_approach_share * float(task.approach_temperature))
-    return float(task.approach_temperature)
+        return max(0.1, min_approach_share * float(nominal_approach))
+    return float(nominal_approach)
 
 
 def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
     if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
-        return f"P-+--PDM-{task.approach_temperature}"
+        return f"P-+--PDM-m{task.dt_cont_multiplier:g}"
     if task.method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         stages = task.stage_count if task.stage_count is not None else "unknown"
         return f"P-S{stages}--TDM-{task.derivative_threshold}"

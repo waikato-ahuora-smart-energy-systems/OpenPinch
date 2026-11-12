@@ -21,8 +21,8 @@ from ..execution.settings import SynthesisWorkflowSettings
 from ..execution.task_builders import (
     _required_stage_count,
     _successful_method,
-    approach_temperature_from_network,
     derivative_threshold_from_network,
+    dt_cont_multiplier_from_network,
     is_utility_only_outcome,
     required_topology_restrictions_from_outcome,
     stage_count_from_network,
@@ -153,7 +153,7 @@ def build_network_evolution_method_tasks(
                     settings=settings,
                     parent_outcome=outcome,
                     pathways=pathways,
-                    approach_temperature=outcome.task.approach_temperature,
+                    dt_cont_multiplier=outcome.task.dt_cont_multiplier,
                     derivative_threshold=outcome.task.derivative_threshold,
                     stage_count=stage_count,
                     topology_restrictions=restrictions,
@@ -164,7 +164,7 @@ def build_network_evolution_method_tasks(
             _standard_evolution_task(
                 settings=settings,
                 parent_outcome=outcome,
-                approach_temperature=outcome.task.approach_temperature,
+                dt_cont_multiplier=outcome.task.dt_cont_multiplier,
                 derivative_threshold=outcome.task.derivative_threshold,
                 stage_count=stage_count,
                 topology_restrictions=restrictions,
@@ -198,7 +198,7 @@ def build_seeded_network_evolution_method_tasks(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
                 method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-                approach_temperature=approach_temperature_from_network(
+                dt_cont_multiplier=dt_cont_multiplier_from_network(
                     network,
                     settings,
                 ),
@@ -252,7 +252,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
                     settings=settings,
                     parent_outcome=outcome,
                     pathways=pathways,
-                    approach_temperature=outcome.task.approach_temperature,
+                    dt_cont_multiplier=outcome.task.dt_cont_multiplier,
                     derivative_threshold=None,
                     stage_count=stage_count,
                     topology_restrictions=restrictions,
@@ -263,7 +263,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
             HeatExchangerNetworkSynthesisTask(
                 run_id=outcome.task.run_id,
                 method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-                approach_temperature=outcome.task.approach_temperature,
+                dt_cont_multiplier=outcome.task.dt_cont_multiplier,
                 derivative_threshold=None,
                 stage_count=stage_count,
                 problem_id=outcome.task.problem_id,
@@ -281,7 +281,7 @@ def _standard_evolution_task(
     *,
     settings: SynthesisWorkflowSettings,
     parent_outcome: HeatExchangerNetworkSynthesisTaskOutcome,
-    approach_temperature: float,
+    dt_cont_multiplier: float,
     derivative_threshold: float | None,
     stage_count: int,
     topology_restrictions: tuple[HeatExchangerNetworkTopologyRestriction, ...],
@@ -289,7 +289,7 @@ def _standard_evolution_task(
     return HeatExchangerNetworkSynthesisTask(
         run_id=settings.run_id,
         method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-        approach_temperature=approach_temperature,
+        dt_cont_multiplier=dt_cont_multiplier,
         derivative_threshold=derivative_threshold,
         stage_count=stage_count,
         problem_id=settings.problem_id,
@@ -306,7 +306,7 @@ def _evolution_tasks_for_pathways(
     settings: SynthesisWorkflowSettings,
     parent_outcome: HeatExchangerNetworkSynthesisTaskOutcome,
     pathways: tuple[TierPathway, ...],
-    approach_temperature: float,
+    dt_cont_multiplier: float,
     derivative_threshold: float | None,
     stage_count: int,
     topology_restrictions: tuple[HeatExchangerNetworkTopologyRestriction, ...],
@@ -331,7 +331,7 @@ def _evolution_tasks_for_pathways(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
                 method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-                approach_temperature=approach_temperature,
+                dt_cont_multiplier=dt_cont_multiplier,
                 derivative_threshold=derivative_threshold,
                 stage_count=stage_count,
                 problem_id=settings.problem_id,
@@ -393,7 +393,7 @@ def build_direct_network_evolution_method_tasks(
         HeatExchangerNetworkSynthesisTask(
             run_id=settings.run_id,
             method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-            approach_temperature=approach_temperature,
+            dt_cont_multiplier=dt_cont_multiplier,
             derivative_threshold=None,
             stage_count=stage_count,
             problem_id=settings.problem_id,
@@ -401,7 +401,7 @@ def build_direct_network_evolution_method_tasks(
             period_id=settings.period_id,
             settings=_run_breadth_settings(settings),
         )
-        for approach_temperature in settings.approach_temperatures
+        for dt_cont_multiplier in settings.dt_cont_multipliers
         for stage_count in settings.stage_selection
     )
 

@@ -69,7 +69,7 @@ def build_pinch_design_method_tasks(
     *,
     problem=None,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate root PDM tasks by sweeping configured approach temperatures."""
+    """Generate root PDM tasks by sweeping the configured dt_cont multipliers."""
     del problem
     return _build_pathway_pinch_design_method_tasks(settings)
 
@@ -83,12 +83,12 @@ def _build_pathway_pinch_design_method_tasks(
 
     for pathway in pathways:
         if pathway.exact_open_hens:
-            for approach_temperature in settings.approach_temperatures:
+            for multiplier in settings.dt_cont_multipliers:
                 tasks.append(
                     HeatExchangerNetworkSynthesisTask(
                         run_id=settings.run_id,
                         method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                        approach_temperature=approach_temperature,
+                        dt_cont_multiplier=multiplier,
                         problem_id=settings.problem_id,
                         workspace_variant=settings.workspace_variant,
                         period_id=settings.period_id,
@@ -98,17 +98,16 @@ def _build_pathway_pinch_design_method_tasks(
             continue
         if pathway.multiplier is None:
             continue
-        for approach_temperature in _pathway_approach_temperatures(settings, pathway):
-            key = (pathway.pdm_mode, approach_temperature)
-            grouped.setdefault(key, []).append(pathway)
+        key = (pathway.pdm_mode, float(pathway.multiplier))
+        grouped.setdefault(key, []).append(pathway)
 
-    for (pdm_mode, approach_temperature), grouped_pathways in grouped.items():
+    for (pdm_mode, multiplier), grouped_pathways in grouped.items():
         settings_data = {"pdm_mode": pdm_mode}
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
                 method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                approach_temperature=approach_temperature,
+                dt_cont_multiplier=multiplier,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
                 period_id=settings.period_id,
@@ -128,15 +127,15 @@ def _with_quality_pdm_tasks(
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     seen = {
         (
-            float(task.approach_temperature),
+            float(task.dt_cont_multiplier),
             tuple(int(value) for value in task.settings.get("stage_selection", ())),
         )
         for task in tasks
     }
     quality_tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    candidate_temperatures = settings.quality_pdm_approach_temperatures
-    for approach_temperature in candidate_temperatures:
-        key = (float(approach_temperature), ())
+    candidate_multipliers = settings.quality_pdm_dt_cont_multipliers
+    for multiplier in candidate_multipliers:
+        key = (float(multiplier), ())
         if key in seen:
             continue
         seen.add(key)
@@ -144,7 +143,7 @@ def _with_quality_pdm_tasks(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
                 method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                approach_temperature=approach_temperature,
+                dt_cont_multiplier=multiplier,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
                 period_id=settings.period_id,
@@ -156,13 +155,13 @@ def _with_quality_pdm_tasks(
     if stage_pair_count <= 0:
         return (*tasks, *quality_tasks)
 
-    stage_pair_temperature = (
-        candidate_temperatures[0]
-        if candidate_temperatures
-        else float(settings.approach_temperatures[0])
+    stage_pair_multiplier = (
+        candidate_multipliers[0]
+        if candidate_multipliers
+        else float(settings.dt_cont_multipliers[0])
     )
     for above_stages, below_stages in _PDM_STAGE_PAIR_SWEEP[:stage_pair_count]:
-        key = (float(stage_pair_temperature), (above_stages, below_stages))
+        key = (float(stage_pair_multiplier), (above_stages, below_stages))
         if key in seen:
             continue
         seen.add(key)
@@ -170,7 +169,7 @@ def _with_quality_pdm_tasks(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
                 method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                approach_temperature=stage_pair_temperature,
+                dt_cont_multiplier=stage_pair_multiplier,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
                 period_id=settings.period_id,
@@ -179,29 +178,6 @@ def _with_quality_pdm_tasks(
             )
         )
     return (*tasks, *quality_tasks)
-
-
-def _pathway_approach_temperatures(
-    settings: SynthesisWorkflowSettings,
-    pathway: TierPathway,
-) -> tuple[float, ...]:
-    """Return the concrete dTmins one PDM multiplier pathway runs.
-
-    The tier-0 pathways run every configured approach temperature; the
-    expanded-tier pathways explore multiples of the first one.
-    """
-
-    if pathway.multiplier is None:
-        raise ValueError("PDM multiplier pathway requires a multiplier.")
-    approach_temperatures = (
-        settings.approach_temperatures
-        if pathway.pathway_kind == "tier0_pdm_evm"
-        else settings.approach_temperatures[:1]
-    )
-    return tuple(
-        float(approach_temperature) * float(pathway.multiplier)
-        for approach_temperature in approach_temperatures
-    )
 
 
 __all__ = [

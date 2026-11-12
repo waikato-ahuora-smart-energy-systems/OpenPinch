@@ -80,7 +80,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     run_id: str
-    approach_temperatures: tuple[float, ...]
+    dt_cont_multipliers: tuple[float, ...]
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
     method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...] = (
@@ -117,7 +117,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     def _validate_run_id(cls, value: str) -> str:
         return _validate_run_id(value)
 
-    @field_validator("approach_temperatures", "derivative_thresholds")
+    @field_validator("dt_cont_multipliers", "derivative_thresholds")
     @classmethod
     def _validate_positive_grid(cls, value: tuple[float, ...]) -> tuple[float, ...]:
         return _validate_positive_grid(value)

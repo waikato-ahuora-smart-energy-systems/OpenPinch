@@ -102,7 +102,7 @@ def _pinch_problem(options: dict) -> PinchProblem:
     payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
     payload["options"] = payload["options"] | {
         "HENS_SOLVER_PDM": "highs",
-        "HENS_APPROACH_TEMPERATURES": [14.0],
+        "HENS_DT_CONT_MULTIPLIERS": [1.4],
         "HENS_SYNTHESIS_QUALITY_TIER": 1,
         **options,
     }

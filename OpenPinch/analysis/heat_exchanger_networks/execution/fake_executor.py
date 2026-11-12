@@ -17,6 +17,7 @@ from ....domain.enums import (
 from ....domain.heat_exchanger import HeatExchanger
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..errors import WorkflowContractError
+from ..solver.arrays import nominal_approach_temperature
 
 
 class FakeSynthesisExecutor:
@@ -94,11 +95,14 @@ def _fake_network(
         "cold utility",
     )
     stage_count = task.stage_count or int(zone.config.hens.stage_selection[0])
-    duty = _fake_duty(task)
+    nominal_approach = nominal_approach_temperature(
+        zone.config, task.dt_cont_multiplier
+    )
+    duty = _fake_duty(task, nominal_approach)
     utility_cost = round(duty * 0.35, 6)
     capital_cost = round(duty * 1.15, 6)
     total_annual_cost = round(utility_cost + capital_cost, 6)
-    approach_temperature = max(float(task.approach_temperature), 1.0)
+    approach_temperature = max(nominal_approach, 1.0)
     temperatures = _fake_temperatures(
         hot_supply=_temperature(hot_stream.supply_temperature, "K"),
         cold_supply=_temperature(cold_stream.supply_temperature, "K"),
@@ -198,7 +202,7 @@ def _fake_network(
             "recovery_unit_count": 1,
             "hot_utility_unit_count": 1,
             "cold_utility_unit_count": 1,
-            "approach_temperature": task.approach_temperature,
+            "dt_cont_multiplier": task.dt_cont_multiplier,
             "derivative_threshold": task.derivative_threshold,
         },
     )
@@ -213,11 +217,13 @@ def _first_stream(items, label: str):
         ) from exc
 
 
-def _fake_duty(task: HeatExchangerNetworkSynthesisTask) -> float:
+def _fake_duty(
+    task: HeatExchangerNetworkSynthesisTask, nominal_approach: float
+) -> float:
     derivative = 0.0 if task.derivative_threshold is None else task.derivative_threshold
     stage = 0 if task.stage_count is None else task.stage_count
     return round(
-        1000.0 + task.approach_temperature * 10.0 + derivative * 100.0 + stage,
+        1000.0 + nominal_approach * 10.0 + derivative * 100.0 + stage,
         6,
     )
 

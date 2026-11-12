@@ -43,17 +43,10 @@ def test_validate_configuration_option_value_accepts_static_valid_cases():
         )
         == "K"
     )
-    assert (
-        meta.validate_configuration_option_value(
-            "HENS_DT_CONT_MULTIPLIERS",
-            valid_values["HENS_DT_CONT_MULTIPLIERS"],
-        )
-        is None
-    )
     assert meta.validate_configuration_option_value(
-        "HENS_APPROACH_TEMPERATURES",
-        valid_values["HENS_APPROACH_TEMPERATURES"],
-    ) == [5.0, 10.5]
+        "HENS_DT_CONT_MULTIPLIERS",
+        valid_values["HENS_DT_CONT_MULTIPLIERS"],
+    ) == [0.5, 1.05]
     assert meta.validate_configuration_option_value(
         "HENS_DERIVATIVE_THRESHOLDS",
         valid_values["HENS_DERIVATIVE_THRESHOLDS"],
@@ -222,7 +215,7 @@ def test_validate_configuration_option_value_rejects_static_invalid_cases(
 @pytest.mark.parametrize(
     ("name", "value", "message"),
     [
-        ("HENS_APPROACH_TEMPERATURES", [math.inf], "finite number"),
+        ("HENS_DT_CONT_MULTIPLIERS", [math.inf], "finite number"),
         ("PROBLEM_PERIOD_IDS", [1], "values must be strings"),
         ("HENS_SOLVER_OPTIONS_TDM", [], "must be provided as a dict"),
         ("HPR_LOAD_PERIOD_VALUES", [], "must be provided as a dict"),

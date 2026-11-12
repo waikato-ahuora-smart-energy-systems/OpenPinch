@@ -35,31 +35,10 @@ __all__ = [
     "DUTY_RTOL",
     "duty_tolerance",
     "heat_resolution",
-    "hen_approach_temperatures",
     "LOG_TIMING",
     "T_CRIT",
     "tol",
 ]
-
-
-def hen_approach_temperatures(config) -> tuple[float, ...]:
-    """The approach temperatures HEN synthesis runs, in K.
-
-    Unset, the one approach temperature is twice ``THERMAL_DT_CONT``: synthesis
-    scales each stream's contribution by ``dTmin / (2 * THERMAL_DT_CONT)``, so
-    the first pinch design run then uses every contribution as entered, as
-    the pinch targets do.
-    """
-
-    if config.hens.approach_temperatures is not None:
-        return tuple(float(value) for value in config.hens.approach_temperatures)
-    approach = 2.0 * float(config.thermal.dt_cont)
-    if approach <= 0.0:
-        raise ValueError(
-            "HENS_APPROACH_TEMPERATURES is unset and THERMAL_DT_CONT is 0, so "
-            "there is no approach temperature for synthesis; set either one."
-        )
-    return (approach,)
 
 
 def _heat_scale(heat_flows) -> float:
@@ -204,8 +183,7 @@ class CostingConfig:
 class HensConfig:
     """Heat exchanger network synthesis settings."""
 
-    approach_temperatures: list[float] | None
-    dt_cont_multipliers: list[float] | None
+    dt_cont_multipliers: list[float]
     derivative_thresholds: list[float]
     min_exchanger_approach_share: float
     synthesis_quality_tier: int

@@ -2,12 +2,15 @@
 
 Tier semantics:
 
-* 0: fastest compact PDM directly to EVM.
-* 1: exact standard OpenHENS PDM -> TDM -> EVM route.
-* 2: protected tiers 0/1 plus base-dTmin compact/direct and raw/TDM routes.
-* 3: base and doubled-dTmin compact/direct and raw/TDM routes.
-* 4: tier-3 dTmin routes with wider EVM branch exploration.
-* 5: experimental reduced/base/doubled-dTmin search at tier-4 breadth.
+* 0: fastest compact PDM directly to EVM, per configured dt_cont multiplier.
+* 1: exact standard OpenHENS PDM -> TDM -> EVM route, per configured multiplier.
+* 2: protected tiers 0/1 plus multiplier-1 compact/direct and raw/TDM routes.
+* 3: multiplier 1 and 2 compact/direct and raw/TDM routes.
+* 4: tier-3 multiplier routes with wider EVM branch exploration.
+* 5: experimental multiplier 0.5/1/2 search at tier-4 breadth.
+
+Tiers 2-5 use their default multipliers only when ``HENS_DT_CONT_MULTIPLIERS``
+is left at its default; a set sweep replaces them.
 
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` apply to every route
 when set, protected or not. Unset, tier 0 and 1 routes evolve at breadth 1 in any
@@ -154,7 +157,7 @@ def pathway_metadata(pathways: Iterable[TierPathway]) -> dict[str, object]:
 
 
 def _tier0_pathways(settings, *, protected: bool) -> tuple[TierPathway, ...]:
-    multipliers = _explicit_or_default_multipliers(settings, default=(1.0,))
+    multipliers = tuple(float(value) for value in settings.dt_cont_multipliers)
     ad_branches, rm_branches, patience = _evolution_search(settings, tier=0)
     return tuple(
         TierPathway(
@@ -223,7 +226,7 @@ def _explicit_or_default_multipliers(
     default: tuple[float, ...],
 ) -> tuple[float, ...]:
     if settings.user_dt_cont_multipliers:
-        return tuple(float(value) for value in settings.dt_cont_multipliers or ())
+        return tuple(float(value) for value in settings.dt_cont_multipliers)
     return default
 
 

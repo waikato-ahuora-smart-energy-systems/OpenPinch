@@ -32,7 +32,7 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
     pathways_from_metadata,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
-    approach_temperature_from_network,
+    dt_cont_multiplier_from_network,
 )
 from OpenPinch.analysis.heat_exchanger_networks.extraction import (
     metadata as extraction_metadata,
@@ -97,7 +97,7 @@ def _task(
         task_id=task_id,
         run_id="run-1",
         method=method,
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
         derivative_threshold=0.5,
         stage_count=1,
         parent_task_id=parent_task_id,
@@ -131,7 +131,7 @@ def _settings(**overrides):
         "workspace_variant": "baseline",
         "period_id": None,
         "synthesis_quality_tier": 1,
-        "approach_temperatures": (10.0,),
+        "dt_cont_multipliers": (1.0,),
         "stage_selection": (1,),
         "evm_n_ad_branches": None,
         "evm_n_rm_branches": None,
@@ -528,7 +528,7 @@ def test_network_evolution_task_edges(monkeypatch):
         targeting_stage, "canonical_topology_restrictions", lambda restrictions: ()
     )
     monkeypatch.setattr(
-        targeting_stage, "approach_temperature_from_network", lambda *_args: 10.0
+        targeting_stage, "dt_cont_multiplier_from_network", lambda *_args: 1.0
     )
     monkeypatch.setattr(
         targeting_stage, "topology_restriction_signature", lambda _restrictions: ()
@@ -948,15 +948,15 @@ def test_one_seed_network_json_is_one_seed():
     assert seeded == (HeatExchangerNetwork.model_validate(network.model_dump()),)
 
 
-def test_seed_network_json_keeps_the_approach_temperature_it_was_solved_at():
-    # source_metadata is not serialised, so a JSON seed must carry the solver
-    # dTmin in its summary metrics or seeded TDM/EVM tasks run at another one.
+def test_seed_network_json_keeps_the_dt_cont_multiplier_it_was_solved_at():
+    # source_metadata is not serialised, so a JSON seed must carry the
+    # multiplier in its summary metrics or seeded TDM/EVM tasks run at another.
     network = HeatExchangerNetwork(
         summary_metrics=extraction_metadata._summary_metrics(
-            SimpleNamespace(dTmin=14.0)
+            SimpleNamespace(), dt_cont_multiplier=1.4
         ),
-        source_metadata={"solver_dTmin": 14.0},
+        source_metadata={"dt_cont_multiplier": 1.4},
     )
     seed = HeatExchangerNetwork.model_validate(network.model_dump(mode="json"))
 
-    assert approach_temperature_from_network(seed, _settings()) == 14.0
+    assert dt_cont_multiplier_from_network(seed, _settings()) == 1.4

@@ -92,13 +92,10 @@ def test_decomposition_targets_preserve_original_effective_contributions(
     problem._master_zone.dt_cont_multiplier = multiplier
     for stream in original_streams:
         stream.delta_t_contribution_multiplier_locked = True
-    # dTmin 12 against THERMAL_DT_CONT 5 scales contributions by 12 / 10;
-    # contributions at or below tol fall back to dTmin / 2.
-    scale = 12.0 / (2.0 * problem._master_zone.config.thermal.dt_cont)
-    expected = [
-        base * multiplier * scale if base * multiplier * scale > tol else 6.0
-        for base in bases
-    ]
+    # Locked streams keep their effective contributions at any task
+    # multiplier (dTmin 12 against THERMAL_DT_CONT 5 is 1.2); a contribution at
+    # or below tol becomes 0.1 K, unscaled because the stream is locked.
+    expected = [base * multiplier if base * multiplier > tol else 0.1 for base in bases]
     captured: dict[str, float | bool | list[float]] = {}
 
     def fake_compute_direct_integration_targets(zone, args=None):

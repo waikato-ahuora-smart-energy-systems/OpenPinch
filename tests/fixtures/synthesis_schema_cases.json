@@ -2,7 +2,7 @@
   "task": {
     "run_id": "schema-run-1",
     "method": "pinch_design_method",
-    "approach_temperature": 10.0,
+    "dt_cont_multiplier": 1.0,
     "derivative_threshold": 0.5,
     "stage_count": 2,
     "problem_id": " problem-a ",
@@ -27,7 +27,7 @@
   },
   "manifest": {
     "run_id": "schema-run-1",
-    "approach_temperatures": [5.0, 10.0],
+    "dt_cont_multipliers": [0.5, 1.0],
     "derivative_thresholds": [0.25],
     "stage_selection": [1, 2],
     "export_formats": ["json", "csv"],

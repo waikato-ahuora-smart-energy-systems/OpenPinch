@@ -998,7 +998,7 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
 ) -> None:
     problem = _four_stream_problem(
         options={
-            "HENS_APPROACH_TEMPERATURES": [14.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.4],
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_STAGE_SELECTION": [3],
             "HENS_RUN_ID": "hens-07-parent-test",
@@ -1075,7 +1075,7 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
 def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> None:
     problem = _four_stream_problem(
         options={
-            "HENS_APPROACH_TEMPERATURES": [14.0, 16.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.4, 1.6],
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_STAGE_SELECTION": [3],
             "HENS_RUN_ID": "hens-parallel-test",
@@ -1348,7 +1348,7 @@ def test_solve_built_task_model_args_failures_and_verification_paths() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-helper",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
 
     class FailedInternalProblem:
@@ -1415,7 +1415,7 @@ def test_solve_built_task_marks_a_solve_that_did_not_converge() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-unconverged",
         method="thermal_derivative_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         stage_count=2,
         derivative_threshold=0.5,
     )
@@ -1445,7 +1445,7 @@ def test_solve_built_task_success_exception_and_root_build_failure(monkeypatch) 
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-success",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
 
     class SuccessfulInternalProblem:
@@ -1521,7 +1521,7 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
             HeatExchangerNetworkSynthesisTask(
                 run_id="no-pathway",
                 method="network_evolution_method",
-                approach_temperature=14.0,
+                dt_cont_multiplier=1.4,
                 derivative_threshold=0.5,
                 stage_count=2,
                 metadata={},
@@ -1565,7 +1565,7 @@ def test_executor_stage_packing_scope_and_factory_helpers() -> None:
     tdm_task = HeatExchangerNetworkSynthesisTask(
         run_id="tdm-stage-packed",
         method="thermal_derivative_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         derivative_threshold=0.5,
         stage_count=2,
     )
@@ -2964,16 +2964,26 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
             dTmin=14.0,
         )
 
+    # dTmin 14 against THERMAL_DT_CONT 5 is a multiplier of 1.4; a missing or
+    # zero contribution becomes 0.1 K times it.
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
         dTmin=14.0,
-    ) == {"value": 7.0, "unit": "delta_degC"}
+        reference_dt_cont=5.0,
+    ) == {"value": pytest.approx(0.14), "unit": "delta_degC"}
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(
             effective_delta_t_contribution=Value([0.0, 1.0, 9.0], "delta_degC")
         ),
         dTmin=14.0,
-    ) == {"values": [7.0, 1.0, 9.0], "unit": "delta_degC"}
+        reference_dt_cont=5.0,
+    ) == {"values": pytest.approx([0.14, 1.4, 12.6]), "unit": "delta_degC"}
+    assert pdm_decomposition._stream_dt_cont_with_fallback(
+        SimpleNamespace(),
+        dTmin=14.0,
+        reference_dt_cont=5.0,
+        locked=True,
+    ) == {"value": pytest.approx(0.1), "unit": "delta_degC"}
 
     assert (
         pdm_decomposition._shifted_pinch_temperature(

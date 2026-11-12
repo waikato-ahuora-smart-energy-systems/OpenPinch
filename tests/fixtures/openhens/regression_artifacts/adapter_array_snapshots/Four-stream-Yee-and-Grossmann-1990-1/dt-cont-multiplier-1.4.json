@@ -1,5 +1,4 @@
 {
-  "active_dTmin": 14.0,
   "array_shapes": {
     "A_coeff": [
       1
@@ -228,18 +227,6 @@
   },
   "case_id": "Four-stream-Yee-and-Grossmann-1990-1",
   "configuration": {
-    "HENS_APPROACH_TEMPERATURES": [
-      2.0,
-      4.0,
-      6.0,
-      8.0,
-      10.0,
-      12.0,
-      14.0,
-      16.0,
-      18.0,
-      20.0
-    ],
     "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
     "HENS_DERIVATIVE_THRESHOLDS": [
       0.5,
@@ -252,6 +239,18 @@
       3.2,
       3.6,
       4.0
+    ],
+    "HENS_DT_CONT_MULTIPLIERS": [
+      0.2,
+      0.4,
+      0.6,
+      0.8,
+      1.0,
+      1.2,
+      1.4,
+      1.6,
+      1.8,
+      2.0
     ],
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
@@ -274,13 +273,14 @@
       3,
       4
     ],
-    "active_dTmin": 14.0,
+    "active_dt_cont_multiplier": 1.4,
     "costing": {
       "COSTING_HX_AREA_COEFF": 150.0,
       "COSTING_HX_AREA_EXP": 1.0,
       "COSTING_HX_UNIT_COST": 5500.0
     }
   },
+  "dt_cont_multiplier": 1.4,
   "extraction_command": "uv run python scripts/convert_openhens_fixtures.py --openhens-root ../OpenHENS --write",
   "preparation": {
     "pinch_problem_class": "PinchProblem",
@@ -295,7 +295,7 @@
   "source_csv_path": "examples/cases/Four-stream-Yee-and-Grossmann-1990-1.csv",
   "source_csv_sha256": "0c0a7f9592e7d8e27d35aef523530d70c11826c407dcbe4adba7fff86f4835f2",
   "source_fixture_path": "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json",
-  "source_fixture_sha256": "6b4a853e0f7aed0fa0f7a8d47b821e83cb565c679d23204ffbb3cf619af3aecb",
+  "source_fixture_sha256": "db32f683105316fd123979c49d55e449bce421544232cb99fcf4890b4a07ab9f",
   "source_openhens_arrays": {
     "A_coeff": [
       150.0
@@ -420,7 +420,7 @@
     "heat_capacity_flowrate": "kW/K",
     "heat_transfer_coefficient": "kW/m^2/K",
     "temperature": "K",
-    "temperature_contribution": "K, falling back to dTmin / 2 when prepared contribution is absent",
+    "temperature_contribution": "K, effective contribution times the dt_cont multiplier, 0.1 K times the multiplier when the prepared contribution is zero",
     "utility_price": "numeric UtilitySchema.price passed through for OpenHENS annual cost equations"
   },
   "utility_identities": {

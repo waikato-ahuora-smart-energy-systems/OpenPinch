@@ -216,7 +216,6 @@ class _DesignAccessor:
         *,
         options: Mapping[str, Any] | None,
         period_id: str | None,
-        approach_temperatures=None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -231,7 +230,6 @@ class _DesignAccessor:
         runtime, configuration = split_runtime_and_configuration_options(options)
         named: dict[str, Any] = {}
         for key, value in (
-            ("HENS_APPROACH_TEMPERATURES", approach_temperatures),
             ("HENS_DT_CONT_MULTIPLIERS", dt_cont_multipliers),
             ("HENS_DERIVATIVE_THRESHOLDS", derivative_thresholds),
             ("HENS_STAGE_SELECTION", stages),
@@ -327,7 +325,6 @@ class _DesignAccessor:
         *,
         options: Mapping[str, Any] | None = None,
         period_id: str | None = None,
-        approach_temperatures=None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -341,11 +338,15 @@ class _DesignAccessor:
 
         It runs quality tier 0 unless ``HENS_SYNTHESIS_QUALITY_TIER`` is set.
 
-        ``approach_temperatures`` sets the pinch design step's approach. The
-        later thermal derivative and evolution steps choose each exchanger's
-        approach by total annual cost, down to 0.1 K, or down to
-        ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times the
-        requested approach if that is larger.
+        ``dt_cont_multipliers`` (``HENS_DT_CONT_MULTIPLIERS``, default
+        ``[1.0]``) are the synthesis sweep: each scales every stream's and
+        utility's ΔT contribution as a zone dt_cont multiplier does in
+        targeting, so 1.0 designs at the targeting contributions. The pinch
+        design step keeps those contributions; the later thermal derivative
+        and evolution steps choose each exchanger's approach by total annual
+        cost, down to 0.1 K, or down to ``HENS_MIN_EXCHANGER_APPROACH_SHARE``
+        (in ``options``) times twice the scaled ``THERMAL_DT_CONT`` if that is
+        larger.
         """
         from ....analysis.heat_exchanger_networks.service import (
             _heat_exchanger_network_enhanced_synthesis_method_service,
@@ -354,7 +355,6 @@ class _DesignAccessor:
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
-            approach_temperatures=approach_temperatures,
             dt_cont_multipliers=dt_cont_multipliers,
             derivative_thresholds=derivative_thresholds,
             stages=stages,

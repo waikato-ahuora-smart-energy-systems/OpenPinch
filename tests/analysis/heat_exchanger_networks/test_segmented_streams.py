@@ -453,9 +453,9 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
     [
         (3.0, 2.0, 6.0),
         (12.0, 2.0, 24.0),
-        (0.0, 2.0, 10.0),
-        (tol / 4.0, 2.0, 10.0),
-        (tol / 2.0, 2.0, 10.0),
+        (0.0, 2.0, 0.1),
+        (tol / 4.0, 2.0, 0.1),
+        (tol / 2.0, 2.0, 0.1),
         (tol, 2.0, 2.0 * tol),
     ],
 )
@@ -483,7 +483,7 @@ def test_effective_temperature_contribution_selects_operating_period():
     )
     assert [
         _temperature_contribution(stream, 20.0, period_idx=n) for n in range(3)
-    ] == pytest.approx([10.0, 6.0, 24.0])
+    ] == pytest.approx([0.1, 6.0, 24.0])
 
 
 @seed(20260918)
@@ -574,8 +574,8 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
 
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
 
-    # Effective contributions (2, 18) scale by dTmin / (2 * THERMAL_DT_CONT)
-    # = 14 / 10; contributions at or below tol fall back to dTmin / 2.
+    # Effective contributions (2, 18) scale by the multiplier
+    # dTmin / (2 * THERMAL_DT_CONT) = 14 / 10; a zero becomes 0.1 K times it.
     assert zone.dt_cont_multiplier == 1.0
     assert zone.config.thermal.dt_cont == pytest.approx(7.0)
     np.testing.assert_allclose(
@@ -584,7 +584,7 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     )
     np.testing.assert_allclose(
         stream.segments[1].delta_t_contribution.to("delta_degC").period_values,
-        [7.0, 7.0],
+        [0.14, 0.14],
     )
     np.testing.assert_allclose(
         stream.delta_t_contribution.to("delta_degC").period_values,
@@ -595,8 +595,9 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
 @seed(20260715)
 @given(
     segmented_streams(),
+    # A synthesis task's internal approach is 2 * THERMAL_DT_CONT * m > 0.
     st.floats(
-        min_value=0.0,
+        min_value=0.1,
         max_value=100.0,
         allow_nan=False,
         allow_infinity=False,
@@ -622,8 +623,9 @@ def test_pdm_fallback_matches_arrays_and_is_idempotent_for_segments(stream, dTmi
     zone.dt_cont_multiplier = 2.0
     reference = zone.config.thermal.dt_cont
     effective = np.asarray(original) * 2.0
-    scaled = effective * dTmin / (2.0 * reference)
-    expected = np.where(scaled > tol, scaled, minimum)
+    task_multiplier = dTmin / (2.0 * reference)
+    scaled = effective * task_multiplier
+    expected = np.where(scaled > tol, scaled, 0.1 * task_multiplier)
     from_arrays = [
         _temperature_contribution(segment, dTmin, reference_dt_cont=reference)
         for segment in next(iter(zone.process_streams)).segments

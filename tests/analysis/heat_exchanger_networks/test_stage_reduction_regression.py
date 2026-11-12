@@ -13,6 +13,7 @@ from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     PreparedSolverArrays,
+    nominal_approach_temperature,
     problem_to_solver_arrays,
 )
 from OpenPinch.application.problem import PinchProblem
@@ -36,9 +37,12 @@ def test_four_stream_best_esm_snapshot_matches_identity_labelled_network() -> No
     snapshot = _load_json(SNAPSHOT_PATH)
     expected = snapshot["expected"]
     tolerances = snapshot["tolerances"]
+    problem = PinchProblem(source=FIXTURE_PATH)
     arrays = problem_to_solver_arrays(
-        PinchProblem(source=FIXTURE_PATH),
-        expected["best_dTmin"],
+        problem,
+        nominal_approach_temperature(
+            problem.master_zone.config, expected["best_dt_cont_multiplier"]
+        ),
     )
 
     network = extract_heat_exchanger_network(
@@ -162,7 +166,10 @@ def _snapshot_solution_arrays(snapshot: dict, arrays: PreparedSolverArrays) -> d
             stage_index = exchanger["stage"] - 1
             q_r[hot_index][cold_index][stage_index] = exchanger["duty"]
             area_r[hot_index][cold_index][stage_index] = exchanger["area"]
-            theta[hot_index][cold_index][stage_index] = expected["best_dTmin"]
+            # The OpenHENS approach: 2 * THERMAL_DT_CONT (5 K) * multiplier.
+            theta[hot_index][cold_index][stage_index] = (
+                10.0 * expected["best_dt_cont_multiplier"]
+            )
         elif kind == "hot_utility":
             cold_index = cold_axis[exchanger["sink_stream"]]
             utility_index = hot_utility_axis[exchanger["source_stream"]]

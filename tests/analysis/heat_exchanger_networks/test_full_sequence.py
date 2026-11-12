@@ -183,7 +183,7 @@ def test_quality_tier_one_keeps_standard_pdm_task_grid() -> None:
 
 
 def test_quality_tier_three_expands_pdm_candidates() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 3})
+    problem = _tier_problem(3)
     settings = workflow_settings_from_problem(problem)
 
     tasks = build_pinch_design_method_tasks(settings)
@@ -192,7 +192,7 @@ def test_quality_tier_three_expands_pdm_candidates() -> None:
     assert settings.quality_pdm_stage_pair_count == 0
     assert settings.effective_evm_n_ad_branches == 1
     assert settings.effective_evm_n_rm_branches == 1
-    assert len(tasks) == 6
+    assert len(tasks) == 5
     assert {task.settings.get("pdm_mode") for task in tasks if task.settings} == {
         "compact",
         "raw",
@@ -204,19 +204,19 @@ def test_quality_tier_three_expands_pdm_candidates() -> None:
         "tier3-compact-1" in task.metadata.get("pathway_ids", ()) for task in tasks
     )
     assert any(
-        task.approach_temperature == 4.0
+        task.dt_cont_multiplier == 2.0
         and "tier3-compact-2" in task.metadata.get("pathway_ids", ())
         for task in tasks
     )
     assert any(
-        task.approach_temperature == 4.0
+        task.dt_cont_multiplier == 2.0
         and "tier3-raw-2" in task.metadata.get("pathway_ids", ())
         for task in tasks
     )
 
 
 def test_quality_tier_four_adds_evm_branch_breadth_to_dtmin_sweep() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    problem = _tier_problem(4)
     settings = workflow_settings_from_problem(problem)
 
     tasks = build_pinch_design_method_tasks(settings)
@@ -224,21 +224,21 @@ def test_quality_tier_four_adds_evm_branch_breadth_to_dtmin_sweep() -> None:
     assert settings.quality_dt_cont_multipliers == (1.0, 2.0)
     assert settings.effective_evm_n_ad_branches == 2
     assert settings.effective_evm_n_rm_branches == 2
-    assert len(tasks) == 6
+    assert len(tasks) == 5
     assert any(
-        task.approach_temperature == 2.0
+        task.dt_cont_multiplier == 1.0
         and "tier4-compact-1" in task.metadata.get("pathway_ids", ())
         for task in tasks
     )
     assert any(
-        task.approach_temperature == 4.0
+        task.dt_cont_multiplier == 2.0
         and "tier4-raw-2" in task.metadata.get("pathway_ids", ())
         for task in tasks
     )
 
 
 def test_quality_tier_five_adds_experimental_reduced_dtmin_without_4x() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
+    problem = _tier_problem(5)
     settings = workflow_settings_from_problem(problem)
 
     tasks = build_pinch_design_method_tasks(problem=problem, settings=settings)
@@ -249,7 +249,7 @@ def test_quality_tier_five_adds_experimental_reduced_dtmin_without_4x() -> None:
     assert settings.effective_evm_n_ad_branches == 2
     assert settings.effective_evm_n_rm_branches == 2
     assert any(
-        task.approach_temperature == 1.0
+        task.dt_cont_multiplier == 0.5
         and "tier5-compact-0p5" in task.metadata.get("pathway_ids", ())
         for task in tasks
     )
@@ -261,9 +261,7 @@ def test_quality_tier_five_adds_experimental_reduced_dtmin_without_4x() -> None:
 
 
 def test_synthesis_quality_tier_five_retains_experimental_limits() -> None:
-    settings = workflow_settings_from_problem(
-        _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
-    )
+    settings = workflow_settings_from_problem(_tier_problem(5))
 
     assert settings.quality_dt_cont_multipliers == (0.5, 1.0, 2.0)
     assert settings.quality_pdm_stage_pair_count == 0
@@ -276,7 +274,6 @@ def test_user_dt_cont_multipliers_are_applied_as_multipliers() -> None:
     problem = _small_problem_with_options(
         {
             "HENS_SYNTHESIS_QUALITY_TIER": 3,
-            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
             "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
         }
     )
@@ -284,17 +281,18 @@ def test_user_dt_cont_multipliers_are_applied_as_multipliers() -> None:
 
     tasks = build_pinch_design_method_tasks(settings)
 
-    assert settings.quality_pdm_approach_temperatures == (10.0, 15.0)
+    assert settings.quality_pdm_dt_cont_multipliers == (1.0, 1.5)
     assert any(
-        task.approach_temperature == 15.0
+        task.dt_cont_multiplier == 1.5
         and "tier3-compact-1p5" in task.metadata.get("pathway_ids", ())
         for task in tasks
     )
-    assert not any(task.approach_temperature in {100.0, 200.0} for task in tasks)
+    # A set sweep replaces the tier's default multipliers.
+    assert not any(task.dt_cont_multiplier == 2.0 for task in tasks)
 
 
 def test_quality_tier_two_contains_tier_zero_and_tier_one_paths() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
+    problem = _tier_problem(2)
     settings = workflow_settings_from_problem(problem)
     executor = FakeSynthesisExecutor()
 
@@ -353,7 +351,7 @@ def test_higher_tier_can_select_protected_lower_tier_evm_result() -> None:
                 for outcome in outcomes
             )
 
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
+    problem = _tier_problem(2)
     settings = workflow_settings_from_problem(problem)
 
     result = workflow_module.execute_open_hens_method(
@@ -600,7 +598,7 @@ def test_evolution_breadth_without_pathways_follows_the_run_tier(
 
 
 def test_evolution_breadth_for_a_derivative_parent_without_pathways() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    problem = _tier_problem(4)
     settings = replace(
         workflow_settings_from_problem(problem),
         synthesis_quality_tier=1,
@@ -608,7 +606,7 @@ def test_evolution_breadth_for_a_derivative_parent_without_pathways() -> None:
     parent_task = HeatExchangerNetworkSynthesisTask(
         run_id=settings.run_id,
         method="thermal_derivative_method",
-        approach_temperature=settings.approach_temperatures[0],
+        dt_cont_multiplier=settings.dt_cont_multipliers[0],
         stage_count=2,
     )
     parent_outcome = FakeSynthesisExecutor().execute(
@@ -821,7 +819,7 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
 
 def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
     _use_fake_default_executor(monkeypatch)
-    configured_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    configured_problem = _tier_problem(4)
     original_config_tier = (
         configured_problem.master_zone.config.hens.synthesis_quality_tier
     )
@@ -1037,7 +1035,7 @@ def test_period_zone_and_multiperiod_designs_resolve_the_same_tier(
 def test_enhanced_synthesis_method_runs_requested_quality_tier(monkeypatch) -> None:
     _use_fake_default_executor(monkeypatch)
     default_problem = _small_problem()
-    explicit_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
+    explicit_problem = _tier_problem(5)
     original_config_tier = (
         explicit_problem.master_zone.config.hens.synthesis_quality_tier
     )
@@ -1101,11 +1099,11 @@ def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
 
     single_result = _run_single_candidate_open_hens(
         single_period,
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
     duplicate_result = _run_single_candidate_open_hens(
         duplicate_period,
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
 
     assert _task_counts_by_method(single_result) == {
@@ -1291,8 +1289,8 @@ def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
     assert recovery.state().sink_inlet_temperature == pytest.approx(410.0)
     assert recovery.state().sink_outlet_temperature > 273.15
     assert design.selected_network.summary_metrics[
-        "approach_temperature"
-    ] == pytest.approx(2.0)
+        "dt_cont_multiplier"
+    ] == pytest.approx(0.2)
 
 
 def test_workspace_design_workflow_dispatches_to_live_problem_design_path(
@@ -1400,6 +1398,13 @@ def _small_problem(*, project_name: str = "HENS Demo") -> PinchProblem:
     return PinchProblem(source=_small_payload(), project_name=project_name)
 
 
+def _tier_problem(tier: int) -> PinchProblem:
+    """The small problem at a quality tier, with the default multiplier sweep."""
+    return _small_problem_with_options(
+        {"HENS_SYNTHESIS_QUALITY_TIER": tier, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
+    )
+
+
 def _small_problem_with_options(
     options: dict,
     *,
@@ -1499,7 +1504,7 @@ def _single_state_no_sweep_payload() -> dict:
             "COSTING_HX_AREA_COEFF": 150.0,
             "COSTING_HX_AREA_EXP": 1.0,
             "COSTING_HX_UNIT_COST": 5500.0,
-            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
             "HENS_BEST_SOLUTIONS_TO_SAVE": 1,
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_LOG_LEVEL": "WARNING",
@@ -1530,11 +1535,11 @@ def _is_scalar_quantity_payload(value: object) -> bool:
 def _run_single_candidate_open_hens(
     problem: PinchProblem,
     *,
-    approach_temperature: float = 14.0,
+    dt_cont_multiplier: float = 1.4,
 ):
     problem.target.direct_heat_integration()
     settings = workflow_settings_from_problem(problem)
-    assert settings.approach_temperatures == (approach_temperature,)
+    assert settings.dt_cont_multipliers == (dt_cont_multiplier,)
     assert settings.derivative_thresholds == (0.5,)
     result = workflow_module.execute_open_hens_method(
         problem,
@@ -1604,7 +1609,7 @@ def _small_payload() -> dict:
     payload = deepcopy(payload)
     payload["options"] = {
         **payload["options"],
-        "HENS_APPROACH_TEMPERATURES": [2.0, 4.0],
+        "HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 1.0],
         "HENS_STAGE_SELECTION": [2],
         "HENS_BEST_SOLUTIONS_TO_SAVE": 2,
@@ -1649,32 +1654,25 @@ def _with_pathway_tac(
     )
 
 
-def test_default_design_runs_every_approach_temperature(monkeypatch) -> None:
+def test_default_design_runs_every_dt_cont_multiplier(monkeypatch) -> None:
     # Audit H8: the default entry (tier 0) built tasks only from the first
-    # approach temperature, while the manifest listed every one.
+    # sweep value, while the manifest listed every one.
     _use_fake_default_executor(monkeypatch)
-    problem = _small_problem_with_options(
-        {"HENS_APPROACH_TEMPERATURES": [2.0, 4.0, 8.0]}
-    )
+    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4, 0.8]})
 
     design = problem.design.heat_exchanger_network()
 
     manifest = design.result.manifest
     assert manifest.synthesis_quality_tier == 0
     assert manifest.task_count_by_method["pinch_design_method"] == 3
-    assert manifest.approach_temperatures == (2.0, 4.0, 8.0)
+    assert manifest.dt_cont_multipliers == (0.2, 0.4, 0.8)
 
 
-def test_manifest_lists_the_approach_temperatures_that_ran(monkeypatch) -> None:
-    # Expanded tiers run multiples of the first approach temperature too.
+def test_manifest_lists_the_dt_cont_multipliers_that_ran(monkeypatch) -> None:
+    # Expanded tiers add their default multipliers to the configured one.
     _use_fake_default_executor(monkeypatch)
-    problem = _small_problem_with_options(
-        {
-            "HENS_APPROACH_TEMPERATURES": [10.0],
-            "HENS_DT_CONT_MULTIPLIERS": [0.5, 1.0],
-        }
-    )
+    problem = _tier_problem(3)
 
     design = problem.design.heat_exchanger_network()
 
-    assert design.result.manifest.approach_temperatures == (5.0, 10.0)
+    assert design.result.manifest.dt_cont_multipliers == (1.0, 2.0)

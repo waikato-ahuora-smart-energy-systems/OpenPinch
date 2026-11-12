@@ -76,12 +76,6 @@ def _positive_float_grid(name: str, value: Any) -> list[float]:
     ]
 
 
-def _optional_positive_float_grid(name: str, value: Any) -> list[float] | None:
-    if value is None:
-        return None
-    return _positive_float_grid(name, value)
-
-
 def _solver_options(name: str, value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{name} must be provided as a dict.")
@@ -381,8 +375,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_ORC_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "orc_capital_recovery_enabled"),
 
     # HEN synthesis.
-    "HENS_APPROACH_TEMPERATURES": _spec(List[float] | None, None, "hens", "approach_temperatures", validator=_optional_positive_float_grid),
-    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_optional_positive_float_grid),
+    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float], [1.0], "hens", "dt_cont_multipliers", validator=_positive_float_grid),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),
     "HENS_SYNTHESIS_QUALITY_TIER": _spec(int, 1, "hens", "synthesis_quality_tier", numeric_min=0.0, numeric_max=5.0),

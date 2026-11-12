@@ -63,7 +63,9 @@ def test_benchmark_failure_taxonomy_groups_solver_errors() -> None:
 
 def test_benchmark_diagnostics_capture_tier_two_pathway_statistics() -> None:
     benchmark = _load_benchmark_module()
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
+    problem = _small_problem_with_options(
+        {"HENS_SYNTHESIS_QUALITY_TIER": 2, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
+    )
     target_output = ensure_target_results(problem, {}, None)
     settings = workflow_settings_from_problem(problem)
     trace_executor = benchmark.BenchmarkTraceExecutor(delegate=FakeSynthesisExecutor())
@@ -127,7 +129,7 @@ def test_benchmark_fixture_default_mode_preserves_fixture_hens_settings() -> Non
         payload,
         options={
             "HENS_MAX_PARALLEL": 6,
-            "HENS_APPROACH_TEMPERATURES": [999.0],
+            "HENS_DT_CONT_MULTIPLIERS": [99.9],
         },
         tier=3,
         run_id="fixture-default-test",
@@ -135,8 +137,8 @@ def test_benchmark_fixture_default_mode_preserves_fixture_hens_settings() -> Non
     )
 
     assert (
-        options["HENS_APPROACH_TEMPERATURES"]
-        == fixture_options["HENS_APPROACH_TEMPERATURES"]
+        options["HENS_DT_CONT_MULTIPLIERS"]
+        == fixture_options["HENS_DT_CONT_MULTIPLIERS"]
     )
     assert (
         options["HENS_DERIVATIVE_THRESHOLDS"]
@@ -165,7 +167,7 @@ def test_benchmark_standard_mode_applies_benchmark_hens_overrides() -> None:
         use_fixture_defaults=False,
     )
 
-    assert options["HENS_APPROACH_TEMPERATURES"] == [10.0]
+    assert options["HENS_DT_CONT_MULTIPLIERS"] == [1.0]
     assert options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5]
     assert options["HENS_STAGE_SELECTION"] == [3]
     assert options["HENS_MAX_PARALLEL"] == 10
@@ -193,7 +195,7 @@ def test_benchmark_trace_executor_forwards_max_parallel_to_delegate() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="network_evolution_method",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
         stage_count=2,
     )
     trace_executor = benchmark.BenchmarkTraceExecutor(delegate=CapturingExecutor())
@@ -223,7 +225,7 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="pinch_design_method",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
         stage_count=2,
         task_id="task-1",
     )
@@ -566,7 +568,7 @@ def _small_problem_with_options(options: dict) -> PinchProblem:
     payload = deepcopy(payload)
     payload["options"] = {
         **payload["options"],
-        "HENS_APPROACH_TEMPERATURES": [2.0, 4.0],
+        "HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 1.0],
         "HENS_STAGE_SELECTION": [2],
         "HENS_BEST_SOLUTIONS_TO_SAVE": 2,

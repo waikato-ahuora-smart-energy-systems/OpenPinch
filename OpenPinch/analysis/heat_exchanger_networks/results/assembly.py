@@ -71,12 +71,12 @@ def build_synthesis_result(
     selected_pathway = _selected_pathway_metadata(accepted)
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id=settings.run_id,
-        # The approach temperatures the tasks ran, which expanded tiers widen
-        # with multiples of the first configured one.
-        approach_temperatures=tuple(
-            sorted({float(task.approach_temperature) for task in tasks})
+        # The dt_cont multipliers the tasks ran, which expanded tiers widen
+        # with their default multipliers.
+        dt_cont_multipliers=tuple(
+            sorted({float(task.dt_cont_multiplier) for task in tasks})
         )
-        or settings.approach_temperatures,
+        or settings.dt_cont_multipliers,
         derivative_thresholds=settings.quality_derivative_thresholds,
         stage_selection=settings.stage_selection,
         method_sequence=_executed_method_sequence(outcomes),
@@ -228,7 +228,8 @@ def _failed_outcome_summary(
     for outcome in failed[:3]:
         reason = outcome.error or outcome.solver_status or "no failure reason"
         summaries.append(
-            f"{outcome.task.method}({outcome.task.approach_temperature:g} K): {reason}"
+            f"{outcome.task.method}(dt_cont x{outcome.task.dt_cont_multiplier:g}): "
+            f"{reason}"
         )
     if len(failed) > len(summaries):
         summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")

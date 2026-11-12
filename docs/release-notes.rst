@@ -280,14 +280,26 @@ Heat exchanger network synthesis
   longer uses APOPT. The reduced network is solved with HiGHS when its model
   is linear, as a pinch design reduction is, and with Ipopt otherwise. A
   reduced network can drop a match whose duty an LP solution sets to zero.
-- ``HENS_APPROACH_TEMPERATURES`` is now unset by default, meaning twice
-  ``THERMAL_DT_CONT`` (10 K at the default 5 K); it was 14 K. Synthesis
-  scales every stream's ΔT contribution by ``dTmin / (2 * THERMAL_DT_CONT)``,
-  so the 14 K default ran the first pinch design at 1.4 times each stream's
-  contribution, with different targets from the pinch analysis. It now uses
-  each contribution as entered, and ``HENS_DT_CONT_MULTIPLIERS`` scales them
-  by exactly the multiplier. Set ``HENS_APPROACH_TEMPERATURES`` for the
-  previous behaviour.
+- Heat exchanger network synthesis is keyed on a dt_cont multiplier instead
+  of an approach temperature. ``HENS_DT_CONT_MULTIPLIERS`` (default ``[1.0]``)
+  is the synthesis sweep at every quality tier: each multiplier scales every
+  stream's, segment's and utility's effective ΔT contribution, as a zone
+  ``dt_cont`` multiplier does in targeting, so the default designs at the
+  contributions the pinch targets use (the old 14 K default ran at 1.4 times
+  them). A stream whose ``dt_cont`` multiplier is locked keeps its own
+  contribution, as in targeting. A contribution of 0 runs at 0.1 K times the
+  multiplier (0.1 K for a locked stream) instead of half the approach
+  temperature. Quality tiers 2 to 5 add their own multipliers only while the
+  option is at its default. ``HENS_APPROACH_TEMPERATURES`` is removed and is
+  now an unknown option, and the design accessor's ``approach_temperatures``
+  argument is gone. Synthesis tasks, outcomes, manifests and networks record
+  ``dt_cont_multiplier`` (manifests ``dt_cont_multipliers``) and no longer an
+  approach temperature or ``solver_dTmin``; the benchmark script reports per
+  multiplier. To convert an approach-temperature grid, use
+  multiplier = dTmin / (2 x ``THERMAL_DT_CONT``), so 14 K at the 5 K default is
+  1.4; the OpenHENS fixtures and sample case are converted this way and solve
+  as before. The OpenPinch-WASM app's HEN calls need updating at its next
+  re-vendor.
 - Each pinch design side is now re-solved for the fewest recovery matches
   among those its minimum-utility solve used, at the same utility. Minimum
   utility cost leaves the match binaries free once the targets are met, so

@@ -16,7 +16,7 @@ from ..execution.settings import SynthesisWorkflowSettings
 from ..execution.task_builders import (
     _required_stage_count,
     _successful_method,
-    approach_temperature_from_network,
+    dt_cont_multiplier_from_network,
     is_pdm_variant_outcome,
     is_utility_only_outcome,
     required_topology_restrictions_from_outcome,
@@ -115,7 +115,7 @@ def build_thermal_derivative_method_tasks(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
                     method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
-                    approach_temperature=outcome.task.approach_temperature,
+                    dt_cont_multiplier=outcome.task.dt_cont_multiplier,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
                     problem_id=settings.problem_id,
@@ -150,13 +150,13 @@ def build_seeded_thermal_derivative_method_tasks(
             network,
             downstream_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
         )
-        approach_temperature = approach_temperature_from_network(network, settings)
+        dt_cont_multiplier = dt_cont_multiplier_from_network(network, settings)
         for derivative_threshold in settings.derivative_thresholds:
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
                     method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
-                    approach_temperature=approach_temperature,
+                    dt_cont_multiplier=dt_cont_multiplier,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
                     problem_id=settings.problem_id,

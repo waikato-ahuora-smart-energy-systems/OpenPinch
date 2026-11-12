@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from ....domain._stream.value_state import resolve_period_weights
-from ....domain.configuration import hen_approach_temperatures, tol
+from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.value import Value
 from ....domain.zone import Zone
@@ -19,6 +19,31 @@ from ..prepared_problem import PreparedProblem
 
 _PreparedItem = tuple[str, Stream, Any | None]
 SEGMENT_PROFILE_VERSION = 2
+# A contribution of 0 (an explicit dt_cont of 0) runs at this many K, times
+# the task's dt_cont multiplier unless the stream's multiplier is locked.
+ZERO_CONTRIBUTION_REPLACEMENT = 0.1
+
+
+def nominal_approach_temperature(config: Any, dt_cont_multiplier: float) -> float:
+    """Return the internal approach temperature of one synthesis multiplier, K.
+
+    Synthesis is keyed on a dt_cont multiplier ``m``. Where the solver layer
+    needs one scalar temperature (the model's ``dTmin`` for big-M bounds and
+    the evolution approach floor, the pinch decomposition and
+    :func:`problem_to_solver_arrays`), it uses ``2 * THERMAL_DT_CONT * m``;
+    :func:`problem_to_solver_arrays` recovers ``m`` from it. The value is
+    internal and never reported in synthesis results.
+    """
+    multiplier = float(dt_cont_multiplier)
+    if not np.isfinite(multiplier) or multiplier <= 0.0:
+        raise ValueError("dt_cont_multiplier must be finite and positive.")
+    reference = float(config.thermal.dt_cont)
+    if not np.isfinite(reference) or reference <= tol:
+        raise ValueError(
+            "HEN synthesis scales THERMAL_DT_CONT by its dt_cont multipliers, "
+            "so THERMAL_DT_CONT must be positive."
+        )
+    return 2.0 * reference * multiplier
 
 
 def annual_cost_scales(costing: Any) -> tuple[float, float]:
@@ -170,14 +195,9 @@ def problem_to_solver_arrays(
         arrays=arrays,
         axis_maps=axis_maps,
         configuration={
-            "HENS_APPROACH_TEMPERATURES": list(hen_approach_temperatures(config)),
             "HENS_BEST_SOLUTIONS_TO_SAVE": hens.best_solutions_to_save,
             "HENS_DERIVATIVE_THRESHOLDS": list(hens.derivative_thresholds),
-            "HENS_DT_CONT_MULTIPLIERS": getattr(
-                hens,
-                "dt_cont_multipliers",
-                None,
-            ),
+            "HENS_DT_CONT_MULTIPLIERS": list(hens.dt_cont_multipliers),
             "HENS_MIN_EXCHANGER_APPROACH_SHARE": hens.min_exchanger_approach_share,
             "HENS_SYNTHESIS_QUALITY_TIER": hens.synthesis_quality_tier,
             "HENS_PDM_STAGE_PAIR_LIMIT": hens.pdm_stage_pair_limit,
@@ -199,7 +219,9 @@ def problem_to_solver_arrays(
             "HENS_SOLVER_PDM": hens.solver_pdm,
             "HENS_SOLVER_TDM": hens.solver_tdm,
             "HENS_STAGE_SELECTION": list(hens.stage_selection),
-            "active_dTmin": float(dTmin),
+            "active_dt_cont_multiplier": _array_dt_cont_multiplier(
+                dTmin, reference_dt_cont
+            ),
             "segment_profile_version": SEGMENT_PROFILE_VERSION,
             "period_ids": list(period_ids),
             "period_weights": [float(weight) for weight in period_weights],
@@ -237,9 +259,10 @@ def problem_to_solver_arrays(
             "heat_transfer_coefficient": "kW/m^2/K",
             "temperature": "K",
             "temperature_contribution": (
-                "K, effective_delta_t_contribution scaled by "
-                "dTmin / (2 * THERMAL_DT_CONT); dTmin / 2 is the fallback for "
-                "missing values or values <= tol"
+                "K, effective_delta_t_contribution times the dt_cont multiplier "
+                "dTmin / (2 * THERMAL_DT_CONT), unscaled for a stream whose "
+                "multiplier is locked; 0.1 K times that multiplier replaces a "
+                "contribution <= tol"
             ),
             "utility_price": (
                 "$/kW/y: price in $/MWh times COSTING_ANNUAL_OP_TIME / 1000, "
@@ -298,6 +321,7 @@ def _solver_array_mapping(
             dTmin,
             period_idx=n,
             reference_dt_cont=zone.config.thermal.dt_cont,
+            locked=stream.delta_t_contribution_multiplier_locked,
         )
 
     def utility_solver_target(stream: Stream, _record, n: int) -> float:
@@ -398,7 +422,7 @@ def _segment_profile_arrays(
     )
     identities = np.full((len(items), max_segments), "", dtype=object)
 
-    for parent_index, ((parent_key, _stream, _record), segments) in enumerate(
+    for parent_index, ((parent_key, parent, _record), segments) in enumerate(
         zip(items, segment_rows)
     ):
         for segment_index, segment in enumerate(segments):
@@ -441,6 +465,7 @@ def _segment_profile_arrays(
                         dTmin,
                         period_idx=period_index,
                         reference_dt_cont=reference_dt_cont,
+                        locked=parent.delta_t_contribution_multiplier_locked,
                     )
                 )
         cumulative_duties[:, parent_index, 1:] = np.cumsum(
@@ -507,29 +532,39 @@ def _period_ids_and_weights(zone: Zone) -> tuple[tuple[str, ...], tuple[float, .
     return ordered_period_ids, period_weights
 
 
+def _array_dt_cont_multiplier(dTmin: float, reference_dt_cont: float | None) -> float:
+    """The dt_cont multiplier the arrays scale unlocked contributions by."""
+    if reference_dt_cont is None or reference_dt_cont <= tol:
+        return 1.0
+    return float(dTmin) / (2.0 * float(reference_dt_cont))
+
+
 def _temperature_contribution(
     stream: Stream,
     dTmin: float,
     *,
     period_idx: int = 0,
     reference_dt_cont: float | None = None,
+    locked: bool = False,
 ) -> float:
-    """Return a stream's temperature contribution for one dTmin tier.
+    """Return a stream's temperature contribution for one synthesis task.
 
-    With ``reference_dt_cont`` (THERMAL_DT_CONT), every contribution is scaled
-    by ``dTmin / (2 * reference_dt_cont)``, so a stream at the default
-    contribution gets exactly dTmin / 2 and the others keep their ratio to it
-    across the sweep. A contribution that is zero after scaling falls back to
-    dTmin / 2. Testing after scaling keeps the policy idempotent: applying it
+    With ``reference_dt_cont`` (THERMAL_DT_CONT), the task's dt_cont
+    multiplier is ``dTmin / (2 * reference_dt_cont)`` (``dTmin`` being the
+    nominal approach of :func:`nominal_approach_temperature`), and every
+    effective contribution is scaled by it, as targeting scales them with a
+    zone multiplier; a ``locked`` stream keeps its effective contribution. A
+    contribution that is zero after scaling becomes 0.1 K times the same
+    multiplier. Testing after scaling keeps the policy idempotent: applying it
     again with ``reference_dt_cont = dTmin / 2`` returns the same values.
     """
     contribution = _value(
         stream.effective_delta_t_contribution, "delta_degC", period_idx=period_idx
     )
-    if reference_dt_cont is not None and reference_dt_cont > tol:
-        contribution = contribution * float(dTmin) / (2.0 * float(reference_dt_cont))
+    multiplier = 1.0 if locked else _array_dt_cont_multiplier(dTmin, reference_dt_cont)
+    contribution *= multiplier
     if contribution <= tol:
-        return float(dTmin) / 2.0
+        return ZERO_CONTRIBUTION_REPLACEMENT * multiplier
     return contribution
 
 
@@ -679,6 +714,8 @@ def _str_array(values) -> np.ndarray:
 
 __all__ = [
     "SEGMENT_PROFILE_VERSION",
+    "ZERO_CONTRIBUTION_REPLACEMENT",
     "PreparedSolverArrays",
+    "nominal_approach_temperature",
     "problem_to_solver_arrays",
 ]

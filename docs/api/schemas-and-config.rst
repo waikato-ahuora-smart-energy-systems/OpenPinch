@@ -49,11 +49,10 @@ temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical
 ``HPR_*`` fields for heat-pump and refrigeration workflows.
 
 ``THERMAL_DT_CONT`` is the ``dt_cont`` of any process stream or utility that
-doesn't give its own (an absent, null or blank value). Heat exchanger network synthesis
-also uses it as the reference for its dTmin sweep: in each tier of
-``HENS_APPROACH_TEMPERATURES`` every stream's contribution is scaled by
-dTmin / (2 · ``THERMAL_DT_CONT``), so a stream at the default contributes
-exactly dTmin / 2. A utility without a ``price`` uses
+doesn't give its own (an absent, null or blank value). Heat exchanger network
+synthesis scales every contribution by each ``HENS_DT_CONT_MULTIPLIERS``
+value, as a zone ``dt_cont`` multiplier does in targeting, so the default
+``[1.0]`` designs at the targeting contributions. A utility without a ``price`` uses
 ``COSTING_UTILITY_PRICE``, the price of the default utilities.
 
 These defaults, ``THERMAL_DT_PHASE_CHANGE``, ``THERMAL_HTC``, the

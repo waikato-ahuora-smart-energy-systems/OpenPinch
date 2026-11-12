@@ -15,7 +15,7 @@ from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..execution.executor import SynthesisExecutor
 from ..execution.settings import SynthesisWorkflowSettings
 from ..execution.task_builders import (
-    approach_temperature_from_network,
+    dt_cont_multiplier_from_network,
     topology_restrictions_from_network,
 )
 from ..results.assembly import (
@@ -99,7 +99,7 @@ def build_seeded_quality_tasks(
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
     """Build canonical, de-duplicated seeded tasks for quality tiers above 1.
 
-    Tasks are de-duplicated on approach temperature and canonical topology,
+    Tasks are de-duplicated on dt_cont multiplier and canonical topology,
     plus the derivative threshold when ``distinct_thresholds`` is true.
     """
 
@@ -112,13 +112,13 @@ def build_seeded_quality_tasks(
                 downstream_method=method,
             )
         )
-        approach_temperature = approach_temperature_from_network(network, settings)
+        dt_cont_multiplier = dt_cont_multiplier_from_network(network, settings)
         signature = topology_restriction_signature(restrictions)
         for derivative_threshold in derivative_thresholds(network):
             key = (
-                (approach_temperature, derivative_threshold, signature)
+                (dt_cont_multiplier, derivative_threshold, signature)
                 if distinct_thresholds
-                else (approach_temperature, signature)
+                else (dt_cont_multiplier, signature)
             )
             if key in seen:
                 continue
@@ -127,7 +127,7 @@ def build_seeded_quality_tasks(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
                     method=method,
-                    approach_temperature=approach_temperature,
+                    dt_cont_multiplier=dt_cont_multiplier,
                     derivative_threshold=derivative_threshold,
                     stage_count=canonical_stage_count(restrictions),
                     problem_id=settings.problem_id,

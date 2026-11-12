@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
     TierPathway,
     pathway_metadata,
@@ -53,7 +51,7 @@ def test_pinch_design_quality_task_builder_adds_deduped_stage_pair_tasks() -> No
     base_task = HeatExchangerNetworkSynthesisTask(
         run_id="method-test",
         method="pinch_design_method",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
     tasks = pinch_design_method._with_quality_pdm_tasks(settings, (base_task,))
     quality_tasks = [
@@ -62,7 +60,7 @@ def test_pinch_design_quality_task_builder_adds_deduped_stage_pair_tasks() -> No
 
     assert any(
         task.metadata["quality_candidate"] == "dt_cont_multiplier"
-        and task.approach_temperature == 15.0
+        and task.dt_cont_multiplier == 1.5
         for task in quality_tasks
     )
     assert [
@@ -99,23 +97,6 @@ def test_pinch_design_quality_task_builder_adds_deduped_stage_pair_tasks() -> No
         for task in duplicate_checked
         if task.metadata.get("quality_candidate") == "stage_pair"
     ] == [[2, 1]]
-
-    with pytest.raises(ValueError, match="requires a multiplier"):
-        pinch_design_method._pathway_approach_temperatures(
-            settings,
-            TierPathway(
-                pathway_id="bad",
-                tier_origin=2,
-                pathway_kind="quality",
-                pdm_mode="compact",
-                multiplier=None,
-                uses_tdm=False,
-                evm_n_ad_branches=1,
-                evm_n_rm_branches=1,
-                evm_no_improvement_patience=None,
-                protected=False,
-            ),
-        )
 
 
 def test_pinch_design_task_builder_skips_non_exact_pathways_without_multiplier(
@@ -164,7 +145,7 @@ def test_thermal_derivative_skips_non_tdm_pathways_and_empty_default_stage():
     task = HeatExchangerNetworkSynthesisTask(
         run_id="method-test",
         method="pinch_design_method",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
         metadata=pathway_metadata((non_tdm_pathway,)),
     )
     outcome = HeatExchangerNetworkSynthesisTaskOutcome(
@@ -223,7 +204,7 @@ def test_thermal_derivative_parent_task_builder_accepts_plain_successful_pdm():
     task = HeatExchangerNetworkSynthesisTask(
         run_id="method-test",
         method="pinch_design_method",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
     outcome = HeatExchangerNetworkSynthesisTaskOutcome(
         task=task,
@@ -335,7 +316,7 @@ def _method_value(method) -> str:
 def _settings(**updates) -> SynthesisWorkflowSettings:
     params = dict(
         run_id="method-test",
-        approach_temperatures=(10.0,),
+        dt_cont_multipliers=(1.0,),
         derivative_thresholds=(0.5,),
         stage_selection=(1,),
         method_sequence=("thermal_derivative_method",),
@@ -379,5 +360,5 @@ def _seed_network(*, method: str) -> HeatExchangerNetwork:
         run_id="seed-run",
         method=method,
         stage_count=1,
-        summary_metrics={"approach_temperature": 10.0},
+        summary_metrics={"dt_cont_multiplier": 1.0},
     )

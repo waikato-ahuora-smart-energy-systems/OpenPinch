@@ -119,7 +119,7 @@ def test_design_options_are_validated_at_their_owner_boundary(monkeypatch) -> No
     with pytest.raises(ValueError, match="TargetInput.options"):
         heat_exchanger_network_synthesis_service(
             problem,
-            options={"HENS_APPROACH_TEMPERATURES": [99.0]},
+            options={"HENS_DT_CONT_MULTIPLIERS": [9.9]},
         )
 
     configured = problem.master_zone.config.hens.derivative_thresholds
@@ -164,7 +164,7 @@ def test_openhens_field_aliases_are_rejected_by_public_schemas() -> None:
     with pytest.raises(ValidationError):
         HeatExchangerNetworkSynthesisManifest(
             run_id="example-run",
-            approach_temperatures=(2.0,),
+            dt_cont_multipliers=(0.2,),
             derivative_thresholds=(0.5,),
             stage_selection=(2,),
             min_dT_values=(2.0,),
@@ -275,7 +275,7 @@ def test_public_design_accessor_returns_ranked_networks(
             adjusted = []
             for outcome in outcomes:
                 network = outcome.network
-                if network is None or outcome.task.approach_temperature != 4.0:
+                if network is None or outcome.task.dt_cont_multiplier != 0.4:
                     adjusted.append(outcome)
                     continue
 
@@ -306,7 +306,7 @@ def test_public_design_accessor_returns_ranked_networks(
     payload = _public_example_payload()
     payload["options"] = {
         **payload["options"],
-        "HENS_APPROACH_TEMPERATURES": [2.0, 4.0],
+        "HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 1.0],
         "HENS_STAGE_SELECTION": [2],
     }

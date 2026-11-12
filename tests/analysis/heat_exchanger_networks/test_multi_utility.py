@@ -215,7 +215,7 @@ def test_dairy_chilling_synthesis_cools_chilled_streams_with_glycol():
     problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
-        approach_temperatures=(5.0,),
+        dt_cont_multipliers=(0.5,),
         max_parallel=1,
     )
 

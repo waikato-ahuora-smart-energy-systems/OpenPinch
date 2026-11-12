@@ -324,20 +324,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Annualise ORC capital", None,
         "Include the annualised ORC capital in its annual cost change.",
     ),
-    "HENS_APPROACH_TEMPERATURES": FieldText(
-        "HEN approach temperatures", "delta_degC",
-        (
-            "Minimum approach temperatures (dTmin) to synthesise networks for; one set "
-            "of design tasks per value. Unset, it is twice THERMAL_DT_CONT, so the "
-            "first pinch design run uses each stream's contribution as entered."
-        ),
-    ),
     "HENS_DT_CONT_MULTIPLIERS": FieldText(
-        "HEN dTmin multipliers", None,
+        "HEN dt_cont multipliers", None,
         (
-            "Multipliers on the first approach temperature for extra pinch design "
-            "candidates at quality tier 2 and above, which scale every stream's "
-            "contribution by the same factor. None uses the tier's defaults."
+            "Multipliers on every stream and utility dT contribution to synthesise "
+            "networks for, as a zone dt_cont multiplier scales them in targeting "
+            "(a locked stream keeps its own); one set of design tasks per value. "
+            "1.0 designs at the targeting contributions. Left at the default, "
+            "quality tiers 2 and above add their own multipliers."
         ),
     ),
     "HENS_DERIVATIVE_THRESHOLDS": FieldText(
@@ -351,10 +345,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Minimum exchanger approach share", None,
         (
             "Smallest exchanger approach the thermal derivative and network evolution "
-            "steps may choose, as a share of the requested approach temperature, from "
-            "0 up to but not including 1. Those steps choose approaches by cost, "
-            "down to 0.1 K by default (0); at 0.5 a 10 K design keeps every "
-            "exchanger at 5 K or more."
+            "steps may choose, as a share of twice THERMAL_DT_CONT times the dt_cont "
+            "multiplier, from 0 up to but not including 1. Those steps choose "
+            "approaches by cost, down to 0.1 K by default (0); at 0.5 a multiplier "
+            "of 1.0 with a 5 K THERMAL_DT_CONT keeps every exchanger at 5 K or more."
         ),
     ),
     "HENS_SYNTHESIS_QUALITY_TIER": FieldText(
