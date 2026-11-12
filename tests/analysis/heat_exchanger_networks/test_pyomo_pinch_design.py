@@ -34,6 +34,9 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.pyomo_model import (
     PyomoModel,
 )
 from OpenPinch.application.problem import PinchProblem
+from tests.analysis.heat_exchanger_networks.test_multi_utility import (
+    _two_cold_utility_problem,
+)
 from tests.support.paths import REPOSITORY_ROOT
 
 FOUR_STREAM_JSON = (
@@ -299,3 +302,46 @@ def test_assign_value_sets_pyomo_values_without_clamping():
     assert selector.fixed
     assert selector.value == pytest.approx(0.0)
     assert duty.value == pytest.approx(12.0)
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_min_units_with_a_utility_cost_cap_minimises_units_alone():
+    # Summing a utility cost of order 1e7 with a unit count lets a MILP's
+    # relative gap hide thousands of units. With the cost capped at the
+    # minimum, the objective is the unit count.
+    problem = _two_cold_utility_problem(5.0, glycol_first=False)
+    cheapest = _built_pdm(problem, dTmin=4.0, side="below")
+    cheapest.optimise(False)
+    cost = cheapest.solver_run.objective_value
+
+    model = PinchDecompModel(
+        **(
+            dict(
+                name="below fewest units",
+                framework="PDM",
+                solver="highs",
+                solver_arrays=problem_to_solver_arrays(problem, 4.0),
+                dTmin=4.0,
+                z_restriction=None,
+                min_dqda=0.0,
+                minimisation_goal="min units",
+                non_isothermal_model=False,
+                integers=True,
+                tol=1e-3,
+                pinch_loc="below",
+                pinch_decomposition=build_pinch_design_decomposition(
+                    problem, 4.0, pinch_location="below"
+                ),
+                stage_selection="automated",
+                utility_cost_cap=cost,
+            )
+        )
+    )
+    model.optimise(False)
+
+    assert model.mSuccess == 1
+    assert model.solver_run.objective_value == pytest.approx(model.n_recovery_units)
+    assert sum(model.Q_cu_by_utility_by_period[0]) == pytest.approx(
+        sum(cheapest.Q_cu_by_utility_by_period[0]), abs=1e-3
+    )

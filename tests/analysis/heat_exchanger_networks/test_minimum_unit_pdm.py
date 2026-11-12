@@ -233,3 +233,56 @@ def test_pdm_stage_reduction_solves_its_linear_model_with_highs():
     assert problem.case.name.startswith("reduced-")
     assert problem.case.solver == "highs"
     assert problem.case.mSuccess == 1
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_main_pdm_network_has_the_fewest_units_its_matches_allow():
+    # Minimum utility cost leaves the binaries free once the targets are met,
+    # so a MILP solver may keep matches it does not need: on the pulp mill
+    # HiGHS left 2,994 below-pinch matches, most carrying under 1 kW. Each
+    # side is re-solved for the fewest units among the matches it used, at
+    # the same utility. At 26 K the four-stream network drops from 7 units
+    # to 6.
+    problem = _problem(26.0, (0, 0))
+
+    problem.get_solution(print_output=False)
+
+    assert problem.below.minimisation_goal == "min units"
+    assert len(problem.extract_network(run_id="pdm").exchangers) == 6
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_fewest_units_resolve_is_time_limited_and_keeps_the_side_converged(
+    monkeypatch,
+):
+    # Proving the fewest units can take far longer than finding them (the
+    # pulp mill's 1,277 used matches). The re-solve stops at a time limit,
+    # and its network keeps the minimum utility the first solve proved.
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    options = []
+    optimise = PinchDecompModel.optimise
+
+    def time_limited(self, print_output):
+        optimise(self, print_output)
+        if self.name.endswith("fewest units"):
+            options.append(self.solver_options)
+            self.solver_run = replace(
+                self.solver_run, termination_condition="maxTimeLimit"
+            )
+
+    monkeypatch.setattr(PinchDecompModel, "optimise", time_limited)
+    problem = _problem(26.0, (0, 0))
+
+    problem.get_solution(print_output=False)
+
+    assert options and all(
+        o == {"time_limit": backend.FEWEST_UNITS_TIME_LIMIT} for o in options
+    )
+    assert problem.below.minimisation_goal == "min units"
+    assert problem.below.solver_run.converged
+    assert problem.case.solver_run.converged

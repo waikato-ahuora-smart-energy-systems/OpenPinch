@@ -46,8 +46,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         pinch_decomposition: PinchDesignDecomposition,
         stage_selection: Literal["automated"] | list[int] | tuple[int, int],
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
+        utility_cost_cap: float | None = None,
     ) -> None:
         self.pinch_loc = pinch_loc
+        # With a cap, "min units" minimises the unit count alone, keeping
+        # utility cost at or below the cap instead of adding it in.
+        self.utility_cost_cap = utility_cost_cap
         self.pinch_decomposition = pinch_decomposition
         self.stage_selection = stage_selection
         super().__init__(

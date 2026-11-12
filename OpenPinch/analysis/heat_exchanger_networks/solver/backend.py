@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import tempfile
@@ -35,6 +36,18 @@ PYOMO_SOLVER_MODULES = {"highs": "highspy", "scip": "pyscipopt", "mindtpy": "hig
 # Solvers that take their options at solve time (in process, or on the
 # command line) rather than from an option file in the working directory.
 SOLVE_TIME_OPTION_SOLVERS = frozenset({"highs", "ipopt-pyomo", "scip", "mindtpy"})
+# Solvers that can start a MIP from the model's current values.
+WARM_START_SOLVERS = frozenset({"highs", "scip"})
+# Each integer solver's wall-time limit option, in seconds.
+TIME_LIMIT_OPTIONS = {
+    "highs": "time_limit",
+    "couenne": "time_limit",
+    "scip": "limits/time",
+    "mindtpy": "time_limit",
+}
+# Seconds allowed for a PDM side's fewest-units re-solve, which can find a
+# sparse network long before it proves the fewest units.
+FEWEST_UNITS_TIME_LIMIT = 60.0
 PYOMO_SOLVER_FACTORY_NAMES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
@@ -207,6 +220,17 @@ def _require_pyomo_solver_available(solver_name: str, executable: str) -> None:
         )
 
 
+def _has_incumbent(results: Any, model: Any) -> bool:
+    """Whether a solve that stopped early loaded a feasible solution."""
+
+    if len(getattr(results, "solution", ())) > 0:
+        return True
+    problem = getattr(results, "problem", None)
+    minimising = getattr(model.objective, "sense", 1) == 1
+    bound = getattr(problem, "upper_bound" if minimising else "lower_bound", None)
+    return bound is not None and math.isfinite(float(bound))
+
+
 def solve_pyomo_model(
     model: Any,
     *,
@@ -242,10 +266,23 @@ def solve_pyomo_model(
             else:
                 if solver_name in SOLVE_TIME_OPTION_SOLVERS:
                     solver.options.update(options)
-                results = solver.solve(model.model, tee=disp)
+                warm_start = (
+                    {"warmstart": True}
+                    if getattr(model, "warm_start", False)
+                    and solver_name in WARM_START_SOLVERS
+                    else {}
+                )
+                results = solver.solve(model.model, tee=disp, **warm_start)
         solver_status = str(results.solver.status)
         termination_condition = str(results.solver.termination_condition)
-        if solver_status not in PASSING_SOLVER_STATUSES:
+        stopped_with_solution = (
+            # HiGHS reports a time-limited solve as "aborted", even with an
+            # incumbent loaded.
+            solver_status == "aborted"
+            and termination_condition in PASSING_TERMINATION_CONDITIONS
+            and _has_incumbent(results, model)
+        )
+        if solver_status not in PASSING_SOLVER_STATUSES and not stopped_with_solution:
             failure_reason = f"Solver exited with status: {solver_status}"
         elif termination_condition not in PASSING_TERMINATION_CONDITIONS:
             failure_reason = f"Solver termination condition: {termination_condition}"

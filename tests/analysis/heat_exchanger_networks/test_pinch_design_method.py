@@ -3270,6 +3270,7 @@ def _pdm_objective_model_with_a_utility_choice(goal: str) -> PinchDecompModel:
     model.CU_target_by_period = [3.0]
     model.period_weights = [1.0]
     model.period_weight_sum = 1.0
+    model.utility_cost_cap = None
     return model
 
 

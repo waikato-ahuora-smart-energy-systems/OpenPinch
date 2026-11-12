@@ -40,6 +40,8 @@ class PyomoModel:
         self.model.parameters = pyo.VarList()
         self.model.constraints = pyo.ConstraintList()
         self.objective = None
+        # Set to start a MIP solve from the variables' current values.
+        self.warm_start = False
 
     def Var(
         self,

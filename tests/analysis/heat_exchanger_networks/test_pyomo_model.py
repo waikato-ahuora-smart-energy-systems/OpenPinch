@@ -375,3 +375,62 @@ def test_mindtpy_solves_a_minlp_by_outer_approximation():
     }
     assert solved.objective_value == pytest.approx(1.5**1.5, rel=1e-4)
     assert x.value == pytest.approx(1.5**1.5, rel=1e-4)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_marked_model_is_warm_started_from_its_current_values(monkeypatch):
+    # A fewest-units re-solve starts from the minimum-utility network, which
+    # is feasible, so HiGHS has an incumbent from the start.
+    model, duty, unit = _binary_model()
+    duty.set_value(3.0)
+    unit.set_value(1)
+    model.warm_start = True
+    seen = {}
+    factory = pyo.SolverFactory
+
+    def recording_factory(name):
+        solver = factory(name)
+        solve = solver.solve
+
+        def recorded(*args, **kwargs):
+            seen.update(kwargs)
+            return solve(*args, **kwargs)
+
+        solver.solve = recorded
+        return solver
+
+    monkeypatch.setattr(pyo, "SolverFactory", recording_factory)
+    backend.configure_pyomo_solver(model, "highs")
+    solved = backend.solve_pyomo_model(model, solver_name="highs")
+
+    assert seen.get("warmstart") is True
+    assert solved.objective_value == pytest.approx(3.5)
+
+
+@pytest.mark.parametrize(("incumbent", "status"), [(3.5, 1), (None, 0)])
+def test_a_time_limited_solve_with_an_incumbent_is_kept(monkeypatch, incumbent, status):
+    # HiGHS reports a solve stopped at its time limit as "aborted" even when
+    # it found a solution; that solution is usable, though not converged.
+    model, _x, _y = _bounded_model(4.0)
+    results = type(
+        "Results",
+        (),
+        {"solver": type("Solver", (), {"status": "aborted"})()},
+    )()
+    results.solver.termination_condition = "maxTimeLimit"
+    # Pyomo's HiGHS interface reports the incumbent as the best bound.
+    results.problem = type("Problem", (), {"upper_bound": incumbent})()
+    results.solution = []
+
+    class _Solver:
+        options: dict = {}
+
+        def solve(self, *_args, **_kwargs):
+            return results
+
+    monkeypatch.setattr(pyo, "SolverFactory", lambda _name: _Solver())
+
+    run = backend.solve_pyomo_model(model, solver_name="highs")
+
+    assert run.status == status
+    assert not run.converged

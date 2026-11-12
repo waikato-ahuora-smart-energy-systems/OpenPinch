@@ -280,6 +280,14 @@ Heat exchanger network synthesis
   longer uses APOPT. The reduced network is solved with HiGHS when its model
   is linear, as a pinch design reduction is, and with Ipopt otherwise. A
   reduced network can drop a match whose duty an LP solution sets to zero.
+- Each pinch design side is now re-solved for the fewest recovery matches
+  among those its minimum-utility solve used, at the same utility. Minimum
+  utility cost leaves the match binaries free once the targets are met, so
+  HiGHS could keep thousands of matches the network did not need: the pulp
+  mill's network had 3,071 units, 2,994 of them below-pinch matches mostly
+  under 1 kW, and now has 84. The re-solve starts from the first solution and
+  stops after 60 s with the best network found. On the four-stream example at
+  26 K the network has 6 units instead of 7.
 - The post-optimisation alpha (flow-on) solve no longer stores the zero
   coefficients of inactive matches. On the 64-stream pulp mill they made up
   most of the sparse system, and its factorisation ran for over 20 minutes

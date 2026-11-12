@@ -592,6 +592,8 @@ def test_internal_problem_error_and_pdm_print_paths():
 
     class FakeSide:
         side_required = True
+        # Unsolved, so no fewest-units re-solve follows.
+        mSuccess = 0
 
         def __init__(self):
             self.optimised = False
@@ -637,6 +639,8 @@ def test_pdm_amalgamated_case_keeps_an_unconverged_side_solve() -> None:
     def side(termination):
         return SimpleNamespace(
             side_required=True,
+            # Unsolved, so no fewest-units re-solve follows.
+            mSuccess=0,
             optimise=lambda print_output=True: None,
             solver_run=backend.SolverRun(
                 name="couenne", termination_condition=termination

@@ -20,6 +20,7 @@ from ..solver.dependencies import (
 )
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
 from ._base.execution import _assign_value, _set_value, _value
+from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -71,6 +72,7 @@ class InternalHeatExchangerNetworkProblem:
     ) -> None:
         """Construct the private PDM or StageWise model for this task."""
 
+        self._model_factories = model_factories
         self.args = {
             "name": self.name,
             "framework": self.framework,
@@ -257,8 +259,10 @@ class InternalHeatExchangerNetworkProblem:
 
         if self.above.side_required:
             self.above.optimise(print_output=print_output)
+            self.above = self._fewest_units_side("above", self.above)
         if self.below.side_required:
             self.below.optimise(print_output=print_output)
+            self.below = self._fewest_units_side("below", self.below)
         self.case = self.above.amalgamate_networks(
             below_case=self.below,
             above_case=self.above,
@@ -274,6 +278,53 @@ class InternalHeatExchangerNetworkProblem:
                 "tol": self.tol,
             }
         )
+
+    def _fewest_units_side(self, name: str, side):
+        """Re-solve a side for the fewest units among the matches it used.
+
+        Minimum utility cost leaves the binaries free once the targets are
+        met, so an integer solver may keep matches the network does not need
+        (thousands of sub-kilowatt matches on a 64-stream case). The side's
+        energy balance holds its utility at the target, and its own solution
+        is feasible on its own matches, so the re-solve keeps the utility and
+        can only drop units. The original side is kept if it fails.
+        """
+
+        if side.mSuccess != 1 or self.solver not in backend.INTEGER_SOLVERS:
+            return side
+        factory = self._model_factory(
+            getattr(self, "_model_factories", None),
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        sparse = factory(
+            **(
+                dict(self.args)
+                | {
+                    "name": f"{name} pinch {self.dTmin} fewest units",
+                    "pinch_loc": name,
+                    "minimisation_goal": "min units",
+                    "utility_cost_cap": side.solver_run.objective_value,
+                    "solver_options": _with_time_limit(
+                        self.solver, self.args.get("solver_options")
+                    ),
+                    "pinch_decomposition": self.pinch_decompositions[name],
+                    "stage_selection": self.stage_selection,
+                }
+            )
+        )
+        _start_from_side(sparse, side)
+        sparse.optimise(print_output=False)
+        if sparse.mSuccess != 1:
+            return side
+        # Stopping at the time limit leaves a network at the same, proven,
+        # minimum utility: the side keeps the first solve's convergence.
+        sparse.solver_run = replace(
+            sparse.solver_run,
+            termination_condition=side.solver_run.termination_condition,
+        )
+        _cleanup_model(side)
+        return sparse
 
     def _solve_pdm_variants(
         self, model_factories: Mapping[str, Any] | None
@@ -357,6 +408,7 @@ class InternalHeatExchangerNetworkProblem:
                         "name": f"{name} pinch {self.dTmin} min units {len(found)}",
                         "pinch_loc": name,
                         "minimisation_goal": "min units",
+                        "utility_cost_cap": primary.solver_run.objective_value,
                         "pinch_decomposition": self.pinch_decompositions[name],
                         "stage_selection": self.stage_selection,
                     }
@@ -578,6 +630,44 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _start_from_side(sparse, side) -> None:
+    """Start ``sparse`` at ``side``'s solution with its unused units off.
+
+    Both models have the same superstructure, so their variables line up.
+    Fixing the unused binaries at zero keeps the re-solve to the side's own
+    matches, and the solution is a feasible warm start for it.
+    """
+
+    for target, source in zip(
+        sparse.m.model.variables.values(),
+        side.m.model.variables.values(),
+        strict=True,
+    ):
+        target.set_value(source.value, skip_validation=True)
+    # Binaries the solver left off, read from the copied values: a match
+    # with a tiny duty is still on, so the start is exactly feasible.
+    for grid, indices in _equations_unit_indices(sparse).items():
+        for index in indices:
+            binary = getattr(sparse, grid)
+            for position in index:
+                binary = binary[position]
+            if not binary.fixed and (binary.value or 0.0) < 0.5:
+                binary.fix(0)
+    sparse.m.warm_start = True
+
+
+def _with_time_limit(solver: str, options) -> Any:
+    """The PDM solver options with the fewest-units time limit added.
+
+    A limit the user set is kept, as are options given as option lines.
+    """
+
+    name = backend.TIME_LIMIT_OPTIONS.get(solver)
+    if name is None or not (options is None or isinstance(options, Mapping)):
+        return options
+    return {name: backend.FEWEST_UNITS_TIME_LIMIT, **dict(options or {})}
 
 
 def _side_units(side) -> int:

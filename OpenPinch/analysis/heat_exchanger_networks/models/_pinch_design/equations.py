@@ -370,8 +370,15 @@ def set_obj(owner) -> None:
             )
         )
     else:
+        if choice and owner.utility_cost_cap is not None:
+            # Relative slack for the cap's own rounding in the solver.
+            owner.m.Equation(
+                _utility_cost(owner) <= owner.utility_cost_cap * (1 + 1e-9) + owner.tol
+            )
         owner.m.Minimize(
-            _utility_cost(owner) + _units(owner) if choice else _units(owner)
+            _units(owner)
+            if not choice or owner.utility_cost_cap is not None
+            else _utility_cost(owner) + _units(owner)
         )
 
 
