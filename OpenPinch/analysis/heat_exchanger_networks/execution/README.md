@@ -5,7 +5,7 @@ Resolves synthesis settings from a prepared problem, plans the quality-tier path
 
 ## Interface
 - `SynthesisWorkflowSettings` (`settings.py`): frozen dataclass of resolved HENS controls, with derived properties (quality fraction, tier multipliers, EVM branch breadth) and `solver_for` / `solver_options_for` per method.
-- `workflow_settings_from_problem` (`settings.py`): reads `master_zone.config.hens` into settings.
+- `workflow_settings_from_problem` (`settings.py`): reads `master_zone.config.hens` into settings; approach temperatures come from `domain.configuration.hen_approach_temperatures` (twice `THERMAL_DT_CONT` when unset).
 - `StagePackingScope` (`settings.py`): alias for the stage-packing scope string.
 - `TierPathway` (`pathways.py`): frozen description of one route through the OpenHENS workflow, with `metadata()`.
 - `tier_pathways`, `pathway_metadata`, `pathways_from_metadata`, `tier_pdm_multipliers`, `tier_evm_branch_breadth` (`pathways.py`): plan pathways for a tier and round-trip them through task metadata.

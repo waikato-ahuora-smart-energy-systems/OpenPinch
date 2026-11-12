@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ....domain.configuration import hen_approach_temperatures
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from .pathways import tier_evm_branch_breadth, tier_pdm_multipliers
 
@@ -182,9 +183,7 @@ def workflow_settings_from_problem(
     dt_cont_multipliers = getattr(hens, "dt_cont_multipliers", None)
     return SynthesisWorkflowSettings(
         run_id=str(hens.run_id),
-        approach_temperatures=tuple(
-            float(value) for value in hens.approach_temperatures
-        ),
+        approach_temperatures=hen_approach_temperatures(config),
         dt_cont_multipliers=(
             None
             if dt_cont_multipliers is None

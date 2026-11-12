@@ -328,14 +328,16 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "HEN approach temperatures", "delta_degC",
         (
             "Minimum approach temperatures (dTmin) to synthesise networks for; one set "
-            "of design tasks per value."
+            "of design tasks per value. Unset, it is twice THERMAL_DT_CONT, so the "
+            "first pinch design run uses each stream's contribution as entered."
         ),
     ),
     "HENS_DT_CONT_MULTIPLIERS": FieldText(
         "HEN dTmin multipliers", None,
         (
             "Multipliers on the first approach temperature for extra pinch design "
-            "candidates at quality tier 2 and above. None uses the tier's defaults."
+            "candidates at quality tier 2 and above, which scale every stream's "
+            "contribution by the same factor. None uses the tier's defaults."
         ),
     ),
     "HENS_DERIVATIVE_THRESHOLDS": FieldText(

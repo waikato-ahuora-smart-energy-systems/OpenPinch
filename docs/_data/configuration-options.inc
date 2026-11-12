@@ -125,8 +125,8 @@ Heat Exchanger Network Synthesis
    :header: "Option", "Type", "Default", "Unit", "Limits", "Description"
    :widths: 22, 8, 12, 8, 10, 40
 
-   "``HENS_APPROACH_TEMPERATURES``","number_list","``[14.0]``","delta_degC","","Minimum approach temperatures (dTmin) to synthesise networks for; one set of design tasks per value."
-   "``HENS_DT_CONT_MULTIPLIERS``","number_list","``None``","","","Multipliers on the first approach temperature for extra pinch design candidates at quality tier 2 and above. None uses the tier's defaults."
+   "``HENS_APPROACH_TEMPERATURES``","number_list","``None``","delta_degC","","Minimum approach temperatures (dTmin) to synthesise networks for; one set of design tasks per value. Unset, it is twice THERMAL_DT_CONT, so the first pinch design run uses each stream's contribution as entered."
+   "``HENS_DT_CONT_MULTIPLIERS``","number_list","``None``","","","Multipliers on the first approach temperature for extra pinch design candidates at quality tier 2 and above, which scale every stream's contribution by the same factor. None uses the tier's defaults."
    "``HENS_DERIVATIVE_THRESHOLDS``","number_list","``[0.5]``","","","Minimum dQ/dA each match must meet in thermal derivative method runs; one run per value."
    "``HENS_MIN_EXCHANGER_APPROACH_SHARE``","number","``0.0``","","","Smallest exchanger approach the thermal derivative and network evolution steps may choose, as a share of the requested approach temperature, from 0 up to but not including 1. Those steps choose approaches by cost, down to 0.1 K by default (0); at 0.5 a 10 K design keeps every exchanger at 5 K or more."
    "``HENS_SYNTHESIS_QUALITY_TIER``","number","``1``","","0 to 5","Search breadth from 0 to 5: 0 skips the thermal derivative method, 1 is standard OpenHENS, 2 to 5 search more widely."

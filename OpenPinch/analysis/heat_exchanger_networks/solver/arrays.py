@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from ....domain._stream.value_state import resolve_period_weights
-from ....domain.configuration import tol
+from ....domain.configuration import hen_approach_temperatures, tol
 from ....domain.stream import Stream
 from ....domain.value import Value
 from ....domain.zone import Zone
@@ -170,7 +170,7 @@ def problem_to_solver_arrays(
         arrays=arrays,
         axis_maps=axis_maps,
         configuration={
-            "HENS_APPROACH_TEMPERATURES": list(hens.approach_temperatures),
+            "HENS_APPROACH_TEMPERATURES": list(hen_approach_temperatures(config)),
             "HENS_BEST_SOLUTIONS_TO_SAVE": hens.best_solutions_to_save,
             "HENS_DERIVATIVE_THRESHOLDS": list(hens.derivative_thresholds),
             "HENS_DT_CONT_MULTIPLIERS": getattr(

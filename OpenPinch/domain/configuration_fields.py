@@ -381,7 +381,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_ORC_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "orc_capital_recovery_enabled"),
 
     # HEN synthesis.
-    "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),
+    "HENS_APPROACH_TEMPERATURES": _spec(List[float] | None, None, "hens", "approach_temperatures", validator=_optional_positive_float_grid),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_optional_positive_float_grid),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),

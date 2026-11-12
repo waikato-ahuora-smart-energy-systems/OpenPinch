@@ -280,6 +280,14 @@ Heat exchanger network synthesis
   longer uses APOPT. The reduced network is solved with HiGHS when its model
   is linear, as a pinch design reduction is, and with Ipopt otherwise. A
   reduced network can drop a match whose duty an LP solution sets to zero.
+- ``HENS_APPROACH_TEMPERATURES`` is now unset by default, meaning twice
+  ``THERMAL_DT_CONT`` (10 K at the default 5 K); it was 14 K. Synthesis
+  scales every stream's ΔT contribution by ``dTmin / (2 * THERMAL_DT_CONT)``,
+  so the 14 K default ran the first pinch design at 1.4 times each stream's
+  contribution, with different targets from the pinch analysis. It now uses
+  each contribution as entered, and ``HENS_DT_CONT_MULTIPLIERS`` scales them
+  by exactly the multiplier. Set ``HENS_APPROACH_TEMPERATURES`` for the
+  previous behaviour.
 - Each pinch design side is now re-solved for the fewest recovery matches
   among those its minimum-utility solve used, at the same utility. Minimum
   utility cost leaves the match binaries free once the targets are met, so
