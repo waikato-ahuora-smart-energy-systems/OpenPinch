@@ -269,6 +269,10 @@ Heat exchanger network synthesis
   solution, then adds or removes the match, where each candidate started
   from default values. The local solves are nonconvex, so candidates can
   reach different networks.
+- The stage-wise models' Chen LMTD approximation no longer takes the cube
+  root of a negative number. A heater or cooler at zero duty leaves its
+  approach temperatures free, which could make the base negative; it now
+  passes through a smooth max with zero.
 - The pinch design method can return several networks per approach
   temperature. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks
   with the fewest units at the utility targets to collect, and

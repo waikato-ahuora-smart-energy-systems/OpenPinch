@@ -1238,3 +1238,26 @@ def test_evolution_keeps_a_converged_start_cheaper_than_every_candidate(monkeypa
     _get_source_net_benefit_evolution(model, print_output=False, max_depth=1)
 
     assert adopted == []
+
+
+def test_chen_mean_is_real_and_positive_for_a_negative_base():
+    # A heater or cooler at zero duty is free to violate its approach, which
+    # can make the base negative; its cube root must stay real for the solver.
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.objectives import (
+        _chen_mean,
+    )
+
+    value = _chen_mean(-5.0, 20.0)
+
+    assert isinstance(value, float)
+    assert 0.0 < value < 1.0
+
+
+def test_chen_mean_is_unchanged_for_an_exchanger_in_use():
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.objectives import (
+        _chen_mean,
+    )
+
+    exact = (20.0 * 10.0 * 30.0 / 2 + 1e-3) ** (1 / 3)
+
+    assert _chen_mean(20.0, 10.0) == pytest.approx(exact, rel=1e-9)

@@ -187,9 +187,20 @@ def _cooler_terminal_differences(owner, n: int, i: int, u: int, *, solved_outlet
     )
 
 
+_CHEN_BASE_SMOOTHING = 1e-2
+
+
 def _chen_mean(delta_1, delta_2):
-    """Return Chen's approximation of the log-mean temperature difference."""
-    return (delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3) ** (1 / 3)
+    """Return Chen's approximation of the log-mean temperature difference.
+
+    The base goes through a smooth max with zero, so a heater or cooler at
+    zero duty, whose approaches are unconstrained, cannot take the cube root
+    of a negative number. For an exchanger in use the base is of order 1e2
+    to 1e4 K^3 and the smoothing changes nothing measurable.
+    """
+    base = delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3
+    smooth_base = 0.5 * (base + (base**2 + _CHEN_BASE_SMOOTHING**2) ** 0.5)
+    return smooth_base ** (1 / 3)
 
 
 def _raise_unsupported_goal(owner) -> None:
