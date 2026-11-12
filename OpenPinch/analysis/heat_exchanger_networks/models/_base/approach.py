@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from . import execution as _execution
 from . import piecewise as _piecewise
 
 
@@ -496,7 +497,7 @@ def _utility_restriction(model, restriction, streams: int, utilities: int):
     """Return ``[stream][utility]`` 0/1 flags from solved or given values."""
 
     def flag(value) -> int:
-        number = value if isinstance(value, int | float) else value[0]
+        number = _execution._value(value)
         return 1 if number > model.tol else 0
 
     return [

@@ -15,7 +15,7 @@ from ..extraction.service import (
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
-from ._base.execution import _assign_value, _set_value
+from ._base.execution import _assign_value, _set_value, _value
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -460,36 +460,40 @@ class InternalHeatExchangerNetworkProblem:
             for i in range(case.I):
                 for j in range(case.J):
                     q_val = (
-                        case.Q_r[i][j][old_k][0]
-                        if case.Q_r[i][j][old_k][0] > case.tol
+                        _value(case.Q_r[i][j][old_k])
+                        if _value(case.Q_r[i][j][old_k]) > case.tol
                         else 0.0
                     )
                     _assign(f_case.Q_r[i][j][new_k], q_val)
                     # Shared across periods: a match used in any period is on.
                     _assign_binary(f_case.z[i][j][new_k], active_locations[i][j][new_k])
-                    _assign(f_case.theta_1[i][j][new_k], case.theta_1[i][j][old_k][0])
-                    _assign(f_case.theta_2[i][j][new_k], case.theta_2[i][j][old_k][0])
+                    _assign(
+                        f_case.theta_1[i][j][new_k], _value(case.theta_1[i][j][old_k])
+                    )
+                    _assign(
+                        f_case.theta_2[i][j][new_k], _value(case.theta_2[i][j][old_k])
+                    )
 
                     if case.non_isothermal_model:
-                        _assign(f_case.X[i][j][new_k], case.X[i][j][old_k][0])
-                        _assign(f_case.Y[j][i][new_k], case.Y[j][i][old_k][0])
+                        _assign(f_case.X[i][j][new_k], _value(case.X[i][j][old_k]))
+                        _assign(f_case.Y[j][i][new_k], _value(case.Y[j][i][old_k]))
                         _assign(
                             f_case.T_h_out_x[i][j][new_k],
-                            case.T_h_out_x[i][j][old_k][0],
+                            _value(case.T_h_out_x[i][j][old_k]),
                         )
                         _assign(
                             f_case.T_c_out_y[j][i][new_k],
-                            case.T_c_out_y[j][i][old_k][0],
+                            _value(case.T_c_out_y[j][i][old_k]),
                         )
 
         reduced_boundaries = [0] + [stage + 1 for stage in active_stages]
         for i in range(case.I):
             for new_k, old_k in enumerate(reduced_boundaries):
-                _assign(f_case.T_h[i][new_k], case.T_h[i][old_k][0])
+                _assign(f_case.T_h[i][new_k], _value(case.T_h[i][old_k]))
 
         for j in range(case.J):
             for new_k, old_k in enumerate(reduced_boundaries):
-                _assign(f_case.T_c[j][new_k], case.T_c[j][old_k][0])
+                _assign(f_case.T_c[j][new_k], _value(case.T_c[j][old_k]))
 
         for duties, flags, source, in_use in (
             (f_case.Q_c, f_case.z_cu, case.Q_c, coolers_in_use),
@@ -497,7 +501,7 @@ class InternalHeatExchangerNetworkProblem:
         ):
             for index, row in enumerate(source):
                 for u, duty in enumerate(row):
-                    _assign(duties[index][u], duty[0])
+                    _assign(duties[index][u], _value(duty))
                     _assign_binary(flags[index][u], in_use[index][u])
 
         f_case.TAC_model = case.TAC_model
@@ -578,7 +582,10 @@ def _peak_recovery_duties(case) -> list:
     by_period = getattr(case, "Q_r_by_period", None) or [case.Q_r]
     return [
         [
-            [max(period[i][j][k][0] for period in by_period) for k in range(case.S)]
+            [
+                max(_value(period[i][j][k]) for period in by_period)
+                for k in range(case.S)
+            ]
             for j in range(case.J)
         ]
         for i in range(case.I)
@@ -593,7 +600,7 @@ def _used_in_any_period(case, name: str) -> list[list[int]]:
     by_period = getattr(case, f"{name}_by_period", None) or [getattr(case, name)]
     return [
         [
-            1 if any(period[index][u][0] > case.tol for period in by_period) else 0
+            1 if any(_value(period[index][u]) > case.tol for period in by_period) else 0
             for u in range(len(row))
         ]
         for index, row in enumerate(by_period[0])

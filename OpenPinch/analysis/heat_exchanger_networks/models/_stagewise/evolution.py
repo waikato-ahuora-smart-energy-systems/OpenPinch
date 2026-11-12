@@ -677,7 +677,7 @@ def _set_recovery_binary_value(
         pass
     except IndexError:
         pass
-    if hasattr(element, "VALUE"):
+    if hasattr(element, "VALUE") or hasattr(element, "is_variable_type"):
         _assign_value(element, int(value))
         return
     z_values[i][j][k] = int(value)
@@ -708,7 +708,7 @@ def _count_allowed_matches(values) -> int:
                 if isinstance(element, int):
                     count += 1 if element == 1 else 0
                 else:
-                    count += 1 if element[0] == 1 else 0
+                    count += 1 if _value(element) == 1 else 0
     return count
 
 

@@ -8,6 +8,7 @@ from .._base import alpha as _alpha
 from .._base import approach as _approach
 from .._base import area as _area
 from .._base.costing import set_period_totals_and_costs
+from .._base.execution import _value
 
 
 def get_post_process(owner) -> None:
@@ -53,7 +54,7 @@ def _get_multiperiod_post_process(owner) -> None:
     ]
     owner.z_hu, owner.z_cu = _area.used_utility_matches(owner, q_h, q_c)
     owner.n_recovery_units = sum(
-        owner.z[i][j][k][0]
+        _value(owner.z[i][j][k])
         for k in range(owner.S)
         for j in range(owner.J)
         for i in range(owner.I)
@@ -70,7 +71,7 @@ def _get_multiperiod_post_process(owner) -> None:
                         owner,
                         owner._active_binary_value(owner.theta_1_by_period[n][i][j][k]),
                         owner._active_binary_value(owner.theta_2_by_period[n][i][j][k]),
-                        owner.z[i][j][k][0],
+                        _value(owner.z[i][j][k]),
                         formula_allowed=(
                             abs(
                                 owner._active_binary_value(
@@ -219,7 +220,7 @@ def _get_multiperiod_post_process(owner) -> None:
         for i in range(owner.I)
     ]
 
-    owner.TAC_model = owner.m.options.objfcnval
+    owner.TAC_model = owner.solver_run.objective_value
     owner.TAC = owner.capital_cost_value + owner.weighted_operating_cost_value
 
 
@@ -244,9 +245,9 @@ def get_lowest_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
         for j in range(owner.J):
             for i in range(owner.I):
                 if owner._active_binary_value(owner.z[i][j][k]) > owner.tol:
-                    owner.net_benefit[i][j][k] = owner.Q_r[i][j][k][
-                        0
-                    ] * _alpha.alpha_value(owner, i, j, k) * (
+                    owner.net_benefit[i][j][k] = _value(
+                        owner.Q_r[i][j][k]
+                    ) * _alpha.alpha_value(owner, i, j, k) * (
                         _area.recovered_utility_price(owner)
                     ) - (
                         owner.unit_cost[0]

@@ -255,6 +255,12 @@ Heat exchanger network synthesis
   have the same objective, so designs from the default settings change. Set
   ``HENS_SOLVER_PDM`` to ``couenne`` for the previous behaviour. A missing
   Couenne binary no longer stops the pinch design method.
+- The thermal derivative method, network evolution and stage reduction build
+  their stage-wise models directly in Pyomo when they are solved with
+  ``couenne``, ``ipopt-pyomo`` or ``highs``, as the pinch design method
+  already did. The equations are unchanged; GEKKO's conversion is skipped,
+  so large stage-wise models no longer risk its recursion limit. ``apopt``
+  and ``ipopt-GEKKO`` still build GEKKO models.
 - The pinch design method can return several networks per approach
   temperature. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks
   with the fewest units at the utility targets to collect, and

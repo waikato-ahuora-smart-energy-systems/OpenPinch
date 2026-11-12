@@ -146,11 +146,11 @@ def amalgamate_networks(
                     1
                     if (
                         max(
-                            amalgamated.Q_r_by_period[n][i][j][k][0]
+                            _value(amalgamated.Q_r_by_period[n][i][j][k])
                             for n in range(amalgamated.N_periods)
                         )
                         if hasattr(amalgamated, "Q_r_by_period")
-                        else amalgamated.Q_r[i][j][k][0]
+                        else _value(amalgamated.Q_r[i][j][k])
                     )
                     > owner.tol
                     else 0
@@ -188,7 +188,7 @@ def _copy_utility_matches(
                     target_duties[n][index][u],
                     [duty if digits is None else round(duty, digits)],
                 )
-            _assign_value(flag, [source_flags[index][u][0]])
+            _assign_value(flag, [_value(source_flags[index][u])])
 
 
 def _clear_utility_matches(target: StageWiseModel, side: str) -> None:
@@ -210,7 +210,7 @@ def _copy_recovery_match(
     source_stage: int,
     target_stage: int,
 ) -> None:
-    _assign_value(target.z[i][j][target_stage], [source.z[i][j][source_stage][0]])
+    _assign_value(target.z[i][j][target_stage], [_value(source.z[i][j][source_stage])])
     if target.N_periods != source.N_periods:
         raise ValueError("PDM side period counts must match during amalgamation.")
     for n in range(target.N_periods):
@@ -220,27 +220,27 @@ def _copy_recovery_match(
         )
         _assign_value(
             target.theta_1_by_period[n][i][j][target_stage],
-            [source.theta_1_by_period[n][i][j][source_stage][0]],
+            [_value(source.theta_1_by_period[n][i][j][source_stage])],
         )
         _assign_value(
             target.theta_2_by_period[n][i][j][target_stage],
-            [source.theta_2_by_period[n][i][j][source_stage][0]],
+            [_value(source.theta_2_by_period[n][i][j][source_stage])],
         )
     if source.non_isothermal_model:
         for n in range(target.N_periods):
             _assign_value(
                 target.X_by_period[n][i][j][target_stage],
-                [source.X_by_period[n][i][j][source_stage][0]],
+                [_value(source.X_by_period[n][i][j][source_stage])],
             )
             _assign_value(
                 target.Y_by_period[n][j][i][target_stage],
-                [source.Y_by_period[n][j][i][source_stage][0]],
+                [_value(source.Y_by_period[n][j][i][source_stage])],
             )
             _assign_value(
                 target.T_h_out_x_by_period[n][i][j][target_stage],
-                [source.T_h_out_x_by_period[n][i][j][source_stage][0]],
+                [_value(source.T_h_out_x_by_period[n][i][j][source_stage])],
             )
             _assign_value(
                 target.T_c_out_y_by_period[n][j][i][target_stage],
-                [source.T_c_out_y_by_period[n][j][i][source_stage][0]],
+                [_value(source.T_c_out_y_by_period[n][j][i][source_stage])],
             )

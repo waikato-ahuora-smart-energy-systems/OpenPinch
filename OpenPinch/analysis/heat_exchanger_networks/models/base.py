@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
+from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ._base import alpha as _alpha
 from ._base import approach as _approach
@@ -82,7 +83,10 @@ class BaseHeatExchangerNetworkModel(ABC):
             raise
 
     def setup_model(self) -> None:
-        "Create and configure the GEKKO model behind optional guards."
+        """Build a native Pyomo model for the Pyomo solvers, else a GEKKO one."""
+
+        if self.solver in backend.PYOMO_SOLVERS:
+            return _execution.setup_pyomo_model(self)
         return _execution.setup_model(self)
 
     @abstractmethod

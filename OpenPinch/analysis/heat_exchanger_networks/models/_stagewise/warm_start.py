@@ -32,7 +32,7 @@ def set_initial_values_for_variables(
                     _execution._set_value(
                         owner,
                         owner.z[i][j][k],
-                        init_solution.z[i][j][k][0],
+                        _value(init_solution.z[i][j][k]),
                         brackets=brackets,
                     )
                     _execution._set_value(
@@ -104,7 +104,7 @@ def set_initial_values_for_variables(
             for u, is_allowed in enumerate(row):
                 if is_allowed > 0:
                     duty = _value(source_duties[index][u])
-                    flag = source_flags[index][u][0]
+                    flag = _value(source_flags[index][u])
                 else:
                     duty, flag = 0.0, 0
                 _execution._set_value(owner, duties[index][u], duty, brackets=brackets)

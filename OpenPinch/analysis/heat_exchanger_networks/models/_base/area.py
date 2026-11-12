@@ -6,6 +6,7 @@ import numpy as np
 
 from OpenPinch.analysis.heat_transfer import compute_LMTD_from_dts
 
+from . import execution as _execution
 from . import piecewise as _piecewise
 
 
@@ -188,7 +189,7 @@ def set_utility_lmtd_and_areas(model, q_h, q_c) -> None:
                 _post_process_lmtd(
                     model,
                     *_heater_terminal_differences(model, n, j, u, q_h[n][j][u]),
-                    model.z_hu[j][u][0],
+                    _execution._value(model.z_hu[j][u]),
                     formula_allowed=False,
                 )
                 for u in range(model.NHU)
@@ -213,7 +214,7 @@ def set_utility_lmtd_and_areas(model, q_h, q_c) -> None:
                 _post_process_lmtd(
                     model,
                     *_cooler_terminal_differences(model, n, i, u, q_c[n][i][u]),
-                    model.z_cu[i][u][0],
+                    _execution._value(model.z_cu[i][u]),
                     formula_allowed=False,
                 )
                 for u in range(model.NCU)

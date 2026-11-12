@@ -9,7 +9,7 @@ Private helper modules for `StageWiseModel` (`../stagewise.py`), which delegates
 - `set_obj` (`objectives.py`): objective for each supported goal, including total-cost forms.
 - `set_initial_values_for_variables` (`warm_start.py`): copies a solved model's values into another.
 - `get_post_process`, `get_lowest_benefit_HX`, `get_lowest_benefit_HX_candidates`, `get_max_benefit_HX`, `get_max_benefit_HX_candidates` (`postprocess.py`): result extraction, dQ/dA, dTAC/dA, alpha, and ranked remove or add candidates. Parent also calls `_get_multiperiod_post_process`.
-- `verify` (`verification.py`): temperature, cost, area and network-feasibility checks; returns `(ok, reasons)`. `_value` unwraps GEKKO values.
+- `verify` (`verification.py`): temperature, cost, area and network-feasibility checks; returns `(ok, reasons)`. `_value` (from `_base.execution`) reads GEKKO values, `[value]` lists and Pyomo components.
 - `get_net_benefit_evolution`, `get_n_minus_one_evolution`, `get_n_plus_one_evolution` (`evolution.py`): topology evolution. Parent also calls `_active_binary_value`.
 - Subdirectories: none.
 
@@ -27,7 +27,7 @@ Private helper modules for `StageWiseModel` (`../stagewise.py`), which delegates
 - Warm start uses the last source period when the source has fewer periods. [warm_start.py:_set_multiperiod_initial_values]
 
 ## Side Effects
-- Evolution builds and solves child `StageWiseModel` instances (GEKKO models), in a `ThreadPoolExecutor` when `max_parallel` exceeds one and `supported_workers` allows it. [evolution.py:_solve_evolution_candidates]
+- Evolution builds and solves child `StageWiseModel` instances (Pyomo or GEKKO models, by solver), in a `ThreadPoolExecutor` when `max_parallel` exceeds one and `supported_workers` allows it. [evolution.py:_solve_evolution_candidates]
 - `get_net_benefit_evolution` ends by calling `owner.cleanup()` on both search paths (only the early return when `owner.mSuccess != 1` skips it), and `_update_with_best_model` overwrites the owner's variables, `z_allowed`, alpha, cost attributes and `solver_run`, then re-runs post-processing. [evolution.py:get_net_benefit_evolution] [evolution.py:_update_with_best_model]
 - `verify` lazily imports and runs `extract_heat_exchanger_network` and `verify_network_feasibility`. [verification.py:_check_network_feasibility]
 - Post-processing runs the post-optimisation alpha solve via `get_alpha_values`. [postprocess.py:_get_multiperiod_post_process]

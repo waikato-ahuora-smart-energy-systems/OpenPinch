@@ -9,7 +9,6 @@ from typing import Any, Literal
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
-from ._base import execution as _execution
 from ._pinch_design import amalgamation as _amalgamation
 from ._pinch_design import equations as _equations
 from ._pinch_design import postprocess as _postprocess
@@ -65,14 +64,6 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             tol=tol,
             solver_options=solver_options,
         )
-
-    def setup_model(self) -> None:
-        """Build a native Pyomo model for the Pyomo solvers, else a GEKKO one."""
-
-        if self.solver in backend.PYOMO_SOLVERS:
-            _execution.setup_pyomo_model(self)
-        else:
-            super().setup_model()
 
     def setup(self) -> None:
         self.set_blank_input_parameters()

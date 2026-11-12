@@ -12,6 +12,12 @@ from . import piecewise as _piecewise
 logger = logging.getLogger(__name__)
 
 
+def _pyomo_value(expression: Any) -> Any:
+    from pyomo.environ import value
+
+    return value(expression)
+
+
 def optimise(model, print_output: bool) -> None:
     """Solve the concrete model and extract plain result data on success.
 
@@ -169,6 +175,36 @@ def _solver_value(model, value: Any) -> float:
     except (TypeError, IndexError, KeyError):
         # A Pyomo variable or parameter holds its number in ``value``.
         return float(getattr(value, "value", value))
+
+
+def _value(value) -> float:
+    """Read a number from a GEKKO value, a ``[value]`` list, or a Pyomo component."""
+
+    if hasattr(value, "is_expression_type") and value.is_expression_type():
+        # A Pyomo expression, such as an Intermediate of a PyomoModel.
+        return float(_pyomo_value(value))
+    if isinstance(value, int | float):
+        return float(value)
+    try:
+        return float(value[0])
+    except (TypeError, IndexError, KeyError):
+        pass
+    for attr in ("VALUE", "value"):
+        if not hasattr(value, attr):
+            continue
+        raw = getattr(value, attr)
+        try:
+            return float(raw[0])
+        except (TypeError, IndexError, KeyError):
+            pass
+        raw_value = getattr(raw, "value", raw)
+        if isinstance(raw_value, int | float):
+            return float(raw_value)
+        try:
+            return float(raw_value[0])
+        except (TypeError, IndexError, KeyError):
+            return float(raw_value)
+    return float(value)
 
 
 def _assign_value(variable: Any, value: Any) -> None:
