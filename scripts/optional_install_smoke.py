@@ -71,7 +71,6 @@ def _check_core_surface() -> None:
         "ipykernel",
         "nbformat",
         "pyomo",
-        "gekko",
         "matplotlib",
         "kaleido",
         "wakepy",

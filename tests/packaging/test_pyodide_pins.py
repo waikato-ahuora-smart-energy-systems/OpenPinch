@@ -38,7 +38,7 @@ def test_every_pyodide_pin_is_exact_and_matches_uv_lock():
     pins = pinned_requirements()
     names = {canonicalize_name(r.name) for r in pins}
     assert {"pytest", "hypothesis", "jsonschema", "openpyxl", "pyxlsb"} <= names
-    assert {"plotly", "tespy", "gekko", "pint"} <= names
+    assert {"plotly", "tespy", "pint"} <= names
     for requirement in pins:
         name = canonicalize_name(requirement.name)
         assert name in locked, f"{name} is pinned for Pyodide but not in uv.lock"

@@ -15,7 +15,6 @@ from tests.support.paths import REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
 SYNTHESIS_ONLY_MODULES = [
-    "gekko",
     "pyomo",
     "pyomo.environ",
     "pyomo.opt",

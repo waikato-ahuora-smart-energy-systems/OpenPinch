@@ -76,7 +76,6 @@ tespy = [
 ]
 synthesis = [
   "pyomo>=6.10.0",
-  "gekko>=1.3.2",
   "plotly>=6.8.0",
   "kaleido>=1.3.0",
   "openpyxl>=3.1.5",
@@ -100,7 +99,6 @@ full = [
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",
   "pyomo>=6.10.0",
-  "gekko>=1.3.2",
   "kaleido>=1.3.0",
   "wakepy>=1.0.0",
   "idaes-pse>=2.11.0",
@@ -128,7 +126,6 @@ dev = [
     "black>=23.9",
     "streamlit",
     "pyomo>=6.10.0",
-    "gekko>=1.3.2",
     "plotly>=6.8.0",
     "kaleido>=1.3.0",
     "openpyxl>=3.1.5",

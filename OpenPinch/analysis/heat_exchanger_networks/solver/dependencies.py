@@ -31,7 +31,6 @@ class SynthesisDependency:
 
 SYNTHESIS_DEPENDENCIES: tuple[SynthesisDependency, ...] = (
     SynthesisDependency("pyomo", "pyomo.environ", "Pyomo model construction"),
-    SynthesisDependency("gekko", "gekko", "GEKKO model construction"),
     SynthesisDependency("plotly", "plotly", "interactive heat exchanger network plots"),
     SynthesisDependency("kaleido", "kaleido", "static plot export"),
     SynthesisDependency("openpyxl", "openpyxl", "workbook export"),

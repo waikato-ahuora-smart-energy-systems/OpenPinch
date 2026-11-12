@@ -8,7 +8,6 @@ import sys
 from tests.support.paths import REPOSITORY_ROOT
 
 BLOCKED_OPTIONAL_PACKAGES = {
-    "gekko",
     "idaes",
     "kaleido",
     "openpyxl",

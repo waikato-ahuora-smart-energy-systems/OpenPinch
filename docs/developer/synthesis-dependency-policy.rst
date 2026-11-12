@@ -19,7 +19,6 @@ into and pushes to ``main``.
 The synthesis dependency set is:
 
 - ``pyomo>=6.10.0``
-- ``gekko>=1.3.2``
 - ``plotly>=6.8.0``
 - ``kaleido>=1.3.0``
 - ``openpyxl>=3.1.5``
@@ -43,8 +42,8 @@ the synthesis stack:
 
    uv sync --frozen --group dev
 
-The ``full`` extra includes the synthesis stack (Pyomo, GEKKO, Kaleido, wakepy,
-IDAES and HiGHS) together with the dashboard, notebook, TESPy, and Brayton-cycle
+The ``full`` extra includes the synthesis stack (Pyomo, Kaleido, wakepy, IDAES
+and HiGHS) together with the dashboard, notebook, TESPy, and Brayton-cycle
 surfaces. External solver binaries are still installed separately.
 
 Test Marker Policy

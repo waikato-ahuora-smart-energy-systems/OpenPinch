@@ -699,18 +699,6 @@ wheels = [
 ]
 
 [[package]]
-name = "gekko"
-version = "1.3.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/7e/dafec6cb998c4d94351dfa49b1d5b14b39f4a3c113723db87709cb16f34f/gekko-1.3.3.tar.gz", hash = "sha256:5d7dc381dfed449b2c01ec14646037ae87b12fb2ea146d826e2ee2bf84a7ca4d", size = 14595641, upload-time = "2026-10-23T20:11:13.328Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/2a/865b3c32b6883bdfbf1d67f349282bbee903a9d9f1bbefa2c98dc5f17034/gekko-1.3.3-py3-none-any.whl", hash = "sha256:70552837864e2bf864322fe4ac5522f1e8ae20965c772dffc0ee545c386e183e", size = 14685902, upload-time = "2026-10-23T20:11:03.062Z" },
-]
-
-[[package]]
 name = "graphviz"
 version = "0.21"
 source = { registry = "https://pypi.org/simple" }
@@ -1514,7 +1502,6 @@ dashboard = [
     { name = "streamlit" },
 ]
 full = [
-    { name = "gekko" },
     { name = "highspy" },
     { name = "idaes-pse" },
     { name = "ipykernel" },
@@ -1536,7 +1523,6 @@ notebook = [
     { name = "pyxlsb" },
 ]
 synthesis = [
-    { name = "gekko" },
     { name = "highspy" },
     { name = "idaes-pse" },
     { name = "kaleido" },
@@ -1554,7 +1540,6 @@ dev = [
     { name = "black" },
     { name = "build" },
     { name = "coverage" },
-    { name = "gekko" },
     { name = "graphviz" },
     { name = "hatchling" },
     { name = "highspy" },
@@ -1588,8 +1573,6 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "coolprop", specifier = ">=8,<9" },
-    { name = "gekko", marker = "extra == 'full'", specifier = ">=1.3.2" },
-    { name = "gekko", marker = "extra == 'synthesis'", specifier = ">=1.3.2" },
     { name = "highspy", marker = "extra == 'full'", specifier = ">=1.11.0" },
     { name = "highspy", marker = "extra == 'synthesis'", specifier = ">=1.11.0" },
     { name = "idaes-pse", marker = "extra == 'full'", specifier = ">=2.11.0" },
@@ -1633,7 +1616,6 @@ dev = [
     { name = "black", specifier = ">=23.9" },
     { name = "build", specifier = ">=1.3.0" },
     { name = "coverage", specifier = ">=7.14.3" },
-    { name = "gekko", specifier = ">=1.3.2" },
     { name = "graphviz", specifier = ">=0.21" },
     { name = "hatchling", specifier = ">=1.26" },
     { name = "highspy", specifier = ">=1.11.0" },
