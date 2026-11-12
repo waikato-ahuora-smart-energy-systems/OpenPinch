@@ -1126,6 +1126,10 @@ def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
             self.theta_2 = [[[_Cell()]]]
             self.optimised = False
 
+        def set_initial_values_for_variables(self, parent, *, brackets=False):
+            # Candidates are warm-started from their parent before the move.
+            pass
+
         def optimise(self, *, print_output):
             self.optimised = True
 

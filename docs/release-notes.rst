@@ -265,6 +265,10 @@ Heat exchanger network synthesis
   longer uses APOPT. The reduced network is solved with HiGHS when its model
   is linear, as a pinch design reduction is, and with Ipopt otherwise. A
   reduced network can drop a match whose duty an LP solution sets to zero.
+- Network evolution starts each candidate from its parent network's
+  solution, then adds or removes the match, where each candidate started
+  from default values. The local solves are nonconvex, so candidates can
+  reach different networks.
 - The pinch design method can return several networks per approach
   temperature. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks
   with the fewest units at the utility targets to collect, and

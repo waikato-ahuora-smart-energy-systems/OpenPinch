@@ -609,6 +609,8 @@ def _build_and_solve_evolution(
         solver_options=owner.solver_options,
     )
 
+    # Start from the parent's solution, then apply the move over it.
+    child.set_initial_values_for_variables(prev_case, brackets=True)
     if kind == "minus":
         _assign_value(child.Q_r[i][j][k], 0.0)
         _assign_value(child.z[i][j][k], 0)

@@ -28,6 +28,7 @@ Private helper modules for `StageWiseModel` (`../stagewise.py`), which delegates
 
 ## Side Effects
 - Evolution builds and solves child `StageWiseModel` instances (Pyomo or GEKKO models, by solver), in a `ThreadPoolExecutor` when `max_parallel` exceeds one and `supported_workers` allows it. [evolution.py:_solve_evolution_candidates]
+- Each evolution candidate is warm-started from its parent's solution, and the add or remove move is then applied over those values. [evolution.py:_build_and_solve_evolution]
 - `get_net_benefit_evolution` ends by calling `owner.cleanup()` on both search paths (only the early return when `owner.mSuccess != 1` skips it), and `_update_with_best_model` overwrites the owner's variables, `z_allowed`, alpha, cost attributes and `solver_run`, then re-runs post-processing. [evolution.py:get_net_benefit_evolution] [evolution.py:_update_with_best_model]
 - `verify` lazily imports and runs `extract_heat_exchanger_network` and `verify_network_feasibility`. [verification.py:_check_network_feasibility]
 - Post-processing runs the post-optimisation alpha solve via `get_alpha_values`. [postprocess.py:_get_multiperiod_post_process]
