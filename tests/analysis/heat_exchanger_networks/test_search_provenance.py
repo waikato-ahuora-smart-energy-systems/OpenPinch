@@ -32,8 +32,10 @@ from .test_full_sequence import (
     ("run_design", "expected_sequence"),
     [
         (
+            # Depth 1 given in the call runs its heuristic, over the small
+            # problem's stored HENS_HEURISTIC_PDM_NETWORKS of 0.
             lambda design: design.heat_exchanger_network(depth=1),
-            ("pinch_design_method", "network_evolution_method"),
+            ("heuristic_pinch_design_method", "network_evolution_method"),
         ),
         (
             lambda design: design.heat_exchanger_network(),

@@ -26,7 +26,7 @@ Private accessor namespaces that `PinchProblem` exposes as `target`, `design`, `
 - `isentropic_cogeneration` requires `0 < efficiency <= 1` [target.py:_TargetAccessor.isentropic_cogeneration].
 - Ranks are one-based positive integers; booleans are rejected [design.py:HeatExchangerNetworkDesignView.network] [design.py:HeatExchangerNetworkDesignView.top].
 - A design run works on an isolated snapshot and commits it to the problem only after the service returns; the view holds a deep copy of the result [design.py:_DesignAccessor._run].
-- `heat_exchanger_network` and its multiperiod form take the search width and depth from the `width` and `depth` arguments, then the call's `options`, then the stored options [design.py:_DesignAccessor._arguments].
+- `heat_exchanger_network` and its multiperiod form take the search width and depth from the `width` and `depth` arguments, then the call's `options`, then the stored options. A `width` or `depth` argument also clears, for that call, the stored options its level governs, unless the call sets them [design.py:_DesignAccessor._arguments].
 - `multiperiod_heat_exchanger_network` needs existing all-period results (or `prerequisites=True`) and does not accept `period_id` [design.py:_DesignAccessor.multiperiod_heat_exchanger_network].
 - `optimise_duties` mapping structures accept only the keys `recovery`, `heaters`, `coolers`, `hot_utility`, `cold_utility`, `stage_count`, and require `recovery` [design.py:_DesignAccessor._network_from_structure].
 - `inventory` returns a `MappingProxyType` copy of the process components [component.py:_ComponentAccessor.inventory].

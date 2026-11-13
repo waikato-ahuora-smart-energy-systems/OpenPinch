@@ -20,6 +20,16 @@ if TYPE_CHECKING:
     from ...problem import PinchProblem
 
 
+# Options a search level sets when they are unset (execution/search.py).
+_WIDTH_OPTIONS = ("HENS_DT_CONT_MULTIPLIERS",)
+_DEPTH_OPTIONS = (
+    "HENS_HEURISTIC_PDM_NETWORKS",
+    "HENS_PDM_MILP",
+    "HENS_EVM_N_AD_BRANCHES",
+    "HENS_EVM_N_RM_BRANCHES",
+)
+
+
 class UtilityChoiceError(ValueError):
     """A heater or cooler names no utility, and its side has several to choose from."""
 
@@ -248,6 +258,15 @@ class _DesignAccessor:
             for key in ("HENS_SOLVER_PDM", "HENS_SOLVER_TDM", "HENS_SOLVER_EVM"):
                 named[key] = solver
         configuration.update(named)
+        # A level asked for in the call sets the options it governs, over the
+        # stored ones, unless the call sets them too.
+        for level, governed in (
+            (width, _WIDTH_OPTIONS),
+            (depth, _DEPTH_OPTIONS),
+        ):
+            if level is not None:
+                for key in governed:
+                    configuration.setdefault(key, None)
         if period_id is not None:
             runtime["period_id"] = period_id
         return runtime, configuration

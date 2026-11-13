@@ -1171,3 +1171,26 @@ def test_out_of_range_width_or_depth_is_rejected(monkeypatch, width, depth) -> N
 
     with pytest.raises(ValueError, match="HENS_SEARCH_"):
         _small_problem().design.heat_exchanger_network(width=width, depth=depth)
+
+
+def test_a_call_level_wins_over_the_stored_options_it_governs(monkeypatch) -> None:
+    # The small problem stores HENS_DT_CONT_MULTIPLIERS [0.2, 0.4] and no
+    # heuristic networks; a width or depth asked for in the call sets them,
+    # unless the call sets them too.
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    wide = problem.design.heat_exchanger_network(width=2)
+    pinned = problem.design.heat_exchanger_network(width=2, dt_cont_multipliers=[1.0])
+    stored = problem.design.heat_exchanger_network()
+    deep = problem.design.heat_exchanger_network(depth=1)
+
+    assert wide.result.manifest.dt_cont_multipliers == (0.5, 0.75, 1.0, 1.5, 2.0)
+    assert pinned.result.manifest.dt_cont_multipliers == (1.0,)
+    assert stored.result.manifest.dt_cont_multipliers == (0.2, 0.4)
+    assert (
+        deep.result.manifest.task_count_by_method.get(
+            "heuristic_pinch_design_method", 0
+        )
+        > 0
+    )
