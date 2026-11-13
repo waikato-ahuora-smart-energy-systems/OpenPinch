@@ -127,7 +127,9 @@ class InternalHeatExchangerNetworkProblem:
                 self._solve_pdm(print_output=print_output)
             else:
                 self.case.optimise(print_output=print_output)
-            if self.framework in {"PDM", "TDM"}:
+            # Heuristic networks are already reduced to their non-empty
+            # stages; reducing by share of recovery would trade it for utility.
+            if self.framework in {"PDM", "TDM"} and self.heuristic_network_limit <= 0:
                 unreduced_case = self.case
                 self.case = self.remove_unused_stages(self.case)
             if (

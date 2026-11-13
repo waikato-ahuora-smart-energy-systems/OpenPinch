@@ -208,3 +208,19 @@ def test_the_heuristic_realises_networks_on_literature_cases(name):
     assert all(count > 0 for count in problem.heuristic_report["realised"].values())
     for network in _networks(problem):
         assert verify_network_feasibility(network) == ()
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_every_heuristic_network_holds_the_utility_targets():
+    # The first network of a task was stage-reduced a second time, by its
+    # share of recovery, and missed the hot utility target by 801 kW on
+    # Ten-stream Ahmad at multiplier 1.5; the task's other networks hit it.
+    pinch = _fixture("Ten-stream-Ahmad-1985")
+    dTmin = nominal_approach_temperature(pinch.master_zone.config, 1.5)
+    problem = _problem(pinch, dTmin, limit=10)
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    hot = [_hot_utility(network) for network in _networks(problem)]
+    assert max(hot) == pytest.approx(min(hot), rel=1e-6)
