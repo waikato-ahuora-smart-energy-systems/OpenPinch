@@ -200,7 +200,9 @@ persistent configuration fields; :doc:`../guides/heat-exchanger-network-synthesi
 lists what each level sets. ``problem.design.heat_exchanger_network(width=...,
 depth=...)`` applies them to one call without changing the loaded problem
 configuration. Those arguments win over the levels in the call's ``options``,
-which win over the stored options for that call only. The levels that ran are
+which win over the stored options for that call only. A level given in the
+call, either way, also overrides the stored options it governs, such as a
+stored ``HENS_DT_CONT_MULTIPLIERS`` for the width, unless the call sets them. The levels that ran are
 in ``design.result.manifest.search_width`` and ``search_depth`` and in
 ``design.result.provenance``. Runtime
 ``options`` passed to design accessors accept other ``HENS_*`` overrides the same

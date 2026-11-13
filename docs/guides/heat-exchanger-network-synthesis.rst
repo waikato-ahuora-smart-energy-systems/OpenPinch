@@ -237,9 +237,9 @@ An option set explicitly overrides the level that would set it:
 and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the depth. A call's
 ``width`` and ``depth`` win over the call's ``options``, which win over the
-stored options for that call only. A ``width`` or ``depth`` given in the call
-also sets the options it governs, over stored ones, unless the same call sets
-them: ``heat_exchanger_network(width=2)`` on a problem that stores
+stored options for that call only. A width or depth given in the call, as an
+argument or in its ``options``, also sets the options it governs, over stored
+ones, unless the same call sets them: ``heat_exchanger_network(width=2)`` on a problem that stores
 ``HENS_DT_CONT_MULTIPLIERS`` runs the width-2 multipliers. The levels that ran
 are in ``design.result.manifest.search_width`` and ``search_depth``. The other
 ``HENS_*`` keys, such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument)

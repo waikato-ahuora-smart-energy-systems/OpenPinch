@@ -1186,6 +1186,17 @@ def test_a_call_level_wins_over_the_stored_options_it_governs(monkeypatch) -> No
     deep = problem.design.heat_exchanger_network(depth=1)
 
     assert wide.result.manifest.dt_cont_multipliers == (0.5, 0.75, 1.0, 1.5, 2.0)
+    # The same level given in the call's options acts the same way.
+    wide_by_option = problem.design.heat_exchanger_network(
+        options={"HENS_SEARCH_WIDTH": 2}
+    )
+    assert wide_by_option.result.manifest.dt_cont_multipliers == (
+        0.5,
+        0.75,
+        1.0,
+        1.5,
+        2.0,
+    )
     assert pinned.result.manifest.dt_cont_multipliers == (1.0,)
     assert stored.result.manifest.dt_cont_multipliers == (0.2, 0.4)
     assert (

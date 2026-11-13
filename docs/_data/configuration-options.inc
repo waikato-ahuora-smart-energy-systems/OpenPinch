@@ -153,7 +153,7 @@ Heat Exchanger Network Synthesis
    "``HENS_OUTPUT_FOLDER``","string","``""""``","","","Folder for synthesis output files. Recorded with the synthesis settings; exports take their own folder."
    "``HENS_OUTPUT_FORMATS``","string_list","``[]``","","","Export formats (json, csv, xlsx) recorded in the synthesis manifest."
    "``HENS_RUN_ID``","string","``default``","","","Identifier recorded on synthesis tasks, results and exports. Letters, digits, underscores, hyphens and periods."
-   "``HENS_BEST_SOLUTIONS_TO_SAVE``","number","``1``","",">= 1","Recorded in the synthesis manifest; no current synthesis step reads it."
+   "``HENS_BEST_SOLUTIONS_TO_SAVE``","number","``1``","",">= 1","The most networks a standalone thermal derivative or network evolution run seeds from a stored design; also recorded in the synthesis manifest."
 
 Heat Pump and Refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

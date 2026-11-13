@@ -258,13 +258,14 @@ class _DesignAccessor:
             for key in ("HENS_SOLVER_PDM", "HENS_SOLVER_TDM", "HENS_SOLVER_EVM"):
                 named[key] = solver
         configuration.update(named)
-        # A level asked for in the call sets the options it governs, over the
-        # stored ones, unless the call sets them too.
+        # A level asked for in the call, as an argument or in its options,
+        # sets the options it governs over the stored ones, unless the call
+        # sets them too.
         for level, governed in (
-            (width, _WIDTH_OPTIONS),
-            (depth, _DEPTH_OPTIONS),
+            ("HENS_SEARCH_WIDTH", _WIDTH_OPTIONS),
+            ("HENS_SEARCH_DEPTH", _DEPTH_OPTIONS),
         ):
-            if level is not None:
+            if level in configuration:
                 for key in governed:
                     configuration.setdefault(key, None)
         if period_id is not None:

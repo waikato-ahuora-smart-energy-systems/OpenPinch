@@ -514,7 +514,11 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HENS_BEST_SOLUTIONS_TO_SAVE": FieldText(
         "HEN solutions to save", None,
-        "Recorded in the synthesis manifest; no current synthesis step reads it.",
+        (
+            "The most networks a standalone thermal derivative or network "
+            "evolution run seeds from a stored design; also recorded in the "
+            "synthesis manifest."
+        ),
     ),
     "HPR_LOAD_MODE": FieldText(
         "HPR duty setting mode", None,
