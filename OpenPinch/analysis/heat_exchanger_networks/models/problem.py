@@ -341,7 +341,8 @@ class InternalHeatExchangerNetworkProblem:
         )
         _start_from_side(sparse, side)
         sparse.optimise(print_output=False)
-        if sparse.mSuccess != 1:
+        if not _replaces(sparse, side):
+            _cleanup_model(sparse)
             return side
         # Stopping at the time limit leaves a network at the same, proven,
         # minimum utility: the side keeps the first solve's convergence.
@@ -874,6 +875,35 @@ def _used_in_any_period(case, name: str) -> list[list[int]]:
         ]
         for index, row in enumerate(by_period[0])
     ]
+
+
+def _replaces(sparse: Any, side: Any) -> bool:
+    """Whether a fewest-units re-solve may replace the side it started from.
+
+    It must have converged, or be a HiGHS solve stopped at its time limit
+    (accepted only with an incumbent), and have no more units and no more
+    utility than the side. A solver stopped at a limit can report success
+    with a point that is not a solution.
+    """
+
+    if sparse.mSuccess != 1:
+        return False
+    if not (sparse.solver_run.converged or sparse.solver == "highs"):
+        return False
+    if sparse.n_units > side.n_units:
+        return False
+    utility, start = _total_utility_duty(sparse), _total_utility_duty(side)
+    return utility <= start * (1.0 + 1e-6) + side.tol
+
+
+def _total_utility_duty(side: Any) -> float:
+    return sum(
+        _value(duty)
+        for grids in (side.Q_h_by_period, side.Q_c_by_period)
+        for grid in grids
+        for row in grid
+        for duty in row
+    )
 
 
 def _minimum_utility_cost(side: Any) -> float:

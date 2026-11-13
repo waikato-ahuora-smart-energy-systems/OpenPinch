@@ -48,9 +48,7 @@ def _highs_available() -> bool:
     return True
 
 
-def _problem(
-    dTmin: float, limits: tuple[int, int], *, extra_utilities=(), source=None
-):
+def _problem(dTmin: float, limits: tuple[int, int], *, extra_utilities=(), source=None):
     payload = json.loads((source or FOUR_STREAM_JSON).read_text(encoding="utf-8"))
     payload["utilities"] += list(extra_utilities)
     pinch = PinchProblem(source=payload, project_name="Four-stream")
@@ -374,3 +372,34 @@ def test_fewest_units_resolve_is_time_limited_and_keeps_the_side_converged(
     assert problem.below.minimisation_goal == "min units"
     assert problem.below.solver_run.converged
     assert problem.case.solver_run.converged
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_an_unconverged_fewest_units_resolve_does_not_replace_the_side(monkeypatch):
+    # Couenne stopped at a limit can report success with a point that is not
+    # a solution; the fewest-units side then replaced a good one.
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    real_optimise = PinchDecompModel.optimise
+
+    def stopped_at_a_limit(self, *args, **kwargs):
+        result = real_optimise(self, *args, **kwargs)
+        if "fewest units" in self.name:
+            self.solver = "couenne"
+            self.solver_run = replace(
+                self.solver_run, termination_condition="maxIterations"
+            )
+        return result
+
+    monkeypatch.setattr(PinchDecompModel, "optimise", stopped_at_a_limit)
+    problem = _problem(14.0, (0, 0))
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    assert "fewest units" not in problem.above.name
+    assert "fewest units" not in problem.below.name
