@@ -190,6 +190,7 @@ class HensConfig:
     pdm_stage_pair_limit: int | None
     pdm_min_unit_networks: int
     pdm_extra_unit_networks: int
+    heuristic_pdm_networks: int
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]

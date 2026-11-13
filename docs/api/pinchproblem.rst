@@ -111,7 +111,7 @@ Interaction Matrix
      - invalidates on mutation
      - base
    * - ``design.*heat_exchanger_network``, ``open_hens``, ``pinch_design``,
-       ``thermal_derivative``, ``network_evolution``, ``optimise_duties``
+       ``heuristic_pinch_design``, ``thermal_derivative``, ``network_evolution``, ``optimise_duties``
      - HEN synthesis and improvement
      - design view
      - designed

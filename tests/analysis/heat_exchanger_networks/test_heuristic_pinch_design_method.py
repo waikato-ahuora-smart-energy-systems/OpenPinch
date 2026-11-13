@@ -248,3 +248,35 @@ def test_the_service_dispatches_the_heuristic_method():
         heat_exchanger_network_synthesis_service(
             problem, method=HEURISTIC, initial_networks=result.network
         )
+
+
+def test_the_network_cap_comes_from_the_configuration():
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_HEURISTIC_PDM_NETWORKS": 4}
+    )
+    executor = FakeSynthesisExecutor()
+
+    settings = workflow_settings_from_problem(problem)
+    workflow_module.execute_open_hens_method(problem, settings, executor=executor)
+
+    assert settings.heuristic_pdm_networks == 4
+    assert HEURISTIC in executor.stage_order
+    assert (
+        workflow_settings_from_problem(
+            _small_problem_with_options({})
+        ).heuristic_pdm_networks
+        == 0
+    )
+
+
+def test_the_design_accessor_runs_the_heuristic_method(monkeypatch):
+    import OpenPinch.analysis.heat_exchanger_networks.targeting.heuristic_pinch_design_method as heuristic_module
+
+    monkeypatch.setattr(
+        heuristic_module, "LocalSynthesisExecutor", FakeSynthesisExecutor
+    )
+    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+
+    design = problem.design.heuristic_pinch_design()
+
+    assert design.selected_network.method == HEURISTIC

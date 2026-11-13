@@ -379,6 +379,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "than the fewest. Each seeds network evolution. 0 adds none."
         ),
     ),
+    "HENS_HEURISTIC_PDM_NETWORKS": FieldText(
+        "Heuristic pinch design networks", None,
+        (
+            "Networks per approach temperature from the heuristic (Linnhoff rules) "
+            "pinch design method, each seeding network evolution. 0 runs none; the "
+            "standalone method then makes up to 10."
+        ),
+    ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
         "Thermal derivative parent limit", None,
         "Recorded in the synthesis manifest; no current synthesis step reads it.",

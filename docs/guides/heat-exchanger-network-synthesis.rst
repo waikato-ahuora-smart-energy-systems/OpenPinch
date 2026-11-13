@@ -102,6 +102,7 @@ Named Advanced Methods
    enhanced = problem.design.enhanced_heat_exchanger_network(quality_tier=2)
    open_hens = problem.design.open_hens()
    pinch_design = problem.design.pinch_design()
+   heuristic = problem.design.heuristic_pinch_design()
    thermal = problem.design.thermal_derivative(
        (pinch_design.selected_network,)
    )
@@ -117,6 +118,47 @@ task metadata without requiring process engineers to call contributor services.
 For multiple operating periods, call
 ``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
 all-period targeting.
+
+Heuristic Pinch Design
+----------------------
+
+``problem.design.heuristic_pinch_design()`` designs networks with the
+classic Linnhoff pinch design rules instead of a MILP. On each side of the
+pinch it:
+
+- matches the streams at the pinch that cannot use a utility on that side
+  (hot streams above the pinch, cold streams below), with partners whose CP
+  is at least their own and no more such streams than partners, splitting
+  streams where either rule fails;
+- ticks each pinch match off at the smaller of its two loads;
+- matches the remaining loads away from the pinch, largest first, with
+  partners whose temperatures keep both ends of the match at the minimum
+  approach;
+- gives the loads left on the other streams to utilities, allowing every
+  utility that can reach them.
+
+It enumerates the alternatives at each decision (pinch matches, optional
+splits and partners away from the pinch), up to
+``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier, or 10 when
+that is 0. Each proposal is then solved by the pinch design side model with
+only its matches allowed, so its duties and temperatures are consistent and
+it meets the utility targets; the sides are joined, stage-reduced and
+verified like the pinch design networks. Proposals the model cannot solve or
+verify are dropped. With several operating periods, each period is designed
+on its own and a proposal is the union of one design per period, one shared
+topology.
+
+Set ``HENS_HEURISTIC_PDM_NETWORKS`` above 0 to run the method in the main
+synthesis workflow too: after the pinch design step, every heuristic network
+seeds network evolution directly, at every quality tier. They never go to the
+thermal derivative method.
+
+.. code-block:: python
+
+   heuristic = problem.design.heuristic_pinch_design()
+   design = problem.design.heat_exchanger_network(
+       options={"HENS_HEURISTIC_PDM_NETWORKS": 10},
+   )
 
 Quality Tiers and Convergence
 -----------------------------

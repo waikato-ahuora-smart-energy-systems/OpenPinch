@@ -463,6 +463,70 @@ def test_benchmark_acceptance_metrics_cover_pdm_outcomes_and_top_tacs() -> None:
     )
 
 
+def test_benchmark_acceptance_metrics_count_heuristic_networks_on_their_own() -> None:
+    benchmark = _load_benchmark_module()
+    problem = _small_problem_with_options(
+        {"HENS_SYNTHESIS_QUALITY_TIER": 0, "HENS_HEURISTIC_PDM_NETWORKS": 2}
+    )
+    target_output = ensure_target_results(problem, {}, None)
+    workflow_result = execute_open_hens_method(
+        problem,
+        workflow_settings_from_problem(problem),
+        executor=FakeSynthesisExecutor(),
+    )
+    design = finalise_design_result(problem, target_output, workflow_result)
+
+    metrics = benchmark.acceptance_metrics(
+        problem, workflow_result.outcomes, design.ranked_networks
+    )
+
+    heuristic = [
+        outcome
+        for outcome in workflow_result.outcomes
+        if outcome.task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+    ]
+    assert metrics["heuristic"]["pdm_network_count"] == len(heuristic) > 0
+    # The pinch design count leaves the heuristic networks out.
+    assert metrics["pdm_network_count"] == sum(
+        outcome.task.method == HeatExchangerNetworkDesignMethod.PinchDesign
+        for outcome in workflow_result.outcomes
+    )
+    assert metrics["combined_distinct_target_meeting_topologies"] >= max(
+        metrics["distinct_target_meeting_topologies"],
+        metrics["heuristic"]["distinct_target_meeting_topologies"],
+    )
+
+
+def test_benchmark_labels_the_heuristic_stage_and_its_evolution_seeds() -> None:
+    benchmark = _load_benchmark_module()
+    problem = _small_problem_with_options({"HENS_HEURISTIC_PDM_NETWORKS": 1})
+    settings = workflow_settings_from_problem(problem)
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.heuristic_pinch_design_method import (
+        build_heuristic_pinch_design_method_tasks,
+    )
+
+    tasks = build_heuristic_pinch_design_method_tasks(settings)
+    outcomes = FakeSynthesisExecutor().execute(
+        tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    evolution = tuple(
+        HeatExchangerNetworkSynthesisTask(
+            run_id=task.run_id,
+            method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
+            dt_cont_multiplier=task.dt_cont_multiplier,
+            stage_count=1,
+            parent_task_id=task.task_id,
+        )
+        for task in tasks
+    )
+
+    assert benchmark._stage_label(tasks, {}) == "heuristic_pdm"
+    assert (
+        benchmark._stage_label(evolution, {o.task.task_id: o for o in outcomes})
+        == "direct_evm_from_pdm"
+    )
+
+
 def test_benchmark_acceptance_comparison_flags_regressions() -> None:
     benchmark = _load_benchmark_module()
     baseline = {

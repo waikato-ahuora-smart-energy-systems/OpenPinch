@@ -437,6 +437,27 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
+    def heuristic_pinch_design(self, *, options=None, period_id=None, **kwargs):
+        """Run the heuristic (Linnhoff rules) pinch design method only.
+
+        Up to ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier,
+        or 10 when that is 0.
+        """
+        from ....analysis.heat_exchanger_networks.service import (
+            heat_exchanger_network_heuristic_pinch_design_method_service,
+        )
+
+        runtime, configuration = self._arguments(
+            options=options, period_id=period_id, **kwargs
+        )
+        return self._run(
+            heat_exchanger_network_heuristic_pinch_design_method_service,
+            surface="heuristic_pinch_design",
+            runtime=runtime,
+            configuration=configuration,
+            workspace_variant=None,
+        )
+
     def thermal_derivative(
         self,
         initial_networks=None,

@@ -53,6 +53,7 @@ EXPECTED_COMPONENT_METHODS = {"add_process_mvr"}
 EXPECTED_DESIGN_METHODS = {
     "enhanced_heat_exchanger_network",
     "heat_exchanger_network",
+    "heuristic_pinch_design",
     "multiperiod_heat_exchanger_network",
     "network_evolution",
     "open_hens",

@@ -132,6 +132,7 @@ Heat Exchanger Network Synthesis
    "``HENS_PDM_STAGE_PAIR_LIMIT``","number","``None``","","0 to 12","Number of extra pinch design candidates with set stage counts above and below the pinch, up to 12. None adds none."
    "``HENS_PDM_MIN_UNIT_NETWORKS``","number","``0``","",">= 0","Extra pinch design networks per approach temperature with the fewest units at the utility targets. Each seeds network evolution. 0 adds none."
    "``HENS_PDM_EXTRA_UNIT_NETWORKS``","number","``0``","",">= 0","Extra pinch design networks per approach temperature with one unit more than the fewest. Each seeds network evolution. 0 adds none."
+   "``HENS_HEURISTIC_PDM_NETWORKS``","number","``0``","",">= 0","Networks per approach temperature from the heuristic (Linnhoff rules) pinch design method, each seeding network evolution. 0 runs none; the standalone method then makes up to 10."
    "``HENS_TDM_PARENT_LIMIT``","number","``None``","",">= 1","Recorded in the synthesis manifest; no current synthesis step reads it."
    "``HENS_STAGE_PACKING``","string","``auto``","","","Methods whose integer models keep active stages contiguous: none, pdm, tdm or all. auto currently means none."
    "``HENS_STAGE_SELECTION``","number_list","``[1, 2, 3]``","","","Stage counts for direct network evolution runs. Exactly two values also fix the pinch design stages above and below the pinch."

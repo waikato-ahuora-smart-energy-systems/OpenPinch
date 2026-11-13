@@ -324,15 +324,20 @@ def acceptance_metrics(
     """Return the PDM topology summary and the best ranked total annual costs.
 
     Each PDM network is checked against the pinch targets at its own dt_cont
-    multiplier.
+    multiplier. Heuristic pinch design networks get their own summary under
+    ``heuristic``, and ``combined_distinct_target_meeting_topologies`` counts
+    the target-meeting topologies of both.
     """
 
     config = problem.master_zone.config
     targets_by_multiplier: dict[float, Any] = {}
-    entries = []
+    entries: dict[HeatExchangerNetworkDesignMethod, list] = {
+        HeatExchangerNetworkDesignMethod.PinchDesign: [],
+        HeatExchangerNetworkDesignMethod.HeuristicPinchDesign: [],
+    }
     for outcome in outcomes:
         if (
-            outcome.task.method != HeatExchangerNetworkDesignMethod.PinchDesign
+            outcome.task.method not in entries
             or outcome.status != "success"
             or outcome.network is None
         ):
@@ -345,7 +350,7 @@ def acceptance_metrics(
                     dTmin=nominal_approach_temperature(config, multiplier),
                 )
             )
-        entries.append(
+        entries[outcome.task.method].append(
             (
                 outcome.network,
                 network_meets_pinch_targets(
@@ -353,7 +358,13 @@ def acceptance_metrics(
                 ),
             )
         )
-    return pdm_topology_summary(entries) | {
+    pdm = entries[HeatExchangerNetworkDesignMethod.PinchDesign]
+    heuristic = entries[HeatExchangerNetworkDesignMethod.HeuristicPinchDesign]
+    return pdm_topology_summary(pdm) | {
+        "heuristic": pdm_topology_summary(heuristic),
+        "combined_distinct_target_meeting_topologies": pdm_topology_summary(
+            pdm + heuristic
+        )["distinct_target_meeting_topologies"],
         "top_total_annual_costs": sorted(
             float(outcome.objective_value)
             for outcome in ranked_networks
@@ -1114,6 +1125,8 @@ def _stage_label(
     method = str(tasks[0].method)
     if method == "pinch_design_method":
         return "pdm"
+    if method == "heuristic_pinch_design_method":
+        return "heuristic_pdm"
     if method == "thermal_derivative_method":
         return "tdm"
     if method != "network_evolution_method":
@@ -1124,7 +1137,11 @@ def _stage_label(
         for task in tasks
         if task.parent_task_id is not None
     }
-    if parent_methods == {"pinch_design_method"}:
+    # Heuristic pinch design networks seed evolution alongside PDM ones.
+    if parent_methods and parent_methods <= {
+        "pinch_design_method",
+        "heuristic_pinch_design_method",
+    }:
         return "direct_evm_from_pdm"
     if parent_methods == {"thermal_derivative_method"}:
         return "evm_from_tdm"

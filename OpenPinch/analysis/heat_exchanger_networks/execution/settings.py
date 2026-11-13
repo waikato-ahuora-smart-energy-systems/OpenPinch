@@ -212,6 +212,7 @@ def workflow_settings_from_problem(
         # The default sweep does not count as set, so tiers 2-5 add their own.
         user_dt_cont_multipliers=list(dt_cont_multipliers)
         != CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default,
+        heuristic_pdm_networks=int(hens.heuristic_pdm_networks),
         pdm_solver=str(hens.solver_pdm),
         tdm_solver=str(hens.solver_tdm),
         evm_solver=str(hens.solver_evm),

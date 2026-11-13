@@ -82,8 +82,10 @@ OpenHENS migration and benchmarks (manual, not run in CI)
 - A benchmark record's acceptance metrics count only successful PDM networks whose hot and cold
   utility in every period is within max(1e-3 kW, 1e-6 relative) of the pinch target, above or below, at that
   network's own dt_cont multiplier; topologies are distinct sets of active matches (recovery
-  matches by stage), whatever their duties [benchmark_performance.py:network_meets_pinch_targets,
-  pdm_topology_summary].
+  matches by stage), whatever their duties. Heuristic pinch design networks are summarised the same way under
+  `heuristic`, and `combined_distinct_target_meeting_topologies` counts both; the heuristic stage is labelled
+  `heuristic_pdm` and evolution seeded from either pinch design method `direct_evm_from_pdm`
+  [benchmark_performance.py:network_meets_pinch_targets, pdm_topology_summary, acceptance_metrics, _stage_label].
 - The OpenHENS comparison needs an OpenHENS checkout that exposes the modules it imports
   [compare_openhens_openpinch_top5.py:_supported_openhens_checkout].
 - Public members of the target, all-period, design and plot accessors (and their batch counterparts) need a tutorial mapping or an entry in
