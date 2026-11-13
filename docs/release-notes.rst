@@ -204,6 +204,10 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- At a dt_cont multiplier where the heuristic pinch design method realises no
+  network, the MILP pinch design method now runs in its place, and its
+  networks seed evolution as the heuristic ones would. Default synthesis
+  raised on six of the twelve literature cases.
 - The extra minimum-unit pinch design networks are capped at the side's
   minimum utility cost. With a choice of utility they were capped at the
   fewest-units count instead, which made every solve infeasible, so those

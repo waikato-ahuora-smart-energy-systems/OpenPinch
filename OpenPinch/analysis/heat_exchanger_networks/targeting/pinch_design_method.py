@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
@@ -56,8 +58,9 @@ def execute_pinch_design_stages(
 ):
     """Run the MILP stage when it is on, then the heuristic stage.
 
-    Returns the MILP tasks and outcomes, then the heuristic ones; a stage that
-    does not run gives empty tuples.
+    At a multiplier where the heuristic realises no network, the MILP runs in
+    its place. Returns the MILP tasks and outcomes, then the heuristic ones; a
+    stage that does not run gives empty tuples.
     """
     milp_tasks, milp_outcomes = (), ()
     if settings.runs_milp_pinch_design:
@@ -71,6 +74,25 @@ def execute_pinch_design_stages(
                 problem, settings, executor=executor
             )
         )
+    if not settings.runs_milp_pinch_design:
+        realised = {
+            float(outcome.task.dt_cont_multiplier)
+            for outcome in heuristic_outcomes
+            if outcome.status == "success"
+        }
+        missing = tuple(
+            multiplier
+            for multiplier in dict.fromkeys(settings.dt_cont_multipliers)
+            if float(multiplier) not in realised
+        )
+        if missing:
+            milp_tasks, milp_outcomes = execute_pinch_design_method_stage(
+                problem,
+                replace(
+                    settings, dt_cont_multipliers=missing, pdm_stage_pair_limit=None
+                ),
+                executor=executor,
+            )
     return milp_tasks, milp_outcomes, heuristic_tasks, heuristic_outcomes
 
 

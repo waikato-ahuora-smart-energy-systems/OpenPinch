@@ -280,3 +280,34 @@ def test_fallbacks_run_at_1_whenever_it_is_one_of_the_multipliers(
     assert duty_optimisation_task(_request(), duty_settings).dt_cont_multiplier == (
         expected
     )
+
+
+@pytest.mark.parametrize("depth", [0, 1])
+def test_the_milp_runs_where_the_heuristic_realises_no_network(depth):
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.heuristic_pinch_design_method import (
+        build_heuristic_pinch_design_method_tasks,
+    )
+
+    problem = _problem({"HENS_SEARCH_DEPTH": depth, "HENS_SEARCH_WIDTH": 1})
+    settings = workflow_settings_from_problem(problem)
+    # The heuristic fails at 0.75 only.
+    failing = {
+        task.task_id
+        for task in build_heuristic_pinch_design_method_tasks(settings)
+        if task.dt_cont_multiplier == 0.75
+    }
+    executor = FakeSynthesisExecutor(failures=failing)
+
+    result = workflow_module.execute_open_hens_method(
+        problem, settings, executor=executor
+    )
+
+    milp = [task for task in result.tasks if task.method == MILP]
+    assert [task.dt_cont_multiplier for task in milp] == [0.75]
+    assert executor.stage_order[:2] == [HEURISTIC, MILP]
+    if depth == 1:
+        evolution_parents = {
+            task.parent_task_id for task in result.tasks if task.method == EVM
+        }
+        assert milp[0].task_id in evolution_parents
+    assert TDM not in executor.stage_order

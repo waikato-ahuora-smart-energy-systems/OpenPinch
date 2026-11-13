@@ -346,3 +346,25 @@ def test_the_pinch_design_accessor_runs_the_heuristic_method(monkeypatch):
 
     assert design.selected_network.method == HEURISTIC
     assert not hasattr(problem.design, "heuristic_pinch_design")
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_default_pinch_design_gives_a_network_where_the_heuristic_cannot():
+    # Six-stream Yee and Grossmann: no heuristic proposal is realised at the
+    # default multipliers, so the MILP runs in its place.
+    payload = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "tests/fixtures/openhens/Six-stream-Yee-and-Grossmann-1990-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    for key in ("HENS_DT_CONT_MULTIPLIERS", "HENS_SOLVER_PDM"):
+        payload["options"].pop(key, None)
+    payload["options"] |= {"HENS_OUTPUT_FORMATS": [], "HENS_MAX_PARALLEL": 1}
+    problem = PinchProblem(source=payload, project_name="six-stream")
+
+    design = problem.design.heat_exchanger_network(depth=0)
+
+    assert design.selected_network.exchangers
+    assert verify_network_feasibility(design.selected_network) == ()
