@@ -662,6 +662,8 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
         I=1,
         J=1,
         S=2,
+        NHU=1,
+        NCU=1,
         Q_r=[[[[10.0], [0.0]]]],
         z=[[[[1.0], [0.0]]]],
         theta_1=[[[[2.0], [0.0]]]],

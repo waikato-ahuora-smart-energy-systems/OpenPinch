@@ -84,6 +84,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         return _equations.used_units(self)
 
+    def require_units(self, at_least: int) -> None:
+        """Require at least ``at_least`` units in this unsolved side."""
+
+        _equations.require_units(self, at_least)
+
     def exclude_units(self, pattern: dict[str, tuple[int, ...]]) -> None:
         """Cut ``pattern`` from this unsolved side with a no-good constraint."""
 

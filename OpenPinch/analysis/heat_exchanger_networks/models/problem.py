@@ -226,7 +226,13 @@ class InternalHeatExchangerNetworkProblem:
             "pinch_design_method",
             default="PinchDecompModel",
         )
-        base_args = dict(self.args)
+        base_args = dict(self.args) | {
+            "solver_options": _with_time_limit(
+                self.solver,
+                self.args.get("solver_options"),
+                seconds=backend.PDM_TIME_LIMIT,
+            )
+        }
         self.above = factory(
             **(
                 base_args
@@ -381,18 +387,20 @@ class InternalHeatExchangerNetworkProblem:
         """Collect extra networks from minimum-unit side topologies.
 
         Each required side is re-solved for the fewest units, with no-good
-        cuts excluding its minimum-utility topology and every one found, until
-        a side passes one unit over its minimum. Side pairs with the fewest
-        total units, then one more, become variants up to
+        cuts excluding its minimum-utility topology and every one found: up to
+        the first limit with its fewest units, then, at least one unit more
+        required, up to the second with one unit more. Side pairs with the
+        fewest total units, then one more, become variants up to
         ``pdm_network_limits``. Needs a solver that keeps integers.
         """
 
         at_minimum, one_more = self.pdm_network_limits
         if at_minimum + one_more <= 0 or self.solver not in backend.INTEGER_SOLVERS:
             return []
-        limit = at_minimum + one_more
         sides = {
-            name: self._minimum_unit_sides(name, side, limit, model_factories)
+            name: self._minimum_unit_sides(
+                name, side, (at_minimum, one_more), model_factories
+            )
             for name, side in (("above", self.above), ("below", self.below))
         }
         pairs = sorted(
@@ -438,22 +446,29 @@ class InternalHeatExchangerNetworkProblem:
         self,
         name: str,
         primary,
-        limit: int,
+        quotas: tuple[int, int],
         model_factories: Mapping[str, Any] | None,
     ) -> list:
-        """The primary side, then its minimum-unit and one-more-unit sides."""
+        """The primary side, then its minimum-unit and one-more-unit sides.
+
+        Up to ``quotas[0]`` sides with the primary's (fewest) units, then,
+        with at least one unit more required, up to ``quotas[1]`` with one
+        unit more. Only a sound solve counts (``_sound_side``).
+        """
 
         if not primary.side_required or primary.mSuccess != 1:
             return [primary]
+        at_minimum, one_more = quotas
         factory = self._model_factory(
             model_factories,
             "pinch_design_method",
             default="PinchDecompModel",
         )
         excluded = [primary.used_units()]
+        fewest = primary.n_units
         found = []
-        fewest = None
-        while len(found) < limit:
+
+        def solve(floor: int | None):
             side = factory(
                 **(
                     dict(self.args)
@@ -476,14 +491,26 @@ class InternalHeatExchangerNetworkProblem:
                 add_recovery_stage_packing_constraints(side)
             for pattern in excluded:
                 side.exclude_units(pattern)
+            if floor is not None:
+                side.require_units(floor)
             side.optimise(print_output=False)
-            if side.mSuccess != 1 or side.used_units() in excluded:
-                break
-            fewest = side.n_units if fewest is None else fewest
-            if side.n_units > fewest + 1:
-                break
-            found.append(side)
+            if not _sound_side(side, primary) or side.used_units() in excluded:
+                _cleanup_model(side)
+                return None
             excluded.append(side.used_units())
+            return side
+
+        for units, quota, floor in (
+            (fewest, at_minimum, None),
+            (fewest + 1, one_more, fewest + 1),
+        ):
+            kept = 0
+            while kept < quota:
+                side = solve(floor)
+                if side is None or side.n_units != units:
+                    break
+                found.append(side)
+                kept += 1
         return [primary, *found]
 
     def _solve_heuristic_pdm(self) -> None:
@@ -713,7 +740,14 @@ class InternalHeatExchangerNetworkProblem:
                 coolers_in_use,
             ],
             min_dqda=case.min_dqda,
-            minimisation_goal=case.minimisation_goal,
+            # With a choice of utilities a duty goal can move load to a dearer
+            # utility at the same duty: hold the cost instead.
+            minimisation_goal=(
+                "utility costs"
+                if case.minimisation_goal in _UTILITY_DUTY_GOALS
+                and (case.NHU > 1 or case.NCU > 1)
+                else case.minimisation_goal
+            ),
             non_isothermal_model=case.non_isothermal_model,
             integers=False,
             tol=case.tol,
@@ -861,10 +895,13 @@ def _start_from_side(sparse, side) -> None:
     sparse.m.warm_start = True
 
 
-def _with_time_limit(solver: str, options) -> Any:
-    """The PDM solver options with the fewest-units time limit added.
+def _with_time_limit(
+    solver: str, options, *, seconds: float = backend.FEWEST_UNITS_TIME_LIMIT
+) -> Any:
+    """The PDM solver options with a time limit added.
 
-    It applies to every fewest-units and minimum-unit solve.
+    The fewest-units limit applies to every fewest-units and minimum-unit
+    solve; the primary sides take ``backend.PDM_TIME_LIMIT``.
 
     A limit the user set is kept, as are options given as option lines.
     """
@@ -872,7 +909,7 @@ def _with_time_limit(solver: str, options) -> Any:
     name = backend.TIME_LIMIT_OPTIONS.get(solver)
     if name is None or not (options is None or isinstance(options, Mapping)):
         return options
-    return {name: backend.FEWEST_UNITS_TIME_LIMIT, **dict(options or {})}
+    return {name: seconds, **dict(options or {})}
 
 
 def _side_units(side) -> int:
@@ -913,6 +950,26 @@ def _used_in_any_period(case, name: str) -> list[list[int]]:
         ]
         for index, row in enumerate(by_period[0])
     ]
+
+
+# Goals that minimise utility duty, which a utility choice turns into cost.
+_UTILITY_DUTY_GOALS = frozenset({"hot utility", "cold utility", "total utility"})
+
+
+def _sound_side(side: Any, primary: Any) -> bool:
+    """Whether a minimum-unit solve gave a usable side.
+
+    It must have converged, or be a HiGHS solve stopped at its limit with an
+    incumbent, and hold the primary's utility: a solver stopped at a limit
+    can report success with a point that is not a solution.
+    """
+
+    if side.mSuccess != 1:
+        return False
+    if not (side.solver_run.converged or side.solver == "highs"):
+        return False
+    utility, start = _total_utility_duty(side), _total_utility_duty(primary)
+    return utility <= start * (1.0 + 1e-6) + primary.tol
 
 
 def _replaces(sparse: Any, side: Any) -> bool:

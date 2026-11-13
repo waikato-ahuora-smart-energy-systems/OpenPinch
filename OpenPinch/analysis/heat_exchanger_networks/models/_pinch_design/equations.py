@@ -445,6 +445,12 @@ def used_units(owner) -> dict[str, tuple[int, ...]]:
     }
 
 
+def require_units(owner, at_least: int) -> None:
+    """Require at least ``at_least`` units: matches, heaters and coolers."""
+
+    owner.m.Equation(_units(owner) >= at_least)
+
+
 def exclude_units(owner, pattern: dict[str, tuple[int, ...]]) -> None:
     """Add a no-good cut: at least one unit must differ from ``pattern``."""
 

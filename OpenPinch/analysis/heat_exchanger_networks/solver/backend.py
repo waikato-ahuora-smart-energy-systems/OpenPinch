@@ -48,6 +48,10 @@ TIME_LIMIT_OPTIONS = {
 # Seconds allowed for a PDM side's fewest-units re-solve, which can find a
 # sparse network long before it proves the fewest units.
 FEWEST_UNITS_TIME_LIMIT = 60.0
+# Seconds allowed for a PDM side's first, minimum-utility solve, unless the
+# user sets a limit: with a utility choice it may not close its gap quickly.
+# A HiGHS solve stopped there keeps its incumbent, as unconverged.
+PDM_TIME_LIMIT = 600.0
 PYOMO_SOLVER_FACTORY_NAMES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",

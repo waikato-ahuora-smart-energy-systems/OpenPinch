@@ -494,3 +494,80 @@ def test_minimum_unit_solves_are_time_limited(monkeypatch):
     problem.get_solution(print_output=False)
 
     assert limits and all(limit == backend.FEWEST_UNITS_TIME_LIMIT for limit in limits)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_stage_reduction_minimises_utility_cost_with_a_utility_choice(monkeypatch):
+    # The reduced network was re-solved for minimum utility duty, so with a
+    # choice of utilities the duty held but load could move to a dearer one
+    # (0.38% over the side minimum on Thirteen-stream Kim's variants).
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as module
+
+    goals = []
+    real = module.StageWiseModel
+
+    def recording(*args, **kwargs):
+        goals.append(kwargs["minimisation_goal"])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(module, "StageWiseModel", recording)
+    medium_pressure_steam = {
+        "name": "MPS",
+        "type": "Hot",
+        "t_supply": {"value": 600.0, "unit": "K"},
+        "t_target": {"value": 600.0, "unit": "K"},
+        "price": {"value": 60.0, "unit": "$/MWh"},
+        "htc": {"value": 5.0, "unit": "kW/m^2/K"},
+        "heat_flow": None,
+    }
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem,
+        "_utilisation_threshold",
+        lambda self, stage_count: 60.0,
+    )
+    problem = _problem(14.0, (0, 0), extra_utilities=(medium_pressure_steam,))
+
+    problem.get_solution(print_output=False)
+
+    assert goals and set(goals) == {"utility costs"}
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_the_one_more_unit_quota_is_filled_after_the_minimum_one():
+    # With enough minimum-unit alternatives on each side, every variant had
+    # the fewest units and HENS_PDM_EXTRA_UNIT_NETWORKS did nothing.
+    source = REPOSITORY_ROOT / "tests/fixtures/openhens/Ten-stream-Ahmad-1985-1.json"
+    problem = _problem(10.0, (3, 3), source=source)
+
+    problem.get_solution(print_output=False)
+
+    units = sorted(
+        _units(variant.extract_network(run_id="pdm"))
+        for variant in problem.pdm_variants
+    )
+    assert units and units[-1] > units[0]
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_the_primary_pinch_design_solve_is_time_limited(monkeypatch):
+    # With a utility choice the primary MILP could run for minutes without
+    # closing its gap (Ten-stream Ahmad with two extra utilities).
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    limits = []
+    real_init = PinchDecompModel.__init__
+
+    def recording(self, *args, **kwargs):
+        name = kwargs.get("name", "")
+        if "units" not in name and "heuristic" not in name:
+            limits.append((kwargs.get("solver_options") or {}).get("time_limit"))
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(PinchDecompModel, "__init__", recording)
+    problem = _problem(14.0, (0, 0))
+
+    problem.get_solution(print_output=False)
+
+    assert limits and all(limit == backend.PDM_TIME_LIMIT for limit in limits)
