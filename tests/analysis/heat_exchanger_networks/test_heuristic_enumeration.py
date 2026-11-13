@@ -221,7 +221,7 @@ def test_an_unsplit_pinch_match_gets_no_relief_stage():
         [stream("cold", 0, 5.0, 100.0, 370.0)],
     )
 
-    proposal = next(_completions(above, ((0, 0),), budget=100))
+    proposal = next(_completions(above, ((0, 0),), nodes=[100]))
 
     assert proposal.stages == 1
 
@@ -260,3 +260,32 @@ def test_a_proposal_that_breaks_the_cp_rule_is_not_complete():
     proposals = propose_side_topologies(below, limit=3)
 
     assert proposals and not any(proposal.complete for proposal in proposals)
+
+
+def test_a_side_search_stays_within_one_node_budget(monkeypatch):
+    # Each pinch-match set had its own budget of 2000 nodes per proposal, so
+    # a side's work grew with the square of the cap.
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic import enumeration
+
+    calls = [0]
+    real_extend = enumeration._extend
+
+    def counting(*args, **kwargs):
+        calls[0] += 1
+        yield from real_extend(*args, **kwargs)
+
+    monkeypatch.setattr(enumeration, "_extend", counting)
+    monkeypatch.setattr(enumeration, "_NODES_PER_PROPOSAL", 20)
+    above = side(
+        "above",
+        [stream("hot", i, 2.0 + i, 100.0, 100.0) for i in range(6)]
+        # A hot stream no cold stream can take: every proposal dead-ends.
+        + [stream("hot", 6, 1.0, 500.0, 200.0, at_pinch=False)],
+        # Partners keep load after the pinch matches, so the search branches
+        # widely before it runs out of room for the last hot stream.
+        [stream("cold", j, 3.0 + j, 150.0, 90.0) for j in range(6)],
+    )
+
+    propose_side_topologies(above, limit=5)
+
+    assert calls[0] <= 20 * 5

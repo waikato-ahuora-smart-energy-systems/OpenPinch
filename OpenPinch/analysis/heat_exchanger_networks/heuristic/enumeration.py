@@ -294,16 +294,16 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
 
     if limit <= 0:
         return []
+    # One node budget for the whole side, shared by every pinch-match search.
+    nodes = [_NODES_PER_PROPOSAL * limit]
     searches = [
-        _completions(side, assignment, budget=_NODES_PER_PROPOSAL * limit)
+        _completions(side, assignment, nodes=nodes)
         if not assignment or cp_feasible(side, assignment)
         # Pinch matches that break the CP rule (its last fallback) cannot
         # make a complete design, whatever follows.
         else (
             replace(proposal, complete=False)
-            for proposal in _completions(
-                side, assignment, budget=_NODES_PER_PROPOSAL * limit
-            )
+            for proposal in _completions(side, assignment, nodes=nodes)
         )
         for assignment in pinch_assignments(side, limit=limit)
     ]
@@ -319,7 +319,10 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
             if proposal.signature in seen:
                 continue
             seen.add(proposal.signature)
-            (complete if proposal.complete else incomplete).append(proposal)
+            if proposal.complete:
+                complete.append(proposal)
+            elif len(incomplete) < limit:
+                incomplete.append(proposal)
             if len(complete) >= limit:
                 break
     return (complete + incomplete)[:limit]
@@ -343,8 +346,13 @@ class _State:
     matches: tuple
 
 
-def _completions(side: PinchSide, assignment, *, budget: int) -> Iterator[SideProposal]:
-    """Depth-first completions of one set of pinch matches."""
+def _completions(
+    side: PinchSide, assignment, *, nodes: list[int]
+) -> Iterator[SideProposal]:
+    """Depth-first completions of one set of pinch matches.
+
+    ``nodes`` is the side's remaining node budget, shared between searches.
+    """
 
     must_kind = "hot" if side.location == "above" else "cold"
     streams = {(s.kind, s.index): s for s in side.hot + side.cold}
@@ -357,7 +365,6 @@ def _completions(side: PinchSide, assignment, *, budget: int) -> Iterator[SidePr
     )
     partner_kind = "cold" if must_kind == "hot" else "hot"
     state = _tick_off(side, state, streams, assignment, must_kind, partner_kind)
-    nodes = [budget]
     yield from _extend(side, state, streams, must_kind, nodes)
 
 
@@ -482,6 +489,8 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
         )
     )
     for partner, duty in candidates:
+        if nodes[0] <= 0:
+            return
         yield from _extend(
             side, _place(state, must, partner, duty), streams, must_kind, nodes
         )
