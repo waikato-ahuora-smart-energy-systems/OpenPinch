@@ -149,6 +149,28 @@ def test_a_proposal_the_side_model_cannot_solve_is_dropped():
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_dropped_proposal_is_not_logged_as_an_error(caplog):
+    # Proposals the side model cannot solve are dropped by design in a normal
+    # run, so they are not errors to the user.
+    problem = _problem(_four_stream(), 14.0, limit=10)
+    problem.load_model()
+    heater_only = SideProposal(
+        location="above",
+        stages=1,
+        matches=(),
+        heaters=((0, 0),),
+        coolers=(),
+        complete=False,
+    )
+
+    with caplog.at_level("DEBUG"):
+        problem._realise_side("above", heater_only, 0)
+
+    failed = [record for record in caplog.records if "[Failed]" in record.message]
+    assert failed and all(record.levelname == "DEBUG" for record in failed)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_segmented_streams_realise_through_the_piecewise_side_model():
     problem = _problem(_segmented_problem(cold_second_duty=200.0), 10.0, limit=5)
 

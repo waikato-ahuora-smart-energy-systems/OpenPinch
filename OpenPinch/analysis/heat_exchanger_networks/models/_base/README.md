@@ -36,6 +36,7 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 - Checks the Pyomo solver (binary first, then Pyomo) and creates a native `PyomoModel`. [execution.py:setup_model]
 - `optimise` always removes the model's run directory afterwards; `cleanup_model` is safe to repeat. [execution.py:optimise] [execution.py:cleanup_model]
 - A solve that stopped before converging (`solver_run.converged` false) keeps `mSuccess` and its values, but is logged as a warning (`[Unconverged]`) rather than `[Success]`. [execution.py:_solve_and_post_process]
+- A failed solve sets `mSuccess` to 0 and is logged at ERROR, or at the model's `failure_log_level` when a caller that expects failures (heuristic proposals, the minimum-unit search) sets one. A passing status with no objective value is a failure (`solver returned no objective value`). [execution.py:_solve_and_post_process]
 - `get_alpha_values` writes the flow-fraction grids (`P_h`, `P_c`, `beta_h`, `beta_c`, `z_i`, `z_j`) and `alpha` onto the model. [alpha.py:get_alpha_values]
 - Writes solver results, logs and many attributes onto the model passed in (`mSuccess`, `solver_run`, `area_*`, `LMTD_*`, `z_allowed`). [execution.py:_solve_and_post_process] [area.py:set_utility_lmtd_and_areas]
 - Lazy imports of `OpenPinch.analysis.heat_exchanger_networks.solver.piecewise` inside segmented-stream branches. [area.py:_apply_segment_recovery_areas] [piecewise.py:_utility_cost_expression]

@@ -81,21 +81,31 @@ def _solve_and_post_process(model, print_output: bool) -> None:
 
     status = model.solver_run.status
     path = getattr(model.m, "_path", None)
+    # A caller that expects some solves to fail (trial topologies) lowers
+    # the level those failures are logged at.
+    failure_level = getattr(model, "failure_log_level", logging.ERROR)
     if model.solver_run.failure_reason is not None:
         model.mSuccess = 0
-        logger.error("[Failed] [model: %s] [path: %s]", model.name, path)
+        logger.log(failure_level, "[Failed] [model: %s] [path: %s]", model.name, path)
     elif status == 1:
-        if model.solver_run.objective_value + model.tol < 0:
+        objective = model.solver_run.objective_value
+        if objective is None or objective + model.tol < 0:
             model.mSuccess = 0
             model.solver_run = backend.SolverRun(
                 name=model.solver_run.name,
                 extension=model.solver_run.extension,
                 status=model.solver_run.status,
-                objective_value=model.solver_run.objective_value,
+                objective_value=objective,
                 solve_time=model.solver_run.solve_time,
-                failure_reason="negative objective value",
+                failure_reason=(
+                    "solver returned no objective value"
+                    if objective is None
+                    else "negative objective value"
+                ),
             )
-            logger.error("[Failed] [model: %s] [path: %s]", model.name, path)
+            logger.log(
+                failure_level, "[Failed] [model: %s] [path: %s]", model.name, path
+            )
         elif not model.solver_run.converged:
             # The values are kept (evolution can start from them), but the
             # objective is not a converged optimum to compare against.
@@ -111,7 +121,8 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             logger.info("[Success] [model: %s] [path: %s]", model.name, path)
     else:
         model.mSuccess = status
-        logger.error(
+        logger.log(
+            failure_level,
             "[Failed] [model: %s] [path: %s] [status: %s]",
             model.name,
             path,

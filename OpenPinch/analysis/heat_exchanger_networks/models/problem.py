@@ -505,6 +505,8 @@ class InternalHeatExchangerNetworkProblem:
                 side.exclude_units(pattern)
             if floor is not None:
                 side.require_units(floor)
+            # The search ends with a solve its cuts leave infeasible.
+            side.failure_log_level = logging.DEBUG
             side.optimise(print_output=False)
             if not _sound_side(side, primary) or side.used_units() in excluded:
                 _cleanup_model(side)
@@ -666,6 +668,8 @@ class InternalHeatExchangerNetworkProblem:
             # A side that is not linear needs Couenne, which may be missing.
             logger.debug("Heuristic %s proposal %d not built: %s", name, rank, exc)
             return None
+        # A proposal the side model cannot solve is dropped by design.
+        side.failure_log_level = logging.DEBUG
         side.optimise(print_output=False)
         if side.mSuccess != 1:
             _cleanup_model(side)

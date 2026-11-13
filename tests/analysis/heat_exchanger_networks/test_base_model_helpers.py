@@ -649,6 +649,24 @@ def test_optimise_warns_when_the_solver_stopped_before_converging(monkeypatch, c
     assert "maxIterations" in caplog.text
 
 
+def test_optimise_fails_a_passing_solve_that_has_no_objective_value(monkeypatch):
+    # A passing status with nothing loaded has no objective to judge; it
+    # raised TypeError and lost the whole task.
+    model = _model()
+    model.m = _FakeModel(solve_status=1, objective=1.0)
+    model.get_post_process = lambda: None
+    monkeypatch.setattr(
+        base_execution.backend,
+        "solve_pyomo_model",
+        lambda *args, **kwargs: _solver_run(objective_value=None),
+    )
+
+    model.optimise(print_output=False)
+
+    assert model.mSuccess == 0
+    assert model.solver_run.failure_reason == "solver returned no objective value"
+
+
 def test_output_to_cmd_line_logs_successful_solve(caplog):
     model = _model()
     model.mSuccess = 0
