@@ -259,8 +259,8 @@ The vapour compression targets (``vapour_compression_heat_pump``,
 ``vapour_compression_refrigeration`` and ``mvr_heat_pump``) take the screen, or
 one of its layouts, as ``refrigerants`` and run once for every fluid set it
 proposes for their method: single-stage and cascade layouts for a cascade
-cycle, parallel layouts for a parallel cycle, and vapour compression plus MVR
-layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators and
+cycle, single-stage and parallel layouts for a parallel cycle, and vapour
+compression plus MVR layouts for ``mvr_heat_pump``. Each run takes its condensers, evaporators and
 MVR stages from its layout, so a split layout runs one condenser on each of its
 ``added_levels``; pass ``condensers`` or ``evaporators`` to run only the layouts
 with those counts. Layouts asking for the same counts and fluids
