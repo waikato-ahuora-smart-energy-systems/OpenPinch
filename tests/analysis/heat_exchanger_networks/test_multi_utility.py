@@ -264,3 +264,56 @@ def test_a_user_utility_named_cu_stays_in_synthesis():
         "Cold Utility.CU",
         "Cold Utility.Glycol",
     }
+
+
+@pytest.mark.synthesis
+def test_multiperiod_area_costs_have_a_finite_slope_at_zero_area():
+    # A shared area at zero, for a unit with no duty, made the area cost's
+    # derivative infinite, and Ipopt stopped on every evolution task of the
+    # dairy chilling case ("can't evaluate pow'(0,0.6)").
+    pyo = pytest.importorskip("pyomo.environ")
+    from pyomo.core.expr.calculus.derivatives import Modes, differentiate
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
+        StageWiseModel,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    problem = PinchProblem("dairy_chilling_multiperiod.json")
+    problem.target.all_heat_integration()
+    model = StageWiseModel(
+        name="dairy relaxed",
+        framework="Stagewise",
+        solver="ipopt-pyomo",
+        solver_arrays=problem_to_solver_arrays(problem, 5.0),
+        stages=2,
+        dTmin=5.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+    )
+
+    for total, grids in (
+        (model.recovery_area_cost_total, model.area_r_shared),
+        (model.hu_area_cost_total, model.area_hu_shared),
+        (model.cu_area_cost_total, model.area_cu_shared),
+    ):
+        areas = [area for area in _flatten(grids) if not area.fixed]
+        assert areas
+        for area in areas:
+            area.set_value(0.0)
+        slope = differentiate(total, wrt=areas[0], mode=Modes.reverse_numeric)
+        assert pyo.value(slope) < float("inf")
+
+
+def _flatten(grid):
+    for item in grid:
+        if isinstance(item, list):
+            yield from _flatten(item)
+        else:
+            yield item
