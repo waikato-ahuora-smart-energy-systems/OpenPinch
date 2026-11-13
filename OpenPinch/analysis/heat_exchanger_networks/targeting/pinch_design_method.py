@@ -5,6 +5,7 @@ from __future__ import annotations
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
+from ..execution.search import reference_dt_cont_multiplier
 from ..execution.settings import SynthesisWorkflowSettings
 from ..results.assembly import SynthesisWorkflowResult
 from ._stage import run_single_method_workflow, run_stage
@@ -97,14 +98,14 @@ def build_pinch_design_method_tasks(
     """One MILP pinch design task per dt_cont multiplier.
 
     ``HENS_PDM_STAGE_PAIR_LIMIT`` adds candidates with set stage counts
-    above and below the pinch, at the first multiplier.
+    above and below the pinch, at the reference multiplier.
     """
     del problem
     tasks = [
         _pinch_design_task(settings, multiplier)
         for multiplier in dict.fromkeys(settings.dt_cont_multipliers)
     ]
-    multiplier = float(settings.dt_cont_multipliers[0])
+    multiplier = reference_dt_cont_multiplier(settings.dt_cont_multipliers)
     for above_stages, below_stages in _PDM_STAGE_PAIR_SWEEP[
         : settings.quality_pdm_stage_pair_count
     ]:

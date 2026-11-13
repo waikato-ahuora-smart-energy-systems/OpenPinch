@@ -66,6 +66,17 @@ class ResolvedSearch:
     evm_n_rm_branches: int
 
 
+def reference_dt_cont_multiplier(multipliers) -> float:
+    """The multiplier a run falls back to when nothing else gives one.
+
+    1.0, the targeting contributions, when it is among the multipliers (as in
+    every width level); otherwise the first configured multiplier.
+    """
+
+    values = tuple(float(value) for value in multipliers)
+    return 1.0 if 1.0 in values else values[0]
+
+
 def resolve_search(hens: Any) -> ResolvedSearch:
     """Return the search options of a HEN configuration group."""
 
@@ -97,5 +108,6 @@ __all__ = [
     "WIDTH_MULTIPLIERS",
     "DepthLevel",
     "ResolvedSearch",
+    "reference_dt_cont_multiplier",
     "resolve_search",
 ]

@@ -204,6 +204,12 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A run that needs one dt_cont multiplier and has none from a network (duty
+  optimisation without ``min_approach_temperature``, a user network passed to
+  ``thermal_derivative()`` or ``network_evolution()``, and the
+  ``HENS_PDM_STAGE_PAIR_LIMIT`` candidates) uses 1.0 when it is among the
+  multipliers, as it is at every search width, instead of the first one (0.75
+  at the default width).
 - ``design.thermal_derivative()`` and ``design.network_evolution()`` called
   without ``initial_networks`` now seed from the stored design of any HEN
   method, not only from a pinch design (for the thermal derivative method) or a

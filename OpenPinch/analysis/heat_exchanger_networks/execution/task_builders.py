@@ -9,6 +9,7 @@ from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestric
 from ....domain.enums import HeatExchangerKind, HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..errors import WorkflowContractError
+from .search import reference_dt_cont_multiplier
 from .settings import SynthesisWorkflowSettings
 
 
@@ -135,14 +136,14 @@ def dt_cont_multiplier_from_network(
     """Return the dt_cont multiplier a seeded method task runs at.
 
     A synthesised network records the multiplier it was solved at. A network
-    without one (a user network, say) runs at the first configured multiplier,
-    1.0 unless ``HENS_DT_CONT_MULTIPLIERS`` is set.
+    without one (a user network, say) runs at the reference multiplier: 1.0
+    when it is configured, otherwise the first configured multiplier.
     """
     for metadata in (network.summary_metrics, network.source_metadata):
         value = metadata.get("dt_cont_multiplier")
         if isinstance(value, int | float) and value > 0.0:
             return float(value)
-    return float(settings.dt_cont_multipliers[0])
+    return reference_dt_cont_multiplier(settings.dt_cont_multipliers)
 
 
 def derivative_threshold_from_network(network: HeatExchangerNetwork) -> float | None:

@@ -230,3 +230,53 @@ def test_the_quality_tier_option_is_gone():
 
     assert "HENS_SYNTHESIS_QUALITY_TIER" not in USER_CONFIG_FIELD_SPECS
     assert {"HENS_SEARCH_WIDTH", "HENS_SEARCH_DEPTH"} <= set(USER_CONFIG_FIELD_SPECS)
+
+
+@pytest.mark.parametrize(
+    ("multipliers", "expected"),
+    [((0.75, 1.0, 1.5), 1.0), ((1.5, 1.0), 1.0), ((0.5, 2.0), 0.5)],
+)
+def test_fallbacks_run_at_1_whenever_it_is_one_of_the_multipliers(
+    multipliers, expected
+):
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        duty_optimisation_task,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
+        dt_cont_multiplier_from_network,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.pinch_design_method import (
+        build_pinch_design_method_tasks,
+    )
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    settings = workflow_settings_from_problem(
+        _problem({"HENS_DT_CONT_MULTIPLIERS": list(multipliers)})
+    )
+    settings = type(settings)(**{**settings.__dict__, "pdm_stage_pair_limit": 1})
+
+    # A user network with no recorded multiplier, stage-pair candidates and
+    # duty optimisation all fall back to the reference multiplier.
+    assert dt_cont_multiplier_from_network(HeatExchangerNetwork(), settings) == expected
+    stage_pair = [
+        task
+        for task in build_pinch_design_method_tasks(settings)
+        if task.settings.get("stage_selection")
+    ]
+    assert [task.dt_cont_multiplier for task in stage_pair] == [expected]
+    duty_settings = SimpleNamespace(
+        run_id="run",
+        dt_cont_multipliers=multipliers,
+        problem_id=None,
+        workspace_variant=None,
+        period_id=None,
+    )
+    from tests.analysis.heat_exchanger_networks.test_duty_optimisation import (
+        _request,
+    )
+
+    assert duty_optimisation_task(_request(), duty_settings).dt_cont_multiplier == (
+        expected
+    )

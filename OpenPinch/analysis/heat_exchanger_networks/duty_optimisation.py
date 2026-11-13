@@ -53,6 +53,7 @@ from ...domain.heat_exchanger import HeatExchanger
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor, _failed_task_outcome
+from .execution.search import reference_dt_cont_multiplier
 from .execution.settings import SynthesisWorkflowSettings
 from .models.fixed_structure import (
     COOLER,
@@ -598,9 +599,9 @@ def duty_optimisation_task(
     return HeatExchangerNetworkSynthesisTask(
         run_id=settings.run_id,
         method=_METHOD,
-        # Contributions at the first configured multiplier; a requested
-        # minimum approach overrides them in the model.
-        dt_cont_multiplier=float(settings.dt_cont_multipliers[0]),
+        # Contributions at the reference multiplier; a requested minimum
+        # approach overrides them in the model.
+        dt_cont_multiplier=reference_dt_cont_multiplier(settings.dt_cont_multipliers),
         stage_count=_stage_count(request.network, exchangers),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
