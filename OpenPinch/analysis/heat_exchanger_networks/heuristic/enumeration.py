@@ -26,6 +26,9 @@ _NODES_PER_PROPOSAL = 2000
 _BISECTION_STEPS = 40
 # Pinch-match sets collected per one kept, before ordering by CP similarity.
 _COLLECTED_PER_PROPOSAL = 4
+# Search nodes spent without a complete proposal, once the incomplete ones
+# are kept, before a side's search stops.
+_STALL_NODES = 1000
 # Partner combinations tried per must stream at one search node.
 _COMBINATIONS_PER_NODE = 64
 
@@ -322,21 +325,23 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
     complete: list[SideProposal] = []
     incomplete: list[SideProposal] = []
     seen: set[tuple] = set()
-    # Incomplete proposals met since the incomplete list filled: past the
-    # cap of them with no complete one, the search is unlikely to find one.
-    stalled = 0
-    while searches and len(complete) < limit and stalled < limit:
+    # Node budget left when a proposal was last kept: once the incomplete
+    # list is full, a search that spends _STALL_NODES without a complete
+    # proposal is unlikely to find one.
+    kept_at = nodes[0]
+    stalled = False
+    while searches and len(complete) < limit and not stalled:
         for search in list(searches):
             proposal = next(search, None)
             if proposal is None:
                 searches.remove(search)
                 continue
             if not proposal.complete and len(incomplete) >= limit:
-                stalled += 1
-                if stalled >= limit:
+                stalled = kept_at - nodes[0] >= _STALL_NODES
+                if stalled:
                     break
                 continue
-            stalled = 0
+            kept_at = nodes[0]
             if proposal.signature in seen:
                 continue
             seen.add(proposal.signature)

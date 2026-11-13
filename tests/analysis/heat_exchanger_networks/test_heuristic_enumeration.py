@@ -353,3 +353,32 @@ def test_a_fruitless_search_stops_once_its_incomplete_proposals_are_kept():
 
     assert proposals and not any(proposal.complete for proposal in proposals)
     assert time.perf_counter() - start < 5.0
+
+
+def test_dead_ends_met_first_do_not_hide_the_complete_proposals_behind_them():
+    # The stream nearest the pinch prefers the only cold stream the farthest
+    # hot stream may use, so the first choice leads to hundreds of dead ends
+    # and the second to complete designs, a few hundred nodes on.
+    from dataclasses import replace
+
+    hot = (
+        [stream("hot", 0, 1.0, 100.0, 300.0, at_pinch=False)]
+        + [
+            stream("hot", 1 + i, 1.0, 100.0, 311.0 + i, at_pinch=False)
+            for i in range(4)
+        ]
+        + [stream("hot", 5, 1.0, 100.0, 400.0, at_pinch=False)]
+    )
+    cold = [stream("cold", j, 1.0, 100.0, 100.0, at_pinch=False) for j in range(8)]
+    allowed = [[False] * 8 for _hot in range(6)]
+    allowed[0][0] = allowed[0][1] = allowed[5][0] = True
+    for i in range(1, 5):
+        allowed[i][2:] = [True] * 6
+    above = replace(
+        side("above", hot, cold),
+        match_allowed=tuple(tuple(row) for row in allowed),
+    )
+
+    proposals = propose_side_topologies(above, limit=5)
+
+    assert [proposal.complete for proposal in proposals] == [True] * 5
