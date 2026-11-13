@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import copy
+import logging
 from dataclasses import dataclass, field, replace
+from itertools import product
 from typing import Any, Literal, Mapping, Sequence
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -25,6 +27,8 @@ from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
+
+logger = logging.getLogger(__name__)
 
 
 class ModelSliceUnavailableError(NotImplementedError):
@@ -66,6 +70,11 @@ class InternalHeatExchangerNetworkProblem:
     pdm_variants: list["InternalHeatExchangerNetworkProblem"] = field(
         default_factory=list, init=False
     )
+    # PDM only: above 0, the heuristic pinch design method builds up to this
+    # many networks instead of the MILP sides; extra ones go in
+    # ``pdm_variants``.
+    heuristic_network_limit: int = 0
+    heuristic_report: dict[str, Any] = field(default_factory=dict, init=False)
 
     def load_model(
         self,
@@ -111,14 +120,20 @@ class InternalHeatExchangerNetworkProblem:
         unreduced_case = None
         try:
             self.load_model(model_factories=model_factories)
-            if self.framework == "PDM":
+            if self.framework == "PDM" and self.heuristic_network_limit > 0:
+                self._solve_heuristic_pdm()
+            elif self.framework == "PDM":
                 self._solve_pdm(print_output=print_output)
             else:
                 self.case.optimise(print_output=print_output)
             if self.framework in {"PDM", "TDM"}:
                 unreduced_case = self.case
                 self.case = self.remove_unused_stages(self.case)
-            if self.framework == "PDM" and self.case.mSuccess == 1:
+            if (
+                self.framework == "PDM"
+                and self.heuristic_network_limit <= 0
+                and self.case.mSuccess == 1
+            ):
                 self.pdm_variants = self._solve_pdm_variants(model_factories)
             if evolution:
                 evolved = self.case.get_net_benefit_evolution(
@@ -432,6 +447,124 @@ class InternalHeatExchangerNetworkProblem:
             found.append(side)
             excluded.append(side.used_units())
         return [primary, *found]
+
+    def _solve_heuristic_pdm(self) -> None:
+        """Realise heuristic pinch design proposals as networks.
+
+        Each required side's proposals are solved for minimum utility with
+        only their matches, heaters and coolers allowed; a side that fails is
+        dropped. Side pairs, fewest proposal ranks first, are amalgamated,
+        stage-reduced and verified like the extra PDM networks, and repeats
+        are dropped, up to ``heuristic_network_limit`` networks. The first
+        becomes this problem's case, the others ``pdm_variants``.
+        """
+
+        from ..heuristic.enumeration import propose_side_topologies
+        from ..heuristic.side_streams import pinch_side
+        from ..reporting.ranking import network_structure_signature
+
+        limit = self.heuristic_network_limit
+        report: dict[str, Any] = {"proposed": {}, "realised": {}}
+        sides = {}
+        for name in ("above", "below"):
+            template = getattr(self, name)
+            if not template.side_required:
+                sides[name] = [template]
+                continue
+            proposals = propose_side_topologies(pinch_side(template), limit=limit)
+            realised = [
+                side
+                for rank, proposal in enumerate(proposals)
+                if (side := self._realise_side(name, proposal, rank)) is not None
+            ]
+            report["proposed"][name] = len(proposals)
+            report["realised"][name] = len(realised)
+            sides[name] = realised
+        pairs = sorted(
+            product(enumerate(sides["above"]), enumerate(sides["below"])),
+            key=lambda pair: (pair[0][0] + pair[1][0], pair[0][0]),
+        )
+        networks: list[InternalHeatExchangerNetworkProblem] = []
+        seen: set = set()
+        failed = repeated = 0
+        for (_a, above), (_b, below) in pairs:
+            if len(networks) >= limit:
+                break
+            variant = self._pdm_variant(above, below)
+            if variant is None or not variant.case.verify()[0]:
+                failed += 1
+                continue
+            signature = network_structure_signature(
+                variant.extract_network(run_id="heuristic-pdm")
+            )
+            if signature in seen:
+                repeated += 1
+                continue
+            seen.add(signature)
+            networks.append(variant)
+        report.update(
+            pairs=len(pairs), failed=failed, repeated=repeated, networks=len(networks)
+        )
+        self.heuristic_report = report
+        logger.info("[%s] heuristic pinch design: %s", self.name, report)
+        if not networks:
+            raise ValueError(
+                "No heuristic pinch design proposal could be realised as a network."
+            )
+        first, *rest = networks
+        self.above, self.below, self.case = first.above, first.below, first.case
+        self.pdm_variants = rest
+
+    def _realise_side(self, name: str, proposal, rank: int):
+        """Solve one side proposal, or return ``None`` if it cannot be."""
+
+        template = getattr(self, name)
+        stages = proposal.stages
+        factory = self._model_factory(
+            getattr(self, "_model_factories", None),
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        try:
+            side = factory(
+                **(
+                    dict(self.args)
+                    | {
+                        "name": f"{name} pinch {self.dTmin} heuristic {rank}",
+                        "pinch_loc": name,
+                        "minimisation_goal": (
+                            "hot utility" if name == "above" else "cold utility"
+                        ),
+                        "pinch_decomposition": self.pinch_decompositions[
+                            name
+                        ].model_copy(
+                            update={
+                                "S": stages,
+                                "K": stages + 1,
+                                "manual_stage_selection": (stages, stages),
+                            }
+                        ),
+                        "stage_selection": [stages, stages],
+                        "z_restriction": proposal.z_restriction(
+                            hot_count=template.I,
+                            cold_count=template.J,
+                            hot_utilities=template.NHU,
+                            cold_utilities=template.NCU,
+                        ),
+                    }
+                )
+            )
+        except ValueError as exc:
+            logger.debug("Heuristic %s proposal %d not built: %s", name, rank, exc)
+            return None
+        side.optimise(print_output=False)
+        if side.mSuccess != 1:
+            _cleanup_model(side)
+            return None
+        # The amalgamated network is built with the above side's restriction,
+        # which must be the problem's, not this side's stage grid.
+        side.z_restriction = self.args["z_restriction"]
+        return side
 
     def _pdm_variant(
         self, above, below

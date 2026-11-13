@@ -13,20 +13,22 @@ A rules-based (Linnhoff) pinch design method. It proposes network topologies for
 - Only streams active on the side in some period are listed. A stream absent in a period has zero load, zero CP and no pinch contact there [side_streams.py:_side_stream].
 - The pinch end is a hot stream's outlet above the pinch and its inlet below; a cold stream's inlet above and its outlet below. A stream reaches the pinch in a period when its pinch-end temperature is within `PINCH_TOLERANCE` K of the pinch temperature shifted by its own contribution [side_streams.py:_side_stream].
 - A segmented stream's pinch CP is that of the clipped segment at its pinch end, and its temperature follows the clipped piecewise profile [side_streams.py:_profile_points].
+- `PinchSide.period_view` and `SideStream.period_view` give one period as single-period data [side_streams.py:PinchSide.period_view].
 - `load` and `pinch_cp` are period-weighted means; `pinch_cp` averages only over periods where the stream is active [side_streams.py:SideStream].
 
 - Rules apply only to streams that reach the pinch. The CP rule for a pinch match holds when the must stream's CP is at most its partner's, within `CP_TOLERANCE`, in every period both reach the pinch [rules.py:cp_rule_met].
 - Splitting: a must stream that no partner can take is split in two, then while must branches outnumber partner branches the partner with the largest CP per branch gains a branch [rules.py:split_counts].
 - `cp_feasible` checks each period separately as a transport problem (max flow): every must stream's CP shared over its pinch matches with no partner over its own CP [rules.py:cp_feasible].
 
-- Pinch matches: each must stream takes as many partners as `split_counts` gives it branches and a partner hosts at most its branch count, with split ratios meeting the CP rule (`cp_feasible`); sets with fewer splits come first. If none exists, each partner may host one more branch, then the CP rule is dropped [enumeration.py:pinch_assignments].
+- Pinch matches: each must stream takes as many partners as `split_counts` gives it branches and a partner hosts at most its branch count, with split ratios meeting the CP rule (`cp_feasible`); sets with fewer splits come first. If none exists, each partner may host one more branch, then the CP rule is dropped. Sets with one must stream split once more (largest CP first) follow as alternatives [enumeration.py:pinch_assignments].
 - Tick-off: a pinch match takes the smaller of its two loads; a split stream shares its load over its pinch matches in proportion to the other streams' CPs [enumeration.py:_tick_off].
 - Away from the pinch, the must stream with the largest remaining load is matched next, branching over partners (tick-off first, then larger duty). A pair is matched at most once. A match's duty is the largest, up to both remaining loads, whose two ends keep the pair's minimum approach in every period both streams run, each stream's slice taken next from its pinch end and scaled by its period load [enumeration.py:_extend, _feasible_duty].
 - Stages: pinch matches sit next to the pinch (stage S - 1 above, stage 0 below) and every further match one stage further out than the last match on either of its streams. Partners with load left get every utility they may use [enumeration.py:_place, _proposal].
+- Multiperiod: each period is designed on its own side view (`PinchSide.period_view`, its active streams with that period's data), and a proposal is the union of one design per period, stages aligned by distance from the pinch and heaters and coolers merged. Combinations are taken best-first by the sum of the designs' ranks; complete unions come first [enumeration.py:propose_side_topologies, _union].
 - Loads within `LOAD_FRACTION_TOLERANCE` of a stream's load count as met. Proposals are de-duplicated by `signature`; each pinch-match set has its own depth-first search and the searches take turns; complete proposals come first and incomplete ones only fill the cap. The search is bounded by a node budget per proposal requested [enumeration.py:propose_side_topologies].
 
 ## Side Effects
-- None: reads model attributes and solver arrays only.
+- None: reads model attributes and solver arrays only. `../models/problem.py` (`InternalHeatExchangerNetworkProblem._solve_heuristic_pdm`) realises the proposals.
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_heuristic_side_streams.py tests/analysis/heat_exchanger_networks/test_heuristic_rules.py tests/analysis/heat_exchanger_networks/test_heuristic_enumeration.py`
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_heuristic_side_streams.py tests/analysis/heat_exchanger_networks/test_heuristic_rules.py tests/analysis/heat_exchanger_networks/test_heuristic_enumeration.py tests/analysis/heat_exchanger_networks/test_heuristic_realisation.py`

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 import numpy as np
@@ -67,6 +67,19 @@ class SideStream:
             np.interp(heat_from_pinch, self.heats[period], self.temperatures[period])
         )
 
+    def period_view(self, period: int) -> "SideStream":
+        """This stream in one period, as a single-period stream."""
+
+        return replace(
+            self,
+            loads=(self.loads[period],),
+            pinch_cps=(self.pinch_cps[period],),
+            at_pinch=(self.at_pinch[period],),
+            heats=(self.heats[period],),
+            temperatures=(self.temperatures[period],),
+            weights=(1.0,),
+        )
+
 
 @dataclass(frozen=True)
 class PinchSide:
@@ -94,6 +107,17 @@ class PinchSide:
     @property
     def periods(self) -> int:
         return len(self.weights)
+
+    def period_view(self, period: int) -> "PinchSide":
+        """The side in one period: its active streams as single-period ones."""
+
+        return replace(
+            self,
+            hot=tuple(s.period_view(period) for s in self.hot if s.active(period)),
+            cold=tuple(s.period_view(period) for s in self.cold if s.active(period)),
+            approach=(self.approach[period],),
+            weights=(1.0,),
+        )
 
 
 def pinch_side(model) -> PinchSide:

@@ -32,7 +32,10 @@ def _duties(proposal):
 def test_pinch_matches_follow_the_cp_rule():
     # Below the pinch the cold stream needs a hot partner with a CP at least
     # its own: 20 kW/K, not 10.
-    assert pinch_assignments(_four_stream_below(), limit=10) == [((0, 1),)]
+    assignments = pinch_assignments(_four_stream_below(), limit=10)
+
+    assert assignments[0] == ((0, 1),)
+    assert ((0, 0),) not in assignments
 
 
 def test_pinch_matches_tick_off_then_away_matches_then_utilities():
@@ -97,3 +100,53 @@ def test_a_split_must_stream_matches_two_partners_at_the_pinch():
 
     assert {(m.hot, m.cold, m.stage) for m in first.matches} == {(0, 0, 0), (0, 1, 0)}
     assert sum(m.duty for m in first.matches) == pytest.approx(100.0)
+
+
+def test_an_optional_split_at_the_pinch_is_a_later_alternative():
+    proposals = propose_side_topologies(_four_stream_below(), limit=10)
+
+    pinch_matches = [
+        {(m.hot, m.cold) for m in p.matches if m.cold == 0} for p in proposals
+    ]
+    assert pinch_matches[0] == {(1, 0)}
+    # The cold pinch stream split across both hot streams.
+    assert {(0, 0), (1, 0)} in pinch_matches[1:]
+
+
+def _two_period_above():
+    from dataclasses import replace
+
+    base = side(
+        "above",
+        [stream("hot", 0, 2.0, 100.0, 100.0)],
+        [stream("cold", 0, 3.0, 100.0, 90.0), stream("cold", 1, 4.0, 100.0, 90.0)],
+    )
+
+    def periods(s, active):
+        return replace(
+            s,
+            loads=tuple(s.loads[0] if on else 0.0 for on in active),
+            pinch_cps=tuple(s.pinch_cps[0] if on else 0.0 for on in active),
+            at_pinch=tuple(on for on in active),
+            heats=(s.heats[0],) * 2,
+            temperatures=(s.temperatures[0],) * 2,
+            weights=(0.5, 0.5),
+        )
+
+    return replace(
+        base,
+        hot=(periods(base.hot[0], (True, True)),),
+        cold=(
+            periods(base.cold[0], (True, False)),
+            periods(base.cold[1], (False, True)),
+        ),
+        approach=base.approach * 2,
+        weights=(0.5, 0.5),
+    )
+
+
+def test_a_multiperiod_proposal_is_the_union_of_each_periods_design():
+    first = propose_side_topologies(_two_period_above(), limit=10)[0]
+
+    assert {(m.hot, m.cold, m.stage) for m in first.matches} == {(0, 0, 0), (0, 1, 0)}
+    assert first.complete

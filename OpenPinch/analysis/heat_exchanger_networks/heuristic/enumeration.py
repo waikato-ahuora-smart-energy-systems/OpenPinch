@@ -10,6 +10,7 @@ topologies only: the pinch side model realises their duties.
 
 from __future__ import annotations
 
+import heapq
 from dataclasses import dataclass
 from itertools import combinations
 from typing import Iterator
@@ -92,10 +93,11 @@ def pinch_assignments(
 
     Each set holds ``(must index, partner index)`` matches. A must stream
     takes as many partners as it has branches and a partner hosts at most
-    its branch count; split ratios must exist that meet the CP rule. Fewer
-    splits come first. When no set meets the rules with the textbook split
-    counts, each partner may host one more branch; failing that, the CP
-    rule is dropped.
+    its branch count; split ratios must exist that meet the CP rule. The
+    textbook split counts come first, fewer splits first; then, as
+    alternatives, one must stream at a time split once more, largest CP
+    first. When no set meets the rules, each partner may host one more
+    branch; failing that, the CP rule is dropped.
     """
 
     must, partners = pinch_streams(side)
@@ -103,21 +105,38 @@ def pinch_assignments(
         return [()]
     must_counts, partner_counts = split_counts(side)
     for extra, check_cp in ((0, True), (1, True), (1, False)):
+        capacity = {index: count + extra for index, count in partner_counts.items()}
         found = _assignments(
-            side,
-            must,
-            partners,
-            must_counts,
-            {index: count + extra for index, count in partner_counts.items()},
-            limit=limit,
-            check_cp=check_cp,
+            side, must, partners, must_counts, capacity, limit=limit, check_cp=check_cp
         )
         if found:
-            return found
-    return [()]
+            break
+    else:
+        return [()]
+    for stream in sorted(must, key=lambda s: (-s.pinch_cp, s.index)):
+        if len(found) >= limit:
+            break
+        more = dict(must_counts) | {stream.index: must_counts[stream.index] + 1}
+        found += [
+            edges
+            for edges in _assignments(
+                side,
+                must,
+                partners,
+                more,
+                capacity,
+                limit=limit - len(found),
+                check_cp=check_cp,
+                exact=True,
+            )
+            if edges not in found
+        ]
+    return found[:limit]
 
 
-def _assignments(side, must, partners, must_counts, capacity, *, limit, check_cp):
+def _assignments(
+    side, must, partners, must_counts, capacity, *, limit, check_cp, exact=False
+):
     # Hardest streams first: largest CP, then most branches.
     order = sorted(must, key=lambda s: (-must_counts[s.index], -s.pinch_cp, s.index))
     found: list[tuple[tuple[int, int], ...]] = []
@@ -130,7 +149,7 @@ def _assignments(side, must, partners, must_counts, capacity, *, limit, check_cp
             if used.get(p.index, 0) < capacity[p.index] and _allowed(side, stream, p)
         ]
         count = min(must_counts[stream.index], len(allowed))
-        if count == 0:
+        if count == 0 or (exact and count < must_counts[stream.index]):
             return []
         combos = list(combinations(allowed, count))
         # One-to-one CP rule first, then partners whose load ticks the
@@ -173,6 +192,71 @@ def _split_count(edges) -> int:
 
 def propose_side_topologies(side: PinchSide, *, limit: int) -> list[SideProposal]:
     """Up to ``limit`` distinct topologies for one pinch side.
+
+    With several periods, each period is designed on its own and a proposal
+    is the union of one design per period (one shared topology), stages
+    aligned by their distance from the pinch. Combinations of lower-ranked
+    designs come first.
+    """
+
+    if limit <= 0:
+        return []
+    if side.periods == 1:
+        return _single_period_topologies(side, limit=limit)
+    designs = [
+        _single_period_topologies(side.period_view(n), limit=limit)
+        for n in range(side.periods)
+    ]
+    designs = [period for period in designs if period]
+    if not designs:
+        return []
+    proposals: list[SideProposal] = []
+    seen: set[tuple] = set()
+    start = (0,) * len(designs)
+    heap = [(0, start)]
+    queued = {start}
+    pops = 0
+    while heap and len(proposals) < limit and pops < _NODES_PER_PROPOSAL * limit:
+        pops += 1
+        _total, ranks = heapq.heappop(heap)
+        union = _union(side, [designs[n][r] for n, r in enumerate(ranks)])
+        if union.signature not in seen:
+            seen.add(union.signature)
+            proposals.append(union)
+        for n in range(len(designs)):
+            if ranks[n] + 1 < len(designs[n]):
+                following = ranks[:n] + (ranks[n] + 1,) + ranks[n + 1 :]
+                if following not in queued:
+                    queued.add(following)
+                    heapq.heappush(heap, (sum(following), following))
+    return sorted(proposals, key=lambda proposal: not proposal.complete)
+
+
+def _union(side: PinchSide, designs: list[SideProposal]) -> SideProposal:
+    """One topology holding every period design, stages aligned at the pinch."""
+
+    stages = max(design.stages for design in designs)
+    above = side.location == "above"
+    matches: dict[tuple[int, int, int], ProposedMatch] = {}
+    for design in designs:
+        for match in design.matches:
+            layer = design.stages - 1 - match.stage if above else match.stage
+            stage = stages - 1 - layer if above else layer
+            key = (match.hot, match.cold, stage)
+            if key not in matches or matches[key].duty < match.duty:
+                matches[key] = ProposedMatch(match.hot, match.cold, stage, match.duty)
+    return SideProposal(
+        location=side.location,
+        stages=stages,
+        matches=tuple(matches.values()),
+        heaters=tuple(sorted({h for design in designs for h in design.heaters})),
+        coolers=tuple(sorted({c for design in designs for c in design.coolers})),
+        complete=all(design.complete for design in designs),
+    )
+
+
+def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SideProposal]:
+    """Up to ``limit`` distinct topologies for one single-period side.
 
     Every set of pinch matches gets its own depth-first search over the
     matches away from the pinch; the searches take turns, so the proposals
