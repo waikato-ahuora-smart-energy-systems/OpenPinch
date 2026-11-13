@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import heapq
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 from typing import Iterator
 
@@ -296,6 +296,15 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
         return []
     searches = [
         _completions(side, assignment, budget=_NODES_PER_PROPOSAL * limit)
+        if not assignment or cp_feasible(side, assignment)
+        # Pinch matches that break the CP rule (its last fallback) cannot
+        # make a complete design, whatever follows.
+        else (
+            replace(proposal, complete=False)
+            for proposal in _completions(
+                side, assignment, budget=_NODES_PER_PROPOSAL * limit
+            )
+        )
         for assignment in pinch_assignments(side, limit=limit)
     ]
     complete: list[SideProposal] = []
@@ -359,8 +368,8 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
     the other streams' CPs. The side model mixes split branches at one
     temperature, so each match must keep its approach between the streams'
     temperatures at both ends of the stage, not just its own slice. When a
-    match cannot, every pinch match is also allowed one stage further out,
-    and the side model shares the duty over the two stages.
+    split's match cannot, every pinch match is also allowed one stage
+    further out, and the side model shares the duty over the two stages.
     """
 
     must_edges: dict[int, list[int]] = {}
@@ -388,7 +397,8 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
             layer[key] = 0
         hot, cold = _hot_cold(must, partner)
         matches.append((hot.index, cold.index, 0, duty))
-    if not _mixed_stage_feasible(side, streams, matches, used):
+    split = len(must_edges) < len(assignment) or len(partner_edges) < len(assignment)
+    if split and not _mixed_stage_feasible(side, streams, matches, used):
         relief = [(hot, cold, 1, 0.0) for hot, cold, _layer, _duty in matches]
         matches += relief
         for hot, cold, _layer, _duty in relief:
@@ -596,11 +606,10 @@ def _proposal(side, state, streams, must_kind, *, complete: bool) -> SideProposa
         )
         for hot, cold, layer, duty in state.matches
     )
-    left = [
-        s
-        for (kind, index), s in streams.items()
-        if kind != must_kind and not _met(s, state.remaining[(kind, index)])
-    ]
+    # Every partner may use its utilities, not just those with load left: if
+    # the side model cannot reach the proposed duties, the load it leaves
+    # must still have somewhere to go. The side model picks the cheapest.
+    left = [s for (kind, _index), s in streams.items() if kind != must_kind]
     heaters = tuple(
         (s.index, u)
         for s in left

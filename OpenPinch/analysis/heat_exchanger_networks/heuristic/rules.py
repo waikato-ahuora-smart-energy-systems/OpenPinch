@@ -48,9 +48,11 @@ def cp_rule_met(must: SideStream, partner: SideStream) -> bool:
 def split_counts(side: PinchSide) -> tuple[dict[int, int], dict[int, int]]:
     """Branches per must stream and per partner after the splitting rules.
 
-    A must stream whose CP no partner can take is split in two; then, while
-    must branches outnumber partner branches, the partner with the largest
-    CP per branch is split once more. Keys are stream indices.
+    A must stream whose CP no partner can take is split into the fewest
+    branches whose largest partner CPs together cover it (at least two, at
+    most one per partner); then, while must branches outnumber partner
+    branches, the partner with the largest CP per branch is split once more.
+    Keys are stream indices.
     """
 
     must, partners = pinch_streams(side)
@@ -60,7 +62,7 @@ def split_counts(side: PinchSide) -> tuple[dict[int, int], dict[int, int]]:
         return must_counts, partner_counts
     for stream in must:
         if not any(cp_rule_met(stream, partner) for partner in partners):
-            must_counts[stream.index] = 2
+            must_counts[stream.index] = _branches_covering(stream, partners)
     for _round in range(_MAX_SPLIT_ROUNDS):
         if sum(must_counts.values()) <= sum(partner_counts.values()):
             break
@@ -70,6 +72,19 @@ def split_counts(side: PinchSide) -> tuple[dict[int, int], dict[int, int]]:
         )
         partner_counts[largest.index] += 1
     return must_counts, partner_counts
+
+
+def _branches_covering(stream: SideStream, partners) -> int:
+    """Fewest branches (two or more) whose largest partner CPs cover the CP."""
+
+    covered = 0.0
+    count = 0
+    for cp in sorted((partner.pinch_cp for partner in partners), reverse=True):
+        covered += cp
+        count += 1
+        if count >= 2 and stream.pinch_cp <= covered * (1.0 + CP_TOLERANCE):
+            break
+    return max(2, count)
 
 
 def cp_feasible(side: PinchSide, edges: Iterable[tuple[int, int]]) -> bool:

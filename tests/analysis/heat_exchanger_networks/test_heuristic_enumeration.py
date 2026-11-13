@@ -188,3 +188,75 @@ def test_away_from_the_pinch_the_most_cp_similar_partner_comes_first():
 
     away = {(m.hot, m.cold) for m in kept.matches if m.hot == 1}
     assert away == {(1, 2)}
+
+
+def test_every_partner_stream_is_offered_its_utilities():
+    # A partner whose load the matches seem to cover still gets its heaters
+    # or coolers: when the side model cannot reach the tick-off duties, the
+    # load left must have somewhere to go (Six-stream Yee and Grossmann below
+    # the pinch put its cooler on the wrong stream).
+    below = side(
+        "below",
+        [stream("hot", 0, 20.0, 1000.0, 590.0)],
+        [stream("cold", 0, 15.0, 1000.0, 576.0)],
+        approach=14.0,
+    )
+
+    (proposal,) = propose_side_topologies(below, limit=10)
+
+    assert proposal.complete
+    assert proposal.coolers == ((0, 0),)
+
+
+def test_an_unsplit_pinch_match_gets_no_relief_stage():
+    # The relief stage lets split branches that mix at one temperature share
+    # their duty with the next stage out; a match with no split gains nothing.
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic.enumeration import (
+        _completions,
+    )
+
+    above = side(
+        "above",
+        [stream("hot", 0, 10.0, 100.0, 380.0)],
+        [stream("cold", 0, 5.0, 100.0, 370.0)],
+    )
+
+    proposal = next(_completions(above, ((0, 0),), budget=100))
+
+    assert proposal.stages == 1
+
+
+def test_a_must_stream_splits_into_enough_branches_for_its_cp():
+    # Thirteen-stream Kim below the pinch: one cold stream of CP 289.9 needs
+    # four hot partners; two branches broke the CP rule on every proposal.
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic.rules import (
+        split_counts,
+    )
+
+    below = side(
+        "below",
+        [
+            stream("hot", i, cp, 1000.0, 400.0)
+            for i, cp in enumerate([100.0, 90.0, 80.0, 70.0])
+        ],
+        [stream("cold", 0, 289.9, 1000.0, 390.0)],
+    )
+
+    must_counts, _partner_counts = split_counts(below)
+
+    assert must_counts == {0: 4}
+    assert all(
+        proposal.complete for proposal in propose_side_topologies(below, limit=3)
+    )
+
+
+def test_a_proposal_that_breaks_the_cp_rule_is_not_complete():
+    below = side(
+        "below",
+        [stream("hot", i, cp, 1000.0, 400.0) for i, cp in enumerate([100.0, 90.0])],
+        [stream("cold", 0, 500.0, 1000.0, 390.0)],
+    )
+
+    proposals = propose_side_topologies(below, limit=3)
+
+    assert proposals and not any(proposal.complete for proposal in proposals)
