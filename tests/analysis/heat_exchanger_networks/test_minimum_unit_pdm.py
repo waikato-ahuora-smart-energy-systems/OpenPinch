@@ -588,3 +588,42 @@ def test_a_side_with_fewer_units_than_the_primary_is_kept():
     # reduction change the network's own count.
     above = [variant.above.n_units for variant in problem.pdm_variants]
     assert above and min(above) < problem.above.n_units
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_time_limited_primary_side_stays_unconverged_and_adds_no_variants(
+    monkeypatch,
+):
+    # A primary side stopped at its time limit has an unproven utility cost:
+    # the reduced network lost that mark, and variants were capped on it.
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    real_optimise = PinchDecompModel.optimise
+
+    def stopped_at_the_limit(self, *args, **kwargs):
+        result = real_optimise(self, *args, **kwargs)
+        if self.name.startswith(("above pinch", "below pinch")) and "units" not in (
+            self.name
+        ):
+            self.solver_run = replace(
+                self.solver_run, termination_condition="maxTimeLimit"
+            )
+        return result
+
+    monkeypatch.setattr(PinchDecompModel, "optimise", stopped_at_the_limit)
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem,
+        "_utilisation_threshold",
+        lambda self, stage_count: 30.0,
+    )
+    problem = _problem(14.0, (2, 1))
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None
+    assert not solved.solver_run.converged
+    assert problem.pdm_variants == []

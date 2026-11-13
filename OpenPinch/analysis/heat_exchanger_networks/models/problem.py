@@ -399,6 +399,14 @@ class InternalHeatExchangerNetworkProblem:
         at_minimum, one_more = self.pdm_network_limits
         if at_minimum + one_more <= 0 or self.solver not in backend.INTEGER_SOLVERS:
             return []
+        if not all(
+            side.solver_run.converged
+            for side in (self.above, self.below)
+            if side.side_required
+        ):
+            # A side stopped at its limit has an unproven minimum utility, so
+            # the extra networks would have no sound cost cap.
+            return []
         sides = {
             name: self._minimum_unit_sides(
                 name, side, (at_minimum, one_more), model_factories
@@ -838,6 +846,12 @@ class InternalHeatExchangerNetworkProblem:
         # unless the reduced one solves and passes the same checks.
         if f_case.mSuccess != 1 or not f_case.verify()[0]:
             return case
+        if not case.solver_run.converged:
+            # The reduced network rests on the same unproven solve.
+            f_case.solver_run = replace(
+                f_case.solver_run,
+                termination_condition=case.solver_run.termination_condition,
+            )
         return f_case
 
     def _get_active_stages(self, case, *, threshold: float | None = None) -> list[int]:
