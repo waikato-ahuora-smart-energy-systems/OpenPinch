@@ -605,6 +605,34 @@ def test_one_more_unit_is_counted_from_the_fewest_units_not_the_primary():
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_minimum_unit_sides_have_their_run_directories_dropped(monkeypatch):
+    # Each kept side's solver may have a run directory (Couenne always has
+    # one for its option file); only the primary sides' were dropped.
+    from OpenPinch.analysis.heat_exchanger_networks.models import (
+        problem as problem_module,
+    )
+
+    cleaned = []
+    real = problem_module._cleanup_model
+
+    def recording(model):
+        cleaned.append(model)
+        real(model)
+
+    monkeypatch.setattr(problem_module, "_cleanup_model", recording)
+    problem = _problem(14.0, (3, 3))
+
+    problem.get_solution(print_output=False)
+
+    sides = [
+        side
+        for variant in problem.pdm_variants
+        for side in (variant.above, variant.below)
+    ]
+    assert sides and all(any(side is model for model in cleaned) for side in sides)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_a_time_limited_primary_side_stays_unconverged_and_adds_no_variants(
     monkeypatch,
 ):

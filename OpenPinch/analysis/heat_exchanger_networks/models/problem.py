@@ -450,6 +450,11 @@ class InternalHeatExchangerNetworkProblem:
                     seen.add(signature)
                     variants.append(variant)
                     kept += 1
+        # Results live on the model variables: drop the found sides' run
+        # directories (get_solution drops the primary sides').
+        for found in sides.values():
+            for side in found[1:]:
+                _cleanup_model(side)
         return variants
 
     def _minimum_unit_sides(
