@@ -493,7 +493,8 @@ def test_evolution_can_add_a_utility_the_parent_did_not_use():
     # (10.65 M against 8.26 M).
     payload = json.loads(
         (
-            REPOSITORY_ROOT / "tests/fixtures/openhens/Six-stream-Spray-Dryer-2025-1.json"
+            REPOSITORY_ROOT
+            / "tests/fixtures/openhens/Six-stream-Spray-Dryer-2025-1.json"
         ).read_text(encoding="utf-8")
     )
     for key in ("HENS_DT_CONT_MULTIPLIERS", "HENS_SOLVER_PDM"):
