@@ -252,6 +252,9 @@ Heat exchanger network synthesis
   any depth in the heuristic's place at a multiplier where the heuristic
   realises no network. From depth 2 its main networks go through the thermal
   derivative method; otherwise its networks seed evolution directly.
+- A MILP pinch design side's first, minimum-utility solve stops after 600 s
+  unless ``HENS_SOLVER_OPTIONS_PDM`` sets a limit; with HiGHS its best network
+  is then kept as an unconverged result.
 - Each MILP pinch design side is re-solved for the fewest units (matches,
   heaters and coolers) among those its minimum-utility solve used, at the same
   utility. Minimum utility cost leaves the match binaries free once the targets
@@ -267,7 +270,8 @@ Heat exchanger network synthesis
   the fewest units at the minimum utility cost to collect, and
   ``HENS_PDM_EXTRA_UNIT_NETWORKS`` how many with one unit more (both 0 by
   default and independent of the depth). No-good cuts exclude each topology
-  found, each solve is time-limited, and an extra network drops only its empty
+  found, each solve is time-limited, the one-more-unit quota is filled after
+  the minimum one, and an extra network drops only its empty
   stages, so it stays at minimum utility. Every extra network is a pinch
   design result of its own and seeds network evolution directly. Collecting
   them needs an integer solver (``highs``, ``couenne``, ``scip`` or
@@ -338,13 +342,16 @@ Heat exchanger network synthesis
   with the same objective: on the four-stream example the best network has
   the same units and TAC in 2 stages instead of 3.
 - Stage reduction no longer uses APOPT: the reduced network is solved with
-  HiGHS when its model is linear and with Ipopt otherwise. A missing solver,
-  or a reduction that would leave no stage, keeps the unreduced network.
+  HiGHS when its model is linear and with Ipopt otherwise, for minimum utility
+  cost when the case has a choice of utilities. A missing solver, or a
+  reduction that would leave no stage, keeps the unreduced network.
 - In network evolution's relaxed model, a heater or cooler switched off by the
   warm start could still carry duty with its approach relaxed by big-M, so on
   Nine-stream Linnhoff-Ahmad every evolved network failed verification. Its
-  duty is now bounded by its binary. A warning says when every evolution task
-  fails, so the result was not evolved.
+  duty is now bounded by its binary, and after the warm start every allowed
+  heater or cooler that can sit idle within its approach is switched back on,
+  so evolution can still add a utility the parent lacked. A warning says when
+  every evolution task fails, so the result was not evolved.
 - In multiperiod evolution, a shared exchanger area at zero (a unit with no
   duty) made the area cost's derivative infinite and stopped Ipopt; a 1e-8 m2
   offset under the cost exponent removes it.
