@@ -105,7 +105,7 @@ def amalgamate_networks(
                         value = (
                             _value(below_case.T_h_by_period[n][i][k - above_case.K + 1])
                             if above_required
-                            else round(_value(below_case.T_h_by_period[n][i][k]), 5)
+                            else _value(below_case.T_h_by_period[n][i][k])
                         )
                     else:
                         value = amalgamated.T_h_out_period[n][i]
@@ -117,12 +117,12 @@ def amalgamate_networks(
                         value = (
                             _value(below_case.T_c_by_period[n][j][k - above_case.K + 1])
                             if above_required
-                            else round(_value(below_case.T_c_by_period[n][j][k]), 5)
+                            else _value(below_case.T_c_by_period[n][j][k])
                         )
                     else:
                         value = amalgamated.T_c_in_period[n][j]
                     _assign_value(amalgamated.T_c_by_period[n][j][k], [value])
-        _copy_utility_matches(amalgamated, below_case, "cold", digits=5)
+        _copy_utility_matches(amalgamated, below_case, "cold")
         if not above_required:
             _clear_utility_matches(amalgamated, "hot")
             amalgamated.minimisation_goal = "cold utility"
@@ -174,8 +174,6 @@ def _copy_utility_matches(
     target: StageWiseModel,
     source: "PinchDecompModel",
     side: str,
-    *,
-    digits: int | None = None,
 ) -> None:
     """Copy each (stream, utility) heater or cooler from one side's solution."""
     target_duties, target_flags = _utility_grids(target, side)
@@ -183,10 +181,8 @@ def _copy_utility_matches(
     for index, row in enumerate(target_flags):
         for u, flag in enumerate(row):
             for n in range(target.N_periods):
-                duty = _value(source_duties[n][index][u])
                 _assign_value(
-                    target_duties[n][index][u],
-                    [duty if digits is None else round(duty, digits)],
+                    target_duties[n][index][u], [_value(source_duties[n][index][u])]
                 )
             _assign_value(flag, [_value(source_flags[index][u])])
 
