@@ -135,10 +135,13 @@ rules by default. On each side of the pinch it:
   (hot streams above the pinch, cold streams below), with partners whose CP
   is at least their own and no more such streams than partners, splitting
   streams where either rule fails;
-- ticks each pinch match off at the smaller of its two loads;
-- matches the remaining loads away from the pinch, largest first, with
-  partners whose temperatures keep both ends of the match at the minimum
-  approach;
+- ticks each pinch match off at the smaller of its two loads, also allowing
+  the match one stage further out when a split's mixed branches would break
+  the approach;
+- matches the remaining loads away from the pinch, the stream nearest the
+  pinch first, with partners whose temperatures keep both ends of the match at
+  the minimum approach (a pair matches again further out only when no new
+  partner can take the load);
 - gives the loads left on the other streams to utilities, allowing every
   utility that can reach them.
 

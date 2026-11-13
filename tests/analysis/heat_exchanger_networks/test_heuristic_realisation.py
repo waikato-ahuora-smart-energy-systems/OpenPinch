@@ -173,3 +173,38 @@ def test_multiperiod_proposals_share_one_topology_across_periods():
     for network in _networks(problem):
         assert verify_network_feasibility(network) == ()
         assert all(len(e.period_states) == 3 for e in network.exchangers)
+
+
+def _fixture(name: str) -> PinchProblem:
+    payload = json.loads(
+        (REPOSITORY_ROOT / f"tests/fixtures/openhens/{name}-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    return PinchProblem(source=payload, project_name=name)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+@pytest.mark.parametrize(
+    "name",
+    [
+        # One cold stream at the pinch above it splits three ways: the split
+        # branches mix at one temperature, so each match also needs the next
+        # stage out.
+        "Six-stream-Yee-and-Grossmann-1990",
+        # A hot stream just above the pinch needs the coldest cold slices,
+        # which a hot stream far above it took first.
+        "Six-stream-Spray-Dryer-2025",
+    ],
+)
+def test_the_heuristic_realises_networks_on_literature_cases(name):
+    pinch = _fixture(name)
+    dTmin = nominal_approach_temperature(pinch.master_zone.config, 1.0)
+    problem = _problem(pinch, dTmin, limit=5)
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    assert all(count > 0 for count in problem.heuristic_report["realised"].values())
+    for network in _networks(problem):
+        assert verify_network_feasibility(network) == ()

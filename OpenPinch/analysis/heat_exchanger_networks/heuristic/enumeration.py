@@ -3,7 +3,7 @@
 Each proposal starts with a set of pinch matches that meets the CP and
 number rules (splitting streams where they fail), ticks each pinch match off
 at the smaller of its two loads, then matches the remaining must-stream loads
-away from the pinch, largest first, branching over the partners whose
+away from the pinch, nearest the pinch first, branching over the partners whose
 temperatures allow it. Partners left with load take utilities. Proposals are
 topologies only: the pinch side model realises their duties.
 """
@@ -356,7 +356,11 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
     """Place the pinch matches next to the pinch, each at its tick-off duty.
 
     A split stream shares its load over its pinch matches in proportion to
-    the other streams' CPs.
+    the other streams' CPs. The side model mixes split branches at one
+    temperature, so each match must keep its approach between the streams'
+    temperatures at both ends of the stage, not just its own slice. When a
+    match cannot, every pinch match is also allowed one stage further out,
+    and the side model shares the duty over the two stages.
     """
 
     must_edges: dict[int, list[int]] = {}
@@ -384,6 +388,11 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
             layer[key] = 0
         hot, cold = _hot_cold(must, partner)
         matches.append((hot.index, cold.index, 0, duty))
+    if not _mixed_stage_feasible(side, streams, matches, used):
+        relief = [(hot, cold, 1, 0.0) for hot, cold, _layer, _duty in matches]
+        matches += relief
+        for hot, cold, _layer, _duty in relief:
+            layer[("hot", hot)] = layer[("cold", cold)] = 1
     return _State(
         remaining=remaining,
         used=used,
@@ -391,6 +400,31 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
         pairs=frozenset((m, p) for m, p in assignment),
         matches=tuple(matches),
     )
+
+
+def _mixed_stage_feasible(side, streams, matches, stage_heat) -> bool:
+    """Whether every match in the pinch stage keeps its approach at both ends.
+
+    Each stream runs from its pinch end to ``stage_heat`` (its whole duty in
+    the stage, as mixed branches leave at one temperature), scaled by each
+    period's load.
+    """
+
+    for hot_index, cold_index, _layer, _duty in matches:
+        hot, cold = streams[("hot", hot_index)], streams[("cold", cold_index)]
+        for n in range(side.periods):
+            if not (hot.active(n) and cold.active(n)):
+                continue
+            approach = side.approach[n][hot_index][cold_index] - 1e-6
+            hot_far = stage_heat[("hot", hot_index)] * hot.loads[n] / hot.load
+            cold_far = stage_heat[("cold", cold_index)] * cold.loads[n] / cold.load
+            for hot_heat, cold_heat in ((0.0, 0.0), (hot_far, cold_far)):
+                if (
+                    hot.temperature(n, hot_heat) - cold.temperature(n, cold_heat)
+                    < approach
+                ):
+                    return False
+    return True
 
 
 def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
@@ -405,18 +439,22 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
     if not open_must:
         yield _proposal(side, state, streams, must_kind, complete=True)
         return
-    must = max(open_must, key=lambda s: (state.remaining[(s.kind, s.index)], -s.index))
-    candidates = []
-    for partner in streams.values():
-        if partner.kind == must.kind or (must.index, partner.index) in state.pairs:
-            continue
-        if not _allowed(side, must, partner):
-            continue
-        if _met(partner, state.remaining[(partner.kind, partner.index)]):
-            continue
-        duty = _feasible_duty(side, state, must, partner)
-        if duty > _tolerance(must):
-            candidates.append((partner, duty))
+    # The stream nearest the pinch first, so it takes the partners' slices
+    # nearest the pinch before a stream far from it uses them up; then the
+    # largest remaining load.
+    must = min(
+        open_must,
+        key=lambda s: (
+            _distance_from_pinch(side, s, state.used[(s.kind, s.index)]),
+            -state.remaining[(s.kind, s.index)],
+            s.index,
+        ),
+    )
+    candidates = _candidates(side, state, streams, must, repeat=False)
+    if not candidates:
+        # A pair matched already may match again further out, as a second
+        # exchanger in another stage, when no new partner can take the load.
+        candidates = _candidates(side, state, streams, must, repeat=True)
     if not candidates:
         yield _proposal(side, state, streams, must_kind, complete=False)
         return
@@ -437,6 +475,46 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
         yield from _extend(
             side, _place(state, must, partner, duty), streams, must_kind, nodes
         )
+
+
+def _candidates(side, state, streams, must, *, repeat: bool):
+    """Partners that can take some of the must stream's load, with duties.
+
+    Without ``repeat`` only partners not yet matched with it; with it only
+    those already matched.
+    """
+
+    candidates = []
+    for partner in streams.values():
+        if partner.kind == must.kind:
+            continue
+        if ((must.index, partner.index) in state.pairs) != repeat:
+            continue
+        if not _allowed(side, must, partner):
+            continue
+        if _met(partner, state.remaining[(partner.kind, partner.index)]):
+            continue
+        duty = _feasible_duty(side, state, must, partner)
+        if duty > _tolerance(must):
+            candidates.append((partner, duty))
+    return candidates
+
+
+def _distance_from_pinch(side, stream: SideStream, heat: float) -> float:
+    """How far (K) a stream's next unmatched heat sits from the pinch side.
+
+    Hot streams above the pinch and cold streams below it run away from the
+    pinch as their heat from the pinch end grows; the mean is over the
+    stream's active periods.
+    """
+
+    sign = 1.0 if side.location == "above" else -1.0
+    temperatures = [
+        sign * stream.temperature(n, heat * stream.loads[n] / stream.load)
+        for n in range(side.periods)
+        if stream.active(n)
+    ]
+    return sum(temperatures) / len(temperatures)
 
 
 def _place(state: _State, must: SideStream, partner: SideStream, duty: float):

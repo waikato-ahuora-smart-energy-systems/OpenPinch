@@ -204,6 +204,12 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The heuristic pinch design method realises networks on more cases. A split
+  at the pinch whose matches cannot keep their approach once the split
+  branches mix also allows each match one stage further out; away from the
+  pinch the stream nearest the pinch is matched first; and a pair may match
+  again further out when no new partner can take a load. On Six-stream Yee and
+  Grossmann and the spray dryer it realised no network before.
 - The heuristic pinch design method realises its proposals with HiGHS when
   highspy is installed, whatever ``HENS_SOLVER_PDM`` names, and without the
   ``HENS_SOLVER_OPTIONS_PDM`` meant for that solver. With Couenne configured
