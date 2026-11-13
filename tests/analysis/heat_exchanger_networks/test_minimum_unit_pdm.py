@@ -48,11 +48,10 @@ def _highs_available() -> bool:
     return True
 
 
-def _problem(dTmin: float, limits: tuple[int, int]):
-    pinch = PinchProblem(
-        source=json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8")),
-        project_name="Four-stream",
-    )
+def _problem(dTmin: float, limits: tuple[int, int], *, extra_utilities=()):
+    payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
+    payload["utilities"] += list(extra_utilities)
+    pinch = PinchProblem(source=payload, project_name="Four-stream")
     return InternalHeatExchangerNetworkProblem(
         solver_arrays=problem_to_solver_arrays(pinch, dTmin),
         framework="PDM",
@@ -87,6 +86,28 @@ def test_pdm_collects_distinct_minimum_unit_networks_as_variants():
     variant_units = [_units(network) for network in networks[1:]]
     assert max(variant_units) - min(variant_units) <= 1
     assert len(variant_units) <= 6
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_pdm_collects_variants_with_a_choice_of_hot_utility():
+    # With a utility choice the variants are capped at the minimum utility
+    # cost; a cap taken from the fewest-units objective made them infeasible.
+    medium_pressure_steam = {
+        "name": "MPS",
+        "type": "Hot",
+        "t_supply": {"value": 600.0, "unit": "K"},
+        "t_target": {"value": 600.0, "unit": "K"},
+        "price": {"value": 60.0, "unit": "$/MWh"},
+        "htc": {"value": 5.0, "unit": "kW/m^2/K"},
+        "heat_flow": None,
+    }
+    problem = _problem(14.0, (2, 1), extra_utilities=(medium_pressure_steam,))
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    assert problem.pdm_variants
+    assert all(variant.case.mSuccess == 1 for variant in problem.pdm_variants)
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")

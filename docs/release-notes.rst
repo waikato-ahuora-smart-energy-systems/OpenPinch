@@ -204,6 +204,10 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The extra minimum-unit pinch design networks are capped at the side's
+  minimum utility cost. With a choice of utility they were capped at the
+  fewest-units count instead, which made every solve infeasible, so those
+  cases got no extra networks.
 - A run that needs one dt_cont multiplier and has none from a network (duty
   optimisation without ``min_approach_temperature``, a user network passed to
   ``thermal_derivative()`` or ``network_evolution()``, and the

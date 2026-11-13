@@ -330,7 +330,7 @@ class InternalHeatExchangerNetworkProblem:
                     "name": f"{name} pinch {self.dTmin} fewest units",
                     "pinch_loc": name,
                     "minimisation_goal": "min units",
-                    "utility_cost_cap": side.solver_run.objective_value,
+                    "utility_cost_cap": _minimum_utility_cost(side),
                     "solver_options": _with_time_limit(
                         self.solver, self.args.get("solver_options")
                     ),
@@ -349,6 +349,9 @@ class InternalHeatExchangerNetworkProblem:
             sparse.solver_run,
             termination_condition=side.solver_run.termination_condition,
         )
+        # The swapped side's objective is its unit count; keep the utility
+        # cost the variants are capped at.
+        sparse.minimum_utility_cost = _minimum_utility_cost(side)
         _cleanup_model(side)
         return sparse
 
@@ -434,7 +437,7 @@ class InternalHeatExchangerNetworkProblem:
                         "name": f"{name} pinch {self.dTmin} min units {len(found)}",
                         "pinch_loc": name,
                         "minimisation_goal": "min units",
-                        "utility_cost_cap": primary.solver_run.objective_value,
+                        "utility_cost_cap": _minimum_utility_cost(primary),
                         "pinch_decomposition": self.pinch_decompositions[name],
                         "stage_selection": self.stage_selection,
                     }
@@ -856,6 +859,11 @@ def _used_in_any_period(case, name: str) -> list[list[int]]:
         ]
         for index, row in enumerate(by_period[0])
     ]
+
+
+def _minimum_utility_cost(side: Any) -> float:
+    """A solved side's minimum utility cost, kept across a fewest-units swap."""
+    return getattr(side, "minimum_utility_cost", side.solver_run.objective_value)
 
 
 def _cleanup_model(model: Any) -> None:
