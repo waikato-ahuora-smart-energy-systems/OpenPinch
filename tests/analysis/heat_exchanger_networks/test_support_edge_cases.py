@@ -377,19 +377,6 @@ def test_result_building_and_seed_validation_edges(monkeypatch):
     with pytest.raises(TypeError, match="HeatExchangerNetwork"):
         seeds._normalise_seed_networks((object(),))
 
-    problem = SimpleNamespace(
-        results=SimpleNamespace(
-            design=SimpleNamespace(method="pinch_design_method", network=seed_network)
-        )
-    )
-    with pytest.raises(ValueError, match="cached thermal_derivative_method"):
-        seeds.resolve_seed_networks(
-            problem,
-            None,
-            method_name="network_evolution_method",
-            cached_source_method="thermal_derivative_method",
-        )
-
 
 def test_service_context_solver_dependency_and_entry_guards(monkeypatch, tmp_path):
     class FakeDesign:

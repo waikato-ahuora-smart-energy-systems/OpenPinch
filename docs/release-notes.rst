@@ -204,6 +204,13 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.thermal_derivative()`` and ``design.network_evolution()`` called
+  without ``initial_networks`` now seed from the stored design of any HEN
+  method, not only from a pinch design (for the thermal derivative method) or a
+  thermal derivative design (for network evolution). They seed from the
+  selected network and the design's other ranked topologies, up to
+  ``HENS_BEST_SOLUTIONS_TO_SAVE`` networks, instead of the selected network
+  alone.
 - ``apopt`` and ``ipopt-GEKKO`` are no longer accepted solver names: every
   heat exchanger network model is now a native Pyomo model, solved with
   ``highs``, ``couenne``, ``ipopt-pyomo``, ``scip`` or ``mindtpy``, and any

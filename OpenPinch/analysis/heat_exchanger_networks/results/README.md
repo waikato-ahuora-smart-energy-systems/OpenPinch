@@ -7,7 +7,7 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 - `SynthesisWorkflowResult` (`assembly.py`): frozen dataclass of tasks, outcomes, accepted result and run time.
 - `build_synthesis_result` (`assembly.py`): demotes infeasible outcomes, accepts the best one and builds the result with its manifest.
 - `demote_infeasible_outcomes` (`assembly.py`): marks solver successes that fail `verify_network_feasibility`, or that carry `diagnostics["unconverged_termination"]`, as failed.
-- `resolve_seed_networks` (`seeds.py`): returns explicit seed networks or the cached upstream design network.
+- `resolve_seed_networks` (`seeds.py`): returns explicit seed networks, or the cached design's selected network followed by its other ranked topologies, up to a limit.
 - `ranked_networks` (`selection.py`): unique ranked outcomes of a result.
 - `network_for_rank` (`selection.py`): network at a one-based rank, without mutation.
 - `select_network` (`selection.py`): writes the chosen outcome into the result.
@@ -20,7 +20,7 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 - Manifest `method_sequence` lists each method once, in outcome order (PDM, TDM, EVM, though tiers above 1 also run some EVM tasks before TDM), without outcomes that failed because Couenne is missing; `settings.method_sequence` does not affect it [assembly.py:_executed_method_sequence].
 - `solution_rank` is one-based; ranks below 1 or beyond the available count raise `IndexError` [selection.py:network_for_rank].
 - `select_network` keeps whatever `ranked_networks` the result holds; for a finalised design that is the unique feasible ranking built by `finalise_design_result`, not every outcome, and `solution_rank` indexes that list [selection.py:select_network] [context.py:finalise_design_result].
-- A cached seed must come from the expected upstream method, and for problems with segmented streams must carry the current `SEGMENT_PROFILE_VERSION` [seeds.py:resolve_seed_networks].
+- A cached seed may come from any HEN method; for problems with segmented streams every cached seed must carry the current `SEGMENT_PROFILE_VERSION` [seeds.py:resolve_seed_networks].
 - Seed networks must be non-empty `HeatExchangerNetwork` instances or mappings that validate as one [seeds.py:_normalise_seed_networks].
 
 ## Side Effects

@@ -110,6 +110,13 @@ Named Advanced Methods
        (thermal.selected_network,)
    )
 
+Called without seed networks, ``thermal_derivative()`` and
+``network_evolution()`` start from the design already stored on the problem,
+whichever method made it: its selected network first, then its other ranked
+topologies, up to ``HENS_BEST_SOLUTIONS_TO_SAVE`` networks in all. So
+``problem.design.heuristic_pinch_design()`` followed by
+``problem.design.network_evolution()`` evolves the heuristic networks.
+
 Successful synthesis stores the serializable result on
 ``problem.results.design`` (the ``TargetOutput.design`` field). The design view
 provides the selected network, ranked candidates, manifest, diagnostics, and
