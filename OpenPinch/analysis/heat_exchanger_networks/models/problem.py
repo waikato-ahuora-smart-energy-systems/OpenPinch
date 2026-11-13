@@ -462,7 +462,8 @@ class InternalHeatExchangerNetworkProblem:
         """The primary side, then its minimum-unit and one-more-unit sides.
 
         Up to ``quotas[0]`` sides with the fewest units (the primary's, or
-        fewer if a side found has fewer), then, with at least one unit more
+        fewer if a side found has fewer; at least one when a one-more side
+        is wanted, to count from), then, with at least one unit more
         required, up to ``quotas[1]`` with one unit more. Only a sound solve
         counts (``_sound_side``).
         """
@@ -513,10 +514,12 @@ class InternalHeatExchangerNetworkProblem:
 
         # Minimum tier. The cut-only search finds the fewest units first; the
         # primary was minimised only within its own matches, so a side with
-        # fewer units than it resets the minimum.
+        # fewer units than it resets the minimum. The one-more tier counts
+        # from that minimum, so it needs one such side even when none is
+        # asked for; pair selection then keeps it out of the variants.
         carried = None
         kept = 0
-        while kept < at_minimum:
+        while kept < max(at_minimum, min(one_more, 1)):
             side = solve(None)
             if side is None:
                 break

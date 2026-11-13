@@ -591,6 +591,20 @@ def test_a_side_with_fewer_units_than_the_primary_is_kept():
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_one_more_unit_is_counted_from_the_fewest_units_not_the_primary():
+    # With no minimum-unit networks asked for, the tier was one unit over the
+    # primary side (14 above the pinch on Ten-stream Ahmad) instead of one
+    # over the fewest units a side can have (9, so 10).
+    source = REPOSITORY_ROOT / "tests/fixtures/openhens/Ten-stream-Ahmad-1985-1.json"
+    problem = _problem(10.0, (0, 2), source=source)
+
+    problem.get_solution(print_output=False)
+
+    above = {variant.above.n_units for variant in problem.pdm_variants}
+    assert above and max(above) < problem.above.n_units
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_a_time_limited_primary_side_stays_unconverged_and_adds_no_variants(
     monkeypatch,
 ):

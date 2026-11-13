@@ -271,7 +271,8 @@ Heat exchanger network synthesis
   ``HENS_PDM_EXTRA_UNIT_NETWORKS`` how many with one unit more (both 0 by
   default and independent of the depth). No-good cuts exclude each topology
   found, each solve is time-limited, the one-more-unit quota is filled after
-  the minimum one, and an extra network drops only its empty
+  the minimum one and counts from the fewest units a side can have, and an
+  extra network drops only its empty
   stages, so it stays at minimum utility. Every extra network is a pinch
   design result of its own and seeds network evolution directly. Collecting
   them needs an integer solver (``highs``, ``couenne``, ``scip`` or
