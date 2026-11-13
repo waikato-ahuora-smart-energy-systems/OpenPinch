@@ -137,7 +137,7 @@ Heat Exchanger Network Synthesis
    "``HENS_PDM_MILP``","boolean","``None``","","","Run the MILP pinch design method (fewest units at minimum utility cost) at every multiplier as well as the heuristic. From depth 2 its networks go through the thermal derivative method; below that they seed evolution directly. Unset, the search depth sets it (on from depth 2)."
    "``HENS_TDM_PARENT_LIMIT``","number","``None``","",">= 1","Recorded in the synthesis manifest; no current synthesis step reads it."
    "``HENS_STAGE_PACKING``","string","``auto``","","","Methods whose integer models keep active stages contiguous: none, pdm, tdm or all. auto currently means none."
-   "``HENS_STAGE_SELECTION``","number_list","``[1, 2, 3]``","","","Stage counts for direct network evolution runs. Exactly two values also fix the pinch design stages above and below the pinch."
+   "``HENS_STAGE_SELECTION``","number_list","``[1, 2, 3]``","","","Stage counts for the direct network evolution runs made when Couenne is missing. Exactly two values also fix the MILP pinch design stages above and below the pinch; the heuristic sets its own. Other runs choose their stage counts."
    "``HENS_SOLVER_PDM``","string","``highs``","","","Solver for the pinch design method models."
    "``HENS_SOLVER_TDM``","string","``couenne``","","","Solver for the thermal derivative method models."
    "``HENS_SOLVER_EVM``","string","``ipopt-pyomo``","","","Solver for the network evolution method models."

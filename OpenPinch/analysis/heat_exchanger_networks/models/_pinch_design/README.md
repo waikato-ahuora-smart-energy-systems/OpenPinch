@@ -6,7 +6,7 @@ Private helper modules for `PinchDecompModel` (`../pinch_decomposition.py`), whi
 ## Interface
 - `calculate_pinch`, `set_preprocessing` (`preprocessing.py`): read period targets and shifted pinch temperatures, then derive stream limits, duties, U values, `Q_max`, and the `z_feasible`, `z_hu_feasible`, `z_cu_feasible` flags. Private helpers used by post-processing: `_active_period_flag`, `_lmtd_formula_allowed`, `_area_from_heat_load`.
 - `set_stage_wise_superstructure`, `set_obj` (`equations.py`): side variables, balances, approach constraints, binaries and the objective. Parent also calls `_set_multiperiod_stage_wise_superstructure`.
-- `used_units`, `exclude_units` (`equations.py`): a solved side's used recovery, heater and cooler units as a `{"z", "z_hu", "z_cu"}` pattern of flags, and a no-good cut that makes an unsolved side differ from such a pattern in at least one unit.
+- `used_units`, `exclude_units` (`equations.py`): a solved side's used recovery, heater and cooler units as a `{"z", "z_hu", "z_cu"}` pattern of flags, and a no-good cut that makes an unsolved side differ from such a pattern in at least one unit. `require_units` requires at least a given number of units.
 - `get_post_process` (`postprocess.py`): extracts duties, approaches, LMTD, areas, units and TAC after a successful solve. Parent also calls `_get_multiperiod_post_process` and `_active_binary_value`.
 - `amalgamate_networks` (`amalgamation.py`): builds a `StageWiseModel` from solved above and below sides.
 - Subdirectories: none.

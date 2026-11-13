@@ -22,8 +22,6 @@ Ranked Synthesis
    )
    design = problem.design.heat_exchanger_network(
        dt_cont_multipliers=[1.0, 1.4, 1.8],
-       stages=[3],
-       best_solutions=3,
    )
 
    top = design.top(3)
@@ -90,8 +88,12 @@ finished by the cheapest utility that reaches its target. In
   temperatures. Synthesis does not place one utility after another along a
   stream, for example cooling water first and then glycol; each unit spans
   the stream's whole utility duty range.
-- The pinch design method meets the utility targets and, where a side has a
-  choice of utilities, prefers the cheaper ones.
+- The pinch design method solves each side of the pinch at its utility
+  target and, where a side has a choice of utilities, prefers the cheaper
+  ones. Heuristic networks and the extra MILP networks keep those targets.
+  The main MILP network then drops stages that carry a small share of its
+  recovery, which can move that recovery to utility (about 10% more utility
+  on the ten-stream Ahmad case).
 - The default ``HU`` and ``CU`` that input preparation adds as backups take
   part only when they are the only utility on their side.
 
@@ -114,7 +116,8 @@ Called without seed networks, ``thermal_derivative()`` and
 whichever method made it: its selected network first, then its other ranked
 topologies, up to ``HENS_BEST_SOLUTIONS_TO_SAVE`` networks in all. So
 ``problem.design.pinch_design()`` followed by
-``problem.design.network_evolution()`` evolves the pinch design networks.
+``problem.design.network_evolution()`` evolves the pinch design networks:
+only the selected one at the default ``HENS_BEST_SOLUTIONS_TO_SAVE`` of 1.
 
 Successful synthesis stores the serializable result on
 ``problem.results.design`` (the ``TargetOutput.design`` field). The design view

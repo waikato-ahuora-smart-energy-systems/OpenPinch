@@ -255,8 +255,9 @@ Heat exchanger network synthesis
 - A MILP pinch design side's first, minimum-utility solve stops after 600 s
   unless ``HENS_SOLVER_OPTIONS_PDM`` sets a limit (a limit set there also
   replaces the 60 s fewest-units and minimum-unit limits). With HiGHS its best
-  network is then kept as an unconverged result, and no extra minimum-unit
-  networks are built on it.
+  network is then kept as an unconverged result (it seeds later steps but is
+  left out of the ranking), and no extra minimum-unit networks are built on
+  it.
 - Each MILP pinch design side is re-solved for the fewest units (matches,
   heaters and coolers) among those its minimum-utility solve used, at the same
   utility. Minimum utility cost leaves the match binaries free once the targets
@@ -307,8 +308,8 @@ Heat exchanger network synthesis
   approach-temperature grid, use multiplier = dTmin / (2 x
   ``THERMAL_DT_CONT``), so 14 K at the 5 K default is 1.4. The OpenHENS
   fixtures are converted this way and solve as before; the packaged
-  four-stream sample now uses the synthesis defaults. The OpenPinch-WASM
-  app's HEN calls need updating at its next re-vendor.
+  four-stream sample now uses the default multipliers, derivative thresholds
+  and pinch design solver.
 - Every heat exchanger network model is now a native Pyomo model. ``apopt``
   and ``ipopt-GEKKO`` are no longer accepted solver names, and any name other
   than ``highs``, ``couenne``, ``ipopt-pyomo``, ``scip`` or ``mindtpy`` raises
@@ -329,9 +330,9 @@ Heat exchanger network synthesis
   same objective. A pinch design model that is not linear is solved with
   Couenne instead, with a logged warning, keeping a time limit. Setting
   ``HENS_SOLVER_PDM`` to ``couenne`` uses Couenne for the MILP pinch design
-  method; the previous default design also needs ``HENS_PDM_MILP: true`` and
-  ``HENS_HEURISTIC_PDM_NETWORKS: 0``, and the heuristic method always uses
-  HiGHS when it is installed.
+  method; the closest to the previous default design also needs
+  ``HENS_HEURISTIC_PDM_NETWORKS: 0`` and ``HENS_DT_CONT_MULTIPLIERS: [1.4]``,
+  and the heuristic method always uses HiGHS when it is installed.
 - ``scip`` and ``mindtpy`` are new solver names, intended for the thermal
   derivative method (``HENS_SOLVER_TDM``). ``scip`` is the SCIP global MINLP
   solver through ``pyscipopt``, which the ``synthesis`` extra now installs.

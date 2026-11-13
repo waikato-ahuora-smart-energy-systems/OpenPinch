@@ -7,7 +7,7 @@ Private helper modules for `StageWiseModel` (`../stagewise.py`), which delegates
 - `set_preprocessing` (`setup.py`): stage counts, total duties, U values, `Q_max`, big-M and feasibility flags.
 - `set_stage_wise_superstructure`, `set_dqda_equations` (`equations.py`): variables, balances, approach constraints, isothermal or non-isothermal mixing, minimum dQ/dA. Parent also calls `_set_multiperiod_stage_wise_superstructure`.
 - `set_obj` (`objectives.py`): objective for each supported goal, including total-cost forms.
-- `set_initial_values_for_variables` (`warm_start.py`): copies a solved model's values into another.
+- `set_initial_values_for_variables` (`warm_start.py`): copies a solved model's values into another, then switches on the relaxed model's idle-safe heaters and coolers (`_base/approach.py:switch_on_idle_safe_utilities`).
 - `get_post_process`, `get_lowest_benefit_HX`, `get_lowest_benefit_HX_candidates`, `get_max_benefit_HX`, `get_max_benefit_HX_candidates` (`postprocess.py`): result extraction, dQ/dA, dTAC/dA, alpha, and ranked remove or add candidates. Parent also calls `_get_multiperiod_post_process`.
 - `verify` (`verification.py`): temperature, cost, area and network-feasibility checks; returns `(ok, reasons)`. `_value` (from `_base.execution`) reads plain numbers, `[value]` lists and Pyomo components.
 - `get_net_benefit_evolution`, `get_n_minus_one_evolution`, `get_n_plus_one_evolution` (`evolution.py`): topology evolution. Parent also calls `_active_binary_value`.

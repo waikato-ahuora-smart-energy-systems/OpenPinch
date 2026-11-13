@@ -427,8 +427,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_STAGE_SELECTION": FieldText(
         "HEN stage counts", None,
         (
-            "Stage counts for direct network evolution runs. Exactly two values also "
-            "fix the pinch design stages above and below the pinch."
+            "Stage counts for the direct network evolution runs made when Couenne "
+            "is missing. Exactly two values also fix the MILP pinch design stages "
+            "above and below the pinch; the heuristic sets its own. Other runs "
+            "choose their stage counts."
         ),
     ),
     "HENS_SOLVER_PDM": FieldText(
