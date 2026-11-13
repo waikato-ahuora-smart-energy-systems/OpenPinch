@@ -161,6 +161,8 @@ def test_packaged_four_stream_sample_matches_converted_fixture_without_outputs()
         "HENS_OUTPUT_FOLDER": "",
         "HENS_OUTPUT_FORMATS": [],
     }
+    for key in converter.PACKAGE_SAMPLE_DEFAULTED_OPTIONS:
+        del expected_sample["options"][key]
 
     assert json.loads(sample_path.read_text()) == expected_sample
 

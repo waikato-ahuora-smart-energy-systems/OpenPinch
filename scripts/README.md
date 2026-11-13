@@ -50,11 +50,11 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   CSV cases to JSON fixtures (needs `--write`).
 - `compare_openhens_openpinch_top5.py` (`compare_openhens_openpinch_top5.py`): runs OpenHENS and
   OpenPinch on fixture cases and writes top-5 comparison CSV and Markdown reports.
-- `benchmark_performance.py` (`benchmark_performance.py`): `time_hens_tier_case`,
-  `time_hens_tier_case_with_timeout`, `summarize_hens_tier_comparisons`,
+- `benchmark_performance.py` (`benchmark_performance.py`): `time_hens_depth_case`,
+  `time_hens_depth_case_with_timeout`, `summarize_hens_depth_comparisons`,
   `small_hens_benchmark_cases`, `resolve_hens_case`, `acceptance_metrics`,
   `network_meets_pinch_targets`, `pdm_topology_summary`, `compare_acceptance`,
-  `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating HEN synthesis quality-tier
+  `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating HEN synthesis search-depth
   benchmark writing incremental JSON. `--hens-case` takes an OpenHENS fixture, a packaged sample
   case (for example `pulp_mill.json`, the large manual case) or a path; `--baseline-json`
   compares acceptance metrics with an earlier run's JSON.

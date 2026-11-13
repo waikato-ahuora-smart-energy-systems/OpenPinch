@@ -372,38 +372,45 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_PDM_STAGE_PAIR_LIMIT": FieldText(
         "Pinch design stage pair candidates", None,
         (
-            "Number of extra pinch design candidates with set stage counts above and "
-            "below the pinch, up to 12. None adds none."
+            "Number of extra MILP pinch design candidates with set stage counts "
+            "above and below the pinch, up to 12. None adds none. Used only when "
+            "the MILP runs at every multiplier (depth 2 and above, or "
+            "HENS_PDM_MILP)."
         ),
     ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (
-            "Extra pinch design networks per approach temperature with the fewest "
-            "units at the utility targets. Each seeds network evolution. 0 adds none."
+            "Extra MILP pinch design networks per dt_cont multiplier with the fewest "
+            "units at the utility targets, each seeding network evolution when it "
+            "runs. 0 adds none. Used only where the MILP runs."
         ),
     ),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": FieldText(
         "Pinch design one-more-unit networks", None,
         (
-            "Extra pinch design networks per approach temperature with one unit more "
-            "than the fewest. Each seeds network evolution. 0 adds none."
+            "Extra MILP pinch design networks per dt_cont multiplier with one unit "
+            "more than the fewest, each seeding network evolution when it runs. 0 "
+            "adds none. Used only where the MILP runs."
         ),
     ),
     "HENS_HEURISTIC_PDM_NETWORKS": FieldText(
         "Heuristic pinch design networks", None,
         (
-            "Networks per approach temperature from the heuristic (Linnhoff rules) "
-            "pinch design method, each seeding network evolution. 0 runs the MILP "
-            "pinch design method instead; unset, the search depth sets it."
+            "Networks per dt_cont multiplier from the heuristic (Linnhoff rules) "
+            "pinch design method, each seeding network evolution from depth 1. "
+            "Where it realises none, the MILP pinch design method runs instead. 0 "
+            "runs only the MILP; unset, the search depth sets it."
         ),
     ),
     "HENS_PDM_MILP": FieldText(
         "MILP pinch design", None,
         (
             "Run the MILP pinch design method (fewest units at minimum utility "
-            "cost) as well as the heuristic. Unset, the search depth sets it (on "
-            "from depth 2)."
+            "cost) at every multiplier as well as the heuristic. From depth 2 its "
+            "networks go through the thermal derivative method; below that they "
+            "seed evolution directly. Unset, the search depth sets it (on from "
+            "depth 2)."
         ),
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(

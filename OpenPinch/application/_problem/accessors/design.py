@@ -382,8 +382,10 @@ class _DesignAccessor:
         """Run the pinch design method only.
 
         The heuristic (Linnhoff rules) method makes up to
-        ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier;
-        ``HENS_PDM_MILP`` adds the MILP method's networks.
+        ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier. The
+        MILP method adds its networks from search depth 2 or with
+        ``HENS_PDM_MILP``, and runs in the heuristic's place at any multiplier
+        where the heuristic realises no network.
         """
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_pinch_design_method_service,

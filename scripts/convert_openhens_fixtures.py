@@ -38,6 +38,13 @@ CASE_IDS = (
     "Thirteen-stream-Kim-et-al-2017-1",
 )
 PACKAGE_SAMPLE_CASE_ID = "Four-stream-Yee-and-Grossmann-1990-1"
+# The package sample shows the synthesis defaults: it drops the OpenHENS
+# solver and the multiplier and threshold grids the fixtures pin.
+PACKAGE_SAMPLE_DEFAULTED_OPTIONS = (
+    "HENS_SOLVER_PDM",
+    "HENS_DT_CONT_MULTIPLIERS",
+    "HENS_DERIVATIVE_THRESHOLDS",
+)
 OPENHENS_DT_GRID = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]
 # The fixtures keep the default THERMAL_DT_CONT of 5 K; synthesis is keyed on
 # dt_cont multipliers, so OpenHENS's dTmin grid becomes dTmin / (2 * 5 K).
@@ -319,6 +326,8 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
                 output_folder="",
                 output_formats=[],
             )
+            for key in PACKAGE_SAMPLE_DEFAULTED_OPTIONS:
+                del sample_case["options"][key]
             _write_json(
                 repo_root
                 / "OpenPinch"

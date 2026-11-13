@@ -38,7 +38,8 @@ Exchanger Approach Temperatures
 -------------------------------
 
 Synthesis runs once per ``dt_cont_multipliers`` value
-(``HENS_DT_CONT_MULTIPLIERS``, default ``[1.0]``). A multiplier scales every
+(``HENS_DT_CONT_MULTIPLIERS``; unset, the search width sets them: 0.75, 1.0
+and 1.5 at the default width). A multiplier scales every
 stream's, segment's and utility's ΔT contribution, as a zone ``dt_cont``
 multiplier does in targeting, so 1.0 designs at the contributions the pinch
 targets use, and a match between two streams needs the sum of their scaled
@@ -162,9 +163,10 @@ thermal derivative method.
 
 From search depth 2, or with ``HENS_PDM_MILP`` set, the MILP pinch design
 method runs as well: it solves each side for minimum utility cost and then the
-fewest units. Its main networks go to the thermal derivative method, and its
-extra minimum-unit networks (and from depth 3 all its networks) straight to
-evolution. With ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
+fewest units. From depth 2 its main networks go to the thermal derivative
+method, and its extra minimum-unit networks (and from depth 3 all its
+networks) straight to evolution; below depth 2, with ``HENS_PDM_MILP``, all
+its networks seed evolution directly. With ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
 At any depth, the MILP also runs at each dt_cont multiplier where the
 heuristic realises no network, and its networks take the heuristic's place.
 The heuristic's side models are solved with HiGHS when it is installed,

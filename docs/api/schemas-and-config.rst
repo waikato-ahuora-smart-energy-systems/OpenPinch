@@ -51,8 +51,9 @@ temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical
 ``THERMAL_DT_CONT`` is the ``dt_cont`` of any process stream or utility that
 doesn't give its own (an absent, null or blank value). Heat exchanger network
 synthesis scales every contribution by each ``HENS_DT_CONT_MULTIPLIERS``
-value, as a zone ``dt_cont`` multiplier does in targeting, so the default
-``[1.0]`` designs at the targeting contributions. A utility without a ``price`` uses
+value, as a zone ``dt_cont`` multiplier does in targeting, so 1.0 designs at
+the targeting contributions. Unset, the search width sets the multipliers
+(0.75, 1.0 and 1.5 at the default width). A utility without a ``price`` uses
 ``COSTING_UTILITY_PRICE``, the price of the default utilities.
 
 These defaults, ``THERMAL_DT_PHASE_CHANGE``, ``THERMAL_HTC``, the
@@ -207,7 +208,7 @@ way: they apply to that call only and do not change the stored configuration.
 
 ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (default 0, at least 0 and below 1) sets
 the smallest exchanger approach the thermal derivative and network evolution
-steps may choose, as a share of the requested approach temperature. At the
+steps may choose, as a share of twice ``THERMAL_DT_CONT`` times the dt_cont multiplier. At the
 default those steps choose approaches by cost down to 0.1 K; see
 :doc:`../guides/heat-exchanger-network-synthesis`.
 

@@ -5,7 +5,7 @@ Orchestrates the HEN synthesis methods: it builds the task graph for pinch desig
 
 ## Interface
 - `execute_open_hens_method` (`open_hens_method.py`): runs the pinch design stages, then TDM and ESM as the search depth requires, and returns a `SynthesisWorkflowResult`.
-- `build_pinch_design_method_tasks`, `execute_pinch_design_method_stage` (`pinch_design_method.py`): one MILP PDM task per dt_cont multiplier, plus the `HENS_PDM_STAGE_PAIR_LIMIT` stage-pair candidates at the first multiplier.
+- `build_pinch_design_method_tasks`, `execute_pinch_design_method_stage` (`pinch_design_method.py`): one MILP PDM task per dt_cont multiplier, plus the `HENS_PDM_STAGE_PAIR_LIMIT` stage-pair candidates at the reference multiplier.
 - `build_heuristic_pinch_design_method_tasks`, `execute_heuristic_pinch_design_method_stage` (`heuristic_pinch_design_method.py`): one heuristic pinch design task per configured multiplier, carrying the network cap.
 - `build_thermal_derivative_method_tasks`, `build_seeded_thermal_derivative_method_tasks`, `execute_thermal_derivative_method_stage`, `execute_seeded_thermal_derivative_method_stage` (`thermal_derivative_method.py`): TDM tasks from PDM outcomes or seed networks.
 - `build_network_evolution_method_tasks`, `build_seeded_network_evolution_method_tasks`, `build_network_evolution_method_tasks_from_pinch_design_method`, `build_direct_network_evolution_method_tasks` and the matching `execute_*_stage` functions (`network_evolution_method.py`): ESM tasks from TDM outcomes, PDM outcomes, seeds, or none.
