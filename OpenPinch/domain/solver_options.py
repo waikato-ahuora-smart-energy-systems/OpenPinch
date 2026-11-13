@@ -68,6 +68,22 @@ _COUENNE_OPTIONS = frozenset(
     }
 )
 
+# HiGHS, the default pinch design solver.
+_HIGHS_OPTIONS = frozenset(
+    {
+        "time_limit",
+        "mip_rel_gap",
+        "mip_abs_gap",
+        "mip_max_nodes",
+        "mip_feasibility_tolerance",
+        "primal_feasibility_tolerance",
+        "dual_feasibility_tolerance",
+        "threads",
+        "presolve",
+        "random_seed",
+    }
+)
+
 # SCIP parameters and MindtPy settings.
 _SCIP_OPTIONS = frozenset(
     {
@@ -92,7 +108,11 @@ _MINDTPY_OPTIONS = frozenset(
 )
 
 ALLOWED_SOLVER_OPTION_NAMES = (
-    _IPOPT_OPTIONS | _COUENNE_OPTIONS | _SCIP_OPTIONS | _MINDTPY_OPTIONS
+    _IPOPT_OPTIONS
+    | _COUENNE_OPTIONS
+    | _HIGHS_OPTIONS
+    | _SCIP_OPTIONS
+    | _MINDTPY_OPTIONS
 )
 
 # Integers as large as a solver's 64-bit settings, and short value text.

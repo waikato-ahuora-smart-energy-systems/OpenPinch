@@ -733,3 +733,19 @@ def test_openhens_compatibility_surfaces_are_absent():
 
     assert importlib.util.find_spec("OpenPinch.openhens") is None
     assert importlib.util.find_spec("OpenPinch.OpenHENS") is None
+
+
+def test_highs_options_are_accepted_for_the_pinch_design_solver():
+    # HiGHS is the default PDM solver; its gap and thread options were
+    # rejected while only time_limit passed.
+    options = {
+        "mip_rel_gap": 0.01,
+        "mip_abs_gap": 1.0,
+        "threads": 2,
+        "mip_feasibility_tolerance": 1e-7,
+        "presolve": "on",
+    }
+
+    cfg = Configuration(options={"HENS_SOLVER_OPTIONS_PDM": options})
+
+    assert cfg.hens.solver_options_pdm == options
