@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from ....domain.enums import HeatExchangerNetworkDesignMethod
+from ..solver.backend import require_solver_backend
+from ..solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 from .search import DEPTH_LEVELS, resolve_search
 
 StagePackingScope = str
@@ -18,8 +23,26 @@ _OPEN_HENS_METHOD_SEQUENCE = (
     HeatExchangerNetworkDesignMethod.NetworkEvolution,
 )
 
+
+def heuristic_solver(pdm_solver: str) -> str:
+    """The solver the heuristic pinch design method realises its sides with.
+
+    Each side is a small MILP with only its proposed matches allowed (a side
+    that is not linear moves to Couenne in the side model), so HiGHS solves
+    it when installed, whatever ``HENS_SOLVER_PDM`` names, and a missing or
+    crashing Couenne does not lose the proposals.
+    """
+
+    try:
+        require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return pdm_solver
+    return "highs"
+
+
 # The heuristic pinch design method realises its networks with the PDM
-# side models, so it runs on the PDM solver settings.
+# side models, so it runs on the PDM solver settings unless it switches to
+# HiGHS (``heuristic_solver``).
 _PINCH_DESIGN_METHODS = (
     HeatExchangerNetworkDesignMethod.PinchDesign,
     HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
@@ -70,7 +93,9 @@ class SynthesisWorkflowSettings:
         )
 
     def solver_for(self, method: HeatExchangerNetworkDesignMethod | None) -> str | None:
-        """Return the configured solver name for one workflow method."""
+        """Return the solver name one workflow method runs with."""
+        if method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+            return heuristic_solver(self.pdm_solver)
         if method in _PINCH_DESIGN_METHODS:
             return self.pdm_solver
         if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
@@ -83,6 +108,12 @@ class SynthesisWorkflowSettings:
         self, method: HeatExchangerNetworkDesignMethod | None
     ) -> dict[str, Any]:
         """Return user-provided solver options for one workflow method."""
+        if (
+            self.solver_for(method) != self.pdm_solver
+            and method in _PINCH_DESIGN_METHODS
+        ):
+            # The configured options are for the configured solver.
+            return {}
         if method in _PINCH_DESIGN_METHODS:
             return dict(self.pdm_solver_options)
         if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:

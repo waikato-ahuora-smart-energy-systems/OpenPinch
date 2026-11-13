@@ -145,8 +145,11 @@ def _highs_available() -> bool:
     return True
 
 
-def _built_pdm(problem, *, dTmin: float, side: str, goal: str | None = None):
+def _built_pdm(
+    problem, *, dTmin: float, side: str, goal: str | None = None, **options
+):
     return PinchDecompModel(
+        **options,
         name=f"{side} pinch {dTmin}",
         framework="PDM",
         solver="highs",
@@ -219,6 +222,30 @@ def test_a_nonlinear_highs_pdm_is_solved_with_couenne(monkeypatch):
     assert model.solver == "couenne"
     # HiGHS options do not apply to Couenne.
     assert configured == [("highs", None), ("couenne", None)]
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_time_limit_follows_a_nonlinear_side_to_couenne(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    configured = []
+
+    def configure(model, solver_name, *, solver_options=None):
+        configured.append((solver_name, solver_options))
+        return backend.SolverRun(name=solver_name, extension="pyomo")
+
+    monkeypatch.setattr(PyomoModel, "is_linear", lambda self: False)
+    monkeypatch.setattr(backend, "configure_pyomo_solver", configure)
+
+    _built_pdm(
+        _four_stream_problem(),
+        dTmin=14.0,
+        side="above",
+        solver_options={"time_limit": 60.0, "mip_rel_gap": 0.01},
+    )
+
+    assert configured[-1] == ("couenne", {"time_limit": 60.0})
 
 
 @pytest.mark.synthesis

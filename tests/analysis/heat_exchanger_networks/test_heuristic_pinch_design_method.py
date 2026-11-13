@@ -398,3 +398,53 @@ def test_the_heuristic_realises_its_sides_with_highs_whatever_the_pdm_solver(
     design = problem.design.heat_exchanger_network(depth=0)
 
     assert design.selected_network.method == HEURISTIC.value
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_heuristic_tasks_report_and_configure_the_solver_they_use():
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        _solver_options_for_task,
+    )
+
+    problem = _small_problem_with_options(
+        {
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
+            "HENS_SOLVER_PDM": "couenne",
+            "HENS_SOLVER_OPTIONS_PDM": {"max_iter": 50},
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+    (task,) = build_heuristic_pinch_design_method_tasks(settings)
+    task = task.model_copy(
+        update={"settings": {**task.settings, "solver_options": {"max_iter": 9}}}
+    )
+
+    assert settings.solver_for(HEURISTIC) == "highs"
+    assert settings.solver_for(MILP) == "couenne"
+    # Options for the configured solver never reach HiGHS.
+    assert _solver_options_for_task(problem, task) == {}
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_heuristic_side_needing_a_missing_solver_is_dropped(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    real_init = PinchDecompModel.__init__
+
+    def segmented_side_without_couenne(self, *args, **kwargs):
+        if "heuristic" in kwargs.get("name", ""):
+            raise MissingSynthesisSolverError("couenne was not found on PATH")
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(PinchDecompModel, "__init__", segmented_side_without_couenne)
+    problem = _pinch_problem(FOUR_STREAM_JSON, {"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+    settings = workflow_settings_from_problem(problem)
+    (task,) = build_heuristic_pinch_design_method_tasks(settings)
+    internal = LocalSynthesisExecutor()._build_problem(
+        task, problem=problem, parent_outcomes={}
+    )
+
+    assert internal.get_solution(print_output=False) is None
+    assert "heuristic" in internal.solution_failure_reason

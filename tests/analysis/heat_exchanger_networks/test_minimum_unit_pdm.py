@@ -472,3 +472,25 @@ def test_one_bad_variant_does_not_lose_the_others(monkeypatch):
     )
 
     assert [outcome.status for outcome in outcomes] == ["success"]
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_minimum_unit_solves_are_time_limited(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    limits = []
+    real_init = PinchDecompModel.__init__
+
+    def recording(self, *args, **kwargs):
+        if "min units" in kwargs.get("name", ""):
+            limits.append((kwargs.get("solver_options") or {}).get("time_limit"))
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(PinchDecompModel, "__init__", recording)
+    problem = _problem(14.0, (2, 1))
+
+    problem.get_solution(print_output=False)
+
+    assert limits and all(limit == backend.FEWEST_UNITS_TIME_LIMIT for limit in limits)

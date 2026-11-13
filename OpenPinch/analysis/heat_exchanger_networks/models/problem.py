@@ -462,6 +462,9 @@ class InternalHeatExchangerNetworkProblem:
                         "pinch_loc": name,
                         "minimisation_goal": "min units",
                         "utility_cost_cap": _minimum_utility_cost(primary),
+                        "solver_options": _with_time_limit(
+                            self.solver, self.args.get("solver_options")
+                        ),
                         "pinch_decomposition": self.pinch_decompositions[name],
                         "stage_selection": self.stage_selection,
                     }
@@ -593,7 +596,12 @@ class InternalHeatExchangerNetworkProblem:
                     }
                 )
             )
-        except ValueError as exc:
+        except (
+            ValueError,
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        ) as exc:
+            # A side that is not linear needs Couenne, which may be missing.
             logger.debug("Heuristic %s proposal %d not built: %s", name, rank, exc)
             return None
         side.optimise(print_output=False)
@@ -855,6 +863,8 @@ def _start_from_side(sparse, side) -> None:
 
 def _with_time_limit(solver: str, options) -> Any:
     """The PDM solver options with the fewest-units time limit added.
+
+    It applies to every fewest-units and minimum-unit solve.
 
     A limit the user set is kept, as are options given as option lines.
     """

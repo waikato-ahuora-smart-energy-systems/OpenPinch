@@ -90,7 +90,11 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         _equations.exclude_units(self, pattern)
 
     def _solve_nonlinear_models_with_couenne(self) -> None:
-        """Send a model HiGHS cannot take to Couenne, without HiGHS options."""
+        """Send a model HiGHS cannot take to Couenne.
+
+        HiGHS options do not apply to Couenne, except a time limit, which is
+        carried over.
+        """
 
         if self.solver != "highs" or self.m.is_linear():
             return
@@ -99,9 +103,19 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             "instead of HiGHS.",
             self.name,
         )
+        options = self.solver_options
+        limit = (
+            options.get(backend.TIME_LIMIT_OPTIONS["highs"])
+            if isinstance(options, dict)
+            else None
+        )
         self.solver = "couenne"
-        self.solver_options = None
-        self.solver_run = backend.configure_pyomo_solver(self.m, self.solver)
+        self.solver_options = (
+            None if limit is None else {backend.TIME_LIMIT_OPTIONS["couenne"]: limit}
+        )
+        self.solver_run = backend.configure_pyomo_solver(
+            self.m, self.solver, solver_options=self.solver_options
+        )
 
     def get_model_parameters_from_solver_arrays(self) -> None:
         super().get_model_parameters_from_solver_arrays()
