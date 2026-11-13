@@ -27,7 +27,6 @@ def test_every_editable_field_has_its_own_label_and_description():
 def test_numeric_list_fields_are_reported_as_number_lists():
     for name in (
         "PROBLEM_PERIOD_WEIGHTS",
-        "HENS_APPROACH_TEMPERATURES",
         "HENS_DT_CONT_MULTIPLIERS",
         "HENS_DERIVATIVE_THRESHOLDS",
         "HENS_STAGE_SELECTION",

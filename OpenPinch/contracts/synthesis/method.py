@@ -29,7 +29,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
     task_id: str | None = None
     run_id: str
     method: HeatExchangerNetworkDesignMethod
-    approach_temperature: float
+    dt_cont_multiplier: float
     derivative_threshold: float | None = None
     stage_count: int | None = None
     problem_id: str | None = None
@@ -60,7 +60,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
     def _validate_optional_identity(cls, value: str | None) -> str | None:
         return _validate_optional_identity(value)
 
-    @field_validator("approach_temperature", "derivative_threshold")
+    @field_validator("dt_cont_multiplier", "derivative_threshold")
     @classmethod
     def _validate_positive_float(cls, value: float | None) -> float | None:
         if value is None:
@@ -90,7 +90,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
     def generate_task_id(self) -> str:
         """Return the deterministic identifier for this task definition."""
         task_key_data = {
-            "approach_temperature": self.approach_temperature,
+            "dt_cont_multiplier": self.dt_cont_multiplier,
             "derivative_threshold": self.derivative_threshold,
             "method": self.method,
             "parent_task_id": self.parent_task_id,

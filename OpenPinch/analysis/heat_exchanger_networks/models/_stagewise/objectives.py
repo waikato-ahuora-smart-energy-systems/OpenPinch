@@ -6,6 +6,11 @@ from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 
+# m^2 added to a shared area under its cost exponent: a unit with no duty has
+# zero area, where the cost's derivative is infinite and stops Ipopt. The
+# added cost is negligible.
+_SHARED_AREA_OFFSET = 1e-8
+
 
 def set_obj(owner) -> None:
     """Attach source StageWise objective expressions unchanged."""
@@ -187,9 +192,20 @@ def _cooler_terminal_differences(owner, n: int, i: int, u: int, *, solved_outlet
     )
 
 
+_CHEN_BASE_SMOOTHING = 1e-2
+
+
 def _chen_mean(delta_1, delta_2):
-    """Return Chen's approximation of the log-mean temperature difference."""
-    return (delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3) ** (1 / 3)
+    """Return Chen's approximation of the log-mean temperature difference.
+
+    The base goes through a smooth max with zero, so a heater or cooler at
+    zero duty, whose approaches are unconstrained, cannot take the cube root
+    of a negative number. For an exchanger in use the base is of order 1e2
+    to 1e4 K^3 and the smoothing changes nothing measurable.
+    """
+    base = delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3
+    smooth_base = 0.5 * (base + (base**2 + _CHEN_BASE_SMOOTHING**2) ** 0.5)
+    return smooth_base ** (1 / 3)
 
 
 def _raise_unsupported_goal(owner) -> None:
@@ -517,7 +533,7 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     owner.recovery_area_cost_total = owner.m.Intermediate(
         owner.A_coeff[0]
         * sum(
-            owner.area_r_shared[i][j][k] ** owner.A_exp[0]
+            (owner.area_r_shared[i][j][k] + _SHARED_AREA_OFFSET) ** owner.A_exp[0]
             for k in range(owner.S)
             for j in range(owner.J)
             for i in range(owner.I)
@@ -526,12 +542,18 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     )
     owner.hu_area_cost_total = owner.m.Intermediate(
         owner.hu_coeff[0]
-        * sum(area ** owner.hu_exp[0] for area in _utility_loads(owner.area_hu_shared)),
+        * sum(
+            (area + _SHARED_AREA_OFFSET) ** owner.hu_exp[0]
+            for area in _utility_loads(owner.area_hu_shared)
+        ),
         name="Total hot utility HX area cost",
     )
     owner.cu_area_cost_total = owner.m.Intermediate(
         owner.cu_coeff[0]
-        * sum(area ** owner.cu_exp[0] for area in _utility_loads(owner.area_cu_shared)),
+        * sum(
+            (area + _SHARED_AREA_OFFSET) ** owner.cu_exp[0]
+            for area in _utility_loads(owner.area_cu_shared)
+        ),
         name="Total cold utility HX area cost",
     )
     owner.unit_cost_total = owner.m.Intermediate(

@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
-from ..execution.pathways import (
-    TierPathway,
-    pathway_metadata,
-    tier_pathways,
-)
+from ..execution.search import reference_dt_cont_multiplier
 from ..execution.settings import SynthesisWorkflowSettings
-from ..results.assembly import SynthesisWorkflowResult
+from ..results.assembly import SynthesisWorkflowResult, demote_infeasible_outcomes
 from ._stage import run_single_method_workflow, run_stage
+from .heuristic_pinch_design_method import (
+    execute_heuristic_pinch_design_method_stage,
+)
 
 _PDM_STAGE_PAIR_SWEEP = (
     (1, 2),
@@ -36,16 +37,66 @@ def _execute_pinch_design_method_workflow(
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
-    """Execute only the PDM method and collect validated method outputs."""
+    """Execute only the pinch design stages and collect validated outputs."""
+
+    def run_stages(method_settings: SynthesisWorkflowSettings):
+        milp_tasks, milp_outcomes, heuristic_tasks, heuristic_outcomes = (
+            execute_pinch_design_stages(problem, method_settings, executor=executor)
+        )
+        return milp_tasks + heuristic_tasks, milp_outcomes + heuristic_outcomes
+
     return run_single_method_workflow(
-        settings,
-        HeatExchangerNetworkDesignMethod.PinchDesign,
-        lambda method_settings: execute_pinch_design_method_stage(
-            problem,
-            method_settings,
-            executor=executor,
-        ),
+        settings, HeatExchangerNetworkDesignMethod.PinchDesign, run_stages
     )
+
+
+def execute_pinch_design_stages(
+    problem,
+    settings: SynthesisWorkflowSettings,
+    *,
+    executor: SynthesisExecutor | None = None,
+):
+    """Run the MILP stage when it is on, then the heuristic stage.
+
+    At a multiplier where the heuristic realises no network that stays in
+    the result, the MILP runs in its place. Returns the MILP tasks and
+    outcomes, then the heuristic ones; a stage that does not run gives empty
+    tuples.
+    """
+    milp_tasks, milp_outcomes = (), ()
+    if settings.runs_milp_pinch_design:
+        milp_tasks, milp_outcomes = execute_pinch_design_method_stage(
+            problem, settings, executor=executor
+        )
+    heuristic_tasks, heuristic_outcomes = (), ()
+    if settings.heuristic_pdm_networks > 0:
+        heuristic_tasks, heuristic_outcomes = (
+            execute_heuristic_pinch_design_method_stage(
+                problem, settings, executor=executor
+            )
+        )
+    if not settings.runs_milp_pinch_design:
+        # Counted after demotion: a network that stopped before converging,
+        # or fails the feasibility check, is not in the result.
+        realised = {
+            float(outcome.task.dt_cont_multiplier)
+            for outcome in demote_infeasible_outcomes(heuristic_outcomes)
+            if outcome.status == "success"
+        }
+        missing = tuple(
+            multiplier
+            for multiplier in dict.fromkeys(settings.dt_cont_multipliers)
+            if float(multiplier) not in realised
+        )
+        if missing:
+            milp_tasks, milp_outcomes = execute_pinch_design_method_stage(
+                problem,
+                replace(
+                    settings, dt_cont_multipliers=missing, pdm_stage_pair_limit=None
+                ),
+                executor=executor,
+            )
+    return milp_tasks, milp_outcomes, heuristic_tasks, heuristic_outcomes
 
 
 def execute_pinch_design_method_stage(
@@ -69,138 +120,44 @@ def build_pinch_design_method_tasks(
     *,
     problem=None,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate root PDM tasks by sweeping configured approach temperatures."""
+    """One MILP pinch design task per dt_cont multiplier.
+
+    ``HENS_PDM_STAGE_PAIR_LIMIT`` adds candidates with set stage counts
+    above and below the pinch, at the reference multiplier.
+    """
     del problem
-    return _build_pathway_pinch_design_method_tasks(settings)
-
-
-def _build_pathway_pinch_design_method_tasks(
-    settings: SynthesisWorkflowSettings,
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    pathways = tier_pathways(settings)
-    tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    grouped: dict[tuple[str, float], list[TierPathway]] = {}
-
-    for pathway in pathways:
-        if pathway.exact_open_hens:
-            for approach_temperature in settings.approach_temperatures:
-                tasks.append(
-                    HeatExchangerNetworkSynthesisTask(
-                        run_id=settings.run_id,
-                        method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                        approach_temperature=approach_temperature,
-                        problem_id=settings.problem_id,
-                        workspace_variant=settings.workspace_variant,
-                        period_id=settings.period_id,
-                        metadata=pathway_metadata((pathway,)),
-                    )
-                )
-            continue
-        if pathway.multiplier is None:
-            continue
-        for approach_temperature in _pathway_approach_temperatures(settings, pathway):
-            key = (pathway.pdm_mode, approach_temperature)
-            grouped.setdefault(key, []).append(pathway)
-
-    for (pdm_mode, approach_temperature), grouped_pathways in grouped.items():
-        settings_data = {"pdm_mode": pdm_mode}
+    tasks = [
+        _pinch_design_task(settings, multiplier)
+        for multiplier in dict.fromkeys(settings.dt_cont_multipliers)
+    ]
+    multiplier = reference_dt_cont_multiplier(settings.dt_cont_multipliers)
+    for above_stages, below_stages in _PDM_STAGE_PAIR_SWEEP[
+        : settings.quality_pdm_stage_pair_count
+    ]:
         tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                approach_temperature=approach_temperature,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                settings=settings_data,
-                metadata=pathway_metadata(grouped_pathways),
-            )
-        )
-
-    if settings.quality_pdm_stage_pair_count <= 0:
-        return tuple(tasks)
-    return _with_quality_pdm_tasks(settings, tuple(tasks))
-
-
-def _with_quality_pdm_tasks(
-    settings: SynthesisWorkflowSettings,
-    tasks: tuple[HeatExchangerNetworkSynthesisTask, ...],
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    seen = {
-        (
-            float(task.approach_temperature),
-            tuple(int(value) for value in task.settings.get("stage_selection", ())),
-        )
-        for task in tasks
-    }
-    quality_tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    candidate_temperatures = settings.quality_pdm_approach_temperatures
-    for approach_temperature in candidate_temperatures:
-        key = (float(approach_temperature), ())
-        if key in seen:
-            continue
-        seen.add(key)
-        quality_tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                approach_temperature=approach_temperature,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                metadata={"quality_candidate": "dt_cont_multiplier"},
-            )
-        )
-
-    stage_pair_count = settings.quality_pdm_stage_pair_count
-    if stage_pair_count <= 0:
-        return (*tasks, *quality_tasks)
-
-    stage_pair_temperature = (
-        candidate_temperatures[0]
-        if candidate_temperatures
-        else float(settings.approach_temperatures[0])
-    )
-    for above_stages, below_stages in _PDM_STAGE_PAIR_SWEEP[:stage_pair_count]:
-        key = (float(stage_pair_temperature), (above_stages, below_stages))
-        if key in seen:
-            continue
-        seen.add(key)
-        quality_tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                approach_temperature=stage_pair_temperature,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
+            _pinch_design_task(
+                settings,
+                multiplier,
                 settings={"stage_selection": [above_stages, below_stages]},
                 metadata={"quality_candidate": "stage_pair"},
             )
         )
-    return (*tasks, *quality_tasks)
+    return tuple(tasks)
 
 
-def _pathway_approach_temperatures(
-    settings: SynthesisWorkflowSettings,
-    pathway: TierPathway,
-) -> tuple[float, ...]:
-    """Return the concrete dTmins one PDM multiplier pathway runs.
-
-    The tier-0 pathways run every configured approach temperature; the
-    expanded-tier pathways explore multiples of the first one.
-    """
-
-    if pathway.multiplier is None:
-        raise ValueError("PDM multiplier pathway requires a multiplier.")
-    approach_temperatures = (
-        settings.approach_temperatures
-        if pathway.pathway_kind == "tier0_pdm_evm"
-        else settings.approach_temperatures[:1]
-    )
-    return tuple(
-        float(approach_temperature) * float(pathway.multiplier)
-        for approach_temperature in approach_temperatures
+def _pinch_design_task(
+    workflow: SynthesisWorkflowSettings,
+    multiplier: float,
+    **fields,
+) -> HeatExchangerNetworkSynthesisTask:
+    return HeatExchangerNetworkSynthesisTask(
+        run_id=workflow.run_id,
+        method=HeatExchangerNetworkDesignMethod.PinchDesign,
+        dt_cont_multiplier=multiplier,
+        problem_id=workflow.problem_id,
+        workspace_variant=workflow.workspace_variant,
+        period_id=workflow.period_id,
+        **fields,
     )
 
 
@@ -208,4 +165,5 @@ __all__ = [
     "_execute_pinch_design_method_workflow",
     "build_pinch_design_method_tasks",
     "execute_pinch_design_method_stage",
+    "execute_pinch_design_stages",
 ]

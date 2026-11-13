@@ -80,7 +80,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     run_id: str
-    approach_temperatures: tuple[float, ...]
+    dt_cont_multipliers: tuple[float, ...]
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
     method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...] = (
@@ -91,7 +91,8 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     export_formats: tuple[SynthesisOutputFormat, ...] = Field(default_factory=tuple)
     solve_tolerance: float = 1e-3
     best_solutions_to_save: int = 1
-    synthesis_quality_tier: int = 1
+    search_width: int = 1
+    search_depth: int = 1
     pdm_stage_pair_limit: int | None = None
     tdm_parent_limit: int | None = None
     stage_packing: str = "auto"
@@ -102,11 +103,6 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     workspace_variant: str | None = None
     period_id: str | None = None
     design_method: HeatExchangerNetworkDesignMethod | None = None
-    selected_pathway_id: str | None = None
-    selected_pathway_kind: str | None = None
-    selected_pdm_mode: str | None = None
-    selected_tier_origin: int | None = None
-    selected_protected_pathway: bool = False
     task_count_by_method: dict[str, int] = Field(default_factory=dict)
     export_records: tuple[HeatExchangerNetworkSynthesisExportRecord, ...] = Field(
         default_factory=tuple,
@@ -117,7 +113,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     def _validate_run_id(cls, value: str) -> str:
         return _validate_run_id(value)
 
-    @field_validator("approach_temperatures", "derivative_thresholds")
+    @field_validator("dt_cont_multipliers", "derivative_thresholds")
     @classmethod
     def _validate_positive_grid(cls, value: tuple[float, ...]) -> tuple[float, ...]:
         return _validate_positive_grid(value)
@@ -149,11 +145,18 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
             raise ValueError("value must be a positive integer")
         return value
 
-    @field_validator("synthesis_quality_tier")
+    @field_validator("search_width")
     @classmethod
-    def _validate_synthesis_quality_tier(cls, value: int) -> int:
-        if value < 0 or value > 5:
-            raise ValueError("synthesis_quality_tier must be between 0 and 5")
+    def _validate_search_width(cls, value: int) -> int:
+        if value < 0 or value > 3:
+            raise ValueError("search_width must be between 0 and 3")
+        return value
+
+    @field_validator("search_depth")
+    @classmethod
+    def _validate_search_depth(cls, value: int) -> int:
+        if value < 0 or value > 4:
+            raise ValueError("search_depth must be between 0 and 4")
         return value
 
     @field_validator("pdm_stage_pair_limit")
@@ -182,22 +185,12 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
         "problem_id",
         "workspace_variant",
         "period_id",
-        "selected_pathway_id",
-        "selected_pathway_kind",
-        "selected_pdm_mode",
     )
     @classmethod
     def _validate_id_collection_or_optional_text(cls, value):
         if isinstance(value, tuple):
             return tuple(_validate_optional_identity(item) for item in value)
         return _validate_optional_identity(value)
-
-    @field_validator("selected_tier_origin")
-    @classmethod
-    def _validate_selected_tier_origin(cls, value: int | None) -> int | None:
-        if value is not None and (value < 0 or value > 5):
-            raise ValueError("selected_tier_origin must be between 0 and 5")
-        return value
 
     @field_validator("task_count_by_method")
     @classmethod

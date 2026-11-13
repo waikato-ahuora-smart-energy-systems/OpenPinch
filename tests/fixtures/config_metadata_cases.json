@@ -1,8 +1,7 @@
 {
   "valid_option_values": {
     "INPUT_UNIT_TEMPERATURE": "K",
-    "HENS_DT_CONT_MULTIPLIERS": null,
-    "HENS_APPROACH_TEMPERATURES": [5, 10.5],
+    "HENS_DT_CONT_MULTIPLIERS": [0.5, 1.05],
     "HENS_DERIVATIVE_THRESHOLDS": [0.25],
     "HENS_STAGE_SELECTION": [1, 2, 3],
     "HENS_OUTPUT_FORMATS": ["json", "xlsx"],

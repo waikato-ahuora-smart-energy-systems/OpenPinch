@@ -24,7 +24,9 @@ from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
 from .arrays import (
+    ZERO_CONTRIBUTION_REPLACEMENT,
     PreparedSolverArrays,
+    _array_dt_cont_multiplier,
     _temperature_contribution,
     problem_to_solver_arrays,
 )
@@ -52,7 +54,7 @@ class PinchDesignTarget(BaseModel):
         default=(
             "OpenPinch direct_heat_integration on copied Zone",
             "Zone.process_streams",
-            "Stream.effective_delta_t_contribution with dTmin / 2 fallback",
+            "Stream.effective_delta_t_contribution times the dt_cont multiplier",
         )
     )
 
@@ -280,7 +282,10 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
         parts = stream.segments if stream.has_segments else (stream,)
         contributions = [
             _stream_dt_cont_with_fallback(
-                part, dTmin=dTmin, reference_dt_cont=zone.config.thermal.dt_cont
+                part,
+                dTmin=dTmin,
+                reference_dt_cont=zone.config.thermal.dt_cont,
+                locked=stream.delta_t_contribution_multiplier_locked,
             )
             for part in parts
         ]
@@ -305,7 +310,7 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
             stream.delta_t_contribution = contributions[0]
         stream.delta_t_contribution_multiplier_locked = locked
 
-    # The baked values are already at the dTmin scale. Record that scale as the
+    # The baked values are already at the task's scale. Record that scale as the
     # zone's reference so applying the convention again leaves them unchanged.
     # The zone (and its config) is a detached copy, so the source is untouched.
     zone.config.update_values(THERMAL_DT_CONT=float(dTmin) / 2.0)
@@ -316,11 +321,18 @@ def _stream_dt_cont_with_fallback(
     *,
     dTmin: float,
     reference_dt_cont: float | None = None,
+    locked: bool = False,
 ) -> dict[str, float | list[float] | str]:
     """Use the solver-array contribution policy for each effective period."""
     current = getattr(stream, "effective_delta_t_contribution", None)
     if current is None:
-        return {"value": float(dTmin) / 2.0, "unit": "delta_degC"}
+        multiplier = (
+            1.0 if locked else _array_dt_cont_multiplier(dTmin, reference_dt_cont)
+        )
+        return {
+            "value": ZERO_CONTRIBUTION_REPLACEMENT * multiplier,
+            "unit": "delta_degC",
+        }
 
     values = [
         _temperature_contribution(
@@ -328,6 +340,7 @@ def _stream_dt_cont_with_fallback(
             dTmin,
             period_idx=period_index,
             reference_dt_cont=reference_dt_cont,
+            locked=locked,
         )
         for period_index in range(current.num_periods)
     ]
@@ -454,8 +467,9 @@ def _build_decomposition(
         },
         dt_cont_convention=(
             "Copied stream and explicit segment dt_cont values are the prepared "
-            "effective contributions scaled by dTmin / (2 * THERMAL_DT_CONT), "
-            "with dTmin / 2 as fallback. "
+            "effective contributions times the task's dt_cont multiplier "
+            "(unscaled for a locked stream), with 0.1 K times that multiplier "
+            "replacing a zero. "
             "The copied zone dt_cont_multiplier is then set to 1.0."
         ),
     )

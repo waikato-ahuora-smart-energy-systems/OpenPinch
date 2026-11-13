@@ -24,7 +24,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         *,
         name: str,
         framework: Literal["TDM", "ESM", "PDM"],
-        solver: Literal["couenne", "ipopt-pyomo", "ipopt-GEKKO", "apopt"],
+        solver: Literal["couenne", "highs", "ipopt-pyomo"],
         solver_arrays: PreparedSolverArrays,
         stages: int,
         dTmin: float,
@@ -91,14 +91,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
 
         return _equations.set_dqda_equations(self)
 
-    def set_initial_values_for_variables(
-        self, init_solution, *, brackets: bool = False
-    ) -> None:
+    def set_initial_values_for_variables(self, init_solution) -> None:
         """Warm-start this model from a solved parent model."""
 
-        return _warm_start.set_initial_values_for_variables(
-            self, init_solution, brackets=brackets
-        )
+        return _warm_start.set_initial_values_for_variables(self, init_solution)
 
     def get_net_benefit_evolution(
         self,

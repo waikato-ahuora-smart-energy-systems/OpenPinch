@@ -79,8 +79,8 @@ HEN Design and Publication
 
 15. ``15_hen_synthesis_and_selection.ipynb`` -- ranked HEN synthesis,
     selection, utilities, serialization, and grids (``solver``).
-16. ``16_advanced_hen_methods.ipynb`` -- enhanced, OpenHENS, Pinch Design,
-    thermal-derivative, and evolution methods (``solver``).
+16. ``16_advanced_hen_methods.ipynb`` -- search depth, pinch design
+    (heuristic and MILP), thermal-derivative and evolution methods (``solver``).
 17. ``17_multiperiod_hen_synthesis.ipynb`` -- one shared multiperiod HEN
     (``solver``).
 18. ``18_results_plots_reports_exports.ipynb`` -- complete observation and

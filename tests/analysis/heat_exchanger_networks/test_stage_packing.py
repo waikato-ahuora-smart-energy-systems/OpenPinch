@@ -35,7 +35,7 @@ class _FakeExpression:
         return ("ge", self, other)
 
 
-class _FakeGekkoLikeModel:
+class _FakeModelBuilder:
     def __init__(self):
         self.params = []
         self.variables = []
@@ -100,7 +100,7 @@ def _fake_model_from_case(case: dict):
             ]
             for i in stream_rows
         ],
-        m=_FakeGekkoLikeModel(),
+        m=_FakeModelBuilder(),
     )
 
 

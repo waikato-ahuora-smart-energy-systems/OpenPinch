@@ -356,8 +356,9 @@ def test_hen_synthesis_docs_keep_internal_cutover_and_dependency_notes():
     for phrase in (
         'python -m pip install "openpinch[synthesis]"',
         "idaes get-extensions",
-        "problem.design.enhanced_heat_exchanger_network(quality_tier=2)",
-        "problem.design.open_hens()",
+        "problem.design.heat_exchanger_network(width=2, depth=3)",
+        "HENS_SEARCH_WIDTH",
+        "HENS_SEARCH_DEPTH",
         "problem.design.network_evolution(",
         "TargetOutput.design",
         'design.result.model_dump(mode="json")',

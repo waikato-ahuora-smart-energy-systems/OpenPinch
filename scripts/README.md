@@ -50,11 +50,11 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   CSV cases to JSON fixtures (needs `--write`).
 - `compare_openhens_openpinch_top5.py` (`compare_openhens_openpinch_top5.py`): runs OpenHENS and
   OpenPinch on fixture cases and writes top-5 comparison CSV and Markdown reports.
-- `benchmark_performance.py` (`benchmark_performance.py`): `time_hens_tier_case`,
-  `time_hens_tier_case_with_timeout`, `summarize_hens_tier_comparisons`,
+- `benchmark_performance.py` (`benchmark_performance.py`): `time_hens_depth_case`,
+  `time_hens_depth_case_with_timeout`, `summarize_hens_depth_comparisons`,
   `small_hens_benchmark_cases`, `resolve_hens_case`, `acceptance_metrics`,
   `network_meets_pinch_targets`, `pdm_topology_summary`, `compare_acceptance`,
-  `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating HEN synthesis quality-tier
+  `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating HEN synthesis search-depth
   benchmark writing incremental JSON. `--hens-case` takes an OpenHENS fixture, a packaged sample
   case (for example `pulp_mill.json`, the large manual case) or a path; `--baseline-json`
   compares acceptance metrics with an earlier run's JSON.
@@ -81,9 +81,13 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   OpenPinch costing has one set [convert_openhens_fixtures.py:_validate_costing_can_use_openpinch_configuration].
 - A benchmark record's acceptance metrics count only successful PDM networks whose hot and cold
   utility in every period is within max(1e-3 kW, 1e-6 relative) of the pinch target, above or below, at that
-  network's own approach temperature; topologies are distinct sets of active matches (recovery
-  matches by stage), whatever their duties [benchmark_performance.py:network_meets_pinch_targets,
-  pdm_topology_summary].
+  network's own dt_cont multiplier; topologies are distinct sets of active matches (recovery
+  matches by stage), whatever their duties. Heuristic pinch design networks are summarised the same way under
+  `heuristic`, and `combined_distinct_target_meeting_topologies` counts both; the heuristic stage is labelled
+  `heuristic_pdm` and evolution seeded from either pinch design method `direct_evm_from_pdm`
+  [benchmark_performance.py:network_meets_pinch_targets, pdm_topology_summary, acceptance_metrics, _stage_label].
+- The benchmark trace executor runs tasks one at a time and returns every outcome the delegate gives for a task, so the
+  extra networks of a pinch design or heuristic task are kept [benchmark_performance.py:BenchmarkTraceExecutor.execute].
 - The OpenHENS comparison needs an OpenHENS checkout that exposes the modules it imports
   [compare_openhens_openpinch_top5.py:_supported_openhens_checkout].
 - Public members of the target, all-period, design and plot accessors (and their batch counterparts) need a tutorial mapping or an entry in
@@ -107,7 +111,7 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   `sys.modules`, prepends `~/.idaes/bin` to `PATH` without restoring it, uses temporary directories, and spawns
   multiprocessing workers [compare_openhens_openpinch_top5.py:_configure_solver_path].
 - `benchmark_performance.py` forks worker processes (POSIX only: it requests the `fork` start method), monkeypatches
-  `solver_backend.solve_gekko_model` while tracing, runs solvers, and writes the JSON results file
+  `solver_backend.solve_pyomo_model` while tracing, runs solvers, and writes the JSON results file
   (default under `results/`) [benchmark_performance.py:BenchmarkSolverCallTracer.patched_backend].
 - `benchmark_nine_stream.py` runs the full OpenHENS workflow with the local solvers and imports the
   helpers in `tests/analysis/heat_exchanger_networks/test_solver_regressions.py` when run.

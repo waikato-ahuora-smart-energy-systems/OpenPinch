@@ -4,19 +4,23 @@ from __future__ import annotations
 
 from .._base import approach as _approach
 from .._base import execution as _execution
+from .verification import _value
 
 
 def set_initial_values_for_variables(
     owner,
     init_solution,
-    *,
-    brackets: bool = False,
 ) -> None:
     """Warm-start this model from a solved parent model."""
 
     if getattr(owner, "N_periods", 1) > 1 and hasattr(owner, "Q_r_by_period"):
-        _set_multiperiod_initial_values(owner, init_solution, brackets=brackets)
-        return
+        _set_multiperiod_initial_values(owner, init_solution)
+    else:
+        _set_single_period_initial_values(owner, init_solution)
+    _approach.switch_on_idle_safe_utilities(owner)
+
+
+def _set_single_period_initial_values(owner, init_solution) -> None:
 
     for k in range(owner.S):
         for j in range(owner.J):
@@ -25,43 +29,35 @@ def set_initial_values_for_variables(
                     _execution._set_value(
                         owner,
                         owner.Q_r[i][j][k],
-                        init_solution.Q_r[i][j][k].VALUE[0],
-                        brackets=brackets,
+                        _value(init_solution.Q_r[i][j][k]),
                     )
                     _execution._set_value(
                         owner,
                         owner.z[i][j][k],
-                        init_solution.z[i][j][k][0],
-                        brackets=brackets,
+                        _value(init_solution.z[i][j][k]),
                     )
                     _execution._set_value(
                         owner,
                         owner.theta_1[i][j][k],
-                        init_solution.theta_1[i][j][k].VALUE[0],
-                        brackets=brackets,
+                        _value(init_solution.theta_1[i][j][k]),
                     )
                     _execution._set_value(
                         owner,
                         owner.theta_2[i][j][k],
-                        init_solution.theta_2[i][j][k].VALUE[0],
-                        brackets=brackets,
+                        _value(init_solution.theta_2[i][j][k]),
                     )
                 else:
-                    _execution._set_value(
-                        owner, owner.Q_r[i][j][k], 0.0, brackets=brackets
-                    )
-                    _execution._set_value(owner, owner.z[i][j][k], 0, brackets=brackets)
+                    _execution._set_value(owner, owner.Q_r[i][j][k], 0.0)
+                    _execution._set_value(owner, owner.z[i][j][k], 0)
                     _execution._set_value(
                         owner,
                         owner.theta_1[i][j][k],
                         _approach._recovery_approach_temperature(owner, i, j),
-                        brackets=brackets,
                     )
                     _execution._set_value(
                         owner,
                         owner.theta_2[i][j][k],
                         _approach._recovery_approach_temperature(owner, i, j),
-                        brackets=brackets,
                     )
 
     for i in range(owner.I):
@@ -69,16 +65,14 @@ def set_initial_values_for_variables(
             _execution._set_value(
                 owner,
                 owner.T_h[i][k],
-                init_solution.T_h[i][k].VALUE[0],
-                brackets=brackets,
+                _value(init_solution.T_h[i][k]),
             )
     for j in range(owner.J):
         for k in range(owner.K):
             _execution._set_value(
                 owner,
                 owner.T_c[j][k],
-                init_solution.T_c[j][k].VALUE[0],
-                brackets=brackets,
+                _value(init_solution.T_c[j][k]),
             )
 
     for side in ("cold", "hot"):
@@ -102,12 +96,12 @@ def set_initial_values_for_variables(
         for index, row in enumerate(allowed):
             for u, is_allowed in enumerate(row):
                 if is_allowed > 0:
-                    duty = source_duties[index][u].VALUE[0]
-                    flag = source_flags[index][u][0]
+                    duty = _value(source_duties[index][u])
+                    flag = _value(source_flags[index][u])
                 else:
                     duty, flag = 0.0, 0
-                _execution._set_value(owner, duties[index][u], duty, brackets=brackets)
-                _execution._set_value(owner, flags[index][u], flag, brackets=brackets)
+                _execution._set_value(owner, duties[index][u], duty)
+                _execution._set_value(owner, flags[index][u], flag)
 
     if owner.non_isothermal_model:
         if init_solution.non_isothermal_model:
@@ -118,112 +112,88 @@ def set_initial_values_for_variables(
                             _execution._set_value(
                                 owner,
                                 owner.X[i][j][k],
-                                init_solution.X[i][j][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.X[i][j][k]),
                             )
                             _execution._set_value(
                                 owner,
                                 owner.Y[j][i][k],
-                                init_solution.Y[j][i][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.Y[j][i][k]),
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h_out_x[i][j][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_h_out_x[i][j][k]),
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c_out_y[j][i][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_c_out_y[j][i][k]),
                             )
                         else:
-                            _execution._set_value(
-                                owner, owner.X[i][j][k], 0.0, brackets=brackets
-                            )
-                            _execution._set_value(
-                                owner, owner.Y[j][i][k], 0.0, brackets=brackets
-                            )
+                            _execution._set_value(owner, owner.X[i][j][k], 0.0)
+                            _execution._set_value(owner, owner.Y[j][i][k], 0.0)
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_h[i][k + 1]),
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_c[j][k]),
                             )
         else:
             for k in range(owner.S):
                 for i in range(owner.I):
                     sum_Q_r_i = sum(
-                        init_solution.Q_r[i][j][k].VALUE[0] for j in range(owner.J)
+                        _value(init_solution.Q_r[i][j][k]) for j in range(owner.J)
                     )
                     for j in range(owner.J):
                         sum_Q_r_j = sum(
-                            init_solution.Q_r[i][j][k].VALUE[0] for i in range(owner.I)
+                            _value(init_solution.Q_r[i][j][k]) for i in range(owner.I)
                         )
                         if owner.z_allowed[i][j][k] > 0:
-                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
+                            q_val = _value(init_solution.Q_r[i][j][k])
                             if q_val > 0.0:
                                 _execution._set_value(
                                     owner,
                                     owner.X[i][j][k],
                                     q_val / sum_Q_r_i if sum_Q_r_i else 0.0,
-                                    brackets=brackets,
                                 )
                                 _execution._set_value(
                                     owner,
                                     owner.Y[j][i][k],
                                     q_val / sum_Q_r_j if sum_Q_r_j else 0.0,
-                                    brackets=brackets,
                                 )
                             else:
-                                _execution._set_value(
-                                    owner, owner.X[i][j][k], 0.0, brackets=brackets
-                                )
-                                _execution._set_value(
-                                    owner, owner.Y[j][i][k], 0.0, brackets=brackets
-                                )
+                                _execution._set_value(owner, owner.X[i][j][k], 0.0)
+                                _execution._set_value(owner, owner.Y[j][i][k], 0.0)
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_h[i][k + 1]),
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_c[j][k]),
                             )
                         else:
-                            _execution._set_value(
-                                owner, owner.X[i][j][k], 0.0, brackets=brackets
-                            )
-                            _execution._set_value(
-                                owner, owner.Y[j][i][k], 0.0, brackets=brackets
-                            )
+                            _execution._set_value(owner, owner.X[i][j][k], 0.0)
+                            _execution._set_value(owner, owner.Y[j][i][k], 0.0)
                             _execution._set_value(
                                 owner,
                                 owner.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_h[i][k + 1]),
                             )
                             _execution._set_value(
                                 owner,
                                 owner.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
+                                _value(init_solution.T_c[j][k]),
                             )
 
 
-def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> None:
+def _set_multiperiod_initial_values(owner, init_solution) -> None:
     source_q_r = getattr(init_solution, "Q_r_by_period", None)
     source_q_c = getattr(init_solution, "Q_c_by_period", None)
     source_q_h = getattr(init_solution, "Q_h_by_period", None)
@@ -252,7 +222,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                             owner._active_binary_value(
                                 source_q_r[source_period_idx][i][j][k]
                             ),
-                            brackets=brackets,
                         )
                         _execution._set_value(
                             owner,
@@ -260,7 +229,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                             owner._active_binary_value(
                                 source_theta_1[source_period_idx][i][j][k]
                             ),
-                            brackets=brackets,
                         )
                         _execution._set_value(
                             owner,
@@ -268,14 +236,12 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                             owner._active_binary_value(
                                 source_theta_2[source_period_idx][i][j][k]
                             ),
-                            brackets=brackets,
                         )
                     else:
                         _execution._set_value(
                             owner,
                             owner.Q_r_by_period[n][i][j][k],
                             0.0,
-                            brackets=brackets,
                         )
                         approach = _approach._recovery_approach_temperature(
                             owner,
@@ -287,13 +253,11 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                             owner,
                             owner.theta_1_by_period[n][i][j][k],
                             approach,
-                            brackets=brackets,
                         )
                         _execution._set_value(
                             owner,
                             owner.theta_2_by_period[n][i][j][k],
                             approach,
-                            brackets=brackets,
                         )
 
         for i in range(owner.I):
@@ -302,7 +266,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner,
                     owner.T_h_by_period[n][i][k],
                     owner._active_binary_value(source_t_h[source_period_idx][i][k]),
-                    brackets=brackets,
                 )
         for j in range(owner.J):
             for k in range(owner.K):
@@ -310,7 +273,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner,
                     owner.T_c_by_period[n][j][k],
                     owner._active_binary_value(source_t_c[source_period_idx][j][k]),
-                    brackets=brackets,
                 )
         for target, source, allowed in (
             (owner.Q_c_by_period[n], source_q_c[source_period_idx], owner.z_cu_allowed),
@@ -323,9 +285,7 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                         if is_allowed > 0
                         else 0.0
                     )
-                    _execution._set_value(
-                        owner, target[index][u], value, brackets=brackets
-                    )
+                    _execution._set_value(owner, target[index][u], value)
 
     for k in range(owner.S):
         for j in range(owner.J):
@@ -334,7 +294,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner,
                     owner.z[i][j][k],
                     owner._active_binary_value(init_solution.z[i][j][k]),
-                    brackets=brackets,
                 )
     for target, source in (
         (owner.z_cu, init_solution.z_cu),
@@ -346,7 +305,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner,
                     flag,
                     owner._active_binary_value(source[index][u]),
-                    brackets=brackets,
                 )
 
     source_area_r = getattr(init_solution, "area_r_shared", None)
@@ -360,7 +318,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                         owner,
                         owner.area_r_shared[i][j][k],
                         owner._active_binary_value(source_area_r[i][j][k]),
-                        brackets=brackets,
                     )
     for source, target_name in (
         (source_area_hu, "area_hu_shared"),
@@ -374,7 +331,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner,
                     area,
                     owner._active_binary_value(source[index][u]),
-                    brackets=brackets,
                 )
 
     if owner.non_isothermal_model and hasattr(owner, "X_by_period"):
@@ -400,7 +356,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                     owner._active_binary_value(
                                         source_x[source_period_idx][i][j][k]
                                     ),
-                                    brackets=brackets,
                                 )
                                 _execution._set_value(
                                     owner,
@@ -408,7 +363,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                     owner._active_binary_value(
                                         source_y[source_period_idx][j][i][k]
                                     ),
-                                    brackets=brackets,
                                 )
                                 _execution._set_value(
                                     owner,
@@ -416,7 +370,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                     owner._active_binary_value(
                                         source_thx[source_period_idx][i][j][k]
                                     ),
-                                    brackets=brackets,
                                 )
                                 _execution._set_value(
                                     owner,
@@ -424,7 +377,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                     owner._active_binary_value(
                                         source_tcy[source_period_idx][j][i][k]
                                     ),
-                                    brackets=brackets,
                                 )
         else:
             for n in range(owner.N_periods):
@@ -452,13 +404,11 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                 owner,
                                 owner.X_by_period[n][i][j][k],
                                 duty / hot_total if active and hot_total else 0.0,
-                                brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
                                 owner.Y_by_period[n][j][i][k],
                                 duty / cold_total if active and cold_total else 0.0,
-                                brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
@@ -466,7 +416,6 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                 owner._active_binary_value(
                                     source_t_h[source_period_idx][i][k + 1]
                                 ),
-                                brackets=brackets,
                             )
                             _execution._set_value(
                                 owner,
@@ -474,5 +423,4 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                                 owner._active_binary_value(
                                     source_t_c[source_period_idx][j][k]
                                 ),
-                                brackets=brackets,
                             )

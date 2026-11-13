@@ -49,11 +49,11 @@ temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical
 ``HPR_*`` fields for heat-pump and refrigeration workflows.
 
 ``THERMAL_DT_CONT`` is the ``dt_cont`` of any process stream or utility that
-doesn't give its own (an absent, null or blank value). Heat exchanger network synthesis
-also uses it as the reference for its dTmin sweep: in each tier of
-``HENS_APPROACH_TEMPERATURES`` every stream's contribution is scaled by
-dTmin / (2 · ``THERMAL_DT_CONT``), so a stream at the default contributes
-exactly dTmin / 2. A utility without a ``price`` uses
+doesn't give its own (an absent, null or blank value). Heat exchanger network
+synthesis scales every contribution by each ``HENS_DT_CONT_MULTIPLIERS``
+value, as a zone ``dt_cont`` multiplier does in targeting, so 1.0 designs at
+the targeting contributions. Unset, the search width sets the multipliers
+(0.75, 1.0 and 1.5 at the default width). A utility without a ``price`` uses
 ``COSTING_UTILITY_PRICE``, the price of the default utilities.
 
 These defaults, ``THERMAL_DT_PHASE_CHANGE``, ``THERMAL_HTC``, the
@@ -191,43 +191,34 @@ The
 :class:`~OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod` enum is the
 single method identity used for dispatch and result metadata.
 ``design.result.manifest.method_sequence`` records the executed task sequence:
-a stage that the tier leaves out, or that could not run because Couenne is
-missing, is not listed.
-For tiered OpenHENS runs, the manifest also records the synthesis quality tier,
-selected pathway, and protected-fallback status.
+a stage that the search depth leaves out, or that could not run because
+Couenne is missing, is not listed. The manifest also records the search width
+and depth that ran.
 
-``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field with a
-default of tier 1 for prepared-problem workflows. If the problem's options set
-it, ``problem.design.heat_exchanger_network()``, its multiperiod form and
-``problem.design.enhanced_heat_exchanger_network()`` run that tier. If they do
-not, those methods run their own defaults, tiers 0 and 2, even though the
-configuration still reads 1; the key in ``problem.to_problem_json()["options"]``
-is what counts as set. ``problem.design.open_hens()`` always runs tier 1. The
-tier that ran is in ``design.result.manifest.synthesis_quality_tier`` and in the
-``HENS_SYNTHESIS_QUALITY_TIER`` value of ``design.result.provenance``. User
-code should prefer
-``problem.design.enhanced_heat_exchanger_network(quality_tier=...)`` for method-level
-tier selection because it applies a call-local override without mutating the
-loaded problem configuration. That argument wins over a tier in the call's
-``options``, which wins over the stored option for that call only. Runtime
+``HENS_SEARCH_WIDTH`` (default 1) and ``HENS_SEARCH_DEPTH`` (default 1) are
+persistent configuration fields; :doc:`../guides/heat-exchanger-network-synthesis`
+lists what each level sets. ``problem.design.heat_exchanger_network(width=...,
+depth=...)`` applies them to one call without changing the loaded problem
+configuration. Those arguments win over the levels in the call's ``options``,
+which win over the stored options for that call only. A level given in the
+call, either way, also overrides the stored options it governs, such as a
+stored ``HENS_DT_CONT_MULTIPLIERS`` for the width, unless the call sets them. The levels that ran are
+in ``design.result.manifest.search_width`` and ``search_depth`` and in
+``design.result.provenance``. Runtime
 ``options`` passed to design accessors accept other ``HENS_*`` overrides the same
 way: they apply to that call only and do not change the stored configuration.
 
 ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (default 0, at least 0 and below 1) sets
 the smallest exchanger approach the thermal derivative and network evolution
-steps may choose, as a share of the requested approach temperature. At the
+steps may choose, as a share of twice ``THERMAL_DT_CONT`` times the dt_cont multiplier. At the
 default those steps choose approaches by cost down to 0.1 K; see
 :doc:`../guides/heat-exchanger-network-synthesis`.
 
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` set the network evolution
-breadth of every route when they are set, including the tier 0 and tier 1 routes that
-tiers 2 to 5 run as protected routes, and including ``problem.design.open_hens()``.
-With either option above 1, the tier 1 route is no longer the original search. When
-they are not set, tier 0 and tier 1 routes use a breadth of 1 in any tier, while tiers
-4 and 5 use 2 on their expanded routes. ``manifest.evm_n_ad_branches`` and
-``manifest.evm_n_rm_branches`` report the widest of these, so at tier 4 or 5 a
-protected route can be selected at a narrower breadth than the manifest shows: check
-``manifest.selected_protected_pathway``.
+breadth of every evolution task when they are set. When they are not, the search
+depth sets it: 1 up to depth 2, 2 at depth 3 and 3 at depth 4.
+``manifest.evm_n_ad_branches`` and ``manifest.evm_n_rm_branches`` report the
+breadth used.
 
 Method-level inputs and outputs are Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,

@@ -1309,10 +1309,9 @@ def _sum(values):
 
 
 def _numeric(value: Any) -> float:
-    """Plain float from a number, a solver variable or a GEKKO Param.
+    """Plain float from a number, a ``[value]`` list or a solver variable.
 
-    GEKKO wraps a Param's value in ``GK_Value`` whose own ``.value`` may be a
-    scalar or a list, so unwrap ``.value`` until a number or sequence remains.
+    Unwrap ``.value`` until a number or sequence remains.
     """
 
     for _ in range(3):

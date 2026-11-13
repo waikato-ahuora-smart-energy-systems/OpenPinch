@@ -76,12 +76,13 @@ tespy = [
 ]
 synthesis = [
   "pyomo>=6.10.0",
-  "gekko>=1.3.2",
   "plotly>=6.8.0",
   "kaleido>=1.3.0",
   "openpyxl>=3.1.5",
   "wakepy>=1.0.0",
   "idaes-pse>=2.11.0",
+  "highspy>=1.11.0",
+  "pyscipopt>=5.5.0",
 ]
 notebook = [
   "ipykernel>=7.2.0",
@@ -99,10 +100,11 @@ full = [
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",
   "pyomo>=6.10.0",
-  "gekko>=1.3.2",
   "kaleido>=1.3.0",
   "wakepy>=1.0.0",
   "idaes-pse>=2.11.0",
+  "highspy>=1.11.0",
+  "pyscipopt>=5.5.0",
 ]
 
 [dependency-groups]
@@ -126,7 +128,6 @@ dev = [
     "black>=23.9",
     "streamlit",
     "pyomo>=6.10.0",
-    "gekko>=1.3.2",
     "plotly>=6.8.0",
     "kaleido>=1.3.0",
     "openpyxl>=3.1.5",
@@ -139,6 +140,8 @@ dev = [
     "coverage>=7.14.3",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.0.0",
+    "highspy>=1.11.0",
+    "pyscipopt>=5.5.0",
 ]
 
 [tool.black]

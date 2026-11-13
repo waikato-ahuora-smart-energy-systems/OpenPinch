@@ -23,7 +23,7 @@ class BaseHeatExchangerNetworkModel(ABC):
 
     The constructor mirrors the source OpenHENS solver defaults, but it accepts
     OpenPinch-prepared solver arrays instead of a CSV path. This layer owns the
-    guarded GEKKO backend setup, source-shaped array normalization, inherited
+    guarded Pyomo backend setup, source-shaped array normalization, inherited
     topology restrictions, common diagnostics, and helper equations that are
     stable across the moved private ``PinchDecompModel`` and ``StageWiseModel``.
     HENS-08 still owns topology evolution and stage-reduction behavior; those
@@ -34,7 +34,7 @@ class BaseHeatExchangerNetworkModel(ABC):
         self,
         name: str,
         framework: Literal["PDM", "TDM", "ESM"],
-        solver: Literal["couenne", "ipopt-pyomo", "ipopt-GEKKO", "apopt"],
+        solver: Literal["couenne", "highs", "ipopt-pyomo"],
         solver_arrays: PreparedSolverArrays,
         dTmin: float,
         z_restriction: list | None,
@@ -82,7 +82,8 @@ class BaseHeatExchangerNetworkModel(ABC):
             raise
 
     def setup_model(self) -> None:
-        "Create and configure the GEKKO model behind optional guards."
+        """Build a native Pyomo model and configure its solver."""
+
         return _execution.setup_model(self)
 
     @abstractmethod
@@ -159,7 +160,7 @@ class BaseHeatExchangerNetworkModel(ABC):
         return _approach.set_match_restrictions(self, restrictions)
 
     def cleanup(self) -> None:
-        "Remove the GEKKO run directory; solved values stay on the model."
+        "Remove the model's run directory; solved values stay on the model."
         return _execution.cleanup_model(self)
 
     def optimise(self, print_output: bool) -> None:

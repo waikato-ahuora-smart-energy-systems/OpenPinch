@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+import copy
+import logging
+from dataclasses import dataclass, field, replace
+from itertools import product
 from typing import Any, Literal, Mapping, Sequence
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..extraction.service import (
     extract_heat_exchanger_network,
@@ -13,10 +17,19 @@ from ..extraction.service import (
 )
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
+from ..solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
+from ._base.execution import _assign_value, _set_value, _value
+from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
+from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
+
+logger = logging.getLogger(__name__)
 
 
 class ModelSliceUnavailableError(NotImplementedError):
@@ -38,6 +51,8 @@ class InternalHeatExchangerNetworkProblem:
     framework: FrameworkName = "TDM"
     solver: str = "couenne"
     dTmin: float = 0.1
+    # The synthesis task's dt_cont multiplier, recorded on extracted networks.
+    dt_cont_multiplier: float | None = None
     min_dqda: float = 0.0
     z_restriction: list | None = None
     minimisation_goal: str = "hot utility"
@@ -50,6 +65,17 @@ class InternalHeatExchangerNetworkProblem:
     stages: int | None = None
     synthesis_task_id: str | None = None
     pinch_decompositions: Mapping[str, PinchDesignDecomposition] | None = None
+    # PDM only: how many extra networks to collect at the fewest units and at
+    # one more unit. Each becomes a problem in ``pdm_variants``.
+    pdm_network_limits: tuple[int, int] = (0, 0)
+    pdm_variants: list["InternalHeatExchangerNetworkProblem"] = field(
+        default_factory=list, init=False
+    )
+    # PDM only: above 0, the heuristic pinch design method builds up to this
+    # many networks instead of the MILP sides; extra ones go in
+    # ``pdm_variants``.
+    heuristic_network_limit: int = 0
+    heuristic_report: dict[str, Any] = field(default_factory=dict, init=False)
 
     def load_model(
         self,
@@ -58,6 +84,7 @@ class InternalHeatExchangerNetworkProblem:
     ) -> None:
         """Construct the private PDM or StageWise model for this task."""
 
+        self._model_factories = model_factories
         self.args = {
             "name": self.name,
             "framework": self.framework,
@@ -94,13 +121,23 @@ class InternalHeatExchangerNetworkProblem:
         unreduced_case = None
         try:
             self.load_model(model_factories=model_factories)
-            if self.framework == "PDM":
+            if self.framework == "PDM" and self.heuristic_network_limit > 0:
+                self._solve_heuristic_pdm()
+            elif self.framework == "PDM":
                 self._solve_pdm(print_output=print_output)
             else:
                 self.case.optimise(print_output=print_output)
-            if self.framework in {"PDM", "TDM"}:
+            # Heuristic networks are already reduced to their non-empty
+            # stages; reducing by share of recovery would trade it for utility.
+            if self.framework in {"PDM", "TDM"} and self.heuristic_network_limit <= 0:
                 unreduced_case = self.case
                 self.case = self.remove_unused_stages(self.case)
+            if (
+                self.framework == "PDM"
+                and self.heuristic_network_limit <= 0
+                and self.case.mSuccess == 1
+            ):
+                self.pdm_variants = self._collect_pdm_variants(model_factories)
             if evolution:
                 evolved = self.case.get_net_benefit_evolution(
                     print_output=print_output,
@@ -117,7 +154,7 @@ class InternalHeatExchangerNetworkProblem:
             self.solution_failure_reason = str(exc)
             return None
         finally:
-            # Results live on the model variables now; drop every GEKKO run
+            # Results live on the model variables now; drop every run
             # directory this solve created, including unsolved PDM sides and
             # the never-solved amalgamated network.
             for model in (
@@ -136,7 +173,8 @@ class InternalHeatExchangerNetworkProblem:
             self.solver_arrays,
             run_id=run_id,
             task_id=self.synthesis_task_id,
-            method=self.framework,
+            method=self._result_method(),
+            dt_cont_multiplier=self.dt_cont_multiplier,
             stage_count=getattr(
                 self.case, "stages", getattr(self.case, "S", self.stages)
             ),
@@ -161,9 +199,16 @@ class InternalHeatExchangerNetworkProblem:
             workspace_variant=workspace_variant,
             period_id=period_id,
             solver_name=self.solver,
-            method=self.framework,
+            method=self._result_method(),
             stage_count=getattr(self.case, "S", self.stages),
         )
+
+    def _result_method(self) -> str:
+        """The method extracted networks are labelled with."""
+
+        if self.framework == "PDM" and self.heuristic_network_limit > 0:
+            return HeatExchangerNetworkDesignMethod.HeuristicPinchDesign.value
+        return self.framework
 
     def _build_pdm(
         self,
@@ -183,7 +228,13 @@ class InternalHeatExchangerNetworkProblem:
             "pinch_design_method",
             default="PinchDecompModel",
         )
-        base_args = dict(self.args)
+        base_args = dict(self.args) | {
+            "solver_options": _with_time_limit(
+                self.solver,
+                self.args.get("solver_options"),
+                seconds=backend.PDM_TIME_LIMIT,
+            )
+        }
         self.above = factory(
             **(
                 base_args
@@ -242,8 +293,10 @@ class InternalHeatExchangerNetworkProblem:
 
         if self.above.side_required:
             self.above.optimise(print_output=print_output)
+            self.above = self._fewest_units_side("above", self.above)
         if self.below.side_required:
             self.below.optimise(print_output=print_output)
+            self.below = self._fewest_units_side("below", self.below)
         self.case = self.above.amalgamate_networks(
             below_case=self.below,
             above_case=self.above,
@@ -259,6 +312,399 @@ class InternalHeatExchangerNetworkProblem:
                 "tol": self.tol,
             }
         )
+
+    def _fewest_units_side(self, name: str, side):
+        """Re-solve a side for the fewest units among the matches it used.
+
+        Minimum utility cost leaves the binaries free once the targets are
+        met, so an integer solver may keep matches the network does not need
+        (thousands of sub-kilowatt matches on a 64-stream case). The side's
+        energy balance holds its utility at the target, and its own solution
+        is feasible on its own matches, so the re-solve keeps the utility and
+        can only drop units. The original side is kept if it fails.
+        """
+
+        if side.mSuccess != 1 or self.solver not in backend.INTEGER_SOLVERS:
+            return side
+        factory = self._model_factory(
+            getattr(self, "_model_factories", None),
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        sparse = factory(
+            **(
+                dict(self.args)
+                | {
+                    "name": f"{name} pinch {self.dTmin} fewest units",
+                    "pinch_loc": name,
+                    "minimisation_goal": "min units",
+                    "utility_cost_cap": _minimum_utility_cost(side),
+                    "solver_options": _with_time_limit(
+                        self.solver, self.args.get("solver_options")
+                    ),
+                    "pinch_decomposition": self.pinch_decompositions[name],
+                    "stage_selection": self.stage_selection,
+                }
+            )
+        )
+        _start_from_side(sparse, side)
+        sparse.optimise(print_output=False)
+        if not _replaces(sparse, side):
+            _cleanup_model(sparse)
+            return side
+        # Stopping at the time limit leaves a network at the same, proven,
+        # minimum utility: the side keeps the first solve's convergence.
+        sparse.solver_run = replace(
+            sparse.solver_run,
+            termination_condition=side.solver_run.termination_condition,
+        )
+        # The swapped side's objective is its unit count; keep the utility
+        # cost the variants are capped at.
+        sparse.minimum_utility_cost = _minimum_utility_cost(side)
+        _cleanup_model(side)
+        return sparse
+
+    def _collect_pdm_variants(
+        self, model_factories: Mapping[str, Any] | None
+    ) -> list["InternalHeatExchangerNetworkProblem"]:
+        """The extra networks, or none if collecting them fails.
+
+        The main network is solved by then, so a failure here only loses the
+        extra networks.
+        """
+
+        try:
+            return self._solve_pdm_variants(model_factories)
+        except (
+            ValueError,
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        ) as exc:
+            logger.warning("[%s] extra PDM networks not collected: %s", self.name, exc)
+            return []
+
+    def _solve_pdm_variants(
+        self, model_factories: Mapping[str, Any] | None
+    ) -> list["InternalHeatExchangerNetworkProblem"]:
+        """Collect extra networks from minimum-unit side topologies.
+
+        Each required side is re-solved for the fewest units, with no-good
+        cuts excluding its minimum-utility topology and every one found: up to
+        the first limit with its fewest units, then, at least one unit more
+        required, up to the second with one unit more. Side pairs with the
+        fewest total units, then one more, become variants up to
+        ``pdm_network_limits``. Needs a solver that keeps integers.
+        """
+
+        at_minimum, one_more = self.pdm_network_limits
+        if at_minimum + one_more <= 0 or self.solver not in backend.INTEGER_SOLVERS:
+            return []
+        if not all(
+            side.solver_run.converged
+            for side in (self.above, self.below)
+            if side.side_required
+        ):
+            # A side stopped at its limit has an unproven minimum utility, so
+            # the extra networks would have no sound cost cap.
+            return []
+        sides = {
+            name: self._minimum_unit_sides(
+                name, side, (at_minimum, one_more), model_factories
+            )
+            for name, side in (("above", self.above), ("below", self.below))
+        }
+        pairs = sorted(
+            (
+                (_side_units(above) + _side_units(below), index_a + index_b, a, b)
+                for index_a, (a, above) in enumerate(enumerate(sides["above"]))
+                for index_b, (b, below) in enumerate(enumerate(sides["below"]))
+                if (a, b) != (0, 0)
+            ),
+            key=lambda pair: pair[:2] + (pair[2], pair[3]),
+        )
+        fewest = min(
+            min(_side_units(side) for side in sides["above"])
+            + min(_side_units(side) for side in sides["below"]),
+            pairs[0][0] if pairs else 0,
+        )
+        from ..reporting.ranking import network_structure_signature
+
+        seen = {
+            network_structure_signature(self.extract_network(run_id="pdm-variants"))
+        }
+        variants = []
+        # Each quota is filled with distinct networks: a pair that repeats a
+        # network already kept does not use up a place.
+        for units, quota in ((fewest, at_minimum), (fewest + 1, one_more)):
+            kept = 0
+            for _units, _rank, a, b in (pair for pair in pairs if pair[0] == units):
+                if kept >= quota:
+                    break
+                variant = self._pdm_variant(sides["above"][a], sides["below"][b])
+                if variant is None:
+                    continue
+                signature = network_structure_signature(
+                    variant.extract_network(run_id="pdm-variants")
+                )
+                if signature not in seen:
+                    seen.add(signature)
+                    variants.append(variant)
+                    kept += 1
+        # Results live on the model variables: drop the found sides' run
+        # directories (get_solution drops the primary sides').
+        for found in sides.values():
+            for side in found[1:]:
+                _cleanup_model(side)
+        return variants
+
+    def _minimum_unit_sides(
+        self,
+        name: str,
+        primary,
+        quotas: tuple[int, int],
+        model_factories: Mapping[str, Any] | None,
+    ) -> list:
+        """The primary side, then its minimum-unit and one-more-unit sides.
+
+        Up to ``quotas[0]`` sides with the fewest units (the primary's, or
+        fewer if a side found has fewer; at least one when a one-more side
+        is wanted, to count from), then, with at least one unit more
+        required, up to ``quotas[1]`` with one unit more. Only a sound solve
+        counts (``_sound_side``).
+        """
+
+        if not primary.side_required or primary.mSuccess != 1:
+            return [primary]
+        at_minimum, one_more = quotas
+        factory = self._model_factory(
+            model_factories,
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        excluded = [primary.used_units()]
+        fewest = primary.n_units
+        found = []
+
+        def solve(floor: int | None):
+            side = factory(
+                **(
+                    dict(self.args)
+                    | {
+                        "name": f"{name} pinch {self.dTmin} min units {len(found)}",
+                        "pinch_loc": name,
+                        "minimisation_goal": "min units",
+                        "utility_cost_cap": _minimum_utility_cost(primary),
+                        "solver_options": _with_time_limit(
+                            self.solver, self.args.get("solver_options")
+                        ),
+                        "pinch_decomposition": self.pinch_decompositions[name],
+                        "stage_selection": self.stage_selection,
+                    }
+                )
+            )
+            if not hasattr(side, "recovery_stage_active"):
+                # Without packing, topologies that differ only in which
+                # stages are empty amalgamate into the same network.
+                add_recovery_stage_packing_constraints(side)
+            for pattern in excluded:
+                side.exclude_units(pattern)
+            if floor is not None:
+                side.require_units(floor)
+            # The search ends with a solve its cuts leave infeasible.
+            side.failure_log_level = logging.DEBUG
+            side.optimise(print_output=False)
+            if not _sound_side(side, primary) or side.used_units() in excluded:
+                _cleanup_model(side)
+                return None
+            excluded.append(side.used_units())
+            return side
+
+        # Minimum tier. The cut-only search finds the fewest units first; the
+        # primary was minimised only within its own matches, so a side with
+        # fewer units than it resets the minimum. The one-more tier counts
+        # from that minimum, so it needs one such side even when none is
+        # asked for; pair selection then keeps it out of the variants.
+        carried = None
+        kept = 0
+        while kept < max(at_minimum, min(one_more, 1)):
+            side = solve(None)
+            if side is None:
+                break
+            if side.n_units > fewest:
+                carried = side
+                break
+            fewest = side.n_units
+            found.append(side)
+            kept += 1
+        # One-more tier, at least one unit over the minimum.
+        kept = 0
+        if carried is not None:
+            if carried.n_units == fewest + 1 and one_more > 0:
+                found.append(carried)
+                kept = 1
+            else:
+                _cleanup_model(carried)
+        while kept < one_more:
+            side = solve(fewest + 1)
+            if side is None:
+                break
+            if side.n_units != fewest + 1:
+                _cleanup_model(side)
+                break
+            found.append(side)
+            kept += 1
+        return [primary, *found]
+
+    def _solve_heuristic_pdm(self) -> None:
+        """Realise heuristic pinch design proposals as networks.
+
+        Each required side's proposals are solved for minimum utility with
+        only their matches, heaters and coolers allowed; a side that fails is
+        dropped. Side pairs, fewest proposal ranks first, are amalgamated,
+        stage-reduced and verified like the extra PDM networks, and repeats
+        are dropped, up to ``heuristic_network_limit`` networks. The first
+        becomes this problem's case, the others ``pdm_variants``.
+        """
+
+        from ..heuristic.enumeration import propose_side_topologies
+        from ..heuristic.side_streams import pinch_side
+        from ..reporting.ranking import network_structure_signature
+
+        limit = self.heuristic_network_limit
+        report: dict[str, Any] = {"proposed": {}, "realised": {}}
+        sides = {}
+        for name in ("above", "below"):
+            template = getattr(self, name)
+            if not template.side_required:
+                sides[name] = [template]
+                continue
+            proposals = propose_side_topologies(pinch_side(template), limit=limit)
+            realised = [
+                side
+                for rank, proposal in enumerate(proposals)
+                if (side := self._realise_side(name, proposal, rank)) is not None
+            ]
+            report["proposed"][name] = len(proposals)
+            report["realised"][name] = len(realised)
+            sides[name] = realised
+        pairs = sorted(
+            product(enumerate(sides["above"]), enumerate(sides["below"])),
+            key=lambda pair: (pair[0][0] + pair[1][0], pair[0][0]),
+        )
+        networks: list[InternalHeatExchangerNetworkProblem] = []
+        seen: set = set()
+        failed = repeated = 0
+        for (_a, above), (_b, below) in pairs:
+            if len(networks) >= limit:
+                break
+            variant = self._pdm_variant(above, below)
+            if variant is None or not variant.case.verify()[0]:
+                failed += 1
+                continue
+            signature = network_structure_signature(
+                variant.extract_network(run_id="heuristic-pdm")
+            )
+            if signature in seen:
+                repeated += 1
+                continue
+            seen.add(signature)
+            networks.append(variant)
+        # Results live on the model variables: drop every side's run directory,
+        # and the unsolved templates' that the realised sides replace.
+        for side in sides["above"] + sides["below"] + [self.above, self.below]:
+            _cleanup_model(side)
+        report.update(
+            pairs=len(pairs), failed=failed, repeated=repeated, networks=len(networks)
+        )
+        self.heuristic_report = report
+        logger.info("[%s] heuristic pinch design: %s", self.name, report)
+        if not networks:
+            raise ValueError(
+                "No heuristic pinch design proposal could be realised as a network."
+            )
+        first, *rest = networks
+        self.above, self.below, self.case = first.above, first.below, first.case
+        self.pdm_variants = rest
+
+    def _realise_side(self, name: str, proposal, rank: int):
+        """Solve one side proposal, or return ``None`` if it cannot be."""
+
+        template = getattr(self, name)
+        stages = proposal.stages
+        factory = self._model_factory(
+            getattr(self, "_model_factories", None),
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        try:
+            side = factory(
+                **(
+                    dict(self.args)
+                    | {
+                        "name": f"{name} pinch {self.dTmin} heuristic {rank}",
+                        "pinch_loc": name,
+                        "minimisation_goal": (
+                            "hot utility" if name == "above" else "cold utility"
+                        ),
+                        "pinch_decomposition": self.pinch_decompositions[
+                            name
+                        ].model_copy(
+                            update={
+                                "S": stages,
+                                "K": stages + 1,
+                                "manual_stage_selection": (stages, stages),
+                            }
+                        ),
+                        "stage_selection": [stages, stages],
+                        "z_restriction": proposal.z_restriction(
+                            hot_count=template.I,
+                            cold_count=template.J,
+                            hot_utilities=template.NHU,
+                            cold_utilities=template.NCU,
+                        ),
+                    }
+                )
+            )
+        except (
+            ValueError,
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        ) as exc:
+            # A side that is not linear needs Couenne, which may be missing.
+            logger.debug("Heuristic %s proposal %d not built: %s", name, rank, exc)
+            return None
+        # A proposal the side model cannot solve is dropped by design.
+        side.failure_log_level = logging.DEBUG
+        side.optimise(print_output=False)
+        if side.mSuccess != 1:
+            _cleanup_model(side)
+            return None
+        # The amalgamated network is built with the above side's restriction,
+        # which must be the problem's, not this side's stage grid.
+        side.z_restriction = self.args["z_restriction"]
+        return side
+
+    def _pdm_variant(
+        self, above, below
+    ) -> "InternalHeatExchangerNetworkProblem | None":
+        variant = copy.copy(self)
+        variant.above, variant.below = above, below
+        variant.pdm_variants = []
+        try:
+            variant.case = above.amalgamate_networks(below_case=below, above_case=above)
+        except ValueError:
+            return None
+        unreduced = variant.case
+        try:
+            variant._carry_unconverged_side_solve()
+            variant.case.get_post_process()
+            # A variant is a minimum-utility network: drop only its empty
+            # stages, not ones whose recovery would go to utility.
+            variant.case = variant.remove_unused_stages(variant.case, empty_only=True)
+        finally:
+            _cleanup_model(unreduced)
+            _cleanup_model(variant.case)
+        return variant if variant.case.mSuccess == 1 else None
 
     def _carry_unconverged_side_solve(self) -> None:
         # The amalgamated model is built, not solved, so its own solver run
@@ -277,14 +723,30 @@ class InternalHeatExchangerNetworkProblem:
                 )
                 return
 
-    def remove_unused_stages(self, case) -> StageWiseModel:
-        """Apply the source stage-utilisation reduction after PDM/TDM solves."""
+    def remove_unused_stages(self, case, *, empty_only: bool = False) -> StageWiseModel:
+        """Apply the source stage-utilisation reduction after PDM/TDM solves.
 
+        Stages carrying less than the utilisation threshold of the recovery
+        are removed and the reduced network re-solved. With ``empty_only``
+        only stages with no recovery go, so the network keeps its utility.
+        Reduction only simplifies a solved network, so without a solver for
+        the reduced model the case is kept.
+        """
+
+        try:
+            return self._reduce_stages(case, empty_only=empty_only)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
+            logger.warning("[%s] stages not reduced: %s", case.name, exc)
+            return case
+
+    def _reduce_stages(self, case, *, empty_only: bool) -> StageWiseModel:
         if case.mSuccess != 1:
             return case
 
-        active_stages = self._get_active_stages(case)
-        if len(active_stages) == case.S:
+        active_stages = self._get_active_stages(
+            case, threshold=0.0 if empty_only else None
+        )
+        if not active_stages or len(active_stages) == case.S:
             return case
 
         peak_recovery = _peak_recovery_duties(case)
@@ -301,10 +763,16 @@ class InternalHeatExchangerNetworkProblem:
 
         heaters_in_use = _used_in_any_period(case, "Q_h")
         coolers_in_use = _used_in_any_period(case, "Q_c")
+        try:
+            # HiGHS for a linear reduced model, Ipopt for the others.
+            backend.require_solver_backend("highs")
+            solver = "highs"
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            solver = "ipopt-pyomo"
         f_case = StageWiseModel(
             name=f"reduced-{case.name}",
             framework=case.framework,
-            solver="apopt",
+            solver=solver,
             solver_arrays=case.solver_arrays,
             stages=len(active_stages),
             dTmin=case.dTmin,
@@ -316,7 +784,14 @@ class InternalHeatExchangerNetworkProblem:
                 coolers_in_use,
             ],
             min_dqda=case.min_dqda,
-            minimisation_goal=case.minimisation_goal,
+            # With a choice of utilities a duty goal can move load to a dearer
+            # utility at the same duty: hold the cost instead.
+            minimisation_goal=(
+                "utility costs"
+                if case.minimisation_goal in _UTILITY_DUTY_GOALS
+                and (case.NHU > 1 or case.NCU > 1)
+                else case.minimisation_goal
+            ),
             non_isothermal_model=case.non_isothermal_model,
             integers=False,
             tol=case.tol,
@@ -326,36 +801,40 @@ class InternalHeatExchangerNetworkProblem:
             for i in range(case.I):
                 for j in range(case.J):
                     q_val = (
-                        case.Q_r[i][j][old_k][0]
-                        if case.Q_r[i][j][old_k][0] > case.tol
+                        _value(case.Q_r[i][j][old_k])
+                        if _value(case.Q_r[i][j][old_k]) > case.tol
                         else 0.0
                     )
                     _assign(f_case.Q_r[i][j][new_k], q_val)
                     # Shared across periods: a match used in any period is on.
                     _assign_binary(f_case.z[i][j][new_k], active_locations[i][j][new_k])
-                    _assign(f_case.theta_1[i][j][new_k], case.theta_1[i][j][old_k][0])
-                    _assign(f_case.theta_2[i][j][new_k], case.theta_2[i][j][old_k][0])
+                    _assign(
+                        f_case.theta_1[i][j][new_k], _value(case.theta_1[i][j][old_k])
+                    )
+                    _assign(
+                        f_case.theta_2[i][j][new_k], _value(case.theta_2[i][j][old_k])
+                    )
 
                     if case.non_isothermal_model:
-                        _assign(f_case.X[i][j][new_k], case.X[i][j][old_k][0])
-                        _assign(f_case.Y[j][i][new_k], case.Y[j][i][old_k][0])
+                        _assign(f_case.X[i][j][new_k], _value(case.X[i][j][old_k]))
+                        _assign(f_case.Y[j][i][new_k], _value(case.Y[j][i][old_k]))
                         _assign(
                             f_case.T_h_out_x[i][j][new_k],
-                            case.T_h_out_x[i][j][old_k][0],
+                            _value(case.T_h_out_x[i][j][old_k]),
                         )
                         _assign(
                             f_case.T_c_out_y[j][i][new_k],
-                            case.T_c_out_y[j][i][old_k][0],
+                            _value(case.T_c_out_y[j][i][old_k]),
                         )
 
         reduced_boundaries = [0] + [stage + 1 for stage in active_stages]
         for i in range(case.I):
             for new_k, old_k in enumerate(reduced_boundaries):
-                _assign(f_case.T_h[i][new_k], case.T_h[i][old_k][0])
+                _assign(f_case.T_h[i][new_k], _value(case.T_h[i][old_k]))
 
         for j in range(case.J):
             for new_k, old_k in enumerate(reduced_boundaries):
-                _assign(f_case.T_c[j][new_k], case.T_c[j][old_k][0])
+                _assign(f_case.T_c[j][new_k], _value(case.T_c[j][old_k]))
 
         for duties, flags, source, in_use in (
             (f_case.Q_c, f_case.z_cu, case.Q_c, coolers_in_use),
@@ -363,9 +842,12 @@ class InternalHeatExchangerNetworkProblem:
         ):
             for index, row in enumerate(source):
                 for u, duty in enumerate(row):
-                    _assign(duties[index][u], duty[0])
+                    _assign(duties[index][u], _value(duty))
                     _assign_binary(flags[index][u], in_use[index][u])
 
+        if f_case.solver == "highs" and not f_case.m.is_linear():
+            f_case.solver = "ipopt-pyomo"
+            f_case.solver_run = backend.configure_pyomo_solver(f_case.m, f_case.solver)
         f_case.TAC_model = case.TAC_model
         f_case.TAC = case.TAC
         f_case.solve_time = case.solve_time
@@ -376,9 +858,15 @@ class InternalHeatExchangerNetworkProblem:
         # unless the reduced one solves and passes the same checks.
         if f_case.mSuccess != 1 or not f_case.verify()[0]:
             return case
+        if not case.solver_run.converged:
+            # The reduced network rests on the same unproven solve.
+            f_case.solver_run = replace(
+                f_case.solver_run,
+                termination_condition=case.solver_run.termination_condition,
+            )
         return f_case
 
-    def _get_active_stages(self, case) -> list[int]:
+    def _get_active_stages(self, case, *, threshold: float | None = None) -> list[int]:
         peak_recovery = _peak_recovery_duties(case)
         q_total = sum(
             peak_recovery[i][j][k]
@@ -393,12 +881,14 @@ class InternalHeatExchangerNetworkProblem:
             sum(peak_recovery[i][j][k] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)
         ]
-        threshold = self._utilisation_threshold(case.S)
-        return [
-            k
-            for k, q_stage in enumerate(q_per_stage)
-            if q_stage / q_total * 100 >= threshold
-        ]
+        if threshold is None:
+            threshold = self._utilisation_threshold(case.S)
+            return [
+                k
+                for k, q_stage in enumerate(q_per_stage)
+                if q_stage / q_total * 100 >= threshold
+            ]
+        return [k for k, q_stage in enumerate(q_per_stage) if q_stage > case.tol]
 
     def _utilisation_threshold(self, stage_count: int) -> float:
         if stage_count <= 3:
@@ -429,6 +919,55 @@ class InternalHeatExchangerNetworkProblem:
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
 
 
+def _start_from_side(sparse, side) -> None:
+    """Start ``sparse`` at ``side``'s solution with its unused units off.
+
+    Both models have the same superstructure, so their variables line up.
+    Fixing the unused binaries at zero keeps the re-solve to the side's own
+    matches, and the solution is a feasible warm start for it.
+    """
+
+    for target, source in zip(
+        sparse.m.model.variables.values(),
+        side.m.model.variables.values(),
+        strict=True,
+    ):
+        target.set_value(source.value, skip_validation=True)
+    # Binaries the solver left off, read from the copied values: a match
+    # with a tiny duty is still on, so the start is exactly feasible.
+    for grid, indices in _equations_unit_indices(sparse).items():
+        for index in indices:
+            binary = getattr(sparse, grid)
+            for position in index:
+                binary = binary[position]
+            if not binary.fixed and (binary.value or 0.0) < 0.5:
+                binary.fix(0)
+    sparse.m.warm_start = True
+
+
+def _with_time_limit(
+    solver: str, options, *, seconds: float = backend.FEWEST_UNITS_TIME_LIMIT
+) -> Any:
+    """The PDM solver options with a time limit added.
+
+    The fewest-units limit applies to every fewest-units and minimum-unit
+    solve; the primary sides take ``backend.PDM_TIME_LIMIT``.
+
+    A limit the user set is kept, as are options given as option lines.
+    """
+
+    name = backend.TIME_LIMIT_OPTIONS.get(solver)
+    if name is None or not (options is None or isinstance(options, Mapping)):
+        return options
+    return {name: seconds, **dict(options or {})}
+
+
+def _side_units(side) -> int:
+    """A side's unit count; a side not on this side of the pinch has none."""
+
+    return int(side.n_units) if side.side_required and side.mSuccess == 1 else 0
+
+
 def _peak_recovery_duties(case) -> list:
     """Return each match's largest duty over the periods, ``[hot][cold][stage]``.
 
@@ -438,7 +977,10 @@ def _peak_recovery_duties(case) -> list:
     by_period = getattr(case, "Q_r_by_period", None) or [case.Q_r]
     return [
         [
-            [max(period[i][j][k][0] for period in by_period) for k in range(case.S)]
+            [
+                max(_value(period[i][j][k]) for period in by_period)
+                for k in range(case.S)
+            ]
             for j in range(case.J)
         ]
         for i in range(case.I)
@@ -453,23 +995,75 @@ def _used_in_any_period(case, name: str) -> list[list[int]]:
     by_period = getattr(case, f"{name}_by_period", None) or [getattr(case, name)]
     return [
         [
-            1 if any(period[index][u][0] > case.tol for period in by_period) else 0
+            1 if any(_value(period[index][u]) > case.tol for period in by_period) else 0
             for u in range(len(row))
         ]
         for index, row in enumerate(by_period[0])
     ]
 
 
+# Goals that minimise utility duty, which a utility choice turns into cost.
+_UTILITY_DUTY_GOALS = frozenset({"hot utility", "cold utility", "total utility"})
+
+
+def _sound_side(side: Any, primary: Any) -> bool:
+    """Whether a minimum-unit solve gave a usable side.
+
+    It must have converged, or be a HiGHS solve stopped at its limit with an
+    incumbent, and hold the primary's utility: a solver stopped at a limit
+    can report success with a point that is not a solution.
+    """
+
+    if side.mSuccess != 1:
+        return False
+    if not (side.solver_run.converged or side.solver == "highs"):
+        return False
+    utility, start = _total_utility_duty(side), _total_utility_duty(primary)
+    return utility <= start * (1.0 + 1e-6) + primary.tol
+
+
+def _replaces(sparse: Any, side: Any) -> bool:
+    """Whether a fewest-units re-solve may replace the side it started from.
+
+    It must have converged, or be a HiGHS solve stopped at its time limit
+    (accepted only with an incumbent), and have no more units and no more
+    utility than the side. A solver stopped at a limit can report success
+    with a point that is not a solution.
+    """
+
+    if sparse.mSuccess != 1:
+        return False
+    if not (sparse.solver_run.converged or sparse.solver == "highs"):
+        return False
+    if sparse.n_units > side.n_units:
+        return False
+    utility, start = _total_utility_duty(sparse), _total_utility_duty(side)
+    return utility <= start * (1.0 + 1e-6) + side.tol
+
+
+def _total_utility_duty(side: Any) -> float:
+    return sum(
+        _value(duty)
+        for grids in (side.Q_h_by_period, side.Q_c_by_period)
+        for grid in grids
+        for row in grid
+        for duty in row
+    )
+
+
+def _minimum_utility_cost(side: Any) -> float:
+    """A solved side's minimum utility cost, kept across a fewest-units swap."""
+    return getattr(side, "minimum_utility_cost", side.solver_run.objective_value)
+
+
 def _cleanup_model(model: Any) -> None:
     if model is not None:
-        backend.cleanup_gekko_model(getattr(model, "m", None))
+        backend.cleanup_model_run_directory(getattr(model, "m", None))
 
 
 def _assign(variable: Any, value: float) -> None:
-    if type(variable).__name__ != "GKParameter":
-        value = max(variable.lower, min(variable.upper, value))
-    variable.VALUE.value = value
+    _set_value(None, variable, value)
 
 
 def _assign_binary(variable: Any, value: float) -> None:
-    variable.VALUE.value = 1 if value > 0 else 0
+    _assign_value(variable, 1 if value > 0 else 0)

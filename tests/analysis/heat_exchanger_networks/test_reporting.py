@@ -412,17 +412,17 @@ def test_result_ranks_stage_shifted_networks_as_duplicate_structures() -> None:
     best_task = _task(
         method="network_evolution_method",
         task_id="esm-stage-best",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
     shifted_task = _task(
         method="network_evolution_method",
         task_id="esm-stage-shifted",
-        approach_temperature=16.0,
+        dt_cont_multiplier=1.6,
     )
     distinct_task = _task(
         method="network_evolution_method",
         task_id="esm-distinct",
-        approach_temperature=18.0,
+        dt_cont_multiplier=1.8,
     )
     best_network = _stage_gap_network("stage-best")
     shifted_network = _stage_compressed_network("stage-shifted")
@@ -473,16 +473,16 @@ def test_design_view_ranks_top_and_network_the_same_way() -> None:
             task=_task(
                 method="network_evolution_method",
                 task_id=task_id,
-                approach_temperature=approach,
+                dt_cont_multiplier=multiplier,
             ),
             status="success",
             network=network,
             objective_value=objective,
         )
-        for task_id, approach, network, objective in (
-            ("esm-best", 14.0, best_network, 100.0),
-            ("esm-shifted", 16.0, _stage_compressed_network("shifted"), 100.05),
-            ("esm-distinct", 18.0, _distinct_network("distinct"), 200.0),
+        for task_id, multiplier, network, objective in (
+            ("esm-best", 1.4, best_network, 100.0),
+            ("esm-shifted", 1.6, _stage_compressed_network("shifted"), 100.05),
+            ("esm-distinct", 1.8, _distinct_network("distinct"), 200.0),
         )
     )
     design = HeatExchangerNetworkDesignView(
@@ -570,7 +570,7 @@ def test_synthesis_result_verification_reports_contract_failures() -> None:
                 task=_task(
                     method="network_evolution_method",
                     task_id="missing-network",
-                    approach_temperature=14.0,
+                    dt_cont_multiplier=1.4,
                 ),
                 status="success",
                 network=None,
@@ -580,7 +580,7 @@ def test_synthesis_result_verification_reports_contract_failures() -> None:
                 task=_task(
                     method="network_evolution_method",
                     task_id="bad-network",
-                    approach_temperature=15.0,
+                    dt_cont_multiplier=1.5,
                 ),
                 status="success",
                 network=infeasible_ranked,
@@ -715,7 +715,7 @@ def test_network_feasibility_checks_minimum_approach_temperature() -> None:
     network = _feasible_balance_network(
         "low-approach",
         source_metadata={
-            "solver_dTmin": 175.0,
+            "minimum_recovery_approach": 175.0,
             "hot_stream_heat_capacity_flowrates": [10.0],
             "cold_stream_heat_capacity_flowrates": [10.0],
             "hot_stream_supply_temperatures": [500.0],
@@ -1143,12 +1143,12 @@ def test_ranked_network_selection_skips_infeasible_low_tac_candidate() -> None:
     low_task = _task(
         method="network_evolution_method",
         task_id="low",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
     feasible_task = _task(
         method="network_evolution_method",
         task_id="feasible",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
     result = HeatExchangerNetworkSynthesisResult(
         network=low_tac_infeasible,
@@ -1745,17 +1745,17 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
     pdm_task = _task(
         method="pinch_design_method",
         task_id="pdm",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
     esm_best_task = _task(
         method="network_evolution_method",
         task_id="esm-best",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
     esm_second_task = _task(
         method="network_evolution_method",
         task_id="esm-second",
-        approach_temperature=18.0,
+        dt_cont_multiplier=1.8,
     )
     return HeatExchangerNetworkSynthesisResult(
         network=_network("accepted-best"),
@@ -1779,7 +1779,7 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
                 task=_task(
                     method="network_evolution_method",
                     task_id="esm-duplicate",
-                    approach_temperature=16.0,
+                    dt_cont_multiplier=1.6,
                 ),
                 status="success",
                 network=_network("accepted-duplicate"),
@@ -1795,7 +1795,7 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
                 task=_task(
                     method="network_evolution_method",
                     task_id="failed",
-                    approach_temperature=20.0,
+                    dt_cont_multiplier=2.0,
                 ),
                 status="failed",
                 objective_value=0.0,
@@ -1930,13 +1930,13 @@ def _task(
     *,
     method,
     task_id: str,
-    approach_temperature: float,
+    dt_cont_multiplier: float,
 ) -> HeatExchangerNetworkSynthesisTask:
     return HeatExchangerNetworkSynthesisTask(
         task_id=task_id,
         run_id="run-1",
         method=method,
-        approach_temperature=approach_temperature,
+        dt_cont_multiplier=dt_cont_multiplier,
         derivative_threshold=0.5,
         stage_count=3,
     )

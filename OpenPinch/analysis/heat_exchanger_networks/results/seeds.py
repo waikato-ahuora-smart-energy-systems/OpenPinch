@@ -6,7 +6,9 @@ from collections.abc import Mapping, Sequence
 
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..prepared_problem import PreparedProblem
+from ..reporting.ranking import network_structure_signature
 from ..solver.arrays import SEGMENT_PROFILE_VERSION
+from .selection import ranked_networks
 
 
 def resolve_seed_networks(
@@ -14,9 +16,13 @@ def resolve_seed_networks(
     initial_networks: HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None,
     *,
     method_name: str,
-    cached_source_method: str,
+    limit: int,
 ) -> tuple[HeatExchangerNetwork, ...]:
-    """Return explicit seed networks or the expected cached upstream design."""
+    """Return explicit seed networks or the cached design's networks.
+
+    The cached design may come from any HEN method. Its selected network
+    leads, followed by its other ranked topologies, up to ``limit`` in all.
+    """
 
     if initial_networks is not None:
         return _normalise_seed_networks(initial_networks)
@@ -26,24 +32,27 @@ def resolve_seed_networks(
     if cached_design is None:
         raise ValueError(
             f"{method_name} requires initial_networks or an existing cached "
-            f"{cached_source_method} design network."
+            "design network."
         )
-    if cached_design.method != cached_source_method:
-        raise ValueError(
-            f"{method_name} requires a cached {cached_source_method} design when "
-            f"initial_networks are omitted; cached design method is "
-            f"{cached_design.method!r}."
-        )
-    if (
-        _problem_has_segments(problem)
-        and cached_design.network.source_metadata.get("segment_profile_version")
+    networks = [cached_design.network]
+    seen = {network_structure_signature(cached_design.network)}
+    for outcome in ranked_networks(cached_design):
+        if len(networks) >= limit:
+            break
+        signature = network_structure_signature(outcome.network)
+        if signature not in seen:
+            seen.add(signature)
+            networks.append(outcome.network)
+    if _problem_has_segments(problem) and any(
+        network.source_metadata.get("segment_profile_version")
         != SEGMENT_PROFILE_VERSION
+        for network in networks
     ):
         raise ValueError(
             f"{method_name} cannot reuse a cached network that lacks current "
             "segment-profile tensors; rerun the upstream HEN method."
         )
-    return (cached_design.network,)
+    return tuple(networks)
 
 
 def _problem_has_segments(problem: PreparedProblem) -> bool:

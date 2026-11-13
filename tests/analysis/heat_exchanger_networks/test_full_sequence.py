@@ -8,7 +8,6 @@ import subprocess
 import sys
 from collections import Counter
 from copy import deepcopy
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -23,14 +22,10 @@ from OpenPinch.analysis.heat_exchanger_networks.errors import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
     LocalSynthesisExecutor,
-    _evolution_options,
     _topology_restriction_values,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
-)
-from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
-    pathways_from_metadata,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     workflow_settings_from_problem,
@@ -82,7 +77,6 @@ from tests.support.paths import REPOSITORY_ROOT
 REPO_ROOT = REPOSITORY_ROOT
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "openhens"
 FORBIDDEN_SOLVER_MODULES = [
-    "gekko",
     "pyomo",
     "pyomo.environ",
     "pyomo.opt",
@@ -148,228 +142,6 @@ def test_fake_executor_task_graph_uses_successful_topology_only() -> None:
     assert tdm_executor.stage_order == ["thermal_derivative_method"]
 
 
-def test_quality_tier_zero_skips_thermal_derivative_stage() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 0})
-    settings = workflow_settings_from_problem(problem)
-    executor = FakeSynthesisExecutor()
-
-    result = workflow_module.execute_open_hens_method(
-        problem,
-        settings,
-        executor=executor,
-    )
-
-    assert executor.stage_order == [
-        "pinch_design_method",
-        "network_evolution_method",
-    ]
-    assert not any(task.method == "thermal_derivative_method" for task in result.tasks)
-    assert all(
-        outcome.task.method != "thermal_derivative_method"
-        for outcome in result.outcomes
-    )
-
-
-def test_quality_tier_one_keeps_standard_pdm_task_grid() -> None:
-    settings = workflow_settings_from_problem(_small_problem())
-
-    tasks = build_pinch_design_method_tasks(settings)
-
-    assert settings.synthesis_quality_tier == 1
-    assert len(tasks) == 2
-    assert all(
-        task.metadata.get("pathway_ids") == ["tier1-open-hens"] for task in tasks
-    )
-    assert all(not task.settings for task in tasks)
-
-
-def test_quality_tier_three_expands_pdm_candidates() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 3})
-    settings = workflow_settings_from_problem(problem)
-
-    tasks = build_pinch_design_method_tasks(settings)
-
-    assert settings.quality_dt_cont_multipliers == (1.0, 2.0)
-    assert settings.quality_pdm_stage_pair_count == 0
-    assert settings.effective_evm_n_ad_branches == 1
-    assert settings.effective_evm_n_rm_branches == 1
-    assert len(tasks) == 6
-    assert {task.settings.get("pdm_mode") for task in tasks if task.settings} == {
-        "compact",
-        "raw",
-    }
-    assert any(
-        "tier1-open-hens" in task.metadata.get("pathway_ids", ()) for task in tasks
-    )
-    assert any(
-        "tier3-compact-1" in task.metadata.get("pathway_ids", ()) for task in tasks
-    )
-    assert any(
-        task.approach_temperature == 4.0
-        and "tier3-compact-2" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-    assert any(
-        task.approach_temperature == 4.0
-        and "tier3-raw-2" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-
-
-def test_quality_tier_four_adds_evm_branch_breadth_to_dtmin_sweep() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
-    settings = workflow_settings_from_problem(problem)
-
-    tasks = build_pinch_design_method_tasks(settings)
-
-    assert settings.quality_dt_cont_multipliers == (1.0, 2.0)
-    assert settings.effective_evm_n_ad_branches == 2
-    assert settings.effective_evm_n_rm_branches == 2
-    assert len(tasks) == 6
-    assert any(
-        task.approach_temperature == 2.0
-        and "tier4-compact-1" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-    assert any(
-        task.approach_temperature == 4.0
-        and "tier4-raw-2" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-
-
-def test_quality_tier_five_adds_experimental_reduced_dtmin_without_4x() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
-    settings = workflow_settings_from_problem(problem)
-
-    tasks = build_pinch_design_method_tasks(problem=problem, settings=settings)
-
-    assert settings.quality_dt_cont_multipliers == (0.5, 1.0, 2.0)
-    assert settings.quality_pdm_stage_pair_count == 0
-    assert settings.quality_derivative_thresholds == (0.5, 1.0)
-    assert settings.effective_evm_n_ad_branches == 2
-    assert settings.effective_evm_n_rm_branches == 2
-    assert any(
-        task.approach_temperature == 1.0
-        and "tier5-compact-0p5" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-    assert not any(
-        "tier5-compact-4" in task.metadata.get("pathway_ids", ())
-        or "tier5-raw-4" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-
-
-def test_synthesis_quality_tier_five_retains_experimental_limits() -> None:
-    settings = workflow_settings_from_problem(
-        _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
-    )
-
-    assert settings.quality_dt_cont_multipliers == (0.5, 1.0, 2.0)
-    assert settings.quality_pdm_stage_pair_count == 0
-    assert settings.quality_derivative_thresholds == (0.5, 1.0)
-    assert settings.effective_evm_n_ad_branches == 2
-    assert settings.effective_evm_n_rm_branches == 2
-
-
-def test_user_dt_cont_multipliers_are_applied_as_multipliers() -> None:
-    problem = _small_problem_with_options(
-        {
-            "HENS_SYNTHESIS_QUALITY_TIER": 3,
-            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
-            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
-        }
-    )
-    settings = workflow_settings_from_problem(problem)
-
-    tasks = build_pinch_design_method_tasks(settings)
-
-    assert settings.quality_pdm_approach_temperatures == (10.0, 15.0)
-    assert any(
-        task.approach_temperature == 15.0
-        and "tier3-compact-1p5" in task.metadata.get("pathway_ids", ())
-        for task in tasks
-    )
-    assert not any(task.approach_temperature in {100.0, 200.0} for task in tasks)
-
-
-def test_quality_tier_two_contains_tier_zero_and_tier_one_paths() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
-    settings = workflow_settings_from_problem(problem)
-    executor = FakeSynthesisExecutor()
-
-    result = workflow_module.execute_open_hens_method(
-        problem,
-        settings,
-        executor=executor,
-    )
-
-    pdm_tasks = [task for task in result.tasks if task.method == "pinch_design_method"]
-    tdm_tasks = [
-        task for task in result.tasks if task.method == "thermal_derivative_method"
-    ]
-    evm_tasks = [
-        task for task in result.tasks if task.method == "network_evolution_method"
-    ]
-
-    assert any(task.settings.get("pdm_mode") == "compact" for task in pdm_tasks)
-    assert any(
-        not task.settings and task.metadata.get("pathway_ids") == ["tier1-open-hens"]
-        for task in pdm_tasks
-    )
-    assert any(
-        "tier0-compact-1" in task.metadata.get("pathway_ids", ()) for task in evm_tasks
-    )
-    assert any(
-        task.metadata.get("pathway_ids") == ["tier1-open-hens"] for task in evm_tasks
-    )
-    assert not any(
-        "tier2-compact-1" in task.metadata.get("pathway_ids", ()) for task in tdm_tasks
-    )
-    assert any(
-        "tier2-compact-1" in task.metadata.get("pathway_ids", ()) for task in evm_tasks
-    )
-    assert result.accepted_result.manifest is not None
-    assert result.accepted_result.manifest.task_count_by_method[
-        "network_evolution_method"
-    ] == len(evm_tasks)
-
-
-def test_higher_tier_can_select_protected_lower_tier_evm_result() -> None:
-    class ProtectedTierWinsExecutor(FakeSynthesisExecutor):
-        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
-            outcomes = super().execute(
-                tasks,
-                problem=problem,
-                parent_outcomes=parent_outcomes,
-                max_parallel=max_parallel,
-            )
-            return tuple(
-                _with_pathway_tac(
-                    outcome,
-                    tier1_tac=100.0,
-                    other_tac=500.0,
-                )
-                for outcome in outcomes
-            )
-
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 2})
-    settings = workflow_settings_from_problem(problem)
-
-    result = workflow_module.execute_open_hens_method(
-        problem,
-        settings,
-        executor=ProtectedTierWinsExecutor(),
-    )
-
-    manifest = result.accepted_result.manifest
-    assert manifest is not None
-    assert result.accepted_result.objective_values["total_annual_cost"] == 100.0
-    assert manifest.selected_pathway_id == "tier1-open-hens"
-    assert manifest.selected_protected_pathway is True
-
-
 def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
@@ -388,10 +160,11 @@ def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     tdm_tasks = build_seeded_thermal_derivative_method_tasks(settings, (seed, seed))
     evolution_tasks = build_seeded_network_evolution_method_tasks(settings, (seed,))
 
-    assert len(tdm_tasks) == 4
-    assert len({task.task_id for task in tdm_tasks}) == 4
+    # A repeated seed topology gives no further tasks: one per threshold.
+    assert len(tdm_tasks) == 2
+    assert len({task.task_id for task in tdm_tasks}) == 2
     assert {task.method for task in tdm_tasks} == {"thermal_derivative_method"}
-    assert {task.seed_network_index for task in tdm_tasks} == {0, 1}
+    assert {task.seed_network_index for task in tdm_tasks} == {0}
     assert all(task.parent_task_id is None for task in tdm_tasks)
     assert all(task.topology_restrictions for task in tdm_tasks)
     assert len(evolution_tasks) == 1
@@ -548,85 +321,6 @@ class _MissingCouenneExecutor(FakeSynthesisExecutor):
         )
 
 
-@pytest.mark.parametrize(
-    ("missing_for", "options", "run_tier", "expected_breadth"),
-    [
-        ("pinch_design_method", {"HENS_SYNTHESIS_QUALITY_TIER": 4}, 0, 1),
-        ("pinch_design_method", {"HENS_SYNTHESIS_QUALITY_TIER": 4}, 1, 1),
-        ("pinch_design_method", {"HENS_SYNTHESIS_QUALITY_TIER": 1}, 4, 2),
-        ("thermal_derivative_method", {"HENS_SYNTHESIS_QUALITY_TIER": 4}, 1, 1),
-        (
-            "pinch_design_method",
-            {
-                "HENS_SYNTHESIS_QUALITY_TIER": 4,
-                "HENS_EVM_N_AD_BRANCHES": 3,
-                "HENS_EVM_N_RM_BRANCHES": 3,
-            },
-            1,
-            3,
-        ),
-    ],
-)
-def test_evolution_breadth_without_pathways_follows_the_run_tier(
-    missing_for: str,
-    options: dict,
-    run_tier: int,
-    expected_breadth: int,
-) -> None:
-    problem = _small_problem_with_options(options)
-    settings = replace(
-        workflow_settings_from_problem(problem),
-        synthesis_quality_tier=run_tier,
-    )
-
-    with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
-        result = workflow_module.execute_open_hens_method(
-            problem,
-            settings,
-            executor=_MissingCouenneExecutor(missing_for),
-        )
-
-    evolution_tasks = [
-        task for task in result.tasks if task.method == "network_evolution_method"
-    ]
-    assert evolution_tasks
-    assert not any(pathways_from_metadata(task.metadata) for task in evolution_tasks)
-    manifest = result.accepted_result.manifest
-    assert manifest.evm_n_ad_branches == expected_breadth
-    assert manifest.evm_n_rm_branches == expected_breadth
-    for task in evolution_tasks:
-        evolution_options = _evolution_options(problem, task, max_parallel=1)
-        assert evolution_options["n_ad_branches"] == expected_breadth
-        assert evolution_options["n_rm_branches"] == expected_breadth
-
-
-def test_evolution_breadth_for_a_derivative_parent_without_pathways() -> None:
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
-    settings = replace(
-        workflow_settings_from_problem(problem),
-        synthesis_quality_tier=1,
-    )
-    parent_task = HeatExchangerNetworkSynthesisTask(
-        run_id=settings.run_id,
-        method="thermal_derivative_method",
-        approach_temperature=settings.approach_temperatures[0],
-        stage_count=2,
-    )
-    parent_outcome = FakeSynthesisExecutor().execute(
-        (parent_task,),
-        problem=problem,
-        parent_outcomes={},
-        max_parallel=1,
-    )[0]
-
-    tasks = build_network_evolution_method_tasks(settings, (parent_outcome,))
-
-    assert len(tasks) == 1
-    evolution_options = _evolution_options(problem, tasks[0], max_parallel=1)
-    assert evolution_options["n_ad_branches"] == 1
-    assert evolution_options["n_rm_branches"] == 1
-
-
 def test_failed_workflow_reports_task_errors() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
@@ -697,6 +391,27 @@ def test_unconverged_outcome_is_demoted_before_ranking() -> None:
     assert demoted.status == "failed"
     assert demoted.error == "solver stopped before converging (maxTimeLimit)"
     assert demoted.network is not None
+
+
+def test_only_unconverged_outcomes_say_which_solver_limit_to_raise() -> None:
+    # Every task stopped at a solver limit: the error names the options that
+    # raise it, not only the termination.
+    from OpenPinch.analysis.heat_exchanger_networks.results.assembly import (
+        build_synthesis_result,
+    )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)[:1]
+    (outcome,) = FakeSynthesisExecutor().execute(
+        pdm_tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    unconverged = outcome.model_copy(
+        update={"diagnostics": {"unconverged_termination": "maxTimeLimit"}}
+    )
+
+    with pytest.raises(WorkflowContractError, match="HENS_SOLVER_OPTIONS_PDM"):
+        build_synthesis_result(settings, pdm_tasks, [unconverged])
 
 
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
@@ -817,29 +532,13 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
         design.result.manifest.design_method
         == HeatExchangerNetworkDesignMethod.OpenHENS
     )
-    assert design.result.manifest.synthesis_quality_tier == 0
+    manifest = design.result.manifest
+    assert (manifest.search_width, manifest.search_depth) == (1, 2)
 
 
-def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
-    _use_fake_default_executor(monkeypatch)
-    configured_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
-    original_config_tier = (
-        configured_problem.master_zone.config.hens.synthesis_quality_tier
-    )
-
-    design = configured_problem.design.open_hens()
-
-    assert design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
+def _resolved_depth(design) -> int:
     assert design.result.manifest is not None
-    assert design.result.manifest.synthesis_quality_tier == 1
-    assert configured_problem.master_zone.config.hens.synthesis_quality_tier == (
-        original_config_tier
-    )
-
-
-def _resolved_tier(design) -> int:
-    assert design.result.manifest is not None
-    return design.result.manifest.synthesis_quality_tier
+    return design.result.manifest.search_depth
 
 
 def _reload_from_problem_json(problem: PinchProblem) -> PinchProblem:
@@ -861,231 +560,8 @@ def _reload_from_bundle(problem: PinchProblem) -> PinchProblem:
 
 def _two_period_problem_with_options(options: dict) -> PinchProblem:
     payload = _duplicate_two_state_no_sweep_payload()
-    payload["options"].pop("HENS_SYNTHESIS_QUALITY_TIER", None)
     payload["options"].update(options)
     return PinchProblem(source=payload, project_name="two-period")
-
-
-def test_default_dispatch_is_fast_tier_zero_and_explicit_openhens_is_tier_one(
-    monkeypatch,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    default_problem = _small_problem()
-    explicit_problem = _small_problem()
-
-    default_design = default_problem.design.heat_exchanger_network()
-    explicit_design = explicit_problem.design.open_hens()
-
-    assert (
-        default_design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
-    )
-    assert (
-        explicit_design.result.design_method
-        == HeatExchangerNetworkDesignMethod.OpenHENS
-    )
-    assert default_design.result.manifest is not None
-    assert explicit_design.result.manifest is not None
-    assert default_design.result.manifest.synthesis_quality_tier == 0
-    assert explicit_design.result.manifest.synthesis_quality_tier == 1
-    assert default_problem.master_zone.config.hens.synthesis_quality_tier == 1
-
-
-@pytest.mark.parametrize("configured_tier", [0, 1, 4])
-def test_default_dispatch_runs_the_quality_tier_the_user_set(
-    monkeypatch,
-    configured_tier: int,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": configured_tier}
-    )
-
-    design = problem.design.heat_exchanger_network()
-
-    assert _resolved_tier(design) == configured_tier
-
-
-@pytest.mark.parametrize("configured_tier", [0, 1, 4])
-def test_enhanced_synthesis_method_runs_the_quality_tier_the_user_set(
-    monkeypatch,
-    configured_tier: int,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": configured_tier}
-    )
-
-    design = problem.design.enhanced_heat_exchanger_network()
-
-    assert _resolved_tier(design) == configured_tier
-
-
-def test_call_argument_beats_call_options_beats_the_quality_tier_the_user_set(
-    monkeypatch,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    tier_option = "HENS_SYNTHESIS_QUALITY_TIER"
-    problem = _small_problem_with_options({tier_option: 4})
-
-    from_argument = problem.design.enhanced_heat_exchanger_network(
-        quality_tier=3,
-        options={tier_option: 2},
-    )
-    enhanced_from_options = problem.design.enhanced_heat_exchanger_network(
-        options={tier_option: 2},
-    )
-    default_from_options = problem.design.heat_exchanger_network(
-        options={tier_option: 2},
-    )
-
-    assert _resolved_tier(from_argument) == 3
-    assert _resolved_tier(enhanced_from_options) == 2
-    assert _resolved_tier(default_from_options) == 2
-    assert problem.to_problem_json()["options"][tier_option] == 4
-
-
-def test_call_options_tier_does_not_count_as_set_on_later_calls(monkeypatch) -> None:
-    _use_fake_default_executor(monkeypatch)
-    problem = _small_problem()
-
-    overridden = problem.design.heat_exchanger_network(
-        options={"HENS_SYNTHESIS_QUALITY_TIER": 3},
-    )
-    later = problem.design.heat_exchanger_network()
-
-    assert _resolved_tier(overridden) == 3
-    assert _resolved_tier(later) == 0
-
-
-@pytest.mark.parametrize(
-    "options",
-    [
-        {"HENS_SYNTHESIS_QUALITY_TIER": 0},
-        {"HENS_SYNTHESIS_QUALITY_TIER": 4},
-    ],
-)
-def test_open_hens_stays_tier_one_whatever_tier_is_set(
-    monkeypatch,
-    options: dict,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    configured = _small_problem_with_options(options)
-
-    assert _resolved_tier(configured.design.open_hens()) == 1
-    assert _resolved_tier(_small_problem().design.open_hens(options=options)) == 1
-
-
-@pytest.mark.parametrize("reload", [_reload_from_problem_json, _reload_from_bundle])
-def test_set_quality_tier_survives_a_reload(monkeypatch, reload) -> None:
-    _use_fake_default_executor(monkeypatch)
-    # Tier 1 is the field default, so only a retained "set" tells it from unset.
-    configured = reload(_small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 1}))
-    unset = reload(_small_problem())
-
-    assert _resolved_tier(configured.design.heat_exchanger_network()) == 1
-    assert _resolved_tier(configured.design.enhanced_heat_exchanger_network()) == 1
-    assert _resolved_tier(unset.design.heat_exchanger_network()) == 0
-    assert _resolved_tier(unset.design.enhanced_heat_exchanger_network()) == 2
-
-
-def test_update_options_can_set_and_clear_the_quality_tier(monkeypatch) -> None:
-    _use_fake_default_executor(monkeypatch)
-    problem = _small_problem()
-
-    problem.update_options({"HENS_SYNTHESIS_QUALITY_TIER": 1})
-    assert _resolved_tier(problem.design.heat_exchanger_network()) == 1
-
-    options = problem.to_problem_json()["options"]
-    del options["HENS_SYNTHESIS_QUALITY_TIER"]
-    problem.update_options(options, replace=True)
-    assert _resolved_tier(problem.design.heat_exchanger_network()) == 0
-
-
-@pytest.mark.parametrize(
-    ("options", "expected_tier"),
-    [
-        ({}, 0),
-        ({"HENS_SYNTHESIS_QUALITY_TIER": 1}, 1),
-        ({"HENS_SYNTHESIS_QUALITY_TIER": 3}, 3),
-    ],
-)
-def test_period_zone_and_multiperiod_designs_resolve_the_same_tier(
-    monkeypatch,
-    options: dict,
-    expected_tier: int,
-) -> None:
-    # The fake executor has no multi-period networks, so stop at the dispatch.
-    class TierResolved(Exception):
-        pass
-
-    def stop_at_dispatch(problem, *, quality_tier, **kwargs):
-        raise TierResolved(quality_tier)
-
-    monkeypatch.setattr(
-        service_module, "_run_open_hens_quality_tier_service", stop_at_dispatch
-    )
-    problem = _two_period_problem_with_options(options)
-
-    with pytest.raises(TierResolved) as for_period:
-        problem.design.heat_exchanger_network(period_id="base")
-    with pytest.raises(TierResolved) as for_all_periods:
-        problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
-
-    assert for_period.value.args == (expected_tier,)
-    assert for_all_periods.value.args == (expected_tier,)
-
-
-def test_enhanced_synthesis_method_runs_requested_quality_tier(monkeypatch) -> None:
-    _use_fake_default_executor(monkeypatch)
-    default_problem = _small_problem()
-    explicit_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
-    original_config_tier = (
-        explicit_problem.master_zone.config.hens.synthesis_quality_tier
-    )
-
-    default_design = default_problem.design.enhanced_heat_exchanger_network()
-    explicit_design = explicit_problem.design.enhanced_heat_exchanger_network(
-        quality_tier=3,
-    )
-
-    assert (
-        default_design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
-    )
-    assert (
-        explicit_design.result.design_method
-        == HeatExchangerNetworkDesignMethod.OpenHENS
-    )
-    assert default_design.result.manifest is not None
-    assert explicit_design.result.manifest is not None
-    assert default_design.result.manifest.synthesis_quality_tier == 2
-    assert explicit_design.result.manifest.synthesis_quality_tier == 3
-    assert explicit_problem.master_zone.config.hens.synthesis_quality_tier == (
-        original_config_tier
-    )
-
-
-@pytest.mark.parametrize("quality_tier", [-1, 6])
-def test_enhanced_synthesis_method_rejects_out_of_range_quality_tier(
-    monkeypatch,
-    quality_tier: int,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    problem = _small_problem()
-
-    with pytest.raises(ValueError, match="quality_tier"):
-        problem.design.enhanced_heat_exchanger_network(quality_tier=quality_tier)
-
-
-@pytest.mark.parametrize("quality_tier", [1.5, "2", True])
-def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
-    monkeypatch,
-    quality_tier: object,
-) -> None:
-    _use_fake_default_executor(monkeypatch)
-    problem = _small_problem()
-
-    with pytest.raises(TypeError, match="quality_tier"):
-        problem.design.enhanced_heat_exchanger_network(quality_tier=quality_tier)
 
 
 @pytest.mark.synthesis
@@ -1094,7 +570,7 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
 # does not import the solver packages.
 @pytest.mark.skipif(
     "not _live_solver_environment_available()",
-    reason="needs the couenne and ipopt binaries and the gekko and pyomo packages",
+    reason="needs the couenne and ipopt binaries and the pyomo package",
 )
 def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
     single_period = _single_state_no_sweep_problem()
@@ -1102,11 +578,11 @@ def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
 
     single_result = _run_single_candidate_open_hens(
         single_period,
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
     duplicate_result = _run_single_candidate_open_hens(
         duplicate_period,
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
     )
 
     assert _task_counts_by_method(single_result) == {
@@ -1252,9 +728,6 @@ def test_design_accessor_rejects_retired_selector_and_invalid_seed_shapes(
         problem.design.heat_exchanger_network(initial_networks=(seed,))
 
     with pytest.raises(TypeError, match="unexpected keyword argument"):
-        problem.design.open_hens(initial_networks=(seed,))
-
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
         problem.design.pinch_design(initial_networks=(seed,))
 
 
@@ -1292,8 +765,8 @@ def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
     assert recovery.state().sink_inlet_temperature == pytest.approx(410.0)
     assert recovery.state().sink_outlet_temperature > 273.15
     assert design.selected_network.summary_metrics[
-        "approach_temperature"
-    ] == pytest.approx(2.0)
+        "dt_cont_multiplier"
+    ] == pytest.approx(0.2)
 
 
 def test_workspace_design_workflow_dispatches_to_live_problem_design_path(
@@ -1500,7 +973,7 @@ def _single_state_no_sweep_payload() -> dict:
             "COSTING_HX_AREA_COEFF": 150.0,
             "COSTING_HX_AREA_EXP": 1.0,
             "COSTING_HX_UNIT_COST": 5500.0,
-            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
             "HENS_BEST_SOLUTIONS_TO_SAVE": 1,
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_LOG_LEVEL": "WARNING",
@@ -1515,7 +988,10 @@ def _single_state_no_sweep_payload() -> dict:
             "HENS_SOLVER_TDM": "couenne",
             "HENS_SOLVE_TOLERANCE": 0.001,
             "HENS_STAGE_SELECTION": [1],
-            "HENS_SYNTHESIS_QUALITY_TIER": 1,
+            "HENS_SEARCH_DEPTH": 2,
+            # The MILP pinch design -> TDM -> EVM pipeline, without the
+            # heuristic.
+            "HENS_HEURISTIC_PDM_NETWORKS": 0,
         },
     }
 
@@ -1531,11 +1007,11 @@ def _is_scalar_quantity_payload(value: object) -> bool:
 def _run_single_candidate_open_hens(
     problem: PinchProblem,
     *,
-    approach_temperature: float = 14.0,
+    dt_cont_multiplier: float = 1.4,
 ):
     problem.target.direct_heat_integration()
     settings = workflow_settings_from_problem(problem)
-    assert settings.approach_temperatures == (approach_temperature,)
+    assert settings.dt_cont_multipliers == (dt_cont_multiplier,)
     assert settings.derivative_thresholds == (0.5,)
     result = workflow_module.execute_open_hens_method(
         problem,
@@ -1568,10 +1044,6 @@ def _live_solver_environment_available() -> bool:
         )
         require_solver_binary(
             "ipopt",
-            purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
-        )
-        require_synthesis_dependency(
-            "gekko",
             purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
         require_synthesis_dependency(
@@ -1609,13 +1081,17 @@ def _small_payload() -> dict:
     payload = deepcopy(payload)
     payload["options"] = {
         **payload["options"],
-        "HENS_APPROACH_TEMPERATURES": [2.0, 4.0],
+        "HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 1.0],
         "HENS_STAGE_SELECTION": [2],
         "HENS_BEST_SOLUTIONS_TO_SAVE": 2,
         "HENS_MAX_PARALLEL": 1,
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_RUN_ID": "hens-05-test",
+        # These tests cover the MILP pinch design -> TDM -> EVM pipeline: at
+        # depth 2, with the heuristic off.
+        "HENS_HEURISTIC_PDM_NETWORKS": 0,
+        "HENS_SEARCH_DEPTH": 2,
     }
     return payload
 
@@ -1628,58 +1104,125 @@ def _outcome_map(outcomes):
     }
 
 
-def _with_pathway_tac(
-    outcome: HeatExchangerNetworkSynthesisTaskOutcome,
-    *,
-    tier1_tac: float,
-    other_tac: float,
-) -> HeatExchangerNetworkSynthesisTaskOutcome:
-    if outcome.task.method != "network_evolution_method" or outcome.network is None:
-        return outcome
-    pathway_ids = outcome.task.metadata.get("pathway_ids", ())
-    tac = tier1_tac if pathway_ids == ["tier1-open-hens"] else other_tac
-    network = outcome.network.model_copy(
-        update={
-            "objective_value": tac,
-            "total_annual_cost": tac,
-            "utility_cost": tac / 2.0,
-            "capital_cost": tac / 2.0,
-        }
-    )
-    return outcome.model_copy(
-        update={
-            "network": network,
-            "objective_value": tac,
-        }
-    )
-
-
-def test_default_design_runs_every_approach_temperature(monkeypatch) -> None:
-    # Audit H8: the default entry (tier 0) built tasks only from the first
-    # approach temperature, while the manifest listed every one.
+def test_default_design_runs_every_dt_cont_multiplier(monkeypatch) -> None:
+    # Audit H8: the default entry built tasks only from the first sweep
+    # value, while the manifest listed every one.
     _use_fake_default_executor(monkeypatch)
-    problem = _small_problem_with_options(
-        {"HENS_APPROACH_TEMPERATURES": [2.0, 4.0, 8.0]}
-    )
+    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4, 0.8]})
 
     design = problem.design.heat_exchanger_network()
 
     manifest = design.result.manifest
-    assert manifest.synthesis_quality_tier == 0
     assert manifest.task_count_by_method["pinch_design_method"] == 3
-    assert manifest.approach_temperatures == (2.0, 4.0, 8.0)
+    assert manifest.dt_cont_multipliers == (0.2, 0.4, 0.8)
 
 
-def test_manifest_lists_the_approach_temperatures_that_ran(monkeypatch) -> None:
-    # Expanded tiers run multiples of the first approach temperature too.
+def test_manifest_lists_the_dt_cont_multipliers_that_ran(monkeypatch) -> None:
+    # Unset, the search width sets the multipliers.
     _use_fake_default_executor(monkeypatch)
-    problem = _small_problem_with_options(
-        {
-            "HENS_APPROACH_TEMPERATURES": [10.0],
-            "HENS_DT_CONT_MULTIPLIERS": [0.5, 1.0],
-        }
+    payload = _small_payload()
+    del payload["options"]["HENS_DT_CONT_MULTIPLIERS"]
+    problem = PinchProblem(source=payload, project_name="HENS Demo")
+
+    design = problem.design.heat_exchanger_network(width=2)
+
+    assert design.result.manifest.dt_cont_multipliers == (0.5, 0.75, 1.0, 1.5, 2.0)
+
+
+def test_call_argument_beats_call_options_beats_the_depth_the_user_set(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options({"HENS_SEARCH_DEPTH": 4})
+
+    from_argument = problem.design.heat_exchanger_network(
+        depth=3, options={"HENS_SEARCH_DEPTH": 1}
     )
+    from_options = problem.design.heat_exchanger_network(
+        options={"HENS_SEARCH_DEPTH": 1}
+    )
+    stored = problem.design.heat_exchanger_network()
 
-    design = problem.design.heat_exchanger_network()
+    assert _resolved_depth(from_argument) == 3
+    assert _resolved_depth(from_options) == 1
+    assert _resolved_depth(stored) == 4
+    assert problem.to_problem_json()["options"]["HENS_SEARCH_DEPTH"] == 4
 
-    assert design.result.manifest.approach_temperatures == (5.0, 10.0)
+
+@pytest.mark.parametrize("reload", [_reload_from_problem_json, _reload_from_bundle])
+def test_a_set_depth_survives_a_reload(monkeypatch, reload) -> None:
+    _use_fake_default_executor(monkeypatch)
+    configured = reload(_small_problem_with_options({"HENS_SEARCH_DEPTH": 1}))
+    unset = reload(_small_problem())
+
+    assert _resolved_depth(configured.design.heat_exchanger_network()) == 1
+    assert _resolved_depth(unset.design.heat_exchanger_network()) == 2
+
+
+@pytest.mark.parametrize(
+    ("options", "expected_depth"), [({}, 2), ({"HENS_SEARCH_DEPTH": 3}, 3)]
+)
+def test_period_zone_and_multiperiod_designs_resolve_the_same_depth(
+    monkeypatch,
+    options: dict,
+    expected_depth: int,
+) -> None:
+    # The fake executor has no multi-period networks, so stop at the dispatch.
+    class DepthResolved(Exception):
+        pass
+
+    def stop_at_dispatch(problem, settings, **kwargs):
+        raise DepthResolved(settings.search_depth)
+
+    monkeypatch.setattr(service_module, "execute_open_hens_method", stop_at_dispatch)
+    problem = _two_period_problem_with_options(options)
+
+    with pytest.raises(DepthResolved) as for_period:
+        problem.design.heat_exchanger_network(period_id="base")
+    with pytest.raises(DepthResolved) as for_all_periods:
+        problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
+
+    assert for_period.value.args == (expected_depth,)
+    assert for_all_periods.value.args == (expected_depth,)
+
+
+@pytest.mark.parametrize(("width", "depth"), [(-1, 2), (4, 2), (1, -1), (1, 5)])
+def test_out_of_range_width_or_depth_is_rejected(monkeypatch, width, depth) -> None:
+    _use_fake_default_executor(monkeypatch)
+
+    with pytest.raises(ValueError, match="HENS_SEARCH_"):
+        _small_problem().design.heat_exchanger_network(width=width, depth=depth)
+
+
+def test_a_call_level_wins_over_the_stored_options_it_governs(monkeypatch) -> None:
+    # The small problem stores HENS_DT_CONT_MULTIPLIERS [0.2, 0.4] and no
+    # heuristic networks; a width or depth asked for in the call sets them,
+    # unless the call sets them too.
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    wide = problem.design.heat_exchanger_network(width=2)
+    pinned = problem.design.heat_exchanger_network(width=2, dt_cont_multipliers=[1.0])
+    stored = problem.design.heat_exchanger_network()
+    deep = problem.design.heat_exchanger_network(depth=1)
+
+    assert wide.result.manifest.dt_cont_multipliers == (0.5, 0.75, 1.0, 1.5, 2.0)
+    # The same level given in the call's options acts the same way.
+    wide_by_option = problem.design.heat_exchanger_network(
+        options={"HENS_SEARCH_WIDTH": 2}
+    )
+    assert wide_by_option.result.manifest.dt_cont_multipliers == (
+        0.5,
+        0.75,
+        1.0,
+        1.5,
+        2.0,
+    )
+    assert pinned.result.manifest.dt_cont_multipliers == (1.0,)
+    assert stored.result.manifest.dt_cont_multipliers == (0.2, 0.4)
+    assert (
+        deep.result.manifest.task_count_by_method.get(
+            "heuristic_pinch_design_method", 0
+        )
+        > 0
+    )

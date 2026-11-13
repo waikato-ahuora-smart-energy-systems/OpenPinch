@@ -324,18 +324,32 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Annualise ORC capital", None,
         "Include the annualised ORC capital in its annual cost change.",
     ),
-    "HENS_APPROACH_TEMPERATURES": FieldText(
-        "HEN approach temperatures", "delta_degC",
+    "HENS_SEARCH_WIDTH": FieldText(
+        "HEN synthesis search width", None,
         (
-            "Minimum approach temperatures (dTmin) to synthesise networks for; one set "
-            "of design tasks per value."
+            "dt_cont multipliers to synthesise at, from 0 to 3: 0 is 1.0; 1 is 0.75, "
+            "1.0 and 1.5; 2 is 0.5, 0.75, 1.0, 1.5 and 2.0; 3 adds 0.6 and 1.25. "
+            "HENS_DT_CONT_MULTIPLIERS overrides it."
+        ),
+    ),
+    "HENS_SEARCH_DEPTH": FieldText(
+        "HEN synthesis search depth", None,
+        (
+            "Synthesis stages and effort, from 0 to 4: 0 is the heuristic pinch "
+            "design method alone; 1 adds network evolution; 2 adds the MILP pinch "
+            "design method and the thermal derivative method; 3 and 4 make more "
+            "pinch design networks and evolve more widely. The options it sets "
+            "override it when set."
         ),
     ),
     "HENS_DT_CONT_MULTIPLIERS": FieldText(
-        "HEN dTmin multipliers", None,
+        "HEN dt_cont multipliers", None,
         (
-            "Multipliers on the first approach temperature for extra pinch design "
-            "candidates at quality tier 2 and above. None uses the tier's defaults."
+            "Multipliers on every stream and utility dT contribution to synthesise "
+            "networks for, as a zone dt_cont multiplier scales them in targeting "
+            "(a locked stream keeps its own); one set of design tasks per value. "
+            "1.0 designs at the targeting contributions. Unset, the search width "
+            "sets them."
         ),
     ),
     "HENS_DERIVATIVE_THRESHOLDS": FieldText(
@@ -349,24 +363,54 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Minimum exchanger approach share", None,
         (
             "Smallest exchanger approach the thermal derivative and network evolution "
-            "steps may choose, as a share of the requested approach temperature, from "
-            "0 up to but not including 1. Those steps choose approaches by cost, "
-            "down to 0.1 K by default (0); at 0.5 a 10 K design keeps every "
-            "exchanger at 5 K or more."
-        ),
-    ),
-    "HENS_SYNTHESIS_QUALITY_TIER": FieldText(
-        "HEN synthesis quality tier", None,
-        (
-            "Search breadth from 0 to 5: 0 skips the thermal derivative method, 1 is "
-            "standard OpenHENS, 2 to 5 search more widely."
+            "steps may choose, as a share of twice THERMAL_DT_CONT times the dt_cont "
+            "multiplier, from 0 up to but not including 1. Those steps choose "
+            "approaches by cost, down to 0.1 K by default (0); at 0.5 a multiplier "
+            "of 1.0 with a 5 K THERMAL_DT_CONT keeps every exchanger at 5 K or more."
         ),
     ),
     "HENS_PDM_STAGE_PAIR_LIMIT": FieldText(
         "Pinch design stage pair candidates", None,
         (
-            "Number of extra pinch design candidates with set stage counts above and "
-            "below the pinch, up to 12. None adds none."
+            "Number of extra MILP pinch design candidates with set stage counts "
+            "above and below the pinch, up to 12. None adds none. Used only when "
+            "the MILP runs at every multiplier (depth 2 and above, or "
+            "HENS_PDM_MILP)."
+        ),
+    ),
+    "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
+        "Pinch design minimum-unit networks", None,
+        (
+            "Extra MILP pinch design networks per dt_cont multiplier with the fewest "
+            "units at the utility targets, each seeding network evolution when it "
+            "runs. 0 adds none. Used only where the MILP runs."
+        ),
+    ),
+    "HENS_PDM_EXTRA_UNIT_NETWORKS": FieldText(
+        "Pinch design one-more-unit networks", None,
+        (
+            "Extra MILP pinch design networks per dt_cont multiplier with one unit "
+            "more than the fewest, each seeding network evolution when it runs. 0 "
+            "adds none. Used only where the MILP runs."
+        ),
+    ),
+    "HENS_HEURISTIC_PDM_NETWORKS": FieldText(
+        "Heuristic pinch design networks", None,
+        (
+            "Networks per dt_cont multiplier from the heuristic (Linnhoff rules) "
+            "pinch design method, each seeding network evolution from depth 1. "
+            "Where it realises none, the MILP pinch design method runs instead. 0 "
+            "runs only the MILP; unset, the search depth sets it."
+        ),
+    ),
+    "HENS_PDM_MILP": FieldText(
+        "MILP pinch design", None,
+        (
+            "Run the MILP pinch design method (fewest units at minimum utility "
+            "cost) at every multiplier as well as the heuristic. From depth 2 its "
+            "networks go through the thermal derivative method; below that they "
+            "seed evolution directly. Unset, the search depth sets it (on from "
+            "depth 2)."
         ),
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
@@ -383,8 +427,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_STAGE_SELECTION": FieldText(
         "HEN stage counts", None,
         (
-            "Stage counts for direct network evolution runs. Exactly two values also "
-            "fix the pinch design stages above and below the pinch."
+            "Stage counts for the direct network evolution runs made when Couenne "
+            "is missing. Exactly two values also fix the MILP pinch design stages "
+            "above and below the pinch; the heuristic sets its own. Other runs "
+            "choose their stage counts."
         ),
     ),
     "HENS_SOLVER_PDM": FieldText(
@@ -425,17 +471,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_EVM_N_AD_BRANCHES": FieldText(
         "Network evolution add branches", None,
         (
-            "Match-adding candidates explored per network evolution step on every "
-            "route, including the standard OpenHENS route. None uses the quality "
-            "tier's default, and 1 on tier 0 and 1 routes."
+            "Match-adding candidates explored per network evolution step. None "
+            "uses the search depth's: 1 up to depth 2, then 2 and 3."
         ),
     ),
     "HENS_EVM_N_RM_BRANCHES": FieldText(
         "Network evolution remove branches", None,
         (
-            "Match-removing candidates explored per network evolution step on every "
-            "route, including the standard OpenHENS route. None uses the quality "
-            "tier's default, and 1 on tier 0 and 1 routes."
+            "Match-removing candidates explored per network evolution step. None "
+            "uses the search depth's: 1 up to depth 2, then 2 and 3."
         ),
     ),
     "HENS_EVM_BEAM_WIDTH": FieldText(
@@ -472,7 +516,11 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HENS_BEST_SOLUTIONS_TO_SAVE": FieldText(
         "HEN solutions to save", None,
-        "Recorded in the synthesis manifest; no current synthesis step reads it.",
+        (
+            "The most networks a standalone thermal derivative or network "
+            "evolution run seeds from a stored design; also recorded in the "
+            "synthesis manifest."
+        ),
     ),
     "HPR_LOAD_MODE": FieldText(
         "HPR duty setting mode", None,

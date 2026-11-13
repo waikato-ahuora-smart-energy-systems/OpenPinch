@@ -1,6 +1,6 @@
 """Allow-listed solver option names and values for HEN synthesis solvers.
 
-Solver options are written into solver option files and GEKKO option lines,
+Solver options are written into solver option files or passed to the solver,
 so only known tolerances, iteration limits and numeric settings are accepted,
 each with a number, a boolean or one simple word as its value.
 """
@@ -12,7 +12,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-# IPOPT (through Pyomo or GEKKO).
+# IPOPT.
 _IPOPT_OPTIONS = frozenset(
     {
         "tol",
@@ -68,26 +68,52 @@ _COUENNE_OPTIONS = frozenset(
     }
 )
 
-# APOPT.
-_APOPT_OPTIONS = frozenset(
+# HiGHS, the default pinch design solver.
+_HIGHS_OPTIONS = frozenset(
     {
-        "minlp_maximum_iterations",
-        "minlp_max_iter_with_int_sol",
-        "minlp_as_nlp",
-        "minlp_branch_method",
-        "minlp_gap_tol",
-        "minlp_integer_tol",
-        "minlp_integer_max",
-        "minlp_integer_leaves",
-        "minlp_print_level",
-        "nlp_maximum_iterations",
-        "objective_convergence_tolerance",
-        "constraint_convergence_tolerance",
-        "use_warm_start",
+        "time_limit",
+        "mip_rel_gap",
+        "mip_abs_gap",
+        "mip_max_nodes",
+        "mip_feasibility_tolerance",
+        "primal_feasibility_tolerance",
+        "dual_feasibility_tolerance",
+        "threads",
+        "presolve",
+        "random_seed",
     }
 )
 
-ALLOWED_SOLVER_OPTION_NAMES = _IPOPT_OPTIONS | _COUENNE_OPTIONS | _APOPT_OPTIONS
+# SCIP parameters and MindtPy settings.
+_SCIP_OPTIONS = frozenset(
+    {
+        "display/verblevel",
+        "limits/time",
+        "limits/gap",
+        "limits/absgap",
+        "limits/nodes",
+        "limits/solutions",
+        "numerics/feastol",
+    }
+)
+_MINDTPY_OPTIONS = frozenset(
+    {
+        "strategy",
+        "mip_solver",
+        "nlp_solver",
+        "iteration_limit",
+        "absolute_bound_tolerance",
+        "relative_bound_tolerance",
+    }
+)
+
+ALLOWED_SOLVER_OPTION_NAMES = (
+    _IPOPT_OPTIONS
+    | _COUENNE_OPTIONS
+    | _HIGHS_OPTIONS
+    | _SCIP_OPTIONS
+    | _MINDTPY_OPTIONS
+)
 
 # Integers as large as a solver's 64-bit settings, and short value text.
 _MAX_INTEGER = 2**63 - 1

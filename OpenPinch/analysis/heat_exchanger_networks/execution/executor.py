@@ -16,10 +16,22 @@ from ....optimisation.execution import _main_module_reruns_in_workers
 from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
-from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
-from .pathways import pathways_from_metadata, tier_evm_branch_breadth
+from ..solver.arrays import (
+    PreparedSolverArrays,
+    nominal_approach_temperature,
+    problem_to_solver_arrays,
+)
+from .search import resolve_search
+from .settings import heuristic_solver
 
 logger = logging.getLogger(__name__)
+
+_PINCH_DESIGN_METHODS = (
+    HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
+)
+# Heuristic networks per multiplier when a task does not set its own cap.
+_HEURISTIC_NETWORKS = 10
 
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
@@ -235,15 +247,55 @@ class LocalSynthesisExecutor:
                 internal_problem = None
             else:
                 _task, outcome, internal_problem = result
-            self.executed_tasks.append(task)
-            if (
-                internal_problem is not None
-                and outcome.status == "success"
-                and task.task_id is not None
-            ):
-                self.problems_by_task_id[task.task_id] = internal_problem
-            outcomes.append(outcome)
+            self._record(task, outcome, internal_problem, outcomes)
+            if internal_problem is not None and outcome.status == "success":
+                outcomes.extend(self._pdm_variant_outcomes(task, internal_problem))
         return tuple(outcomes)
+
+    def _record(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+        internal_problem: InternalHeatExchangerNetworkProblem | None,
+        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome],
+    ) -> None:
+        self.executed_tasks.append(task)
+        if (
+            internal_problem is not None
+            and outcome.status == "success"
+            and task.task_id is not None
+        ):
+            self.problems_by_task_id[task.task_id] = internal_problem
+        outcomes.append(outcome)
+
+    def _pdm_variant_outcomes(
+        self,
+        task: HeatExchangerNetworkSynthesisTask,
+        internal_problem: InternalHeatExchangerNetworkProblem,
+    ) -> list[HeatExchangerNetworkSynthesisTaskOutcome]:
+        """Give each extra PDM network its own task, outcome and problem.
+
+        Each variant is a seed for network evolution, which warm-starts from
+        the private problem registered under the variant's task id.
+        """
+
+        outcomes: list[HeatExchangerNetworkSynthesisTaskOutcome] = []
+        variants = getattr(internal_problem, "pdm_variants", None) or []
+        internal_problem.pdm_variants = []
+        for index, variant in enumerate(variants, start=1):
+            variant_task = _pdm_variant_task(task, index, _variant_key(task))
+            variant.synthesis_task_id = variant_task.task_id
+            try:
+                outcome = _solved_outcome(variant_task, variant, variant.case)
+            except (ValueError, WorkflowContractError) as exc:
+                # One extra network that cannot be extracted or verified does
+                # not lose the others or the main network.
+                logger.warning(
+                    "Extra network %s dropped: %s", variant_task.task_id, exc
+                )
+                continue
+            self._record(variant_task, outcome, variant, outcomes)
+        return outcomes
 
     def _build_problem(
         self,
@@ -253,15 +305,21 @@ class LocalSynthesisExecutor:
         parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
     ) -> InternalHeatExchangerNetworkProblem:
         parent_problem = self._parent_problem(task, parent_outcomes)
+        config = problem.master_zone.config
+        nominal_approach = nominal_approach_temperature(config, task.dt_cont_multiplier)
         dTmin = _task_model_approach_temperature(
             task,
-            min_approach_share=problem.master_zone.config.hens.min_exchanger_approach_share,
+            nominal_approach,
+            min_approach_share=config.hens.min_exchanger_approach_share,
         )
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
         is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
-        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
+        is_heuristic = (
+            task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+        )
+        if task.method in _PINCH_DESIGN_METHODS:
             from ..solver.pinch_design_decomposition import (
                 build_pinch_design_decomposition,
             )
@@ -269,13 +327,13 @@ class LocalSynthesisExecutor:
             decompositions = {
                 "above": build_pinch_design_decomposition(
                     problem,
-                    task.approach_temperature,
+                    nominal_approach,
                     pinch_location="above",
                     stage_selection=stage_selection,
                 ),
                 "below": build_pinch_design_decomposition(
                     problem,
-                    task.approach_temperature,
+                    nominal_approach,
                     pinch_location="below",
                     stage_selection=stage_selection,
                 ),
@@ -287,6 +345,7 @@ class LocalSynthesisExecutor:
             framework=_model_framework(task.method),
             solver=_solver_for_task(problem, task.method),
             dTmin=dTmin,
+            dt_cont_multiplier=task.dt_cont_multiplier,
             min_dqda=(
                 0.0
                 if task.derivative_threshold is None
@@ -303,6 +362,19 @@ class LocalSynthesisExecutor:
             stages=task.stage_count,
             synthesis_task_id=task.task_id,
             pinch_decompositions=decompositions,
+            pdm_network_limits=(
+                (
+                    int(problem.master_zone.config.hens.pdm_min_unit_networks),
+                    int(problem.master_zone.config.hens.pdm_extra_unit_networks),
+                )
+                if decompositions is not None and not is_heuristic
+                else (0, 0)
+            ),
+            heuristic_network_limit=(
+                int(task.settings.get("heuristic_networks", _HEURISTIC_NETWORKS))
+                if is_heuristic
+                else 0
+            ),
         )
 
     def _parent_problem(
@@ -337,10 +409,10 @@ class LocalSynthesisExecutor:
     ) -> dict[str, Any] | None:
         factories = dict(self.model_factories or {})
         scope = _stage_packing_scope(problem)
-        pdm_mode = str(task.settings.get("pdm_mode", ""))
-        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign and (
-            pdm_mode == "compact" or (not pdm_mode and scope in {"pdm", "all"})
-        ):
+        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign and scope in {
+            "pdm",
+            "all",
+        }:
             factories.setdefault(
                 "pinch_design_method",
                 _stage_packed_pdm_factory(),
@@ -406,37 +478,7 @@ def _solve_built_task(
                 "solver did not return a successful heat exchanger network model",
             )
             return task, _failed_task_outcome(task, reason), None
-        verify = getattr(solved, "verify", None)
-        if callable(verify):
-            is_valid, reasons = verify()
-            if not is_valid:
-                reason = "verification failed: " + ", ".join(
-                    str(reason) for reason in reasons
-                )
-                internal_problem.solution_failure_reason = reason
-                return task, _failed_task_outcome(task, reason), internal_problem
-
-        network = internal_problem.extract_network(run_id=task.run_id)
-        # An unconverged solve stays a success so downstream tasks can start
-        # from it; demote_infeasible_outcomes keeps it out of the ranking.
-        solver_run = getattr(solved, "solver_run", None)
-        diagnostics = (
-            {}
-            if getattr(solver_run, "converged", True)
-            else {"unconverged_termination": str(solver_run.termination_condition)}
-        )
-        return (
-            task,
-            HeatExchangerNetworkSynthesisTaskOutcome(
-                task=task,
-                status="success",
-                network=network,
-                objective_value=network.total_annual_cost,
-                solver_status=_solver_status(internal_problem),
-                diagnostics=diagnostics,
-            ),
-            internal_problem,
-        )
+        return task, _solved_outcome(task, internal_problem, solved), internal_problem
     except Exception as exc:
         logger.debug(
             "HEN synthesis task %s failed to solve: %s",
@@ -445,6 +487,61 @@ def _solve_built_task(
             exc_info=True,
         )
         return task, _failed_task_outcome(task, str(exc)), None
+
+
+def _solved_outcome(
+    task: HeatExchangerNetworkSynthesisTask,
+    internal_problem: InternalHeatExchangerNetworkProblem,
+    solved: Any,
+) -> HeatExchangerNetworkSynthesisTaskOutcome:
+    """Verify a solved model and extract its network as the task outcome."""
+
+    verify = getattr(solved, "verify", None)
+    if callable(verify):
+        is_valid, reasons = verify()
+        if not is_valid:
+            reason = "verification failed: " + ", ".join(
+                str(reason) for reason in reasons
+            )
+            internal_problem.solution_failure_reason = reason
+            return _failed_task_outcome(task, reason)
+
+    network = internal_problem.extract_network(run_id=task.run_id)
+    # An unconverged solve stays a success so downstream tasks can start
+    # from it; demote_infeasible_outcomes keeps it out of the ranking.
+    solver_run = getattr(solved, "solver_run", None)
+    diagnostics = (
+        {}
+        if getattr(solver_run, "converged", True)
+        else {"unconverged_termination": str(solver_run.termination_condition)}
+    )
+    return HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task,
+        status="success",
+        network=network,
+        objective_value=network.total_annual_cost,
+        solver_status=_solver_status(internal_problem),
+        diagnostics=diagnostics,
+    )
+
+
+def _pdm_variant_task(
+    task: HeatExchangerNetworkSynthesisTask, index: int, key: str = "pdm_variant"
+) -> HeatExchangerNetworkSynthesisTask:
+    """The task record of a pinch design task's ``index``-th extra network."""
+
+    return HeatExchangerNetworkSynthesisTask(
+        **task.model_dump(exclude={"task_id", "settings"}),
+        settings={**task.settings, key: index},
+    )
+
+
+def _variant_key(task: HeatExchangerNetworkSynthesisTask) -> str:
+    """The task-settings key that numbers a task's extra networks."""
+
+    if task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+        return "heuristic_variant"
+    return "pdm_variant"
 
 
 def _build_and_solve_root_task(
@@ -513,6 +610,7 @@ def _failed_task_outcome(
 def _model_framework(method: HeatExchangerNetworkDesignMethod) -> str:
     return {
         HeatExchangerNetworkDesignMethod.PinchDesign: "PDM",
+        HeatExchangerNetworkDesignMethod.HeuristicPinchDesign: "PDM",
         HeatExchangerNetworkDesignMethod.ThermalDerivative: "TDM",
         HeatExchangerNetworkDesignMethod.NetworkEvolution: "ESM",
     }[method]
@@ -526,26 +624,31 @@ def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
 
 def _task_model_approach_temperature(
     task: HeatExchangerNetworkSynthesisTask,
+    nominal_approach: float,
     *,
     min_approach_share: float = 0.0,
 ) -> float:
     """Return the model's minimum approach temperature.
 
-    The pinch design step uses the task's approach. The thermal derivative and
-    evolution steps minimise cost down to 0.1 K, or to ``min_approach_share``
-    (``HENS_MIN_EXCHANGER_APPROACH_SHARE``) times the task's approach if larger.
+    ``nominal_approach`` is the task multiplier's internal approach,
+    ``2 * THERMAL_DT_CONT * dt_cont_multiplier``. The pinch design step uses
+    it. The thermal derivative and evolution steps minimise cost down to
+    0.1 K, or to ``min_approach_share`` (``HENS_MIN_EXCHANGER_APPROACH_SHARE``)
+    times it if larger.
     """
     if task.method in {
         HeatExchangerNetworkDesignMethod.ThermalDerivative,
         HeatExchangerNetworkDesignMethod.NetworkEvolution,
     }:
-        return max(0.1, min_approach_share * float(task.approach_temperature))
-    return float(task.approach_temperature)
+        return max(0.1, min_approach_share * float(nominal_approach))
+    return float(nominal_approach)
 
 
 def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
     if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
-        return f"P-+--PDM-{task.approach_temperature}"
+        return f"P-+--PDM-m{task.dt_cont_multiplier:g}"
+    if task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+        return f"P-+--HPDM-m{task.dt_cont_multiplier:g}"
     if task.method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         stages = task.stage_count if task.stage_count is not None else "unknown"
         return f"P-S{stages}--TDM-{task.derivative_threshold}"
@@ -555,7 +658,13 @@ def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 
 def _solver_for_task(problem, method: HeatExchangerNetworkDesignMethod) -> str:
     hens = problem.master_zone.config.hens
-    if method == HeatExchangerNetworkDesignMethod.PinchDesign:
+    if method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+        return heuristic_solver(str(hens.solver_pdm))
+    return _configured_solver(hens, method)
+
+
+def _configured_solver(hens, method: HeatExchangerNetworkDesignMethod) -> str:
+    if method in _PINCH_DESIGN_METHODS:
         return str(hens.solver_pdm)
     if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         return str(hens.solver_tdm)
@@ -568,7 +677,11 @@ def _solver_options_for_task(
 ) -> dict[str, Any]:
     method = task.method
     hens = problem.master_zone.config.hens
-    if method == HeatExchangerNetworkDesignMethod.PinchDesign:
+    if _solver_for_task(problem, method) != _configured_solver(hens, method):
+        # Every option given, for the method or the task, is for the
+        # configured solver.
+        return {}
+    if method in _PINCH_DESIGN_METHODS:
         base_options = dict(hens.solver_options_pdm)
     elif method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         base_options = dict(hens.solver_options_tdm)
@@ -590,62 +703,20 @@ def _evolution_options(
     max_parallel: int,
 ) -> dict[str, int | None]:
     hens = problem.master_zone.config.hens
-    tier = int(getattr(hens, "synthesis_quality_tier", 1))
+    search = resolve_search(hens)
     task_settings = task.settings or {}
-    pathway_options = _pathway_evolution_options(task)
     return {
         "n_ad_branches": int(
-            task_settings.get(
-                "evolution_n_ad_branches",
-                pathway_options.get(
-                    "n_ad_branches",
-                    _branch_breadth(
-                        getattr(hens, "evm_n_ad_branches", None),
-                        tier=tier,
-                    ),
-                ),
-            )
+            task_settings.get("evolution_n_ad_branches", search.evm_n_ad_branches)
         ),
         "n_rm_branches": int(
-            task_settings.get(
-                "evolution_n_rm_branches",
-                pathway_options.get(
-                    "n_rm_branches",
-                    _branch_breadth(
-                        getattr(hens, "evm_n_rm_branches", None),
-                        tier=tier,
-                    ),
-                ),
-            )
+            task_settings.get("evolution_n_rm_branches", search.evm_n_rm_branches)
         ),
         "max_parallel": max(1, int(max_parallel)),
         "no_improvement_patience": _optional_int(
-            task_settings.get(
-                "evolution_no_improvement_patience",
-                pathway_options.get("no_improvement_patience"),
-            )
+            task_settings.get("evolution_no_improvement_patience")
         ),
         "beam_width": max(1, int(getattr(hens, "evm_beam_width", 4) or 4)),
-    }
-
-
-def _branch_breadth(value: int | None, *, tier: int) -> int:
-    if value is not None:
-        return max(1, int(value))
-    return tier_evm_branch_breadth(tier)
-
-
-def _pathway_evolution_options(
-    task: HeatExchangerNetworkSynthesisTask,
-) -> dict[str, int | None]:
-    pathways = pathways_from_metadata(task.metadata)
-    if not pathways:
-        return {}
-    first = pathways[0]
-    return {
-        "n_ad_branches": first.evm_n_ad_branches,
-        "n_rm_branches": first.evm_n_rm_branches,
-        "no_improvement_patience": first.evm_no_improvement_patience,
     }
 
 

@@ -21,7 +21,7 @@ def _task(index: int) -> HeatExchangerNetworkSynthesisTask:
     return HeatExchangerNetworkSynthesisTask(
         run_id=f"task-{index}",
         method="pinch_design_method",
-        approach_temperature=10.0 + index,
+        dt_cont_multiplier=1.0 + index,
     )
 
 
@@ -42,7 +42,7 @@ def stub_solves(monkeypatch):
 
     def solve(worker_args):
         task = worker_args[0]
-        cost = 100.0 - 10.0 * task.approach_temperature + 100.0
+        cost = 110.0 - 10.0 * task.dt_cont_multiplier
         return (
             task,
             HeatExchangerNetworkSynthesisTaskOutcome(

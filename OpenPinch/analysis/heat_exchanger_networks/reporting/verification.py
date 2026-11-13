@@ -216,13 +216,15 @@ def _check_minimum_approach(
     """Check each match against its own required approach.
 
     The solver requires each pair (i, j) to keep its own approach dT_r, the
-    sum of the two streams' contributions, not the global dTmin. A network
+    sum of the two streams' contributions, not one global approach. A network
     with a low-dt_cont stream at its own approach is valid; a pair below its
-    own approach is not, even when that is above dTmin. Heaters and coolers
-    are checked against their utility's approach when the network records it.
+    own approach is not, even when that is above the others'. Heaters and
+    coolers are checked against their utility's approach when the network
+    records it. A recovery match without its own falls back to
+    ``minimum_recovery_approach`` when the network records one.
     """
     metadata = network.source_metadata
-    d_tmin = _optional_float(metadata.get("solver_dTmin"))
+    d_tmin = _optional_float(metadata.get("minimum_recovery_approach"))
     required = {
         HeatExchangerKind.RECOVERY: _pair_minimum_approaches(network, period_id),
         HeatExchangerKind.HOT_UTILITY: _pair_minimum_approaches(

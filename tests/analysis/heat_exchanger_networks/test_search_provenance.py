@@ -1,4 +1,4 @@
-"""What a HEN result records about the stages and quality tier that ran."""
+"""What a HEN result records about the stages and search levels that ran."""
 
 from __future__ import annotations
 
@@ -9,9 +9,6 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
-)
-from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
-    tier_pathways,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     workflow_settings_from_problem,
@@ -35,11 +32,13 @@ from .test_full_sequence import (
     ("run_design", "expected_sequence"),
     [
         (
-            lambda design: design.heat_exchanger_network(),
-            ("pinch_design_method", "network_evolution_method"),
+            # Depth 1 given in the call runs its heuristic, over the small
+            # problem's stored HENS_HEURISTIC_PDM_NETWORKS of 0.
+            lambda design: design.heat_exchanger_network(depth=1),
+            ("heuristic_pinch_design_method", "network_evolution_method"),
         ),
         (
-            lambda design: design.open_hens(),
+            lambda design: design.heat_exchanger_network(),
             (
                 "pinch_design_method",
                 "thermal_derivative_method",
@@ -47,7 +46,7 @@ from .test_full_sequence import (
             ),
         ),
     ],
-    ids=["tier-0", "tier-1"],
+    ids=["depth-1", "depth-2"],
 )
 def test_manifest_method_sequence_records_the_stages_that_ran(
     monkeypatch,
@@ -128,110 +127,63 @@ def test_manifest_method_sequence_omits_an_evolution_stage_couenne_could_not_run
     )
 
 
-_TIER = "HENS_SYNTHESIS_QUALITY_TIER"
+_DEPTH = "HENS_SEARCH_DEPTH"
 
 
 @pytest.mark.parametrize(
-    ("stored_options", "run_design", "expected_tier"),
+    ("stored_options", "run_design", "expected_depth"),
     [
-        ({}, lambda design: design.heat_exchanger_network(), 0),
-        ({}, lambda design: design.enhanced_heat_exchanger_network(), 2),
-        (
-            {_TIER: 4},
-            lambda design: design.enhanced_heat_exchanger_network(quality_tier=0),
-            0,
-        ),
-        ({}, lambda design: design.heat_exchanger_network(options={_TIER: 3}), 3),
-        ({_TIER: 3}, lambda design: design.heat_exchanger_network(), 3),
-        ({_TIER: 3}, lambda design: design.open_hens(), 1),
-        ({}, lambda design: design.open_hens(options={_TIER: 3}), 1),
+        ({}, lambda design: design.heat_exchanger_network(), 2),
+        ({_DEPTH: 4}, lambda design: design.heat_exchanger_network(depth=0), 0),
+        ({}, lambda design: design.heat_exchanger_network(options={_DEPTH: 3}), 3),
+        ({_DEPTH: 3}, lambda design: design.heat_exchanger_network(), 3),
     ],
-    ids=[
-        "default-tier-0",
-        "enhanced-default-tier-2",
-        "argument-beats-stored",
-        "call-option",
-        "stored-option",
-        "open-hens-ignores-stored",
-        "open-hens-ignores-call-option",
-    ],
+    ids=["fixture-depth", "argument-beats-stored", "call-option", "stored-option"],
 )
-def test_provenance_settings_record_the_quality_tier_that_ran(
+def test_provenance_settings_record_the_depth_that_ran(
     monkeypatch,
     stored_options: dict,
     run_design,
-    expected_tier: int,
+    expected_depth: int,
 ) -> None:
     _use_fake_default_executor(monkeypatch)
 
     design = run_design(_small_problem_with_options(stored_options).design)
 
-    assert design.result.provenance.effective_settings[_TIER] == expected_tier
-    assert design.result.manifest.synthesis_quality_tier == expected_tier
+    assert design.result.provenance.effective_settings[_DEPTH] == expected_depth
+    assert design.result.manifest.search_depth == expected_depth
 
 
-def _evolution_breadths(problem, tasks) -> dict[tuple[str, ...], tuple[int, int]]:
-    breadths = {}
+def _evolution_breadths(problem, tasks) -> set[tuple[int, int, int | None]]:
+    breadths = set()
     for task in tasks:
         if task.method != HeatExchangerNetworkDesignMethod.NetworkEvolution:
             continue
         options = _evolution_options(problem, task, max_parallel=1)
-        breadths[tuple(task.metadata["pathway_ids"])] = (
-            options["n_ad_branches"],
-            options["n_rm_branches"],
+        breadths.add(
+            (
+                options["n_ad_branches"],
+                options["n_rm_branches"],
+                options["no_improvement_patience"],
+            )
         )
     return breadths
 
 
-@pytest.mark.parametrize("tier", range(6))
-def test_breadth_options_apply_on_every_route_and_manifest_agrees(tier: int) -> None:
-    problem = _small_problem_with_options(
-        {
-            "HENS_SYNTHESIS_QUALITY_TIER": tier,
-            "HENS_EVM_N_AD_BRANCHES": 2,
-            "HENS_EVM_N_RM_BRANCHES": 3,
-        }
-    )
-
-    result = execute_open_hens_method(
-        problem,
-        workflow_settings_from_problem(problem),
-        executor=FakeSynthesisExecutor(),
-    )
-
-    manifest = result.accepted_result.manifest
-    breadths = _evolution_breadths(problem, result.tasks)
-    assert breadths
-    assert set(breadths.values()) == {(2, 3)}
-    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (2, 3)
-
-
-@pytest.mark.parametrize("tier", [0, 1])
 @pytest.mark.parametrize(
-    ("options", "expected_patience"),
-    [({}, None), ({"HENS_EVM_N_AD_BRANCHES": 2}, 2)],
+    ("options", "expected"),
+    [
+        ({_DEPTH: 2}, {(1, 1, None)}),
+        ({_DEPTH: 3}, {(2, 2, 2)}),
+        ({_DEPTH: 4}, {(3, 3, 2)}),
+        ({_DEPTH: 4, "HENS_EVM_N_AD_BRANCHES": 1}, {(1, 3, 2)}),
+        ({_DEPTH: 2, "HENS_EVM_N_RM_BRANCHES": 2}, {(1, 2, 2)}),
+    ],
 )
-def test_tier_zero_and_one_routes_prune_only_when_widened(
-    tier: int,
-    options: dict[str, int],
-    expected_patience: int | None,
+def test_every_evolution_task_and_the_manifest_use_the_depth_breadth(
+    options: dict, expected: set
 ) -> None:
-    problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": tier, **options}
-    )
-
-    pathways = tier_pathways(workflow_settings_from_problem(problem))
-
-    assert pathways
-    assert {pathway.evm_no_improvement_patience for pathway in pathways} == {
-        expected_patience
-    }
-
-
-def test_protected_routes_stay_at_one_by_default_while_manifest_reports_widest() -> (
-    None
-):
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    problem = _small_problem_with_options(options)
 
     result = execute_open_hens_method(
         problem,
@@ -239,25 +191,17 @@ def test_protected_routes_stay_at_one_by_default_while_manifest_reports_widest()
         executor=FakeSynthesisExecutor(),
     )
 
+    assert _evolution_breadths(problem, result.tasks) == expected
     manifest = result.accepted_result.manifest
-    breadths = _evolution_breadths(problem, result.tasks)
-    assert set(breadths.values()) == {(1, 1), (2, 2)}
-    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (2, 2)
+    ((n_ad, n_rm, _patience),) = expected
+    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (n_ad, n_rm)
 
 
 @pytest.mark.parametrize(
     "missing_for", ["pinch_design_method", "thermal_derivative_method"]
 )
-def test_couenne_fallback_follows_the_breadth_options_and_manifest_agrees(
-    missing_for: str,
-) -> None:
-    problem = _small_problem_with_options(
-        {
-            "HENS_SYNTHESIS_QUALITY_TIER": 1,
-            "HENS_EVM_N_AD_BRANCHES": 2,
-            "HENS_EVM_N_RM_BRANCHES": 3,
-        }
-    )
+def test_couenne_fallback_evolution_uses_the_depth_breadth(missing_for: str) -> None:
+    problem = _small_problem_with_options({_DEPTH: 3})
 
     with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
         result = execute_open_hens_method(
@@ -266,14 +210,4 @@ def test_couenne_fallback_follows_the_breadth_options_and_manifest_agrees(
             executor=_NoCouenneForMethod(missing_for),
         )
 
-    manifest = result.accepted_result.manifest
-    evolution_tasks = [
-        task
-        for task in result.tasks
-        if task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
-    ]
-    assert evolution_tasks
-    for task in evolution_tasks:
-        options = _evolution_options(problem, task, max_parallel=1)
-        assert (options["n_ad_branches"], options["n_rm_branches"]) == (2, 3)
-    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (2, 3)
+    assert _evolution_breadths(problem, result.tasks) == {(2, 2, 2)}

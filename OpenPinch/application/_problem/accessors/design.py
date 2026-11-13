@@ -6,8 +6,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from ..arguments import (
-    ArgumentSpec,
-    resolve_effective_arguments,
     split_runtime_and_configuration_options,
     temporary_zone_configuration,
 )
@@ -20,6 +18,16 @@ if TYPE_CHECKING:
     )
     from ....domain.heat_exchanger_network import HeatExchangerNetwork
     from ...problem import PinchProblem
+
+
+# Options a search level sets when they are unset (execution/search.py).
+_WIDTH_OPTIONS = ("HENS_DT_CONT_MULTIPLIERS",)
+_DEPTH_OPTIONS = (
+    "HENS_HEURISTIC_PDM_NETWORKS",
+    "HENS_PDM_MILP",
+    "HENS_EVM_N_AD_BRANCHES",
+    "HENS_EVM_N_RM_BRANCHES",
+)
 
 
 class UtilityChoiceError(ValueError):
@@ -216,7 +224,8 @@ class _DesignAccessor:
         *,
         options: Mapping[str, Any] | None,
         period_id: str | None,
-        approach_temperatures=None,
+        width=None,
+        depth=None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -231,7 +240,8 @@ class _DesignAccessor:
         runtime, configuration = split_runtime_and_configuration_options(options)
         named: dict[str, Any] = {}
         for key, value in (
-            ("HENS_APPROACH_TEMPERATURES", approach_temperatures),
+            ("HENS_SEARCH_WIDTH", width),
+            ("HENS_SEARCH_DEPTH", depth),
             ("HENS_DT_CONT_MULTIPLIERS", dt_cont_multipliers),
             ("HENS_DERIVATIVE_THRESHOLDS", derivative_thresholds),
             ("HENS_STAGE_SELECTION", stages),
@@ -248,29 +258,19 @@ class _DesignAccessor:
             for key in ("HENS_SOLVER_PDM", "HENS_SOLVER_TDM", "HENS_SOLVER_EVM"):
                 named[key] = solver
         configuration.update(named)
+        # A level asked for in the call, as an argument or in its options,
+        # sets the options it governs over the stored ones, unless the call
+        # sets them too.
+        for level, governed in (
+            ("HENS_SEARCH_WIDTH", _WIDTH_OPTIONS),
+            ("HENS_SEARCH_DEPTH", _DEPTH_OPTIONS),
+        ):
+            if level in configuration:
+                for key in governed:
+                    configuration.setdefault(key, None)
         if period_id is not None:
             runtime["period_id"] = period_id
         return runtime, configuration
-
-    def _quality_tier(
-        self,
-        configuration: Mapping[str, Any],
-        *,
-        default: int,
-        named: int | None = None,
-    ) -> int:
-        """Resolve a call's tier; the field default of 1 does not count as set."""
-        effective = resolve_effective_arguments(
-            {
-                "quality_tier": ArgumentSpec(
-                    "HENS_SYNTHESIS_QUALITY_TIER", default=default
-                )
-            },
-            named={} if named is None else {"quality_tier": named},
-            options=configuration,
-            config_values=self._problem.to_problem_json().get("options"),
-        )
-        return effective.values["quality_tier"]
 
     def _run(self, service, *, surface, runtime, configuration, **service_kwargs):
         from ....domain.enums import StreamLoc
@@ -294,11 +294,6 @@ class _DesignAccessor:
                 else tuple(root.period_ids)
             )
             settings = {**root.config._values, **configuration, **runtime}
-            # The configuration keeps its tier; the service may run another one.
-            if result.manifest is not None:
-                settings["HENS_SYNTHESIS_QUALITY_TIER"] = (
-                    result.manifest.synthesis_quality_tier
-                )
             result.provenance = make_provenance(
                 isolated,
                 "design." + surface,
@@ -325,9 +320,10 @@ class _DesignAccessor:
     def heat_exchanger_network(
         self,
         *,
+        width: int | None = None,
+        depth: int | None = None,
         options: Mapping[str, Any] | None = None,
         period_id: str | None = None,
-        approach_temperatures=None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -337,24 +333,35 @@ class _DesignAccessor:
         best_solutions=None,
         solve_tolerance=None,
     ) -> HeatExchangerNetworkDesignView:
-        """Run the default HEN synthesis workflow.
+        """Run HEN synthesis at a search width and depth.
 
-        It runs quality tier 0 unless ``HENS_SYNTHESIS_QUALITY_TIER`` is set.
+        ``width`` (``HENS_SEARCH_WIDTH``, 0 to 3, default 1) picks the dt_cont
+        multipliers: 1.0; 0.75, 1.0 and 1.5; then five and seven values from
+        0.5 to 2.0. ``depth`` (``HENS_SEARCH_DEPTH``, 0 to 4, default 1) picks
+        the stages and their effort: 0 is the heuristic pinch design method
+        alone, 1 adds network evolution, 2 adds the MILP pinch design method
+        and the thermal derivative method, and 3 and 4 add more networks and
+        wider evolution. An option set explicitly, such as
+        ``dt_cont_multipliers`` or ``HENS_HEURISTIC_PDM_NETWORKS``, overrides
+        the level.
 
-        ``approach_temperatures`` sets the pinch design step's approach. The
-        later thermal derivative and evolution steps choose each exchanger's
-        approach by total annual cost, down to 0.1 K, or down to
-        ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times the
-        requested approach if that is larger.
+        Each multiplier scales every stream's and utility's ΔT contribution as
+        a zone dt_cont multiplier does in targeting, so 1.0 designs at the
+        targeting contributions. The pinch design step keeps those
+        contributions; the later thermal derivative and evolution steps choose
+        each exchanger's approach by total annual cost, down to 0.1 K, or down
+        to ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times twice
+        the scaled ``THERMAL_DT_CONT`` if that is larger.
         """
         from ....analysis.heat_exchanger_networks.service import (
-            _heat_exchanger_network_enhanced_synthesis_method_service,
+            heat_exchanger_network_open_hens_method_service,
         )
 
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
-            approach_temperatures=approach_temperatures,
+            width=width,
+            depth=depth,
             dt_cont_multipliers=dt_cont_multipliers,
             derivative_thresholds=derivative_thresholds,
             stages=stages,
@@ -365,63 +372,22 @@ class _DesignAccessor:
             solve_tolerance=solve_tolerance,
         )
         return self._run(
-            _heat_exchanger_network_enhanced_synthesis_method_service,
+            heat_exchanger_network_open_hens_method_service,
             surface="heat_exchanger_network",
-            runtime=runtime,
-            configuration=configuration,
-            quality_tier=self._quality_tier(configuration, default=0),
-            workspace_variant=None,
-        )
-
-    def enhanced_heat_exchanger_network(
-        self,
-        *,
-        quality_tier: int | None = None,
-        options: Mapping[str, Any] | None = None,
-        period_id: str | None = None,
-        **kwargs,
-    ) -> HeatExchangerNetworkDesignView:
-        """Run enhanced OpenHENS synthesis at a chosen quality tier.
-
-        ``quality_tier`` wins, then ``HENS_SYNTHESIS_QUALITY_TIER`` if set, then 2.
-        """
-        from ....analysis.heat_exchanger_networks.service import (
-            _heat_exchanger_network_enhanced_synthesis_method_service,
-        )
-
-        runtime, configuration = self._arguments(
-            options=options, period_id=period_id, **kwargs
-        )
-        return self._run(
-            _heat_exchanger_network_enhanced_synthesis_method_service,
-            surface="enhanced_heat_exchanger_network",
-            runtime=runtime,
-            configuration=configuration,
-            quality_tier=self._quality_tier(
-                configuration, default=2, named=quality_tier
-            ),
-            workspace_variant=None,
-        )
-
-    def open_hens(self, *, options=None, period_id=None, **kwargs):
-        """Run the tier-one OpenHENS PDM -> TDM -> EVM workflow."""
-        from ....analysis.heat_exchanger_networks.service import (
-            heat_exchanger_network_open_hens_method_service,
-        )
-
-        runtime, configuration = self._arguments(
-            options=options, period_id=period_id, **kwargs
-        )
-        return self._run(
-            heat_exchanger_network_open_hens_method_service,
-            surface="open_hens",
             runtime=runtime,
             configuration=configuration,
             workspace_variant=None,
         )
 
     def pinch_design(self, *, options=None, period_id=None, **kwargs):
-        """Run the pinch design method only."""
+        """Run the pinch design method only.
+
+        The heuristic (Linnhoff rules) method makes up to
+        ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier. The
+        MILP method adds its networks from search depth 2 or with
+        ``HENS_PDM_MILP``, and runs in the heuristic's place at any multiplier
+        where the heuristic realises no network.
+        """
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_pinch_design_method_service,
         )
@@ -596,7 +562,7 @@ class _DesignAccessor:
         remaining exchanger carries duty. The result names removed exchangers
         in ``selected_network.summary_metrics["removed_exchangers"]``.
 
-        Requires the optional synthesis dependencies (GEKKO and the configured
+        Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (

@@ -204,12 +204,186 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- The flow-on (alpha) values that rank candidate exchangers in network
-  evolution are now solved directly as one sparse linear system instead of a
-  separate APOPT model per call. Results match the APOPT solve to within
-  1e-11, and on the four-stream example the alpha solves take 0.08 s instead
-  of 9 s. A system with no unique solution in [-1, 1] still falls back to
-  neutral alpha.
+- Synthesis now searches in two directions instead of by quality tier.
+  ``HENS_SEARCH_WIDTH`` (0 to 3, default 1) picks the dt_cont multipliers:
+  1.0; 0.75, 1.0 and 1.5; five values from 0.5 to 2.0; or seven.
+  ``HENS_SEARCH_DEPTH`` (0 to 4, default 1) picks the stages and their effort:
+  0 is the heuristic pinch design method alone; 1 adds network evolution; 2
+  adds the MILP pinch design method and the thermal derivative method; 3 and
+  4 make more heuristic networks, seed evolution with every MILP network and
+  evolve more widely. An option set explicitly (``HENS_DT_CONT_MULTIPLIERS``,
+  ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
+  ``HENS_EVM_N_AD_BRANCHES``, ``HENS_EVM_N_RM_BRANCHES``) overrides its
+  level, and those options now default to unset. ``design.heat_exchanger_network()``
+  takes ``width`` and ``depth``; a level given in the call also overrides the
+  stored options it governs, unless the call sets them. The default run (width
+  1, depth 1) sweeps three multipliers with the heuristic pinch design method
+  and evolution, where tier 0 ran one multiplier with the MILP.
+- Removed: ``HENS_SYNTHESIS_QUALITY_TIER``,
+  ``design.enhanced_heat_exchanger_network()``, ``design.open_hens()`` and the
+  tier pathways (protected and expanded routes, compact and raw pinch design
+  modes). The manifest records ``search_width`` and ``search_depth`` in place
+  of ``synthesis_quality_tier`` and the ``selected_pathway_*``,
+  ``selected_pdm_mode``, ``selected_tier_origin`` and
+  ``selected_protected_pathway`` fields. The Excel input template lists the
+  new options.
+- The pinch design step uses a heuristic pinch design method by default, in
+  ``problem.design.pinch_design()`` and in the main workflow (networks
+  labelled ``heuristic_pinch_design_method``). It proposes networks with the
+  Linnhoff pinch design rules: pinch matches by the CP and number-of-streams
+  rules, stream splits where they fail (as many branches as the partner CPs
+  need), tick-off, then matches away from the pinch, the stream nearest the
+  pinch first, and utilities on every partner stream. It enumerates the
+  alternatives at each decision up to a cap, streams of similar CP first
+  (smallest ``|ln(CP_hot / CP_cold)|``). The pinch design side models realise
+  each proposal with only its matches allowed, solved with HiGHS when
+  highspy is installed whatever ``HENS_SOLVER_PDM`` names, so duties,
+  segmented streams, several utilities and multiperiod cases are handled as
+  in the MILP; a multiperiod proposal is the union of one design per period.
+  Split branches mix at one temperature in the side model, so a split that
+  cannot keep its approach that way is also allowed the next stage out.
+  Proposals that cannot be solved or verified are dropped.
+  ``HENS_HEURISTIC_PDM_NETWORKS`` (10 at depths 0 to 2) caps the networks per
+  dt_cont multiplier. Heuristic networks seed network evolution directly,
+  never the thermal derivative method. ``method="heuristic_pinch_design_method"``
+  is not a design method of its own: the service raises ``ValueError``.
+- The MILP pinch design method runs at every multiplier from depth 2 or with
+  ``HENS_PDM_MILP``, alone with ``HENS_HEURISTIC_PDM_NETWORKS`` at 0, and at
+  any depth in the heuristic's place at a multiplier where the heuristic
+  realises no network. From depth 2 its main networks go through the thermal
+  derivative method; otherwise its networks seed evolution directly.
+- A MILP pinch design side's first, minimum-utility solve stops after 600 s
+  unless ``HENS_SOLVER_OPTIONS_PDM`` sets a limit (a limit set there also
+  replaces the 60 s fewest-units and minimum-unit limits). With HiGHS its best
+  network is then kept as an unconverged result (it seeds later steps but is
+  left out of the ranking), and no extra minimum-unit networks are built on
+  it.
+- Each MILP pinch design side is re-solved for the fewest units (matches,
+  heaters and coolers) among those its minimum-utility solve used, at the same
+  utility. Minimum utility cost leaves the match binaries free once the targets
+  are met, so a solver can keep many matches the network does not need (on the
+  pulp mill, thousands of below-pinch matches under 1 kW). The re-solve starts
+  from the first solution, stops after 60 s with the best network found, and
+  replaces the side only if it converged (or is a HiGHS solve with an
+  incumbent) with no more units or utility.
+- The MILP pinch design method runs in the heuristic's place at a multiplier
+  where every heuristic network is left out of the result (it stopped before
+  converging, or fails the feasibility check), not only where none was
+  realised. When no converged network remains because a solve stopped at a
+  solver limit, the ``WorkflowContractError`` names the options that raise
+  the limit (``HENS_SOLVER_OPTIONS_PDM``, ``_TDM`` or ``_EVM``).
+- The MILP pinch design method can return several networks per dt_cont
+  multiplier. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks with
+  the fewest units at the minimum utility cost to collect, and
+  ``HENS_PDM_EXTRA_UNIT_NETWORKS`` how many with one unit more (both 0 by
+  default and independent of the depth). No-good cuts exclude each topology
+  found, each solve is time-limited, the one-more-unit quota is filled after
+  the minimum one and counts from the fewest units a side can have, and an
+  extra network drops only its empty
+  stages, so it stays at minimum utility. Every extra network is a pinch
+  design result of its own and seeds network evolution directly. Collecting
+  them needs an integer solver (``highs``, ``couenne``, ``scip`` or
+  ``mindtpy``), and a failure while collecting them keeps the main network.
+- ``design.thermal_derivative()`` and ``design.network_evolution()`` called
+  without ``initial_networks`` seed from the stored design of any HEN method,
+  not only from a pinch design (for the thermal derivative method) or a
+  thermal derivative design (for network evolution). They seed from the
+  selected network and the design's other ranked topologies, up to
+  ``HENS_BEST_SOLUTIONS_TO_SAVE`` networks, and drop repeated topologies. A
+  network without a recorded multiplier runs at 1.0 when it is configured.
+- Heat exchanger network synthesis is keyed on a dt_cont multiplier instead
+  of an approach temperature. Each multiplier scales every stream's,
+  segment's and utility's effective ΔT contribution, as a zone ``dt_cont``
+  multiplier does in targeting, so 1.0 designs at the contributions the pinch
+  targets use (the old 14 K default ran at 1.4 times them). A stream whose
+  ``dt_cont`` multiplier is locked keeps its own contribution, as in
+  targeting. A contribution of 0 runs at 0.1 K times the multiplier (0.1 K
+  for a locked stream) instead of half the approach temperature.
+  ``HENS_APPROACH_TEMPERATURES`` is removed and is now an unknown option, and
+  the design accessor's ``approach_temperatures`` argument is gone. Synthesis
+  tasks, outcomes, manifests and networks record ``dt_cont_multiplier``
+  (manifests ``dt_cont_multipliers``) and no longer an approach temperature or
+  ``solver_dTmin`` (a duty-optimised network records its least recovery
+  approach as ``minimum_recovery_approach``). To convert an
+  approach-temperature grid, use multiplier = dTmin / (2 x
+  ``THERMAL_DT_CONT``), so 14 K at the 5 K default is 1.4. The OpenHENS
+  fixtures are converted this way and solve as before; the packaged
+  four-stream sample now uses the default multipliers, derivative thresholds
+  and pinch design solver.
+- Every heat exchanger network model is now a native Pyomo model. ``apopt``
+  and ``ipopt-GEKKO`` are no longer accepted solver names, and any name other
+  than ``highs``, ``couenne``, ``ipopt-pyomo``, ``scip`` or ``mindtpy`` raises
+  ``MissingSynthesisSolverError`` listing them. The APOPT solver options
+  (``minlp_*``, ``nlp_maximum_iterations`` and the like) are no longer
+  accepted, and the ``synthesis`` and ``full`` extras no longer install
+  ``gekko``. Large cases no longer fail in GEKKO's recursive conversion (the
+  pulp mill failed with "maximum recursion depth exceeded" before any solve).
+  A solve that ends without a solution ("noSolution" or "unbounded") is a
+  failed solve, so its start values are never ranked as a network.
+- ``highs`` is a new pinch design method solver and the new default for
+  ``HENS_SOLVER_PDM`` (it was ``couenne``): the HiGHS MILP solver, run in
+  process through ``highspy``, which the ``synthesis`` extra now installs. It
+  needs no executable, and HiGHS options (``time_limit``, ``mip_rel_gap``,
+  ``mip_abs_gap``, ``threads`` and tolerances) are accepted. HiGHS proves the
+  same optimum as Couenne on the pinch design model and is much faster on
+  large cases, but it can return a different network among those with the
+  same objective. A pinch design model that is not linear is solved with
+  Couenne instead, with a logged warning, keeping a time limit. Setting
+  ``HENS_SOLVER_PDM`` to ``couenne`` uses Couenne for the MILP pinch design
+  method; the closest to the previous default design also needs
+  ``HENS_HEURISTIC_PDM_NETWORKS: 0`` and ``HENS_DT_CONT_MULTIPLIERS: [1.4]``,
+  and the heuristic method always uses HiGHS when it is installed.
+- ``scip`` and ``mindtpy`` are new solver names, intended for the thermal
+  derivative method (``HENS_SOLVER_TDM``). ``scip`` is the SCIP global MINLP
+  solver through ``pyscipopt``, which the ``synthesis`` extra now installs.
+  ``mindtpy`` is Pyomo's MindtPy outer approximation, with HiGHS for the MILP
+  masters and Ipopt for the NLP subproblems. SCIP limits (``limits/time``,
+  ``limits/gap``) and MindtPy settings (``strategy``, ``iteration_limit``) are
+  accepted solver options. The default stays ``couenne``.
+- Each pinch design model has exactly one objective. With more than one hot or
+  cold utility on a side, two objectives were passed and Couenne and Ipopt
+  optimised only the first, utility cost. The utility goals keep that
+  behaviour, now stated directly; "heat recovery" now minimises utility cost
+  plus the heat left unrecovered, and "min units" utility cost plus the number
+  of units.
+- The pinch design method switches each recovery, heater and cooler duty on
+  with a big-M constraint, ``Q <= Q_max * z``, where it required
+  ``Q * (1 - z) = 0``. The model is now linear for unsegmented streams, and its
+  relaxation is tighter. A solver can pick a different network among those
+  with the same objective: on the four-stream example the best network has
+  the same units and TAC in 2 stages instead of 3.
+- Stage reduction no longer uses APOPT: the reduced network is solved with
+  HiGHS when its model is linear and with Ipopt otherwise, for minimum utility
+  cost when the case has a choice of utilities. A missing solver, or a
+  reduction that would leave no stage, keeps the unreduced network.
+- In network evolution's relaxed model, a heater or cooler switched off by the
+  warm start could still carry duty with its approach relaxed by big-M, so on
+  Nine-stream Linnhoff-Ahmad every evolved network failed verification. Its
+  duty is now bounded by its binary, and after the warm start every allowed
+  heater or cooler that can sit idle within its approach is switched back on,
+  so evolution can still add a utility the parent lacked. A warning says when
+  every evolution task fails, so the result was not evolved.
+- In multiperiod evolution, a shared exchanger area at zero (a unit with no
+  duty) made the area cost's derivative infinite and stopped Ipopt; a 1e-8 m2
+  offset under the cost exponent removes it.
+- Network evolution starts each candidate from its parent network's solution,
+  then adds or removes the match, where each candidate started from default
+  values. The flow-on (alpha) values that rank candidates are solved as one
+  sparse linear system (0.08 s instead of 9 s on the four-stream example)
+  without storing the zero coefficients of inactive matches, which made the
+  pulp mill's factorisation run for over 20 minutes. A system with no unique
+  solution in [-1, 1] still falls back to neutral alpha.
+- The stage-wise models' Chen LMTD approximation no longer takes the cube root
+  of a negative number: a heater or cooler at zero duty leaves its approach
+  temperatures free, so the base now passes through a smooth max with zero.
+- ``ipopt-pyomo`` now defaults to ``bound_push`` and ``bound_frac`` of 1e-6
+  (Ipopt's own default is 1e-2, relative to each bound, which is about 3.5 K at
+  350 K and moves a warm start off its solved temperatures). Options set in
+  ``HENS_SOLVER_OPTIONS_EVM`` or ``HENS_SOLVER_OPTIONS_TDM`` take precedence.
+  Ipopt options now go on its command line rather than into an ``ipopt.opt``
+  file, so parallel evolution solves no longer wait on each other.
+- Duty optimisation without ``min_approach_temperature`` runs at multiplier
+  1.0 when it is configured, as it is at every search width.
 
 0.8.3 (2026-11-11)
 ------------------

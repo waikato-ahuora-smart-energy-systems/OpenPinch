@@ -20,7 +20,6 @@ from OpenPinch.analysis.heat_exchanger_networks.errors import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution import (
     fallbacks,
-    pathways,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
@@ -28,11 +27,8 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     _first_stream,
     _temperature,
 )
-from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
-    pathways_from_metadata,
-)
 from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
-    approach_temperature_from_network,
+    dt_cont_multiplier_from_network,
 )
 from OpenPinch.analysis.heat_exchanger_networks.extraction import (
     metadata as extraction_metadata,
@@ -97,7 +93,7 @@ def _task(
         task_id=task_id,
         run_id="run-1",
         method=method,
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
         derivative_threshold=0.5,
         stage_count=1,
         parent_task_id=parent_task_id,
@@ -130,8 +126,8 @@ def _settings(**overrides):
         "problem_id": "problem-1",
         "workspace_variant": "baseline",
         "period_id": None,
-        "synthesis_quality_tier": 1,
-        "approach_temperatures": (10.0,),
+        "search_depth": 2,
+        "dt_cont_multipliers": (1.0,),
         "stage_selection": (1,),
         "evm_n_ad_branches": None,
         "evm_n_rm_branches": None,
@@ -145,10 +141,19 @@ def _settings(**overrides):
 
 
 class _Variable:
+    """A Pyomo-shaped variable."""
+
     def __init__(self, lower: float = -1e9, upper: float = 1e9):
-        self.lower = lower
-        self.upper = upper
-        self.VALUE = SimpleNamespace(value=None)
+        self.lb = lower
+        self.ub = upper
+        self.fixed = False
+        self.value = None
+
+    def is_variable_type(self) -> bool:
+        return True
+
+    def set_value(self, value, skip_validation: bool = False) -> None:
+        self.value = value
 
 
 class _IndexRejectingElement:
@@ -225,32 +230,6 @@ def test_couenne_fallback_predicates_reject_non_matching_inputs():
         )
         is False
     )
-
-
-def test_pathway_metadata_skips_invalid_items_and_uses_explicit_breadth():
-    metadata = {
-        "pathways": [
-            "not-a-pathway",
-            {
-                "pathway_id": "p1",
-                "tier_origin": 2,
-                "pathway_kind": "quality",
-                "pdm_mode": "compact",
-                "pdm_multiplier": None,
-                "uses_tdm": False,
-                "evm_n_ad_branches": 2,
-                "evm_n_rm_branches": 3,
-                "evm_no_improvement_patience": None,
-                "protected": False,
-            },
-        ]
-    }
-
-    rehydrated = pathways_from_metadata(metadata)
-
-    assert len(rehydrated) == 1
-    assert rehydrated[0].pathway_id == "p1"
-    assert pathways._branch_breadth(0, tier=5) == 1
 
 
 def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Path):
@@ -367,19 +346,6 @@ def test_result_building_and_seed_validation_edges(monkeypatch):
         seeds._normalise_seed_networks(())
     with pytest.raises(TypeError, match="HeatExchangerNetwork"):
         seeds._normalise_seed_networks((object(),))
-
-    problem = SimpleNamespace(
-        results=SimpleNamespace(
-            design=SimpleNamespace(method="pinch_design_method", network=seed_network)
-        )
-    )
-    with pytest.raises(ValueError, match="cached thermal_derivative_method"):
-        seeds.resolve_seed_networks(
-            problem,
-            None,
-            method_name="network_evolution_method",
-            cached_source_method="thermal_derivative_method",
-        )
 
 
 def test_service_context_solver_dependency_and_entry_guards(monkeypatch, tmp_path):
@@ -500,14 +466,12 @@ def test_network_evolution_task_edges(monkeypatch):
     )
     assert len(standard_tasks) == 1
 
-    assert evolution._evolution_task_settings(
-        n_ad_branches=2,
-        n_rm_branches=3,
-        no_improvement_patience=4,
+    assert evolution._run_breadth_settings(
+        _settings(effective_evm_n_ad_branches=2, effective_evm_n_rm_branches=3)
     ) == {
         "evolution_n_ad_branches": 2,
         "evolution_n_rm_branches": 3,
-        "evolution_no_improvement_patience": 4,
+        "evolution_no_improvement_patience": 2,
     }
 
     monkeypatch.setattr(
@@ -519,7 +483,7 @@ def test_network_evolution_task_edges(monkeypatch):
         targeting_stage, "canonical_topology_restrictions", lambda restrictions: ()
     )
     monkeypatch.setattr(
-        targeting_stage, "approach_temperature_from_network", lambda *_args: 10.0
+        targeting_stage, "dt_cont_multiplier_from_network", lambda *_args: 1.0
     )
     monkeypatch.setattr(
         targeting_stage, "topology_restriction_signature", lambda _restrictions: ()
@@ -532,7 +496,7 @@ def test_network_evolution_task_edges(monkeypatch):
     )
 
     seeded_tasks = evolution.build_seeded_network_evolution_method_tasks(
-        _settings(synthesis_quality_tier=2),
+        _settings(),
         (HeatExchangerNetwork(), HeatExchangerNetwork()),
     )
 
@@ -583,6 +547,8 @@ def test_internal_problem_error_and_pdm_print_paths():
 
     class FakeSide:
         side_required = True
+        # Unsolved, so no fewest-units re-solve follows.
+        mSuccess = 0
 
         def __init__(self):
             self.optimised = False
@@ -628,6 +594,8 @@ def test_pdm_amalgamated_case_keeps_an_unconverged_side_solve() -> None:
     def side(termination):
         return SimpleNamespace(
             side_required=True,
+            # Unsolved, so no fewest-units re-solve follows.
+            mSuccess=0,
             optimise=lambda print_output=True: None,
             solver_run=backend.SolverRun(
                 name="couenne", termination_condition=termination
@@ -635,7 +603,7 @@ def test_pdm_amalgamated_case_keeps_an_unconverged_side_solve() -> None:
         )
 
     amalgamated = SimpleNamespace(
-        solver_run=backend.SolverRun(name="apopt"),
+        solver_run=backend.SolverRun(name="couenne"),
         get_post_process=lambda: None,
     )
     problem = InternalHeatExchangerNetworkProblem(
@@ -658,6 +626,9 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
 ):
     class ReducedCase:
         def __init__(self, **kwargs):
+            self.solver = kwargs["solver"]
+            # Reduction picks HiGHS or Ipopt by the reduced model's linearity.
+            self.m = SimpleNamespace(is_linear=lambda: True)
             self.S = kwargs["stages"]
             self.I = 1
             self.J = 1
@@ -691,6 +662,8 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
         I=1,
         J=1,
         S=2,
+        NHU=1,
+        NCU=1,
         Q_r=[[[[10.0], [0.0]]]],
         z=[[[[1.0], [0.0]]]],
         theta_1=[[[[2.0], [0.0]]]],
@@ -739,12 +712,9 @@ def test_stagewise_recovery_binary_and_scalar_value_fallbacks():
     assert z_values == [[[1]]]
 
     assert stagewise_verification._value(7.5) == pytest.approx(7.5)
-    assert stagewise_verification._value(
-        SimpleNamespace(VALUE=SimpleNamespace(value=8.5))
-    ) == pytest.approx(8.5)
-    assert stagewise_verification._value(
-        SimpleNamespace(value=SimpleNamespace(value=[9.5]))
-    ) == pytest.approx(9.5)
+    assert stagewise_verification._value(SimpleNamespace(value=8.5)) == pytest.approx(
+        8.5
+    )
 
     class FloatOnly:
         def __float__(self):
@@ -935,15 +905,15 @@ def test_one_seed_network_json_is_one_seed():
     assert seeded == (HeatExchangerNetwork.model_validate(network.model_dump()),)
 
 
-def test_seed_network_json_keeps_the_approach_temperature_it_was_solved_at():
-    # source_metadata is not serialised, so a JSON seed must carry the solver
-    # dTmin in its summary metrics or seeded TDM/EVM tasks run at another one.
+def test_seed_network_json_keeps_the_dt_cont_multiplier_it_was_solved_at():
+    # source_metadata is not serialised, so a JSON seed must carry the
+    # multiplier in its summary metrics or seeded TDM/EVM tasks run at another.
     network = HeatExchangerNetwork(
         summary_metrics=extraction_metadata._summary_metrics(
-            SimpleNamespace(dTmin=14.0)
+            SimpleNamespace(), dt_cont_multiplier=1.4
         ),
-        source_metadata={"solver_dTmin": 14.0},
+        source_metadata={"dt_cont_multiplier": 1.4},
     )
     seed = HeatExchangerNetwork.model_validate(network.model_dump(mode="json"))
 
-    assert approach_temperature_from_network(seed, _settings()) == 14.0
+    assert dt_cont_multiplier_from_network(seed, _settings()) == 1.4

@@ -12,6 +12,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
 from ...indexing import build_index_grid
+from . import execution as _execution
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,11 @@ def _solve_flow_on_system(model) -> np.ndarray | None:
     right_hand_side = np.zeros(3 * count)
 
     def add(row: int, column: int, coefficient: float) -> None:
+        # Inactive matches give zero flow-on coefficients. Storing them makes
+        # the LU factorisation fill in: on a 64-stream network most of the
+        # matrix would be stored zeros.
+        if coefficient == 0.0:
+            return
         rows.append(row)
         columns.append(column)
         coefficients.append(coefficient)
@@ -134,7 +140,7 @@ def alpha_value(model, i: int, j: int, k: int) -> float:
 
     if len(model.alpha) == 0:
         return 1.0
-    return float(model.alpha[i][j][k][0])
+    return float(_execution._value(model.alpha[i][j][k]))
 
 
 def _recovery_grid_shape(model) -> tuple[int, int, int]:
@@ -151,7 +157,7 @@ def _recovery_indices(model):
 
 
 def _solved_value(value: Any) -> Any:
-    return value[0]
+    return _execution._value(value)
 
 
 def _unchanged(value: Any) -> Any:
@@ -240,8 +246,11 @@ def _set_postoptimisation_flow_fractions(model) -> None:
     """Set numeric flow fractions from a solved model's ``[value]`` arrays."""
 
     def flow_fraction(numerator: Callable[[], float], i: int, j: int, k: int):
-        if model.T_h[i][k][0] > model.T_c[j][k + 1][0]:
-            return numerator() / (model.T_h[i][k][0] - model.T_c[j][k + 1][0])
+        if _execution._value(model.T_h[i][k]) > _execution._value(model.T_c[j][k + 1]):
+            return numerator() / (
+                _execution._value(model.T_h[i][k])
+                - _execution._value(model.T_c[j][k + 1])
+            )
         return 0.0
 
     _set_flow_fraction_grids(model, _solved_value, flow_fraction)
@@ -251,16 +260,18 @@ def _set_postoptimisation_flow_fractions(model) -> None:
     )
     model.beta_h = build_index_grid(
         lambda i, j, k: (
-            model.Q_r[i][j][k][0] / model.Sum_Qr_is[i][k][0]
-            if model.Sum_Qr_is[i][k][0] > 0
+            _execution._value(model.Q_r[i][j][k])
+            / _execution._value(model.Sum_Qr_is[i][k])
+            if _execution._value(model.Sum_Qr_is[i][k]) > 0
             else 0.0
         ),
         _recovery_grid_shape(model),
     )
     model.beta_c = build_index_grid(
         lambda i, j, k: (
-            model.Q_r[i][j][k][0] / model.Sum_Qr_js[j][k][0]
-            if model.Sum_Qr_js[j][k][0] > 0
+            _execution._value(model.Q_r[i][j][k])
+            / _execution._value(model.Sum_Qr_js[j][k])
+            if _execution._value(model.Sum_Qr_js[j][k]) > 0
             else 0.0
         ),
         _recovery_grid_shape(model),

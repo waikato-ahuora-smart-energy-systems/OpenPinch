@@ -123,7 +123,7 @@ def _manifest_with_export_records(
     if base is None:
         return HeatExchangerNetworkSynthesisManifest(
             run_id=design.run_id,
-            approach_temperatures=(1.0,),
+            dt_cont_multipliers=(1.0,),
             derivative_thresholds=(1.0,),
             stage_selection=(design.stage_count or 1,),
             task_ids=tuple(

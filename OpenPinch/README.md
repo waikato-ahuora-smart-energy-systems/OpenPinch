@@ -24,7 +24,7 @@ The importable package. `PinchProblem` and `PinchWorkspace` are the only names e
 - Configuration keys are defined in one place. [domain/configuration_fields.py:CONFIG_FIELD_SPECS]
 
 ## Global Side Effects
-- Importing the package builds the Pint registry and installs it as the Pint application registry [domain/value.py:ureg]. File IO happens in `adapters`, the `presentation` exporters, `resources.py`, the `notebook` and `schema` subcommands in `__main__.py` [__main__.py:_schema_command], the TESPy performance-map adapter (a private temporary design-state file), and `analysis/heat_exchanger_networks` (synthesis result exports and GEKKO run directories). GEKKO solves, which launch external solvers, are confined to `analysis/heat_exchanger_networks`.
+- Importing the package builds the Pint registry and installs it as the Pint application registry [domain/value.py:ureg]. File IO happens in `adapters`, the `presentation` exporters, `resources.py`, the `notebook` and `schema` subcommands in `__main__.py` [__main__.py:_schema_command], the TESPy performance-map adapter (a private temporary design-state file), and `analysis/heat_exchanger_networks` (synthesis result exports and solver run directories). Solver runs, which launch external solvers, are confined to `analysis/heat_exchanger_networks`.
 
 ## System Verification
 - Run: `uv run --no-sync pytest tests/architecture`

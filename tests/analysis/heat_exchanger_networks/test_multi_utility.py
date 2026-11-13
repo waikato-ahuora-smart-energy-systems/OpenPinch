@@ -99,15 +99,22 @@ def _two_cold_utility_problem(hot_target: float, *, glycol_first: bool) -> Pinch
     )
 
 
+def _couenne_available() -> bool:
+    try:
+        require_solver_binary("couenne", purpose="multi-utility regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 def _solved_model(hot_target: float, *, glycol_first: bool):
-    pytest.importorskip("gekko")
     arrays = problem_to_solver_arrays(
         _two_cold_utility_problem(hot_target, glycol_first=glycol_first), D_TMIN
     )
     model = StageWiseModel(
         name=f"two-cold-utilities-{hot_target}",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=arrays,
         stages=1,
         dTmin=D_TMIN,
@@ -115,8 +122,8 @@ def _solved_model(hot_target: float, *, glycol_first: bool):
         min_dqda=0.0,
         minimisation_goal="total cost",
         non_isothermal_model=False,
-        # Relaxed match binaries: APOPT's branch and bound fails on the glycol
-        # case, which the relaxed model, IPOPT and Couenne all solve.
+        # Relaxed match binaries: with integer binaries Couenne reports this
+        # one-stage case infeasible, while the relaxed model solves.
         integers=False,
         tol=1e-6,
     )
@@ -133,13 +140,16 @@ def _cooler_duties(network) -> dict[str, float]:
     }
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _couenne_available()", reason="needs the couenne binary")
 @pytest.mark.parametrize("glycol_first", [False, True])
 @pytest.mark.parametrize(
     ("hot_target", "expected_utility"),
     [(30.0, "CW"), (5.0, "Glycol")],
 )
-def test_apopt_stagewise_cools_with_the_cheapest_feasible_utility(
+def test_couenne_stagewise_cools_with_the_cheapest_feasible_utility(
     hot_target, expected_utility, glycol_first
 ):
     model, arrays = _solved_model(hot_target, glycol_first=glycol_first)
@@ -205,7 +215,7 @@ def test_dairy_chilling_synthesis_cools_chilled_streams_with_glycol():
     problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
-        approach_temperatures=(5.0,),
+        dt_cont_multipliers=(0.5,),
         max_parallel=1,
     )
 
@@ -254,3 +264,66 @@ def test_a_user_utility_named_cu_stays_in_synthesis():
         "Cold Utility.CU",
         "Cold Utility.Glycol",
     }
+
+
+def _ipopt_available() -> bool:
+    try:
+        require_solver_binary("ipopt", purpose="multiperiod stage-wise model")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.synthesis
+# Building the stage-wise model checks for its solver, Ipopt.
+@pytest.mark.skipif("not _ipopt_available()", reason="needs the ipopt binary")
+def test_multiperiod_area_costs_have_a_finite_slope_at_zero_area():
+    # A shared area at zero, for a unit with no duty, made the area cost's
+    # derivative infinite, and Ipopt stopped on every evolution task of the
+    # dairy chilling case ("can't evaluate pow'(0,0.6)").
+    pyo = pytest.importorskip("pyomo.environ")
+    from pyomo.core.expr.calculus.derivatives import Modes, differentiate
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
+        StageWiseModel,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    problem = PinchProblem("dairy_chilling_multiperiod.json")
+    problem.target.all_heat_integration()
+    model = StageWiseModel(
+        name="dairy relaxed",
+        framework="Stagewise",
+        solver="ipopt-pyomo",
+        solver_arrays=problem_to_solver_arrays(problem, 5.0),
+        stages=2,
+        dTmin=5.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+    )
+
+    for total, grids in (
+        (model.recovery_area_cost_total, model.area_r_shared),
+        (model.hu_area_cost_total, model.area_hu_shared),
+        (model.cu_area_cost_total, model.area_cu_shared),
+    ):
+        areas = [area for area in _flatten(grids) if not area.fixed]
+        assert areas
+        for area in areas:
+            area.set_value(0.0)
+        slope = differentiate(total, wrt=areas[0], mode=Modes.reverse_numeric)
+        assert pyo.value(slope) < float("inf")
+
+
+def _flatten(grid):
+    for item in grid:
+        if isinstance(item, list):
+            yield from _flatten(item)
+        else:
+            yield item

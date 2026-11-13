@@ -16,12 +16,12 @@ from ....contracts.synthesis.task import (
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
 from ..execution.fallbacks import _couenne_was_missing
-from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
 from ..reporting.verification import verify_network_feasibility
 
 _METHOD_SEQUENCE: tuple[HeatExchangerNetworkDesignMethod, ...] = (
     HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
     HeatExchangerNetworkDesignMethod.ThermalDerivative,
     HeatExchangerNetworkDesignMethod.NetworkEvolution,
 )
@@ -68,22 +68,21 @@ def build_synthesis_result(
         }.items()
         if value is not None
     }
-    selected_pathway = _selected_pathway_metadata(accepted)
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id=settings.run_id,
-        # The approach temperatures the tasks ran, which expanded tiers widen
-        # with multiples of the first configured one.
-        approach_temperatures=tuple(
-            sorted({float(task.approach_temperature) for task in tasks})
+        # The dt_cont multipliers the tasks ran.
+        dt_cont_multipliers=tuple(
+            sorted({float(task.dt_cont_multiplier) for task in tasks})
         )
-        or settings.approach_temperatures,
+        or settings.dt_cont_multipliers,
         derivative_thresholds=settings.quality_derivative_thresholds,
         stage_selection=settings.stage_selection,
         method_sequence=_executed_method_sequence(outcomes),
         export_formats=settings.output_formats,
         solve_tolerance=settings.solve_tolerance,
         best_solutions_to_save=settings.best_solutions_to_save,
-        synthesis_quality_tier=settings.synthesis_quality_tier,
+        search_width=settings.search_width,
+        search_depth=settings.search_depth,
         pdm_stage_pair_limit=settings.pdm_stage_pair_limit,
         tdm_parent_limit=settings.tdm_parent_limit,
         stage_packing=settings.stage_packing,
@@ -94,11 +93,6 @@ def build_synthesis_result(
         workspace_variant=settings.workspace_variant,
         period_id=settings.period_id,
         design_method=settings.design_method,
-        selected_pathway_id=selected_pathway.get("pathway_id"),
-        selected_pathway_kind=selected_pathway.get("pathway_kind"),
-        selected_pdm_mode=selected_pathway.get("pdm_mode"),
-        selected_tier_origin=selected_pathway.get("tier_origin"),
-        selected_protected_pathway=bool(selected_pathway.get("protected", False)),
         task_count_by_method=_task_count_by_method(tasks),
     )
     return HeatExchangerNetworkSynthesisResult(
@@ -117,16 +111,6 @@ def build_synthesis_result(
         ranked_networks=tuple(outcomes),
         manifest=manifest,
     )
-
-
-def _selected_pathway_metadata(
-    accepted: HeatExchangerNetworkSynthesisTaskOutcome,
-) -> dict[str, object]:
-    pathways = pathways_from_metadata(accepted.task.metadata)
-    if not pathways:
-        return {}
-    pathway = pathways[0]
-    return pathway.metadata()
 
 
 def _executed_method_sequence(
@@ -169,6 +153,13 @@ def _accepted_outcome(
     message = "heat exchanger network synthesis produced no successful task outcomes."
     if detail:
         message = f"{message} Failed task details: {detail}"
+    if any("unconverged_termination" in outcome.diagnostics for outcome in outcomes):
+        message = (
+            f"{message} A solve stopped at a solver limit before converging: "
+            "raise the limit (time_limit for HiGHS, max_iter for Ipopt) in "
+            "HENS_SOLVER_OPTIONS_PDM, HENS_SOLVER_OPTIONS_TDM or "
+            "HENS_SOLVER_OPTIONS_EVM."
+        )
     raise WorkflowContractError(message)
 
 
@@ -228,7 +219,8 @@ def _failed_outcome_summary(
     for outcome in failed[:3]:
         reason = outcome.error or outcome.solver_status or "no failure reason"
         summaries.append(
-            f"{outcome.task.method}({outcome.task.approach_temperature:g} K): {reason}"
+            f"{outcome.task.method}(dt_cont x{outcome.task.dt_cont_multiplier:g}): "
+            f"{reason}"
         )
     if len(failed) > len(summaries):
         summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")

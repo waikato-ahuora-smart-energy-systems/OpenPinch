@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
 
+from . import execution as _execution
 from . import piecewise as _piecewise
 
 
@@ -402,18 +404,90 @@ def _set_terminal_approach_equations(
     The utility inlet faces the stream's fixed target, so ``inlet_shortfall``
     is a number; the other end moves with the stream. A binary ``match``
     relaxes both by big-M. A relaxed model fixes ``match``, so a unit whose
-    fixed end falls short of its approach there can carry no duty.
+    fixed end falls short of its approach there can carry no duty. Its
+    ``match`` can change after the model is built (a warm start sets it to
+    the parent's flag), and the relaxed model has no other link from duty to
+    ``match``, so the duty is also bounded by ``match``: a unit switched off
+    carries no duty instead of duty at any temperature.
     """
-    if type(match).__name__ != "GKParameter":
+    if not _is_parameter(match):
         model.m.Equation(-inlet_shortfall >= -big_m * (1 - match))
     elif inlet_shortfall > model.tol:
         model.m.Equation(duty == 0)
         return
+    else:
+        model.m.Equation(duty <= duty.ub * match)
     model.m.Equation(outlet_margin >= -big_m * (1 - match))
 
 
+def switch_on_idle_safe_utilities(model) -> None:
+    """Switch on, in a relaxed model, each allowed utility that may sit idle.
+
+    A warm start sets a relaxed model's fixed heater and cooler binaries to
+    the parent's flags, and a unit switched off carries no duty, so evolution
+    could never add one the parent lacked. A unit switched on keeps its
+    moving end at approach even at zero duty, so only units whose outlet
+    clears the stream's target by their approach in every period are switched
+    back on; the others (a utility leaving below the stream's target) keep
+    the parent's flag. Reported costs count units by their duty, so an idle
+    unit left on costs nothing there.
+    """
+
+    for j, row in enumerate(model.z_hu):
+        for u, flag in enumerate(row):
+            if _switchable(flag, model.z_hu_allowed[j][u]) and all(
+                _idle_margin(
+                    model._utility_solved_outlet_temperature("hot", n, j, u),
+                    model.T_c_out_period[n][j],
+                    _hot_utility_outlet_approach_temperature(model, j, u, n),
+                )
+                >= -model.tol
+                for n in range(model.N_periods)
+                if _stream_active(model, "cold", n, j)
+            ):
+                _set_parameter(model, flag)
+    for i, row in enumerate(model.z_cu):
+        for u, flag in enumerate(row):
+            if _switchable(flag, model.z_cu_allowed[i][u]) and all(
+                _idle_margin(
+                    model.T_h_out_period[n][i],
+                    model._utility_solved_outlet_temperature("cold", n, i, u),
+                    _cold_utility_outlet_approach_temperature(model, i, u, n),
+                )
+                >= -model.tol
+                for n in range(model.N_periods)
+                if _stream_active(model, "hot", n, i)
+            ):
+                _set_parameter(model, flag)
+
+
+def _switchable(flag, allowed) -> bool:
+    """A fixed binary, switched off, on an allowed unit."""
+
+    return _is_parameter(flag) and float(flag.value) < 0.5 and allowed > 0
+
+
+def _idle_margin(hot_end, cold_end, approach) -> float:
+    """``hot_end - cold_end - approach``, or minus infinity if not a number."""
+
+    try:
+        return float(hot_end) - float(cold_end) - float(approach)
+    except (TypeError, ValueError):
+        return -math.inf
+
+
+def _set_parameter(model, flag) -> None:
+    _execution._set_value(model, flag, 1.0)
+
+
+def _is_parameter(value) -> bool:
+    """Return whether a model value is fixed: a ``PyomoModel`` parameter."""
+
+    return bool(getattr(value, "fixed", False))
+
+
 def _weighted_state_average(model, values: Sequence[Any]) -> Any:
-    """Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for GEKKO expressions."""
+    """Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for model expressions."""
 
     return (
         sum(float(model.period_weights[n]) * values[n] for n in range(model.N_periods))
@@ -455,20 +529,6 @@ def set_match_restrictions(model, restrictions) -> None:
                 ]
                 for i in range(model.I)
             ]
-        elif type(z_restriction[0][0][0]).__name__ in {
-            "GKVariable",
-            "GKParameter",
-        }:
-            model.z_allowed = [
-                [
-                    [
-                        1 if z_restriction[i][j][k][0] > model.tol else 0
-                        for k in range(model.S)
-                    ]
-                    for j in range(model.J)
-                ]
-                for i in range(model.I)
-            ]
         else:
             raise ValueError("Invalid restriction type")
     else:
@@ -490,7 +550,7 @@ def _utility_restriction(model, restriction, streams: int, utilities: int):
     """Return ``[stream][utility]`` 0/1 flags from solved or given values."""
 
     def flag(value) -> int:
-        number = value if isinstance(value, int | float) else value[0]
+        number = _execution._value(value)
         return 1 if number > model.tol else 0
 
     return [
