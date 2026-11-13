@@ -358,8 +358,8 @@ Heat exchanger network synthesis
   allowed, so duties, segmented streams, several utilities and multiperiod
   cases are handled as in the pinch design method; a multiperiod proposal is
   the union of one rules-based design per period. Proposals that cannot be
-  solved or verified are dropped. ``HENS_HEURISTIC_PDM_NETWORKS`` (default
-  10 by default) caps the networks per dt_cont multiplier. Each heuristic
+  solved or verified are dropped. ``HENS_HEURISTIC_PDM_NETWORKS`` (10 by
+  default) caps the networks per dt_cont multiplier. Each heuristic
   network seeds network evolution directly, never the thermal derivative
   method. ``HENS_PDM_MILP`` runs the MILP pinch design method as well (on from
   search depth 2); with ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs
@@ -367,7 +367,7 @@ Heat exchanger network synthesis
 - Synthesis now searches in two directions instead of by quality tier.
   ``HENS_SEARCH_WIDTH`` (0 to 3, default 1) picks the dt_cont multipliers: 1.0;
   0.75, 1.0 and 1.5; 0.5 to 2.0 in five values; or seven. ``HENS_SEARCH_DEPTH``
-  (0 to 4, default 2) picks the stages and their effort: 0 is the heuristic
+  (0 to 4, default 1) picks the stages and their effort: 0 is the heuristic
   pinch design method alone; 1 adds network evolution; 2 adds the MILP pinch
   design method and the thermal derivative method; 3 and 4 make more heuristic
   networks, seed evolution with every MILP network and evolve more widely. An
@@ -382,9 +382,10 @@ Heat exchanger network synthesis
   raw pinch design modes): the manifest records ``search_width`` and
   ``search_depth`` in place of ``synthesis_quality_tier`` and the
   ``selected_pathway_*``, ``selected_pdm_mode``, ``selected_tier_origin`` and
-  ``selected_protected_pathway`` fields. The default run now sweeps three
-  multipliers and runs the thermal derivative method (tier 0 ran one multiplier
-  without it), so it takes longer. Standalone seeded thermal derivative and
+  ``selected_protected_pathway`` fields. The default run (width 1, depth 1)
+  now sweeps three multipliers with the heuristic pinch design method and
+  evolution (tier 0 ran one multiplier with the MILP), so it makes more
+  networks; the MILP and the thermal derivative method run from depth 2. Standalone seeded thermal derivative and
   evolution runs drop repeated seed topologies.
 
 0.8.3 (2026-11-11)

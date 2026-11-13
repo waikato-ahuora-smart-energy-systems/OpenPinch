@@ -194,7 +194,7 @@ a stage that the search depth leaves out, or that could not run because
 Couenne is missing, is not listed. The manifest also records the search width
 and depth that ran.
 
-``HENS_SEARCH_WIDTH`` (default 1) and ``HENS_SEARCH_DEPTH`` (default 2) are
+``HENS_SEARCH_WIDTH`` (default 1) and ``HENS_SEARCH_DEPTH`` (default 1) are
 persistent configuration fields; :doc:`../guides/heat-exchanger-network-synthesis`
 lists what each level sets. ``problem.design.heat_exchanger_network(width=...,
 depth=...)`` applies them to one call without changing the loaded problem

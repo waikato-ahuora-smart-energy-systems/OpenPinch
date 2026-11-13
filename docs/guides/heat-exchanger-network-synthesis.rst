@@ -165,8 +165,8 @@ evolution. With ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
 
 .. code-block:: python
 
-   heuristic_only = problem.design.pinch_design(options={"HENS_SEARCH_DEPTH": 1})
-   with_milp = problem.design.pinch_design()
+   heuristic_only = problem.design.pinch_design()
+   with_milp = problem.design.pinch_design(options={"HENS_SEARCH_DEPTH": 2})
 
 Search Width, Depth and Convergence
 -----------------------------------
@@ -202,11 +202,11 @@ The depth picks the stages run at each multiplier and their effort:
      - heuristic pinch design only
      - 10
      - none
-   * - 1
+   * - 1 (default)
      - heuristic, then evolution
      - 10
      - 1
-   * - 2 (default)
+   * - 2
      - heuristic and MILP; MILP through the thermal derivative method
      - 10
      - 1

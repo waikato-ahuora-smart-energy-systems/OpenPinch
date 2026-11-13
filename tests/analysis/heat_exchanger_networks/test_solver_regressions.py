@@ -286,6 +286,7 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
         max_parallel=1,
         # The baseline is the MILP pinch design -> TDM -> EVM pipeline.
         heuristic_pdm_networks=0,
+        search_depth=2,
     )
 
     workflow_result = execute_open_hens_method(
@@ -418,7 +419,9 @@ def _assert_live_solver_case_matches_checked_in_summary(
     problem.target.all_heat_integration()
     # The baselines are the MILP pinch design -> TDM -> EVM pipeline.
     settings = replace(
-        workflow_settings_from_problem(problem), heuristic_pdm_networks=0
+        workflow_settings_from_problem(problem),
+        heuristic_pdm_networks=0,
+        search_depth=2,
     )
     if max_parallel is not None:
         settings = replace(settings, max_parallel=max_parallel)

@@ -41,6 +41,7 @@ _LEVEL_OPTIONS = (
     "HENS_DT_CONT_MULTIPLIERS",
     "HENS_HEURISTIC_PDM_NETWORKS",
     "HENS_PDM_MILP",
+    "HENS_SEARCH_DEPTH",
 )
 
 
@@ -76,13 +77,15 @@ def test_the_levels_are_the_agreed_presets():
     ]
 
 
-def test_by_default_synthesis_searches_width_one_at_depth_two():
+def test_by_default_synthesis_searches_width_one_at_depth_one():
     settings = workflow_settings_from_problem(_problem({}))
 
-    assert (settings.search_width, settings.search_depth) == (1, 2)
+    assert (settings.search_width, settings.search_depth) == (1, 1)
     assert settings.dt_cont_multipliers == (0.75, 1.0, 1.5)
     assert settings.heuristic_pdm_networks == 10
-    assert settings.pdm_milp is True
+    assert settings.pdm_milp is False
+    assert settings.runs_evolution is True
+    assert settings.runs_thermal_derivative_method is False
     assert settings.effective_evm_n_ad_branches == 1
     assert settings.effective_evm_n_rm_branches == 1
 

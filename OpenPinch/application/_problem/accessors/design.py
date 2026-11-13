@@ -317,7 +317,7 @@ class _DesignAccessor:
 
         ``width`` (``HENS_SEARCH_WIDTH``, 0 to 3, default 1) picks the dt_cont
         multipliers: 1.0; 0.75, 1.0 and 1.5; then five and seven values from
-        0.5 to 2.0. ``depth`` (``HENS_SEARCH_DEPTH``, 0 to 4, default 2) picks
+        0.5 to 2.0. ``depth`` (``HENS_SEARCH_DEPTH``, 0 to 4, default 1) picks
         the stages and their effort: 0 is the heuristic pinch design method
         alone, 1 adds network evolution, 2 adds the MILP pinch design method
         and the thermal derivative method, and 3 and 4 add more networks and

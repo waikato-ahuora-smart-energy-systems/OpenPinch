@@ -1067,9 +1067,10 @@ def _small_payload() -> dict:
         "HENS_MAX_PARALLEL": 1,
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_RUN_ID": "hens-05-test",
-        # These tests cover the MILP pinch design -> TDM -> EVM pipeline, so
-        # the heuristic, the default pinch design method, is off.
+        # These tests cover the MILP pinch design -> TDM -> EVM pipeline: at
+        # depth 2, with the heuristic off.
         "HENS_HEURISTIC_PDM_NETWORKS": 0,
+        "HENS_SEARCH_DEPTH": 2,
     }
     return payload
 

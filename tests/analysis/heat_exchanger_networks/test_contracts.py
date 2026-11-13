@@ -396,7 +396,7 @@ def test_hen_config_field_specs_use_openpinch_names():
         "solver_evm",
     )
     assert CONFIG_FIELD_SPECS["HENS_SEARCH_WIDTH"].default == 1
-    assert CONFIG_FIELD_SPECS["HENS_SEARCH_DEPTH"].default == 2
+    assert CONFIG_FIELD_SPECS["HENS_SEARCH_DEPTH"].default == 1
     assert CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default is None
     assert CONFIG_FIELD_SPECS["HENS_EVM_N_AD_BRANCHES"].default is None
     assert CONFIG_FIELD_SPECS["HENS_EVM_N_RM_BRANCHES"].default is None

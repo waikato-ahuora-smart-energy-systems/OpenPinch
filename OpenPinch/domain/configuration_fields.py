@@ -381,7 +381,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # HEN synthesis.
     # None: set by the search width or depth.
     "HENS_SEARCH_WIDTH": _spec(int, 1, "hens", "search_width", numeric_min=0.0, numeric_max=3.0),
-    "HENS_SEARCH_DEPTH": _spec(int, 2, "hens", "search_depth", numeric_min=0.0, numeric_max=4.0),
+    "HENS_SEARCH_DEPTH": _spec(int, 1, "hens", "search_depth", numeric_min=0.0, numeric_max=4.0),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),

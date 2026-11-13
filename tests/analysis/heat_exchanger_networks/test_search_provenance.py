@@ -136,7 +136,7 @@ _DEPTH = "HENS_SEARCH_DEPTH"
         ({}, lambda design: design.heat_exchanger_network(options={_DEPTH: 3}), 3),
         ({_DEPTH: 3}, lambda design: design.heat_exchanger_network(), 3),
     ],
-    ids=["default", "argument-beats-stored", "call-option", "stored-option"],
+    ids=["fixture-depth", "argument-beats-stored", "call-option", "stored-option"],
 )
 def test_provenance_settings_record_the_depth_that_ran(
     monkeypatch,

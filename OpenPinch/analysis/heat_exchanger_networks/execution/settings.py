@@ -42,7 +42,7 @@ class SynthesisWorkflowSettings:
     # The search levels; workflow_settings_from_problem resolves the options
     # they set into the fields below.
     search_width: int = 1
-    search_depth: int = 2
+    search_depth: int = 1
     pdm_stage_pair_limit: int | None = None
     tdm_parent_limit: int | None = None
     stage_packing: StagePackingScope = "auto"

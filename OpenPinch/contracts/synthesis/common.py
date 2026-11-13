@@ -92,7 +92,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     solve_tolerance: float = 1e-3
     best_solutions_to_save: int = 1
     search_width: int = 1
-    search_depth: int = 2
+    search_depth: int = 1
     pdm_stage_pair_limit: int | None = None
     tdm_parent_limit: int | None = None
     stage_packing: str = "auto"
