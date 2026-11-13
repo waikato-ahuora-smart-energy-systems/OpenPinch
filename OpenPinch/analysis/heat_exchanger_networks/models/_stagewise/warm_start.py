@@ -15,7 +15,12 @@ def set_initial_values_for_variables(
 
     if getattr(owner, "N_periods", 1) > 1 and hasattr(owner, "Q_r_by_period"):
         _set_multiperiod_initial_values(owner, init_solution)
-        return
+    else:
+        _set_single_period_initial_values(owner, init_solution)
+    _approach.switch_on_idle_safe_utilities(owner)
+
+
+def _set_single_period_initial_values(owner, init_solution) -> None:
 
     for k in range(owner.S):
         for j in range(owner.J):

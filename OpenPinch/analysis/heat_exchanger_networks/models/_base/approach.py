@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import Any
 
@@ -417,6 +418,66 @@ def _set_terminal_approach_equations(
     else:
         model.m.Equation(duty <= duty.ub * match)
     model.m.Equation(outlet_margin >= -big_m * (1 - match))
+
+
+def switch_on_idle_safe_utilities(model) -> None:
+    """Switch on, in a relaxed model, each allowed utility that may sit idle.
+
+    A warm start sets a relaxed model's fixed heater and cooler binaries to
+    the parent's flags, and a unit switched off carries no duty, so evolution
+    could never add one the parent lacked. A unit switched on keeps its
+    moving end at approach even at zero duty, so only units whose outlet
+    clears the stream's target by their approach in every period are switched
+    back on; the others (a utility leaving below the stream's target) keep
+    the parent's flag. Reported costs count units by their duty, so an idle
+    unit left on costs nothing there.
+    """
+
+    for j, row in enumerate(model.z_hu):
+        for u, flag in enumerate(row):
+            if _switchable(flag, model.z_hu_allowed[j][u]) and all(
+                _idle_margin(
+                    model._utility_solved_outlet_temperature("hot", n, j, u),
+                    model.T_c_out_period[n][j],
+                    _hot_utility_outlet_approach_temperature(model, j, u, n),
+                )
+                >= -model.tol
+                for n in range(model.N_periods)
+                if _stream_active(model, "cold", n, j)
+            ):
+                _set_parameter(model, flag)
+    for i, row in enumerate(model.z_cu):
+        for u, flag in enumerate(row):
+            if _switchable(flag, model.z_cu_allowed[i][u]) and all(
+                _idle_margin(
+                    model.T_h_out_period[n][i],
+                    model._utility_solved_outlet_temperature("cold", n, i, u),
+                    _cold_utility_outlet_approach_temperature(model, i, u, n),
+                )
+                >= -model.tol
+                for n in range(model.N_periods)
+                if _stream_active(model, "hot", n, i)
+            ):
+                _set_parameter(model, flag)
+
+
+def _switchable(flag, allowed) -> bool:
+    """A fixed binary, switched off, on an allowed unit."""
+
+    return _is_parameter(flag) and float(flag.value) < 0.5 and allowed > 0
+
+
+def _idle_margin(hot_end, cold_end, approach) -> float:
+    """``hot_end - cold_end - approach``, or minus infinity if not a number."""
+
+    try:
+        return float(hot_end) - float(cold_end) - float(approach)
+    except (TypeError, ValueError):
+        return -math.inf
+
+
+def _set_parameter(model, flag) -> None:
+    _execution._set_value(model, flag, 1.0)
 
 
 def _is_parameter(value) -> bool:

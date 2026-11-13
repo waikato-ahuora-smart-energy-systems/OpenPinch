@@ -480,3 +480,28 @@ def test_default_synthesis_evolves_nine_stream_linnhoff_ahmad():
 
     assert design.result.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
     assert verify_network_feasibility(design.selected_network) == ()
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_highs_available() and _ipopt_available())", reason="needs HiGHS and Ipopt"
+)
+def test_evolution_can_add_a_utility_the_parent_did_not_use():
+    # Evolution from a parent with no heater or cooler on a stream must still
+    # be able to give it one. Bounding a switched-off unit's duty without
+    # switching idle-safe units back on made the spray dryer 29% costlier
+    # (10.65 M against 8.26 M).
+    payload = json.loads(
+        (
+            REPOSITORY_ROOT / "tests/fixtures/openhens/Six-stream-Spray-Dryer-2025-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    for key in ("HENS_DT_CONT_MULTIPLIERS", "HENS_SOLVER_PDM"):
+        payload["options"].pop(key, None)
+    payload["options"] |= {"HENS_OUTPUT_FORMATS": [], "HENS_MAX_PARALLEL": 1}
+    problem = PinchProblem(source=payload, project_name="spray-dryer")
+
+    design = problem.design.heat_exchanger_network(depth=1)
+
+    assert design.selected_network.total_annual_cost < 8.5e6
+    assert verify_network_feasibility(design.selected_network) == ()
