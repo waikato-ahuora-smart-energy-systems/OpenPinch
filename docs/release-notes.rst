@@ -204,6 +204,10 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A Couenne or Ipopt solve that stops early, for example at an iteration or
+  time limit, now fails unless the solver returned a point. Before, such a
+  solve passed with the variables at their start values, and the unsolved
+  network could be post-processed and ranked.
 - Synthesis now searches in two directions instead of by quality tier.
   ``HENS_SEARCH_WIDTH`` (0 to 3, default 1) picks the dt_cont multipliers:
   1.0; 0.75, 1.0 and 1.5; five values from 0.5 to 2.0; or seven.

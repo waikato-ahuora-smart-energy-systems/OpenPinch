@@ -2350,7 +2350,7 @@ class _FakeSolver:
         self.options = {}
         self._solve = solve
 
-    def solve(self, model, tee=False):
+    def solve(self, model, tee=False, **_kwargs):
         return self._solve(model, tee=tee)
 
 

@@ -188,6 +188,51 @@ def test_pyomo_solve_without_a_solution_is_failed(monkeypatch, termination):
     assert termination in run.failure_reason
 
 
+@pytest.mark.parametrize("termination", ["maxIterations", "maxTimeLimit", "unknown"])
+def test_an_early_stop_without_a_solution_is_failed(monkeypatch, termination):
+    # Couenne or Ipopt stopping early before finding a point returns no
+    # solution; the variables would still hold their start values.
+    model, _x, _y = _bounded_model(4.0)
+    results = type(
+        "Results",
+        (),
+        {"solver": type("Solver", (), {"status": "warning"})()},
+    )()
+    results.solver.termination_condition = termination
+    results.problem = type("Problem", (), {"upper_bound": float("inf")})()
+    results.solution = []
+
+    class _Solver:
+        options: dict = {}
+
+        def solve(self, *_args, **_kwargs):
+            return results
+
+    monkeypatch.setattr(pyo, "SolverFactory", lambda _name: _Solver())
+
+    run = backend.solve_pyomo_model(model, solver_name="couenne")
+
+    assert run.status == 0
+    assert run.objective_value is None
+    assert termination in run.failure_reason
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not _solver_available('ipopt-pyomo')", reason="needs the ipopt binary"
+)
+def test_an_iteration_limited_ipopt_solve_keeps_its_point():
+    model, x, _y = _bounded_model(4.0)
+
+    backend.configure_pyomo_solver(model, "ipopt-pyomo", solver_options={"max_iter": 1})
+    run = backend.solve_pyomo_model(model, solver_name="ipopt-pyomo")
+
+    assert run.termination_condition == "maxIterations"
+    assert run.status == 1
+    assert not run.converged
+    assert x.value is not None
+
+
 def _highs_available() -> bool:
     return _solver_available("highs")
 
