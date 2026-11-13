@@ -389,25 +389,29 @@ class InternalHeatExchangerNetworkProblem:
             + min(_side_units(side) for side in sides["below"]),
             pairs[0][0] if pairs else 0,
         )
-        chosen = [pair for pair in pairs if pair[0] == fewest][:at_minimum] + [
-            pair for pair in pairs if pair[0] == fewest + 1
-        ][:one_more]
         from ..reporting.ranking import network_structure_signature
 
         seen = {
             network_structure_signature(self.extract_network(run_id="pdm-variants"))
         }
         variants = []
-        for _units, _rank, a, b in chosen:
-            variant = self._pdm_variant(sides["above"][a], sides["below"][b])
-            if variant is None:
-                continue
-            signature = network_structure_signature(
-                variant.extract_network(run_id="pdm-variants")
-            )
-            if signature not in seen:
-                seen.add(signature)
-                variants.append(variant)
+        # Each quota is filled with distinct networks: a pair that repeats a
+        # network already kept does not use up a place.
+        for units, quota in ((fewest, at_minimum), (fewest + 1, one_more)):
+            kept = 0
+            for _units, _rank, a, b in (pair for pair in pairs if pair[0] == units):
+                if kept >= quota:
+                    break
+                variant = self._pdm_variant(sides["above"][a], sides["below"][b])
+                if variant is None:
+                    continue
+                signature = network_structure_signature(
+                    variant.extract_network(run_id="pdm-variants")
+                )
+                if signature not in seen:
+                    seen.add(signature)
+                    variants.append(variant)
+                    kept += 1
         return variants
 
     def _minimum_unit_sides(
@@ -450,7 +454,7 @@ class InternalHeatExchangerNetworkProblem:
             for pattern in excluded:
                 side.exclude_units(pattern)
             side.optimise(print_output=False)
-            if side.mSuccess != 1:
+            if side.mSuccess != 1 or side.used_units() in excluded:
                 break
             fewest = side.n_units if fewest is None else fewest
             if side.n_units > fewest + 1:
@@ -595,7 +599,9 @@ class InternalHeatExchangerNetworkProblem:
         try:
             variant._carry_unconverged_side_solve()
             variant.case.get_post_process()
-            variant.case = variant.remove_unused_stages(variant.case)
+            # A variant is a minimum-utility network: drop only its empty
+            # stages, not ones whose recovery would go to utility.
+            variant.case = variant.remove_unused_stages(variant.case, empty_only=True)
         finally:
             _cleanup_model(unreduced)
             _cleanup_model(variant.case)
@@ -618,14 +624,21 @@ class InternalHeatExchangerNetworkProblem:
                 )
                 return
 
-    def remove_unused_stages(self, case) -> StageWiseModel:
-        """Apply the source stage-utilisation reduction after PDM/TDM solves."""
+    def remove_unused_stages(self, case, *, empty_only: bool = False) -> StageWiseModel:
+        """Apply the source stage-utilisation reduction after PDM/TDM solves.
+
+        Stages carrying less than the utilisation threshold of the recovery
+        are removed and the reduced network re-solved. With ``empty_only``
+        only stages with no recovery go, so the network keeps its utility.
+        """
 
         if case.mSuccess != 1:
             return case
 
-        active_stages = self._get_active_stages(case)
-        if len(active_stages) == case.S:
+        active_stages = self._get_active_stages(
+            case, threshold=0.0 if empty_only else None
+        )
+        if not active_stages or len(active_stages) == case.S:
             return case
 
         peak_recovery = _peak_recovery_duties(case)
@@ -732,7 +745,7 @@ class InternalHeatExchangerNetworkProblem:
             return case
         return f_case
 
-    def _get_active_stages(self, case) -> list[int]:
+    def _get_active_stages(self, case, *, threshold: float | None = None) -> list[int]:
         peak_recovery = _peak_recovery_duties(case)
         q_total = sum(
             peak_recovery[i][j][k]
@@ -747,12 +760,14 @@ class InternalHeatExchangerNetworkProblem:
             sum(peak_recovery[i][j][k] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)
         ]
-        threshold = self._utilisation_threshold(case.S)
-        return [
-            k
-            for k, q_stage in enumerate(q_per_stage)
-            if q_stage / q_total * 100 >= threshold
-        ]
+        if threshold is None:
+            threshold = self._utilisation_threshold(case.S)
+            return [
+                k
+                for k, q_stage in enumerate(q_per_stage)
+                if q_stage / q_total * 100 >= threshold
+            ]
+        return [k for k, q_stage in enumerate(q_per_stage) if q_stage > case.tol]
 
     def _utilisation_threshold(self, stage_count: int) -> float:
         if stage_count <= 3:

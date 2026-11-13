@@ -341,7 +341,8 @@ def test_min_units_with_a_utility_cost_cap_minimises_units_alone():
     model.optimise(False)
 
     assert model.mSuccess == 1
-    assert model.solver_run.objective_value == pytest.approx(model.n_recovery_units)
+    # Every unit counts: recovery matches, heaters and coolers.
+    assert model.solver_run.objective_value == pytest.approx(model.n_units)
     assert sum(model.Q_cu_by_utility_by_period[0]) == pytest.approx(
         sum(cheapest.Q_cu_by_utility_by_period[0]), abs=1e-3
     )

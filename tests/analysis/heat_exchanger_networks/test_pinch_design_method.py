@@ -3235,6 +3235,10 @@ def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
     model.Q_c_by_period = [[[3.0]]]
     model.Q_r_by_period = [[[[4.0]]]]
     model.z = [[[1.0]]]
+    # Min units counts heater and cooler binaries too, linked to their duty.
+    model.z_hu = [[1.0]]
+    model.z_cu = [[1.0]]
+    model.tol = 1e-3
     model.period_weights = [1.0]
     model.period_weight_sum = 1.0
 
@@ -3258,6 +3262,9 @@ def _pdm_objective_model_with_a_utility_choice(goal: str) -> PinchDecompModel:
     model.Q_r_by_period = [[[[4.0]]]]
     model.Qtot_sh_period = [[20.0]]
     model.z = [[[1.0]]]
+    model.z_hu = [[1.0, 1.0]]
+    model.z_cu = [[1.0]]
+    model.tol = 1e-3
     model.hu_cost_period = [[10.0, 1.0]]
     model.cu_cost_period = [[5.0]]
     model.HU_target_by_period = [9.0]
@@ -3291,7 +3298,8 @@ def test_pinch_decomp_utility_goals_with_a_utility_choice_minimise_utility_cost(
         # Unrecovered hot-stream heat, 20 - 4: minimising it maximises
         # recovery and keeps the objective non-negative.
         ("heat recovery", 16.0),
-        ("min units", 1.0),
+        # One match, two heaters and one cooler.
+        ("min units", 4.0),
     ],
 )
 def test_pinch_decomp_other_goals_with_a_utility_choice_combine_one_objective(

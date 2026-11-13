@@ -296,14 +296,44 @@ def _heat_recovery(owner, n: int):
 
 
 def _units(owner):
+    """Every unit binary: recovery matches, heaters and coolers."""
     return owner.m.sum(
         [
-            owner.z[i][j][k]
-            for k in range(owner.S)
-            for j in range(owner.J)
-            for i in range(owner.I)
+            _at(getattr(owner, name), index)
+            for name, indices in _unit_index_sets(owner).items()
+            for index in indices
         ]
     )
+
+
+# A unit counts as used above this many times the model tolerance.
+_USED_DUTY_FACTOR = 10.0
+
+
+def _link_units_to_duty(owner) -> None:
+    """A unit binary may be on only if the unit carries duty in some period.
+
+    The big-M link only stops duty without its binary. When units are
+    minimised, an idle binary set to 1 would satisfy a no-good cut with the
+    network unchanged, so each binary also needs duty, above the tolerance
+    post-processing uses to read a unit as used.
+    """
+    least = _USED_DUTY_FACTOR * owner.tol
+    duties = {
+        "z": lambda i, j, k: [owner.Q_r_by_period[n][i][j][k] for n in _periods(owner)],
+        "z_hu": lambda j, u: [owner.Q_h_by_period[n][j][u] for n in _periods(owner)],
+        "z_cu": lambda i, u: [owner.Q_c_by_period[n][i][u] for n in _periods(owner)],
+    }
+    for name, indices in _unit_index_sets(owner).items():
+        for index in indices:
+            owner.m.Equation(
+                owner.m.sum(duties[name](*index))
+                >= least * _at(getattr(owner, name), index)
+            )
+
+
+def _periods(owner) -> range:
+    return range(owner.N_periods)
 
 
 def _set_utility_target(owner, duty_grids, targets) -> None:
@@ -370,6 +400,7 @@ def set_obj(owner) -> None:
             )
         )
     else:
+        _link_units_to_duty(owner)
         if choice and owner.utility_cost_cap is not None:
             # Relative slack for the cap's own rounding in the solver.
             owner.m.Equation(

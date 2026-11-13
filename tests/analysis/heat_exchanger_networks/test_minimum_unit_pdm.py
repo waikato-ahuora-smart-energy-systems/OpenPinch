@@ -48,8 +48,10 @@ def _highs_available() -> bool:
     return True
 
 
-def _problem(dTmin: float, limits: tuple[int, int], *, extra_utilities=()):
-    payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
+def _problem(
+    dTmin: float, limits: tuple[int, int], *, extra_utilities=(), source=None
+):
+    payload = json.loads((source or FOUR_STREAM_JSON).read_text(encoding="utf-8"))
     payload["utilities"] += list(extra_utilities)
     pinch = PinchProblem(source=payload, project_name="Four-stream")
     return InternalHeatExchangerNetworkProblem(
@@ -108,6 +110,71 @@ def test_pdm_collects_variants_with_a_choice_of_hot_utility():
     assert solved is not None and solved.mSuccess == 1
     assert problem.pdm_variants
     assert all(variant.case.mSuccess == 1 for variant in problem.pdm_variants)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_variants_with_utility_choices_are_distinct_and_at_minimum_utility():
+    # An unused heater or cooler binary set to 1 at zero duty must not count
+    # as a new topology, and stage reduction must not trade recovery for
+    # utility.
+    utilities = (
+        {
+            "name": "MPS",
+            "type": "Hot",
+            "t_supply": {"value": 600.0, "unit": "K"},
+            "t_target": {"value": 600.0, "unit": "K"},
+            "price": {"value": 60.0, "unit": "$/MWh"},
+            "htc": {"value": 5.0, "unit": "kW/m^2/K"},
+            "heat_flow": None,
+        },
+        {
+            "name": "RW",
+            "type": "Cold",
+            "t_supply": {"value": 290.0, "unit": "K"},
+            "t_target": {"value": 300.0, "unit": "K"},
+            "price": {"value": 10.0, "unit": "$/MWh"},
+            "htc": {"value": 1.0, "unit": "kW/m^2/K"},
+            "heat_flow": None,
+        },
+    )
+    problem = _problem(14.0, (3, 3), extra_utilities=utilities)
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    networks = [problem.extract_network(run_id="pdm")] + [
+        variant.extract_network(run_id="pdm") for variant in problem.pdm_variants
+    ]
+    assert len(problem.pdm_variants) >= 2
+    signatures = [network_structure_signature(network) for network in networks]
+    assert len(set(signatures)) == len(signatures)
+    minimum = networks[0].utility_cost
+    for network in networks[1:]:
+        assert network.utility_cost == pytest.approx(minimum, rel=1e-6)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_stage_reduction_keeps_variants_at_minimum_utility(monkeypatch):
+    # Reducing a variant's stages by their share of recovery traded recovery
+    # for utility (2% on Ten-stream Ahmad with utility choices). A threshold
+    # every stage falls under makes that reduction certain to be tried.
+    reference = _problem(14.0, (0, 0))
+    reference.get_solution(print_output=False)
+    minimum = reference.extract_network(run_id="pdm").utility_cost
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem,
+        "_utilisation_threshold",
+        lambda self, stage_count: 60.0,
+    )
+    problem = _problem(14.0, (3, 3))
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    assert problem.pdm_variants
+    for variant in problem.pdm_variants:
+        network = variant.extract_network(run_id="pdm")
+        assert network.utility_cost == pytest.approx(minimum, rel=1e-6)
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
