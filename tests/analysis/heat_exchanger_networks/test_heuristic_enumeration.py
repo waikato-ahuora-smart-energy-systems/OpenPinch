@@ -333,12 +333,23 @@ def test_a_wide_split_among_many_partners_finishes_quickly():
     assert time.perf_counter() - start < 10.0
 
 
-def test_a_fruitless_search_stops_once_its_incomplete_proposals_are_kept():
+def test_a_fruitless_search_stops_once_its_incomplete_proposals_are_kept(
+    monkeypatch,
+):
     # Every match is temperature-limited, so no proposal completes. Once the
     # cap of incomplete proposals was kept, the search still spent its whole
-    # node budget (47 s here) looking for a complete one.
-    import time
+    # node budget (47 s here) looking for a complete one. Counting nodes, not
+    # seconds, keeps the check independent of the machine (Pyodide is slow).
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic import enumeration
 
+    nodes = [0]
+    real_extend = enumeration._extend
+
+    def counting(*args, **kwargs):
+        nodes[0] += 1
+        yield from real_extend(*args, **kwargs)
+
+    monkeypatch.setattr(enumeration, "_extend", counting)
     above = side(
         "above",
         [
@@ -348,11 +359,11 @@ def test_a_fruitless_search_stops_once_its_incomplete_proposals_are_kept():
         [stream("cold", j, 1.0, 5000.0, 90.0, at_pinch=False) for j in range(5)],
     )
 
-    start = time.perf_counter()
     proposals = propose_side_topologies(above, limit=10)
 
     assert proposals and not any(proposal.complete for proposal in proposals)
-    assert time.perf_counter() - start < 5.0
+    # Well under the side's budget of 2000 nodes per proposal requested.
+    assert nodes[0] <= 2 * enumeration._STALL_NODES
 
 
 def test_dead_ends_met_first_do_not_hide_the_complete_proposals_behind_them():
