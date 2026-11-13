@@ -266,7 +266,17 @@ def test_a_user_utility_named_cu_stays_in_synthesis():
     }
 
 
+def _ipopt_available() -> bool:
+    try:
+        require_solver_binary("ipopt", purpose="multiperiod stage-wise model")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 @pytest.mark.synthesis
+# Building the stage-wise model checks for its solver, Ipopt.
+@pytest.mark.skipif("not _ipopt_available()", reason="needs the ipopt binary")
 def test_multiperiod_area_costs_have_a_finite_slope_at_zero_area():
     # A shared area at zero, for a unit with no duty, made the area cost's
     # derivative infinite, and Ipopt stopped on every evolution task of the
