@@ -165,6 +165,10 @@ method runs as well: it solves each side for minimum utility cost and then the
 fewest units. Its main networks go to the thermal derivative method, and its
 extra minimum-unit networks (and from depth 3 all its networks) straight to
 evolution. With ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
+At any depth, the MILP also runs at each dt_cont multiplier where the
+heuristic realises no network, and its networks take the heuristic's place.
+The heuristic's side models are solved with HiGHS when it is installed,
+whatever ``HENS_SOLVER_PDM`` names.
 
 .. code-block:: python
 

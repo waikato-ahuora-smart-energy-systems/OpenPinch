@@ -119,10 +119,12 @@ class SynthesisWorkflowSettings:
 
     @property
     def runs_milp_pinch_design(self) -> bool:
-        """Whether the MILP pinch design method runs.
+        """Whether the MILP pinch design method runs at every multiplier.
 
-        The heuristic is the default pinch design method; the MILP runs when
-        asked for, or when the heuristic makes no networks.
+        The heuristic is the default pinch design method; the MILP runs at
+        every multiplier when asked for (``pdm_milp``) or when the heuristic
+        is off. Otherwise it runs only where the heuristic realises no network
+        (``execute_pinch_design_stages``).
         """
 
         return self.pdm_milp or self.heuristic_pdm_networks <= 0
