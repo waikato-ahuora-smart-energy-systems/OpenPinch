@@ -370,12 +370,12 @@ Heat exchanger network synthesis
   (0 to 4, default 2) picks the stages and their effort: 0 is the heuristic
   pinch design method alone; 1 adds network evolution; 2 adds the MILP pinch
   design method and the thermal derivative method; 3 and 4 make more heuristic
-  and minimum-unit MILP networks, seed evolution with every MILP network and
-  evolve more widely. An option set explicitly (``HENS_DT_CONT_MULTIPLIERS``,
+  networks, seed evolution with every MILP network and evolve more widely. An
+  option set explicitly (``HENS_DT_CONT_MULTIPLIERS``,
   ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
-  ``HENS_PDM_MIN_UNIT_NETWORKS``, ``HENS_PDM_EXTRA_UNIT_NETWORKS``,
   ``HENS_EVM_N_AD_BRANCHES``, ``HENS_EVM_N_RM_BRANCHES``) overrides its level;
-  those options now default to unset. ``design.heat_exchanger_network()`` takes
+  those options now default to unset. ``HENS_PDM_MIN_UNIT_NETWORKS`` and
+  ``HENS_PDM_EXTRA_UNIT_NETWORKS`` stay independent of the depth (default 0). ``design.heat_exchanger_network()`` takes
   ``width`` and ``depth``. ``HENS_SYNTHESIS_QUALITY_TIER``,
   ``design.enhanced_heat_exchanger_network()`` and ``design.open_hens()`` are
   removed, with the tier pathways (protected and expanded routes, compact and

@@ -41,8 +41,6 @@ _LEVEL_OPTIONS = (
     "HENS_DT_CONT_MULTIPLIERS",
     "HENS_HEURISTIC_PDM_NETWORKS",
     "HENS_PDM_MILP",
-    "HENS_PDM_MIN_UNIT_NETWORKS",
-    "HENS_PDM_EXTRA_UNIT_NETWORKS",
 )
 
 
@@ -66,17 +64,15 @@ def test_the_levels_are_the_agreed_presets():
             level.evolution,
             level.heuristic_networks,
             level.milp,
-            level.min_unit_networks,
-            level.extra_unit_networks,
             level.evolution_breadth,
         )
         for level in (DEPTH_LEVELS[depth] for depth in range(5))
     ] == [
-        (False, 10, False, 0, 0, 1),
-        (True, 10, False, 0, 0, 1),
-        (True, 10, True, 0, 0, 1),
-        (True, 20, True, 3, 2, 2),
-        (True, 50, True, 5, 5, 3),
+        (False, 10, False, 1),
+        (True, 10, False, 1),
+        (True, 10, True, 1),
+        (True, 20, True, 2),
+        (True, 50, True, 3),
     ]
 
 
@@ -87,10 +83,6 @@ def test_by_default_synthesis_searches_width_one_at_depth_two():
     assert settings.dt_cont_multipliers == (0.75, 1.0, 1.5)
     assert settings.heuristic_pdm_networks == 10
     assert settings.pdm_milp is True
-    assert (settings.pdm_min_unit_networks, settings.pdm_extra_unit_networks) == (
-        0,
-        0,
-    )
     assert settings.effective_evm_n_ad_branches == 1
     assert settings.effective_evm_n_rm_branches == 1
 
@@ -102,10 +94,6 @@ def test_the_levels_set_the_options_left_unset():
 
     assert settings.dt_cont_multipliers == WIDTH_MULTIPLIERS[3]
     assert settings.heuristic_pdm_networks == 50
-    assert (settings.pdm_min_unit_networks, settings.pdm_extra_unit_networks) == (
-        5,
-        5,
-    )
     assert settings.effective_evm_n_ad_branches == 3
     assert settings.effective_evm_n_rm_branches == 3
 
@@ -119,8 +107,6 @@ def test_an_option_set_explicitly_overrides_the_level():
                 "HENS_DT_CONT_MULTIPLIERS": [1.0],
                 "HENS_HEURISTIC_PDM_NETWORKS": 4,
                 "HENS_PDM_MILP": False,
-                "HENS_PDM_MIN_UNIT_NETWORKS": 1,
-                "HENS_PDM_EXTRA_UNIT_NETWORKS": 0,
                 "HENS_EVM_N_AD_BRANCHES": 1,
             }
         )
@@ -129,10 +115,6 @@ def test_an_option_set_explicitly_overrides_the_level():
     assert settings.dt_cont_multipliers == (1.0,)
     assert settings.heuristic_pdm_networks == 4
     assert settings.pdm_milp is False
-    assert (settings.pdm_min_unit_networks, settings.pdm_extra_unit_networks) == (
-        1,
-        0,
-    )
     assert settings.effective_evm_n_ad_branches == 1
     assert settings.effective_evm_n_rm_branches == 3
 
@@ -195,8 +177,22 @@ def test_depth_three_seeds_every_milp_network_into_evolution():
     assert {o.task.task_id for o in milp if not is_pdm_variant_outcome(o)} <= seeded
 
 
-def test_the_depth_sets_the_minimum_unit_milp_networks():
-    problem = _problem({"HENS_SEARCH_DEPTH": 3, "HENS_SEARCH_WIDTH": 0})
+@pytest.mark.parametrize(
+    ("options", "limits"),
+    [
+        ({"HENS_SEARCH_DEPTH": 4}, (0, 0)),
+        (
+            {
+                "HENS_SEARCH_DEPTH": 2,
+                "HENS_PDM_MIN_UNIT_NETWORKS": 2,
+                "HENS_PDM_EXTRA_UNIT_NETWORKS": 1,
+            },
+            (2, 1),
+        ),
+    ],
+)
+def test_the_minimum_unit_milp_networks_come_only_from_their_options(options, limits):
+    problem = _problem({"HENS_SEARCH_WIDTH": 0, **options})
     problem.target.all_heat_integration()
     settings = workflow_settings_from_problem(problem)
     from OpenPinch.analysis.heat_exchanger_networks.targeting.pinch_design_method import (
@@ -208,7 +204,7 @@ def test_the_depth_sets_the_minimum_unit_milp_networks():
         task, problem=problem, parent_outcomes={}
     )
 
-    assert internal.pdm_network_limits == (3, 2)
+    assert internal.pdm_network_limits == limits
 
 
 def test_the_design_accessor_takes_width_and_depth(monkeypatch):

@@ -189,8 +189,8 @@ class HensConfig:
     derivative_thresholds: list[float]
     min_exchanger_approach_share: float
     pdm_stage_pair_limit: int | None
-    pdm_min_unit_networks: int | None
-    pdm_extra_unit_networks: int | None
+    pdm_min_unit_networks: int
+    pdm_extra_unit_networks: int
     heuristic_pdm_networks: int | None
     pdm_milp: bool | None
     tdm_parent_limit: int | None

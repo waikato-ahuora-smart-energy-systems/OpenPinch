@@ -51,8 +51,6 @@ class SynthesisWorkflowSettings:
     # Cap on heuristic pinch design networks per multiplier; 0 runs none.
     heuristic_pdm_networks: int = 10
     pdm_milp: bool = False
-    pdm_min_unit_networks: int = 0
-    pdm_extra_unit_networks: int = 0
     pdm_solver: str
     tdm_solver: str
     evm_solver: str
@@ -204,8 +202,6 @@ def workflow_settings_from_problem(
         evm_n_rm_branches=search.evm_n_rm_branches,
         heuristic_pdm_networks=search.heuristic_networks,
         pdm_milp=search.milp,
-        pdm_min_unit_networks=search.min_unit_networks,
-        pdm_extra_unit_networks=search.extra_unit_networks,
         pdm_solver=str(hens.solver_pdm),
         tdm_solver=str(hens.solver_tdm),
         evm_solver=str(hens.solver_evm),

@@ -355,8 +355,8 @@ class LocalSynthesisExecutor:
             pinch_decompositions=decompositions,
             pdm_network_limits=(
                 (
-                    resolve_search(problem.master_zone.config.hens).min_unit_networks,
-                    resolve_search(problem.master_zone.config.hens).extra_unit_networks,
+                    int(problem.master_zone.config.hens.pdm_min_unit_networks),
+                    int(problem.master_zone.config.hens.pdm_extra_unit_networks),
                 )
                 if decompositions is not None and not is_heuristic
                 else (0, 0)

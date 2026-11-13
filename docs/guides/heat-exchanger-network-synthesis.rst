@@ -197,38 +197,35 @@ The depth picks the stages run at each multiplier and their effort:
    * - Depth
      - Stages
      - Heuristic networks
-     - MILP networks
      - Evolution breadth
    * - 0
      - heuristic pinch design only
      - 10
      - none
-     - none
    * - 1
      - heuristic, then evolution
      - 10
-     - none
      - 1
    * - 2 (default)
      - heuristic and MILP; MILP through the thermal derivative method
      - 10
      - 1
-     - 1
    * - 3
      - as 2; every MILP network also straight to evolution
      - 20
-     - 1, 3 more with the fewest units, 2 with one more
      - 2
    * - 4
      - as 3
      - 50
-     - 1, 5 more with the fewest units, 5 with one more
      - 3
+
+The extra minimum-unit MILP networks are not part of the depth: set
+``HENS_PDM_MIN_UNIT_NETWORKS`` and ``HENS_PDM_EXTRA_UNIT_NETWORKS`` (both 0 by
+default) to add them at any depth that runs the MILP.
 
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
 and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
-``HENS_PDM_MIN_UNIT_NETWORKS``, ``HENS_PDM_EXTRA_UNIT_NETWORKS``,
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the depth. A call's
 ``width`` and ``depth`` win over the call's ``options``, which win over the
 stored options for that call only. The levels that ran are in

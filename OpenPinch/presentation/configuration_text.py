@@ -380,16 +380,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Pinch design minimum-unit networks", None,
         (
             "Extra pinch design networks per approach temperature with the fewest "
-            "units at the utility targets. Each seeds network evolution. 0 adds "
-            "none; unset, the search depth sets it."
+            "units at the utility targets. Each seeds network evolution. 0 adds none."
         ),
     ),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": FieldText(
         "Pinch design one-more-unit networks", None,
         (
             "Extra pinch design networks per approach temperature with one unit more "
-            "than the fewest. Each seeds network evolution. 0 adds none; unset, the "
-            "search depth sets it."
+            "than the fewest. Each seeds network evolution. 0 adds none."
         ),
     ),
     "HENS_HEURISTIC_PDM_NETWORKS": FieldText(
