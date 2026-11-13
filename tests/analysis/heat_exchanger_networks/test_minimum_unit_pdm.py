@@ -403,3 +403,72 @@ def test_an_unconverged_fewest_units_resolve_does_not_replace_the_side(monkeypat
     assert solved is not None and solved.mSuccess == 1
     assert "fewest units" not in problem.above.name
     assert "fewest units" not in problem.below.name
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_failure_collecting_variants_keeps_the_main_network(monkeypatch):
+    def broken(self, model_factories):
+        raise ValueError("variant model failed")
+
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem, "_solve_pdm_variants", broken
+    )
+    problem = _problem(14.0, (2, 1))
+
+    solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    assert problem.pdm_variants == []
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_stage_reduction_without_its_solver_keeps_the_case(monkeypatch):
+    problem = _problem(14.0, (0, 0))
+    problem.get_solution(print_output=False)
+    case = problem.case
+
+    def missing(solver_name):
+        raise MissingSynthesisSolverError(f"{solver_name} is missing")
+
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem,
+        "_get_active_stages",
+        lambda self, case, threshold=None: [0],
+    )
+    monkeypatch.setattr(backend, "require_solver_backend", missing)
+
+    assert problem.remove_unused_stages(case) is case
+
+
+def test_one_bad_variant_does_not_lose_the_others(monkeypatch):
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.errors import (
+        WorkflowContractError,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution import (
+        executor as executor_module,
+    )
+    from OpenPinch.contracts.synthesis.task import (
+        HeatExchangerNetworkSynthesisTask,
+        HeatExchangerNetworkSynthesisTaskOutcome,
+    )
+
+    def solved_outcome(task, problem, case):
+        if case == "bad":
+            raise WorkflowContractError("verification failed")
+        return HeatExchangerNetworkSynthesisTaskOutcome(task=task, status="success")
+
+    monkeypatch.setattr(executor_module, "_solved_outcome", solved_outcome)
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="run", method="pinch_design_method", dt_cont_multiplier=1.0
+    )
+    internal = SimpleNamespace(
+        pdm_variants=[SimpleNamespace(case="bad"), SimpleNamespace(case="good")]
+    )
+
+    outcomes = executor_module.LocalSynthesisExecutor()._pdm_variant_outcomes(
+        task, internal
+    )
+
+    assert [outcome.status for outcome in outcomes] == ["success"]

@@ -289,7 +289,15 @@ class LocalSynthesisExecutor:
         for index, variant in enumerate(variants, start=1):
             variant_task = _pdm_variant_task(task, index, _variant_key(task))
             variant.synthesis_task_id = variant_task.task_id
-            outcome = _solved_outcome(variant_task, variant, variant.case)
+            try:
+                outcome = _solved_outcome(variant_task, variant, variant.case)
+            except (ValueError, WorkflowContractError) as exc:
+                # One extra network that cannot be extracted or verified does
+                # not lose the others or the main network.
+                logger.warning(
+                    "Extra network %s dropped: %s", variant_task.task_id, exc
+                )
+                continue
             self._record(variant_task, outcome, variant, outcomes)
         return outcomes
 

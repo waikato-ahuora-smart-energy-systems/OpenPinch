@@ -135,7 +135,7 @@ class InternalHeatExchangerNetworkProblem:
                 and self.heuristic_network_limit <= 0
                 and self.case.mSuccess == 1
             ):
-                self.pdm_variants = self._solve_pdm_variants(model_factories)
+                self.pdm_variants = self._collect_pdm_variants(model_factories)
             if evolution:
                 evolved = self.case.get_net_benefit_evolution(
                     print_output=print_output,
@@ -355,6 +355,25 @@ class InternalHeatExchangerNetworkProblem:
         sparse.minimum_utility_cost = _minimum_utility_cost(side)
         _cleanup_model(side)
         return sparse
+
+    def _collect_pdm_variants(
+        self, model_factories: Mapping[str, Any] | None
+    ) -> list["InternalHeatExchangerNetworkProblem"]:
+        """The extra networks, or none if collecting them fails.
+
+        The main network is solved by then, so a failure here only loses the
+        extra networks.
+        """
+
+        try:
+            return self._solve_pdm_variants(model_factories)
+        except (
+            ValueError,
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        ) as exc:
+            logger.warning("[%s] extra PDM networks not collected: %s", self.name, exc)
+            return []
 
     def _solve_pdm_variants(
         self, model_factories: Mapping[str, Any] | None
@@ -631,8 +650,17 @@ class InternalHeatExchangerNetworkProblem:
         Stages carrying less than the utilisation threshold of the recovery
         are removed and the reduced network re-solved. With ``empty_only``
         only stages with no recovery go, so the network keeps its utility.
+        Reduction only simplifies a solved network, so without a solver for
+        the reduced model the case is kept.
         """
 
+        try:
+            return self._reduce_stages(case, empty_only=empty_only)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
+            logger.warning("[%s] stages not reduced: %s", case.name, exc)
+            return case
+
+    def _reduce_stages(self, case, *, empty_only: bool) -> StageWiseModel:
         if case.mSuccess != 1:
             return case
 
