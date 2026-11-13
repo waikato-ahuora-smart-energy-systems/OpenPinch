@@ -13,7 +13,7 @@ from __future__ import annotations
 import heapq
 import math
 from dataclasses import dataclass, replace
-from itertools import combinations
+from itertools import combinations, islice
 from typing import Iterator
 
 from .rules import cp_feasible, cp_rule_met, pinch_streams, split_counts
@@ -26,6 +26,8 @@ _NODES_PER_PROPOSAL = 2000
 _BISECTION_STEPS = 40
 # Pinch-match sets collected per one kept, before ordering by CP similarity.
 _COLLECTED_PER_PROPOSAL = 4
+# Partner combinations tried per must stream at one search node.
+_COMBINATIONS_PER_NODE = 64
 
 
 def cp_distance(cp_a: float, cp_b: float) -> float:
@@ -162,7 +164,17 @@ def _assignments(
         count = min(must_counts[stream.index], len(allowed))
         if count == 0 or (exact and count < must_counts[stream.index]):
             return []
-        combos = list(combinations(allowed, count))
+        # Partners in order of preference, then a bounded number of their
+        # combinations, generated lazily: listing every combination of many
+        # partners at every node does not finish.
+        allowed.sort(
+            key=lambda p: (
+                not cp_rule_met(stream, p),
+                cp_distance(stream.pinch_cp, p.pinch_cp),
+                p.index,
+            )
+        )
+        combos = list(islice(combinations(allowed, count), _COMBINATIONS_PER_NODE))
         # One-to-one CP rule first, then the most similar CPs, then partners
         # whose load ticks the stream off most closely.
         return sorted(
@@ -316,6 +328,8 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
             if proposal is None:
                 searches.remove(search)
                 continue
+            if not proposal.complete and len(incomplete) >= limit:
+                continue
             if proposal.signature in seen:
                 continue
             seen.add(proposal.signature)
@@ -344,6 +358,9 @@ class _State:
     layer: dict
     pairs: frozenset
     matches: tuple
+    # A relief stage was added: most such proposals cannot be realised, so
+    # they are never marked complete.
+    relief: bool = False
 
 
 def _completions(
@@ -416,6 +433,7 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
         layer=layer,
         pairs=frozenset((m, p) for m, p in assignment),
         matches=tuple(matches),
+        relief=split and len(matches) > len(assignment),
     )
 
 
@@ -454,7 +472,7 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
         if kind == must_kind and not _met(s, state.remaining[(kind, s.index)])
     ]
     if not open_must:
-        yield _proposal(side, state, streams, must_kind, complete=True)
+        yield _proposal(side, state, streams, must_kind, complete=not state.relief)
         return
     # The stream nearest the pinch first, so it takes the partners' slices
     # nearest the pinch before a stream far from it uses them up; then the
@@ -553,6 +571,7 @@ def _place(state: _State, must: SideStream, partner: SideStream, duty: float):
         layer=layers,
         pairs=state.pairs | {(must.index, partner.index)},
         matches=state.matches + ((hot.index, cold.index, layer, duty),),
+        relief=state.relief,
     )
 
 

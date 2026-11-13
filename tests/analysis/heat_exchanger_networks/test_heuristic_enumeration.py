@@ -289,3 +289,45 @@ def test_a_side_search_stays_within_one_node_budget(monkeypatch):
     propose_side_topologies(above, limit=5)
 
     assert calls[0] <= 20 * 5
+
+
+def test_a_relief_stage_proposal_is_not_complete():
+    # One cold stream at the pinch splits three ways and its mixed branches
+    # break the approach, so the relief stage is added. Most such proposals
+    # cannot be realised: they rank after complete ones.
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic.enumeration import (
+        _completions,
+    )
+
+    above = side(
+        "above",
+        [
+            stream("hot", 0, 6.0, 600.0, 380.0),
+            stream("hot", 1, 4.0, 200.0, 380.0),
+            stream("hot", 2, 6.0, 600.0, 380.0),
+        ],
+        [stream("cold", 0, 18.0, 3000.0, 370.0)],
+    )
+
+    proposal = next(_completions(above, ((0, 0), (1, 0), (2, 0)), nodes=[100]))
+
+    assert proposal.stages == 2
+    assert not proposal.complete
+
+
+def test_a_wide_split_among_many_partners_finishes_quickly():
+    # One must stream needing eight branches among 40 partners listed every
+    # combination at every search node and did not finish.
+    import time
+
+    below = side(
+        "below",
+        [stream("hot", i, 10.0, 100.0, 400.0) for i in range(40)],
+        [stream("cold", 0, 80.0, 1000.0, 390.0)],
+    )
+
+    start = time.perf_counter()
+    proposals = propose_side_topologies(below, limit=10)
+
+    assert proposals
+    assert time.perf_counter() - start < 10.0
