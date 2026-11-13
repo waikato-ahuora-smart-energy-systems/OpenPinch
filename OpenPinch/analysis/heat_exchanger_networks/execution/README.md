@@ -4,7 +4,7 @@
 Resolves synthesis settings from a prepared problem, plans the quality-tier pathways, and executes batches of synthesis tasks, either with the local solver executor or a deterministic fake. The `targeting` package builds tasks and calls the executors here; `results` and `reporting` consume the outcomes. Solver models come from `../models` and solver arrays from `../solver`.
 
 ## Interface
-- `SynthesisWorkflowSettings` (`settings.py`): frozen dataclass of resolved HENS controls, with derived properties (quality fraction, tier multipliers, `quality_pdm_dt_cont_multipliers`, EVM branch breadth), `heuristic_pdm_networks` (the heuristic network cap per multiplier, 0 for none) and `solver_for` / `solver_options_for` per method; the heuristic pinch design method uses the PDM solver and options.
+- `SynthesisWorkflowSettings` (`settings.py`): frozen dataclass of resolved HENS controls, with derived properties (quality fraction, tier multipliers, `quality_pdm_dt_cont_multipliers`, EVM branch breadth), `heuristic_pdm_networks` (the heuristic network cap per multiplier, 0 for none), `runs_milp_pinch_design` (`pdm_milp`, or no heuristic networks) and `solver_for` / `solver_options_for` per method; the heuristic pinch design method uses the PDM solver and options.
 - `workflow_settings_from_problem` (`settings.py`): reads `master_zone.config.hens` into settings; `dt_cont_multipliers` is `HENS_DT_CONT_MULTIPLIERS` (default `[1.0]`), and `user_dt_cont_multipliers` is true when it differs from that default.
 - `StagePackingScope` (`settings.py`): alias for the stage-packing scope string.
 - `TierPathway` (`pathways.py`): frozen description of one route through the OpenHENS workflow, with `metadata()`.

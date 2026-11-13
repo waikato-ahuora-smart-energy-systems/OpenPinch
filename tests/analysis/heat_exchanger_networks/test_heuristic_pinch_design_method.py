@@ -1,8 +1,9 @@
-"""The heuristic pinch design method as a standalone method and as seeds.
+"""The heuristic pinch design method, the default pinch design method.
 
 Heuristic networks are labelled with their own method, fan out like the
 extra PDM networks, seed network evolution and never go to the thermal
-derivative method.
+derivative method. The MILP pinch design method runs only when
+``HENS_PDM_MILP`` is set, or when ``HENS_HEURISTIC_PDM_NETWORKS`` is 0.
 """
 
 from __future__ import annotations
@@ -34,20 +35,23 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
     MissingSynthesisSolverError,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting.heuristic_pinch_design_method import (
-    _execute_heuristic_pinch_design_method_workflow,
     build_heuristic_pinch_design_method_tasks,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
     build_network_evolution_method_tasks_from_pinch_design_method,
 )
+from OpenPinch.analysis.heat_exchanger_networks.targeting.pinch_design_method import (
+    _execute_pinch_design_method_workflow,
+)
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
 from tests.analysis.heat_exchanger_networks.test_full_sequence import (
-    _small_problem_with_options,
+    _small_payload,
 )
 from tests.support.paths import REPOSITORY_ROOT
 
 HEURISTIC = HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+MILP = HeatExchangerNetworkDesignMethod.PinchDesign
 FOUR_STREAM_JSON = (
     REPOSITORY_ROOT
     / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
@@ -63,6 +67,14 @@ def _highs_available() -> bool:
 
 
 BASIC_PINCH_JSON = REPOSITORY_ROOT / "OpenPinch/tutorials/sample_cases/basic_pinch.json"
+
+
+def _small_problem_with_options(options: dict) -> PinchProblem:
+    """The small test problem with the default pinch design options."""
+    payload = _small_payload()
+    del payload["options"]["HENS_HEURISTIC_PDM_NETWORKS"]
+    payload["options"] |= options
+    return PinchProblem(source=payload, project_name="HENS Demo")
 
 
 def _pinch_problem(source, options: dict) -> PinchProblem:
@@ -92,14 +104,16 @@ def test_tasks_run_one_per_multiplier_with_the_network_cap():
     assert all(task.settings["heuristic_networks"] == 4 for task in tasks)
 
 
-def test_the_standalone_method_caps_at_ten_networks_when_unset():
+def test_by_default_the_heuristic_gives_ten_networks_and_the_milp_is_off():
     settings = workflow_settings_from_problem(_small_problem_with_options({}))
 
-    (task,) = build_heuristic_pinch_design_method_tasks(
-        replace(settings, dt_cont_multipliers=(1.0,)), standalone=True
-    )
-
-    assert task.settings["heuristic_networks"] == 10
+    assert settings.heuristic_pdm_networks == 10
+    assert settings.pdm_milp is False
+    assert settings.runs_milp_pinch_design is False
+    assert replace(settings, pdm_milp=True).runs_milp_pinch_design
+    # With no heuristic networks the MILP runs, or there would be no pinch
+    # design networks at all.
+    assert replace(settings, heuristic_pdm_networks=0).runs_milp_pinch_design
 
 
 @pytest.mark.synthesis
@@ -110,7 +124,7 @@ def test_standalone_run_gives_distinct_verified_networks_labelled_heuristic():
     )
     settings = workflow_settings_from_problem(problem)
 
-    result = _execute_heuristic_pinch_design_method_workflow(
+    result = _execute_pinch_design_method_workflow(
         problem, settings, executor=LocalSynthesisExecutor()
     )
 
@@ -126,6 +140,7 @@ def test_standalone_run_gives_distinct_verified_networks_labelled_heuristic():
     for outcome in solved:
         assert verify_network_feasibility(outcome.network) == ()
     assert result.accepted_result.method == HEURISTIC
+    assert result.accepted_result.design_method == MILP
 
 
 @pytest.mark.synthesis
@@ -134,7 +149,7 @@ def test_extra_heuristic_networks_get_their_own_variant_tasks():
     problem = _pinch_problem(BASIC_PINCH_JSON, {"HENS_DT_CONT_MULTIPLIERS": [1.0]})
     executor = LocalSynthesisExecutor()
 
-    result = _execute_heuristic_pinch_design_method_workflow(
+    result = _execute_pinch_design_method_workflow(
         problem, workflow_settings_from_problem(problem), executor=executor
     )
 
@@ -159,8 +174,8 @@ def test_heuristic_outcomes_seed_evolution_and_skip_the_derivative_method(tier):
         problem, settings, executor=executor
     )
 
-    assert executor.stage_order.index(HEURISTIC) == 1
-    assert executor.stage_order[0] == HeatExchangerNetworkDesignMethod.PinchDesign
+    assert executor.stage_order[0] == HEURISTIC
+    assert MILP not in executor.stage_order
     heuristic_ids = {t.task_id for t in result.tasks if t.method == HEURISTIC}
     assert heuristic_ids
     evolution_parents = {
@@ -177,14 +192,37 @@ def test_heuristic_outcomes_seed_evolution_and_skip_the_derivative_method(tier):
     assert not heuristic_ids & derivative_parents
 
 
-def test_without_a_network_cap_the_workflow_runs_no_heuristic_stage():
-    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+def test_the_milp_option_runs_the_milp_before_the_heuristic():
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_PDM_MILP": True}
+    )
+    executor = FakeSynthesisExecutor()
+
+    result = workflow_module.execute_open_hens_method(
+        problem, workflow_settings_from_problem(problem), executor=executor
+    )
+
+    assert executor.stage_order[:2] == [MILP, HEURISTIC]
+    milp_ids = {t.task_id for t in result.tasks if t.method == MILP}
+    derivative_parents = {
+        t.parent_task_id
+        for t in result.tasks
+        if t.method == HeatExchangerNetworkDesignMethod.ThermalDerivative
+    }
+    assert milp_ids & derivative_parents
+
+
+def test_without_a_network_cap_the_workflow_runs_only_the_milp():
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_HEURISTIC_PDM_NETWORKS": 0}
+    )
     executor = FakeSynthesisExecutor()
 
     workflow_module.execute_open_hens_method(
         problem, workflow_settings_from_problem(problem), executor=executor
     )
 
+    assert executor.stage_order[0] == MILP
     assert HEURISTIC not in executor.stage_order
 
 
@@ -229,24 +267,40 @@ def test_heuristic_tasks_build_pinch_design_problems_with_the_cap():
     assert internal.solver == str(problem.master_zone.config.hens.solver_pdm)
 
 
-def test_the_service_dispatches_the_heuristic_method():
+@pytest.mark.parametrize(
+    ("options", "stages"),
+    [({}, [HEURISTIC]), ({"HENS_PDM_MILP": True}, [MILP, HEURISTIC])],
+)
+def test_the_pinch_design_service_runs_the_heuristic_and_optionally_the_milp(
+    options, stages
+):
+    from OpenPinch.analysis.heat_exchanger_networks.service import (
+        heat_exchanger_network_synthesis_service,
+    )
+
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], **options}
+    )
+    executor = FakeSynthesisExecutor()
+
+    result = heat_exchanger_network_synthesis_service(
+        problem, method=MILP.value, executor=executor
+    )
+
+    assert executor.stage_order == stages
+    assert result.design_method == MILP
+
+
+def test_the_heuristic_is_not_a_design_method_of_its_own():
     from OpenPinch.analysis.heat_exchanger_networks.service import (
         heat_exchanger_network_synthesis_service,
     )
 
     problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
-    executor = FakeSynthesisExecutor()
 
-    result = heat_exchanger_network_synthesis_service(
-        problem, method=HEURISTIC.value, executor=executor
-    )
-
-    assert executor.stage_order == [HEURISTIC]
-    assert result.method == HEURISTIC
-    assert result.design_method == HEURISTIC
-    with pytest.raises(ValueError, match="initial_networks"):
+    with pytest.raises(ValueError, match="pinch_design_method"):
         heat_exchanger_network_synthesis_service(
-            problem, method=HEURISTIC, initial_networks=result.network
+            problem, method=HEURISTIC, executor=FakeSynthesisExecutor()
         )
 
 
@@ -265,11 +319,11 @@ def test_the_network_cap_comes_from_the_configuration():
         workflow_settings_from_problem(
             _small_problem_with_options({})
         ).heuristic_pdm_networks
-        == 0
+        == 10
     )
 
 
-def test_the_design_accessor_runs_the_heuristic_method(monkeypatch):
+def test_the_pinch_design_accessor_runs_the_heuristic_method(monkeypatch):
     import OpenPinch.analysis.heat_exchanger_networks.targeting.heuristic_pinch_design_method as heuristic_module
 
     monkeypatch.setattr(
@@ -277,6 +331,7 @@ def test_the_design_accessor_runs_the_heuristic_method(monkeypatch):
     )
     problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
 
-    design = problem.design.heuristic_pinch_design()
+    design = problem.design.pinch_design()
 
     assert design.selected_network.method == HEURISTIC
+    assert not hasattr(problem.design, "heuristic_pinch_design")

@@ -1520,6 +1520,9 @@ def _single_state_no_sweep_payload() -> dict:
             "HENS_SOLVE_TOLERANCE": 0.001,
             "HENS_STAGE_SELECTION": [1],
             "HENS_SYNTHESIS_QUALITY_TIER": 1,
+            # The MILP pinch design -> TDM -> EVM pipeline, without the
+            # heuristic.
+            "HENS_HEURISTIC_PDM_NETWORKS": 0,
         },
     }
 
@@ -1616,6 +1619,9 @@ def _small_payload() -> dict:
         "HENS_MAX_PARALLEL": 1,
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_RUN_ID": "hens-05-test",
+        # These tests cover the MILP pinch design -> TDM -> EVM pipeline, so
+        # the heuristic, the default pinch design method, is off.
+        "HENS_HEURISTIC_PDM_NETWORKS": 0,
     }
     return payload
 

@@ -383,8 +383,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Heuristic pinch design networks", None,
         (
             "Networks per approach temperature from the heuristic (Linnhoff rules) "
-            "pinch design method, each seeding network evolution. 0 runs none; the "
-            "standalone method then makes up to 10."
+            "pinch design method, the default pinch design method; each seeds "
+            "network evolution. 0 runs the MILP pinch design method instead."
+        ),
+    ),
+    "HENS_PDM_MILP": FieldText(
+        "MILP pinch design", None,
+        (
+            "Also run the MILP pinch design method (fewest units at minimum "
+            "utility cost), whose networks go to the thermal derivative method."
         ),
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(

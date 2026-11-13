@@ -223,7 +223,9 @@ def test_thermal_derivative_parent_task_builder_accepts_plain_successful_pdm():
 
 
 def test_pinch_design_workflow_wrappers_use_executor_contract(monkeypatch):
-    settings = _settings(method_sequence=("pinch_design_method",))
+    settings = _settings(
+        method_sequence=("pinch_design_method",), heuristic_pdm_networks=0
+    )
     default_executor = _RecordingExecutor()
     monkeypatch.setattr(
         pinch_design_method,

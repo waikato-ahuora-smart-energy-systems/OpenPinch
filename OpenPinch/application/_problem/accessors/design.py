@@ -404,7 +404,11 @@ class _DesignAccessor:
         )
 
     def open_hens(self, *, options=None, period_id=None, **kwargs):
-        """Run the tier-one OpenHENS PDM -> TDM -> EVM workflow."""
+        """Run the tier-one OpenHENS PDM -> TDM -> EVM workflow.
+
+        TDM refines only MILP pinch design networks, so it runs only with
+        ``HENS_PDM_MILP`` (or ``HENS_HEURISTIC_PDM_NETWORKS`` at 0).
+        """
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_open_hens_method_service,
         )
@@ -421,7 +425,12 @@ class _DesignAccessor:
         )
 
     def pinch_design(self, *, options=None, period_id=None, **kwargs):
-        """Run the pinch design method only."""
+        """Run the pinch design method only.
+
+        The heuristic (Linnhoff rules) method makes up to
+        ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier;
+        ``HENS_PDM_MILP`` adds the MILP method's networks.
+        """
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_pinch_design_method_service,
         )
@@ -432,27 +441,6 @@ class _DesignAccessor:
         return self._run(
             heat_exchanger_network_pinch_design_method_service,
             surface="pinch_design",
-            runtime=runtime,
-            configuration=configuration,
-            workspace_variant=None,
-        )
-
-    def heuristic_pinch_design(self, *, options=None, period_id=None, **kwargs):
-        """Run the heuristic (Linnhoff rules) pinch design method only.
-
-        Up to ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier,
-        or 10 when that is 0.
-        """
-        from ....analysis.heat_exchanger_networks.service import (
-            heat_exchanger_network_heuristic_pinch_design_method_service,
-        )
-
-        runtime, configuration = self._arguments(
-            options=options, period_id=period_id, **kwargs
-        )
-        return self._run(
-            heat_exchanger_network_heuristic_pinch_design_method_service,
-            surface="heuristic_pinch_design",
             runtime=runtime,
             configuration=configuration,
             workspace_variant=None,

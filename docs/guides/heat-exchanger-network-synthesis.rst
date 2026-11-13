@@ -102,7 +102,6 @@ Named Advanced Methods
    enhanced = problem.design.enhanced_heat_exchanger_network(quality_tier=2)
    open_hens = problem.design.open_hens()
    pinch_design = problem.design.pinch_design()
-   heuristic = problem.design.heuristic_pinch_design()
    thermal = problem.design.thermal_derivative(
        (pinch_design.selected_network,)
    )
@@ -114,8 +113,8 @@ Called without seed networks, ``thermal_derivative()`` and
 ``network_evolution()`` start from the design already stored on the problem,
 whichever method made it: its selected network first, then its other ranked
 topologies, up to ``HENS_BEST_SOLUTIONS_TO_SAVE`` networks in all. So
-``problem.design.heuristic_pinch_design()`` followed by
-``problem.design.network_evolution()`` evolves the heuristic networks.
+``problem.design.pinch_design()`` followed by
+``problem.design.network_evolution()`` evolves the pinch design networks.
 
 Successful synthesis stores the serializable result on
 ``problem.results.design`` (the ``TargetOutput.design`` field). The design view
@@ -129,9 +128,9 @@ all-period targeting.
 Heuristic Pinch Design
 ----------------------
 
-``problem.design.heuristic_pinch_design()`` designs networks with the
-classic Linnhoff pinch design rules instead of a MILP. On each side of the
-pinch it:
+The pinch design step, in ``problem.design.pinch_design()`` and the main
+synthesis workflow, designs networks with the classic Linnhoff pinch design
+rules by default. On each side of the pinch it:
 
 - matches the streams at the pinch that cannot use a utility on that side
   (hot streams above the pinch, cold streams below), with partners whose CP
@@ -146,8 +145,8 @@ pinch it:
 
 It enumerates the alternatives at each decision (pinch matches, optional
 splits and partners away from the pinch), streams of similar CP first, up to
-``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier, or 10 when
-that is 0. Each proposal is then solved by the pinch design side model with
+``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier (default
+10). Each proposal is then solved by the pinch design side model with
 only its matches allowed, so its duties and temperatures are consistent and
 it meets the utility targets; the sides are joined, stage-reduced and
 verified like the pinch design networks. Proposals the model cannot solve or
@@ -155,17 +154,19 @@ verify are dropped. With several operating periods, each period is designed
 on its own and a proposal is the union of one design per period, one shared
 topology.
 
-Set ``HENS_HEURISTIC_PDM_NETWORKS`` above 0 to run the method in the main
-synthesis workflow too: after the pinch design step, every heuristic network
-seeds network evolution directly, at every quality tier. They never go to the
+In the main synthesis workflow every heuristic network seeds network
+evolution directly, at every quality tier. Heuristic networks never go to the
 thermal derivative method.
+
+Set ``HENS_PDM_MILP`` to also run the MILP pinch design method, which solves
+each side for minimum utility cost and then the fewest units. Its networks go
+to the thermal derivative method as well as to evolution. With
+``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
 
 .. code-block:: python
 
-   heuristic = problem.design.heuristic_pinch_design()
-   design = problem.design.heat_exchanger_network(
-       options={"HENS_HEURISTIC_PDM_NETWORKS": 10},
-   )
+   heuristic_only = problem.design.pinch_design()
+   with_milp = problem.design.pinch_design(options={"HENS_PDM_MILP": True})
 
 Quality Tiers and Convergence
 -----------------------------

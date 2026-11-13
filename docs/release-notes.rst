@@ -344,8 +344,10 @@ Heat exchanger network synthesis
   thermal derivative method still refines only the minimum-utility network.
   Collecting them needs an integer solver (``highs``, ``couenne`` or
   ``apopt``).
-- New heuristic pinch design method, ``problem.design.heuristic_pinch_design()``
-  (``heuristic_pinch_design_method``). It proposes networks with the Linnhoff
+- The pinch design step now uses a heuristic pinch design method by default,
+  in ``problem.design.pinch_design()`` and in the main synthesis workflow
+  (networks labelled ``heuristic_pinch_design_method``). It proposes networks
+  with the Linnhoff
   pinch design rules: pinch matches by the CP and number-of-streams rules,
   stream splits where they fail, tick-off, then matches away from the pinch
   and utilities. It enumerates the alternatives at each decision up to a cap,
@@ -357,12 +359,15 @@ Heat exchanger network synthesis
   allowed, so duties, segmented streams, several utilities and multiperiod
   cases are handled as in the pinch design method; a multiperiod proposal is
   the union of one rules-based design per period. Proposals that cannot be
-  solved or verified are dropped. ``HENS_HEURISTIC_PDM_NETWORKS`` (default 0)
-  caps the networks per dt_cont multiplier: above 0, the main synthesis
-  workflow also runs the method after the pinch design step, and each
-  heuristic network seeds network evolution directly at every tier (never
-  the thermal derivative method). The standalone method makes up to 10
-  networks per multiplier when the option is 0.
+  solved or verified are dropped. ``HENS_HEURISTIC_PDM_NETWORKS`` (default
+  10) caps the networks per dt_cont multiplier. Each heuristic network seeds
+  network evolution directly at every tier, never the thermal derivative
+  method.
+- The MILP pinch design method is now opt-in: set ``HENS_PDM_MILP`` to run it
+  before the heuristic, or set ``HENS_HEURISTIC_PDM_NETWORKS`` to 0 to run it
+  alone. Only MILP networks go to the thermal derivative method, so by default
+  synthesis no longer runs that method at any quality tier, and
+  ``open_hens()`` runs it only with ``HENS_PDM_MILP``.
 
 0.8.3 (2026-11-11)
 ------------------

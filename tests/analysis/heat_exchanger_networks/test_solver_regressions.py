@@ -284,6 +284,8 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
         derivative_thresholds=(expected["best_min_dQ"],),
         best_solutions_to_save=1,
         max_parallel=1,
+        # The baseline is the MILP pinch design -> TDM -> EVM pipeline.
+        heuristic_pdm_networks=0,
     )
 
     workflow_result = execute_open_hens_method(
@@ -414,13 +416,12 @@ def _assert_live_solver_case_matches_checked_in_summary(
     problem = PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json")
 
     problem.target.all_heat_integration()
-    if max_parallel is None:
-        settings = workflow_settings_from_problem(problem)
-    else:
-        settings = replace(
-            workflow_settings_from_problem(problem),
-            max_parallel=max_parallel,
-        )
+    # The baselines are the MILP pinch design -> TDM -> EVM pipeline.
+    settings = replace(
+        workflow_settings_from_problem(problem), heuristic_pdm_networks=0
+    )
+    if max_parallel is not None:
+        settings = replace(settings, max_parallel=max_parallel)
     workflow_result = execute_open_hens_method(
         problem,
         settings,

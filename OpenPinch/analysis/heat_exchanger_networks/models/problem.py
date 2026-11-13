@@ -510,8 +510,9 @@ class InternalHeatExchangerNetworkProblem:
                 continue
             seen.add(signature)
             networks.append(variant)
-        # Results live on the model variables: drop every side's run directory.
-        for side in sides["above"] + sides["below"]:
+        # Results live on the model variables: drop every side's run directory,
+        # and the unsolved templates' that the realised sides replace.
+        for side in sides["above"] + sides["below"] + [self.above, self.below]:
             _cleanup_model(side)
         report.update(
             pairs=len(pairs), failed=failed, repeated=repeated, networks=len(networks)

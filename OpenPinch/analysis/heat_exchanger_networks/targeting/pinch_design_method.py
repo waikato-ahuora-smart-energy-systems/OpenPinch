@@ -13,6 +13,9 @@ from ..execution.pathways import (
 from ..execution.settings import SynthesisWorkflowSettings
 from ..results.assembly import SynthesisWorkflowResult
 from ._stage import run_single_method_workflow, run_stage
+from .heuristic_pinch_design_method import (
+    execute_heuristic_pinch_design_method_stage,
+)
 
 _PDM_STAGE_PAIR_SWEEP = (
     (1, 2),
@@ -36,16 +39,43 @@ def _execute_pinch_design_method_workflow(
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
-    """Execute only the PDM method and collect validated method outputs."""
+    """Execute only the pinch design stages and collect validated outputs."""
+
+    def run_stages(method_settings: SynthesisWorkflowSettings):
+        milp_tasks, milp_outcomes, heuristic_tasks, heuristic_outcomes = (
+            execute_pinch_design_stages(problem, method_settings, executor=executor)
+        )
+        return milp_tasks + heuristic_tasks, milp_outcomes + heuristic_outcomes
+
     return run_single_method_workflow(
-        settings,
-        HeatExchangerNetworkDesignMethod.PinchDesign,
-        lambda method_settings: execute_pinch_design_method_stage(
-            problem,
-            method_settings,
-            executor=executor,
-        ),
+        settings, HeatExchangerNetworkDesignMethod.PinchDesign, run_stages
     )
+
+
+def execute_pinch_design_stages(
+    problem,
+    settings: SynthesisWorkflowSettings,
+    *,
+    executor: SynthesisExecutor | None = None,
+):
+    """Run the MILP stage when it is on, then the heuristic stage.
+
+    Returns the MILP tasks and outcomes, then the heuristic ones; a stage that
+    does not run gives empty tuples.
+    """
+    milp_tasks, milp_outcomes = (), ()
+    if settings.runs_milp_pinch_design:
+        milp_tasks, milp_outcomes = execute_pinch_design_method_stage(
+            problem, settings, executor=executor
+        )
+    heuristic_tasks, heuristic_outcomes = (), ()
+    if settings.heuristic_pdm_networks > 0:
+        heuristic_tasks, heuristic_outcomes = (
+            execute_heuristic_pinch_design_method_stage(
+                problem, settings, executor=executor
+            )
+        )
+    return milp_tasks, milp_outcomes, heuristic_tasks, heuristic_outcomes
 
 
 def execute_pinch_design_method_stage(
@@ -184,4 +214,5 @@ __all__ = [
     "_execute_pinch_design_method_workflow",
     "build_pinch_design_method_tasks",
     "execute_pinch_design_method_stage",
+    "execute_pinch_design_stages",
 ]

@@ -48,7 +48,8 @@ class SynthesisWorkflowSettings:
     evm_n_rm_branches: int | None = None
     user_dt_cont_multipliers: bool = False
     # Cap on heuristic pinch design networks per multiplier; 0 runs none.
-    heuristic_pdm_networks: int = 0
+    heuristic_pdm_networks: int = 10
+    pdm_milp: bool = False
     pdm_solver: str
     tdm_solver: str
     evm_solver: str
@@ -134,6 +135,16 @@ class SynthesisWorkflowSettings:
         return 0
 
     @property
+    def runs_milp_pinch_design(self) -> bool:
+        """Whether the MILP pinch design method runs.
+
+        The heuristic is the default pinch design method; the MILP runs when
+        asked for, or when the heuristic makes no networks.
+        """
+
+        return self.pdm_milp or self.heuristic_pdm_networks <= 0
+
+    @property
     def quality_derivative_thresholds(self) -> tuple[float, ...]:
         """Return configured TDM thresholds without tier-generated sweeps."""
 
@@ -213,6 +224,7 @@ def workflow_settings_from_problem(
         user_dt_cont_multipliers=list(dt_cont_multipliers)
         != CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default,
         heuristic_pdm_networks=int(hens.heuristic_pdm_networks),
+        pdm_milp=bool(hens.pdm_milp),
         pdm_solver=str(hens.solver_pdm),
         tdm_solver=str(hens.solver_tdm),
         evm_solver=str(hens.solver_evm),

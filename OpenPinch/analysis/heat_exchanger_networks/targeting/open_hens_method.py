@@ -19,15 +19,12 @@ from ..results.assembly import (
     build_synthesis_result,
     demote_infeasible_outcomes,
 )
-from .heuristic_pinch_design_method import (
-    execute_heuristic_pinch_design_method_stage,
-)
 from .network_evolution_method import (
     execute_direct_network_evolution_method_stage,
     execute_network_evolution_method_from_pinch_design_stage,
     execute_network_evolution_method_stage,
 )
-from .pinch_design_method import execute_pinch_design_method_stage
+from .pinch_design_method import execute_pinch_design_stages
 from .thermal_derivative_method import execute_thermal_derivative_method_stage
 
 
@@ -45,23 +42,12 @@ def execute_open_hens_method(
         executor = LocalSynthesisExecutor()
     start = perf_counter()
 
-    pdm_tasks, pdm_outcomes = execute_pinch_design_method_stage(
-        problem=problem,
-        settings=settings,
-        executor=executor,
-    )
-
     # Heuristic networks seed evolution directly at every tier, as the extra
-    # PDM networks do, and never go to the thermal derivative method.
-    heuristic_tasks, heuristic_outcomes = (), ()
-    if settings.heuristic_pdm_networks > 0:
-        heuristic_tasks, heuristic_outcomes = (
-            execute_heuristic_pinch_design_method_stage(
-                problem=problem,
-                settings=settings,
-                executor=executor,
-            )
-        )
+    # PDM networks do, and never go to the thermal derivative method; only
+    # MILP networks (HENS_PDM_MILP) do.
+    pdm_tasks, pdm_outcomes, heuristic_tasks, heuristic_outcomes = (
+        execute_pinch_design_stages(problem, settings, executor=executor)
+    )
 
     pdm_outcome_map = _outcome_map(pdm_outcomes) | _outcome_map(heuristic_outcomes)
     if _can_skip_preliminary_stages_for_missing_couenne(

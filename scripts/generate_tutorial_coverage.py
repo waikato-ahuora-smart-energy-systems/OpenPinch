@@ -119,7 +119,6 @@ DESIGN_TUTORIALS = {
     "enhanced_heat_exchanger_network": 16,
     "open_hens": 16,
     "pinch_design": 16,
-    "heuristic_pinch_design": 16,
     "thermal_derivative": 16,
     "network_evolution": 16,
     "optimise_duties": 16,

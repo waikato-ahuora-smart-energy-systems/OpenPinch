@@ -672,6 +672,8 @@ def _small_problem_with_options(options: dict) -> PinchProblem:
         "HENS_MAX_PARALLEL": 1,
         "HENS_OUTPUT_FORMATS": [],
         "HENS_RUN_ID": "benchmark-test",
+        # The MILP pinch design -> TDM -> EVM pipeline, without the heuristic.
+        "HENS_HEURISTIC_PDM_NETWORKS": 0,
         **options,
     }
     return PinchProblem(source=payload, project_name="benchmark-test")
