@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import replace
 from time import perf_counter
 
@@ -124,6 +125,14 @@ def execute_open_hens_method(
                 )
             esm_tasks = tuple(esm_tasks + after_tasks)
             esm_outcomes = tuple(esm_outcomes + after_outcomes)
+
+    if esm_outcomes and not any(o.status == "success" for o in esm_outcomes):
+        warnings.warn(
+            "Every network evolution task failed, so the result is a network "
+            "that was not evolved.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     tasks = tuple(pdm_tasks + heuristic_tasks + tdm_tasks + esm_tasks)
     outcomes = demote_infeasible_outcomes(

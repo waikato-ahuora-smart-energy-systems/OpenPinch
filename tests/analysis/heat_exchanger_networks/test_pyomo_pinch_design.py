@@ -119,6 +119,42 @@ def test_relaxed_pyomo_utility_match_with_a_short_fixed_end_carries_no_duty():
 
 
 @pytest.mark.synthesis
+def test_relaxed_pyomo_utility_match_switched_off_carries_no_duty():
+    # Evolution builds a relaxed model with its utility binaries fixed at 1,
+    # then the warm start sets each to the parent's flag. A heater the parent
+    # did not use is then off, and its big-M-relaxed approach let it carry
+    # duty at any temperature: on Nine-stream Linnhoff-Ahmad every evolved
+    # network had a heater 40 K short of its approach.
+    pyo = pytest.importorskip("pyomo.environ")
+    model = SimpleNamespace(m=PyomoModel(), tol=1e-6)
+    duty = model.m.Var(value=5.0, lb=0.0, ub=10.0)
+    match = model.m.Param(value=1)
+    base_approach._set_terminal_approach_equations(
+        model,
+        match=match,
+        duty=duty,
+        inlet_shortfall=0.0,
+        outlet_margin=model.m.Param(value=-40.0),
+        big_m=100.0,
+    )
+
+    match.fix(0)
+
+    def broken(constraint):
+        body = pyo.value(constraint.body)
+        return (
+            constraint.upper is not None and body > pyo.value(constraint.upper) + 1e-9
+        ) or (
+            constraint.lower is not None and body < pyo.value(constraint.lower) - 1e-9
+        )
+
+    constraints = list(model.m.model.component_data_objects(pyo.Constraint))
+    assert any(broken(constraint) for constraint in constraints)
+    duty.set_value(0.0)
+    assert not any(broken(constraint) for constraint in constraints)
+
+
+@pytest.mark.synthesis
 def test_set_value_changes_pyomo_parameters_and_clamps_variables():
     # The segmented-stream solve loop switches its interval selectors, which
     # are parameters, between solves.
@@ -145,9 +181,7 @@ def _highs_available() -> bool:
     return True
 
 
-def _built_pdm(
-    problem, *, dTmin: float, side: str, goal: str | None = None, **options
-):
+def _built_pdm(problem, *, dTmin: float, side: str, goal: str | None = None, **options):
     return PinchDecompModel(
         **options,
         name=f"{side} pinch {dTmin}",

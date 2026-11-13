@@ -403,13 +403,19 @@ def _set_terminal_approach_equations(
     The utility inlet faces the stream's fixed target, so ``inlet_shortfall``
     is a number; the other end moves with the stream. A binary ``match``
     relaxes both by big-M. A relaxed model fixes ``match``, so a unit whose
-    fixed end falls short of its approach there can carry no duty.
+    fixed end falls short of its approach there can carry no duty. Its
+    ``match`` can change after the model is built (a warm start sets it to
+    the parent's flag), and the relaxed model has no other link from duty to
+    ``match``, so the duty is also bounded by ``match``: a unit switched off
+    carries no duty instead of duty at any temperature.
     """
     if not _is_parameter(match):
         model.m.Equation(-inlet_shortfall >= -big_m * (1 - match))
     elif inlet_shortfall > model.tol:
         model.m.Equation(duty == 0)
         return
+    else:
+        model.m.Equation(duty <= duty.ub * match)
     model.m.Equation(outlet_margin >= -big_m * (1 - match))
 
 

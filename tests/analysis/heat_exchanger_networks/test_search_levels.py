@@ -311,3 +311,35 @@ def test_the_milp_runs_where_the_heuristic_realises_no_network(depth):
         }
         assert milp[0].task_id in evolution_parents
     assert TDM not in executor.stage_order
+
+
+def test_a_warning_says_when_every_evolution_task_fails():
+    from OpenPinch.contracts.synthesis.task import (
+        HeatExchangerNetworkSynthesisTaskOutcome,
+    )
+
+    class FailingEvolution(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            if tasks and tasks[0].method == EVM:
+                self.stage_order.append(EVM)
+                return tuple(
+                    HeatExchangerNetworkSynthesisTaskOutcome(
+                        task=task, status="failed", error="verification failed"
+                    )
+                    for task in tasks
+                )
+            return super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+
+    problem = _problem({"HENS_SEARCH_DEPTH": 1, "HENS_SEARCH_WIDTH": 0})
+
+    with pytest.warns(RuntimeWarning, match="Every network evolution task failed"):
+        workflow_module.execute_open_hens_method(
+            problem,
+            workflow_settings_from_problem(problem),
+            executor=FailingEvolution(),
+        )

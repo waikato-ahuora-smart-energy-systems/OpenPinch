@@ -448,3 +448,35 @@ def test_a_heuristic_side_needing_a_missing_solver_is_dropped(monkeypatch):
 
     assert internal.get_solution(print_output=False) is None
     assert "heuristic" in internal.solution_failure_reason
+
+
+def _ipopt_available() -> bool:
+    try:
+        backend.require_solver_backend("ipopt-pyomo")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_highs_available() and _ipopt_available())", reason="needs HiGHS and Ipopt"
+)
+def test_default_synthesis_evolves_nine_stream_linnhoff_ahmad():
+    # Every evolved network failed verification here: a heater the parent
+    # did not use was switched off but still carried duty.
+    payload = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "tests/fixtures/openhens/Nine-stream-Linnhoff-and-Ahmad-1999-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    for key in ("HENS_DT_CONT_MULTIPLIERS", "HENS_SOLVER_PDM"):
+        payload["options"].pop(key, None)
+    payload["options"] |= {"HENS_OUTPUT_FORMATS": [], "HENS_MAX_PARALLEL": 1}
+    problem = PinchProblem(source=payload, project_name="nine-stream")
+
+    design = problem.design.heat_exchanger_network(width=0, depth=1)
+
+    assert design.result.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
+    assert verify_network_feasibility(design.selected_network) == ()
