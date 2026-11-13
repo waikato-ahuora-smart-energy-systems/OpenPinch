@@ -25,7 +25,7 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 - A crossed match (non-positive terminal difference) has LMTD 0 and so zero area. [area.py:_post_process_lmtd]
 - Design area of every unit is the maximum over periods; period totals are weighted by `period_weights`. [area.py:set_utility_lmtd_and_areas] [costing.py:_weighted_numeric_average]
 - Capital cost is `unit_cost * n_units` plus power-law area terms for recovery, heaters and coolers. [costing.py:set_period_totals_and_costs]
-- With a solver in `backend.INTEGER_SOLVERS` (`couenne`, `highs`) segment temperature and price profiles use interval binaries; with the others they use relaxed selectors that the solve loop updates. Approach-contribution profiles always use relaxed selectors. [piecewise.py:_set_piecewise_stage_heat_coordinates, _utility_cost_expression]
+- With a solver in `backend.INTEGER_SOLVERS` (`couenne`, `highs`, `scip`, `mindtpy`) segment temperature and price profiles use interval binaries; with the others they use relaxed selectors that the solve loop updates. Approach-contribution profiles always use relaxed selectors. [piecewise.py:_set_piecewise_stage_heat_coordinates, _utility_cost_expression]
 - Piecewise solves repeat up to eight times until active segments stop changing; failure to stabilise, or a negative objective, marks the solve failed. [execution.py:_solve_and_post_process]
 - `_set_value` clamps to variable bounds; a parameter (a fixed `PyomoModel` variable) takes the value unclamped. [execution.py:_set_value]
 - `_assign_value` writes a value unclamped onto a Pyomo variable or parameter; warm starts, amalgamation, evolution moves and stage reduction write values only through it or `_set_value`. [execution.py:_assign_value]

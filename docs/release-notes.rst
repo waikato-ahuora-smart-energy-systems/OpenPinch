@@ -253,18 +253,18 @@ Heat exchanger network synthesis
   realises no network. From depth 2 its main networks go through the thermal
   derivative method; otherwise its networks seed evolution directly.
 - A MILP pinch design side's first, minimum-utility solve stops after 600 s
-  unless ``HENS_SOLVER_OPTIONS_PDM`` sets a limit; with HiGHS its best network
-  is then kept as an unconverged result.
+  unless ``HENS_SOLVER_OPTIONS_PDM`` sets a limit (a limit set there also
+  replaces the 60 s fewest-units and minimum-unit limits). With HiGHS its best
+  network is then kept as an unconverged result, and no extra minimum-unit
+  networks are built on it.
 - Each MILP pinch design side is re-solved for the fewest units (matches,
   heaters and coolers) among those its minimum-utility solve used, at the same
   utility. Minimum utility cost leaves the match binaries free once the targets
-  are met, so HiGHS could keep thousands of matches the network did not need:
-  the pulp mill's network had 3,071 units, 2,994 of them below-pinch matches
-  mostly under 1 kW, and now has 84. The re-solve starts from the first
-  solution, stops after 60 s with the best network found, and replaces the
-  side only if it converged (or is a HiGHS solve with an incumbent) with no
-  more units or utility. On the four-stream example at 26 K the network has
-  6 units instead of 7.
+  are met, so a solver can keep many matches the network does not need (on the
+  pulp mill, thousands of below-pinch matches under 1 kW). The re-solve starts
+  from the first solution, stops after 60 s with the best network found, and
+  replaces the side only if it converged (or is a HiGHS solve with an
+  incumbent) with no more units or utility.
 - The MILP pinch design method can return several networks per dt_cont
   multiplier. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks with
   the fewest units at the minimum utility cost to collect, and
@@ -320,8 +320,11 @@ Heat exchanger network synthesis
   same optimum as Couenne on the pinch design model and is much faster on
   large cases, but it can return a different network among those with the
   same objective. A pinch design model that is not linear is solved with
-  Couenne instead, with a logged warning, keeping a time limit. Set
-  ``HENS_SOLVER_PDM`` to ``couenne`` for the previous behaviour.
+  Couenne instead, with a logged warning, keeping a time limit. Setting
+  ``HENS_SOLVER_PDM`` to ``couenne`` uses Couenne for the MILP pinch design
+  method; the previous default design also needs ``HENS_PDM_MILP: true`` and
+  ``HENS_HEURISTIC_PDM_NETWORKS: 0``, and the heuristic method always uses
+  HiGHS when it is installed.
 - ``scip`` and ``mindtpy`` are new solver names, intended for the thermal
   derivative method (``HENS_SOLVER_TDM``). ``scip`` is the SCIP global MINLP
   solver through ``pyscipopt``, which the ``synthesis`` extra now installs.
@@ -360,7 +363,8 @@ Heat exchanger network synthesis
   values. The flow-on (alpha) values that rank candidates are solved as one
   sparse linear system (0.08 s instead of 9 s on the four-stream example)
   without storing the zero coefficients of inactive matches, which made the
-  pulp mill's factorisation run for over 20 minutes.
+  pulp mill's factorisation run for over 20 minutes. A system with no unique
+  solution in [-1, 1] still falls back to neutral alpha.
 - The stage-wise models' Chen LMTD approximation no longer takes the cube root
   of a negative number: a heater or cooler at zero duty leaves its approach
   temperatures free, so the base now passes through a smooth max with zero.

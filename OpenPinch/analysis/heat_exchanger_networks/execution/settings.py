@@ -255,5 +255,6 @@ def _stage_packing_scope(hens) -> StagePackingScope:
 __all__ = [
     "StagePackingScope",
     "SynthesisWorkflowSettings",
+    "heuristic_solver",
     "workflow_settings_from_problem",
 ]

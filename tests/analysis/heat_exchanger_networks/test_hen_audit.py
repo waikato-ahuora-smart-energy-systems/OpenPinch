@@ -531,6 +531,7 @@ def test_stage_reduction_sets_shared_flags_from_every_period(monkeypatch):
     case.TAC_model = case.TAC = case.solve_time = 1.0
     case.Q_h_by_period = [[[[0.0]]], [[[6.0]]]]
     case.Q_h = case.Q_h_by_period[0]
+    case.solver_run = SimpleNamespace(converged=True)
 
     InternalHeatExchangerNetworkProblem(
         solver_arrays=object(), framework="TDM", stages=3
