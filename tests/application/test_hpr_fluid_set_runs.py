@@ -248,10 +248,24 @@ def test_a_refrigerant_list_still_returns_the_target(calls):
 def test_parallel_targets_reject_a_screen_with_no_parallel_layout(calls):
     with pytest.raises(ValueError, match="parallel_vapour_compression"):
         PinchProblem().target.vapour_compression_heat_pump(
-            refrigerants=_screen(), is_cascade_cycle=False
+            refrigerants=_screen(CASCADE, MVR), is_cascade_cycle=False
         )
 
     assert calls == []
+
+
+def test_parallel_targets_run_a_single_stage_layout(calls):
+    # A parallel screen labels its one condenser, one evaporator choice as a
+    # single stage, which a parallel cycle runs as well.
+    runs = PinchProblem().target.vapour_compression_heat_pump(
+        refrigerants=_screen(SINGLE_HOT), is_cascade_cycle=False
+    )
+
+    assert [run.fluids for run in runs.runs] == [("Ammonia",), ("n-Butane",)]
+    assert [(call["condensers"], call["evaporators"]) for call in calls] == [
+        (1, 1),
+        (1, 1),
+    ]
 
 
 def test_refrigeration_rejects_a_heat_pumping_screen(calls):
