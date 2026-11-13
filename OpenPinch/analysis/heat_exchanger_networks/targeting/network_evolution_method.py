@@ -219,10 +219,17 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
     *,
     settings: SynthesisWorkflowSettings | None = None,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate ESM tasks directly from PDM when TDM is unavailable."""
+    """Generate ESM tasks directly from PDM or heuristic pinch design outcomes.
+
+    Heuristic networks carry no tier pathways and seed evolution at every
+    tier, with the run's branch breadth.
+    """
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     for outcome in pdm_outcomes:
-        if not _successful_method(
+        heuristic = _successful_method(
+            outcome, HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+        )
+        if not heuristic and not _successful_method(
             outcome, HeatExchangerNetworkDesignMethod.PinchDesign
         ):
             continue
@@ -237,6 +244,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
             settings is not None
             and settings.synthesis_quality_tier > 1
             and not pathways
+            and not heuristic
         ):
             continue
         restrictions = required_topology_restrictions_from_outcome(

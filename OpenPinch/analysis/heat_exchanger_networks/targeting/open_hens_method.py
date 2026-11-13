@@ -19,6 +19,9 @@ from ..results.assembly import (
     build_synthesis_result,
     demote_infeasible_outcomes,
 )
+from .heuristic_pinch_design_method import (
+    execute_heuristic_pinch_design_method_stage,
+)
 from .network_evolution_method import (
     execute_direct_network_evolution_method_stage,
     execute_network_evolution_method_from_pinch_design_stage,
@@ -48,7 +51,19 @@ def execute_open_hens_method(
         executor=executor,
     )
 
-    pdm_outcome_map = _outcome_map(pdm_outcomes)
+    # Heuristic networks seed evolution directly at every tier, as the extra
+    # PDM networks do, and never go to the thermal derivative method.
+    heuristic_tasks, heuristic_outcomes = (), ()
+    if settings.heuristic_pdm_networks > 0:
+        heuristic_tasks, heuristic_outcomes = (
+            execute_heuristic_pinch_design_method_stage(
+                problem=problem,
+                settings=settings,
+                executor=executor,
+            )
+        )
+
+    pdm_outcome_map = _outcome_map(pdm_outcomes) | _outcome_map(heuristic_outcomes)
     if _can_skip_preliminary_stages_for_missing_couenne(
         settings,
         pdm_tasks,
@@ -65,6 +80,18 @@ def execute_open_hens_method(
             settings=settings,
             executor=executor,
         )
+        if heuristic_outcomes:
+            seeded_tasks, seeded_outcomes = (
+                execute_network_evolution_method_from_pinch_design_stage(
+                    problem=problem,
+                    settings=settings,
+                    pdm_outcomes=heuristic_outcomes,
+                    parent_outcomes=pdm_outcome_map,
+                    executor=executor,
+                )
+            )
+            esm_tasks = tuple(esm_tasks + seeded_tasks)
+            esm_outcomes = tuple(esm_outcomes + seeded_outcomes)
     elif settings.skips_thermal_derivative_method:
         tdm_tasks = ()
         tdm_outcomes = ()
@@ -72,7 +99,7 @@ def execute_open_hens_method(
             execute_network_evolution_method_from_pinch_design_stage(
                 problem=problem,
                 settings=settings,
-                pdm_outcomes=pdm_outcomes,
+                pdm_outcomes=pdm_outcomes + heuristic_outcomes,
                 parent_outcomes=pdm_outcome_map,
                 executor=executor,
             )
@@ -87,7 +114,7 @@ def execute_open_hens_method(
             pdm_outcomes
             if settings.synthesis_quality_tier > 1
             else tuple(o for o in pdm_outcomes if is_pdm_variant_outcome(o))
-        )
+        ) + heuristic_outcomes
         if direct_pdm_outcomes:
             direct_esm_tasks, direct_esm_outcomes = (
                 execute_network_evolution_method_from_pinch_design_stage(
@@ -130,14 +157,16 @@ def execute_open_hens_method(
             execute_network_evolution_method_from_pinch_design_stage(
                 problem=problem,
                 settings=settings,
-                pdm_outcomes=pdm_outcomes,
+                pdm_outcomes=pdm_outcomes + heuristic_outcomes,
                 parent_outcomes=pdm_outcome_map,
                 executor=executor,
             )
         )
 
-    tasks = tuple(pdm_tasks + tdm_tasks + esm_tasks)
-    outcomes = demote_infeasible_outcomes(pdm_outcomes + tdm_outcomes + esm_outcomes)
+    tasks = tuple(pdm_tasks + heuristic_tasks + tdm_tasks + esm_tasks)
+    outcomes = demote_infeasible_outcomes(
+        pdm_outcomes + heuristic_outcomes + tdm_outcomes + esm_outcomes
+    )
     return SynthesisWorkflowResult(
         tasks=tasks,
         outcomes=outcomes,

@@ -9,6 +9,7 @@ from itertools import product
 from typing import Any, Literal, Mapping, Sequence
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..extraction.service import (
     extract_heat_exchanger_network,
@@ -170,7 +171,7 @@ class InternalHeatExchangerNetworkProblem:
             self.solver_arrays,
             run_id=run_id,
             task_id=self.synthesis_task_id,
-            method=self.framework,
+            method=self._result_method(),
             dt_cont_multiplier=self.dt_cont_multiplier,
             stage_count=getattr(
                 self.case, "stages", getattr(self.case, "S", self.stages)
@@ -196,9 +197,16 @@ class InternalHeatExchangerNetworkProblem:
             workspace_variant=workspace_variant,
             period_id=period_id,
             solver_name=self.solver,
-            method=self.framework,
+            method=self._result_method(),
             stage_count=getattr(self.case, "S", self.stages),
         )
+
+    def _result_method(self) -> str:
+        """The method extracted networks are labelled with."""
+
+        if self.framework == "PDM" and self.heuristic_network_limit > 0:
+            return HeatExchangerNetworkDesignMethod.HeuristicPinchDesign.value
+        return self.framework
 
     def _build_pdm(
         self,

@@ -22,6 +22,7 @@ from ..reporting.verification import verify_network_feasibility
 
 _METHOD_SEQUENCE: tuple[HeatExchangerNetworkDesignMethod, ...] = (
     HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
     HeatExchangerNetworkDesignMethod.ThermalDerivative,
     HeatExchangerNetworkDesignMethod.NetworkEvolution,
 )

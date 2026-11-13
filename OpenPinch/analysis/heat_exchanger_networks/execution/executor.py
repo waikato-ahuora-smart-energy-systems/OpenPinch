@@ -25,6 +25,13 @@ from .pathways import pathways_from_metadata, tier_evm_branch_breadth
 
 logger = logging.getLogger(__name__)
 
+_PINCH_DESIGN_METHODS = (
+    HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
+)
+# Heuristic networks per multiplier when a task does not set its own cap.
+_HEURISTIC_NETWORKS = 10
+
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
     """Create solver workers with the interpreter's default process context."""
@@ -275,7 +282,7 @@ class LocalSynthesisExecutor:
         variants = getattr(internal_problem, "pdm_variants", None) or []
         internal_problem.pdm_variants = []
         for index, variant in enumerate(variants, start=1):
-            variant_task = _pdm_variant_task(task, index)
+            variant_task = _pdm_variant_task(task, index, _variant_key(task))
             variant.synthesis_task_id = variant_task.task_id
             outcome = _solved_outcome(variant_task, variant, variant.case)
             self._record(variant_task, outcome, variant, outcomes)
@@ -300,7 +307,10 @@ class LocalSynthesisExecutor:
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
         is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
-        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
+        is_heuristic = (
+            task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+        )
+        if task.method in _PINCH_DESIGN_METHODS:
             from ..solver.pinch_design_decomposition import (
                 build_pinch_design_decomposition,
             )
@@ -348,8 +358,13 @@ class LocalSynthesisExecutor:
                     int(problem.master_zone.config.hens.pdm_min_unit_networks),
                     int(problem.master_zone.config.hens.pdm_extra_unit_networks),
                 )
-                if decompositions is not None
+                if decompositions is not None and not is_heuristic
                 else (0, 0)
+            ),
+            heuristic_network_limit=(
+                int(task.settings.get("heuristic_networks", _HEURISTIC_NETWORKS))
+                if is_heuristic
+                else 0
             ),
         )
 
@@ -502,14 +517,22 @@ def _solved_outcome(
 
 
 def _pdm_variant_task(
-    task: HeatExchangerNetworkSynthesisTask, index: int
+    task: HeatExchangerNetworkSynthesisTask, index: int, key: str = "pdm_variant"
 ) -> HeatExchangerNetworkSynthesisTask:
-    """The task record of a PDM task's ``index``-th extra network."""
+    """The task record of a pinch design task's ``index``-th extra network."""
 
     return HeatExchangerNetworkSynthesisTask(
         **task.model_dump(exclude={"task_id", "settings"}),
-        settings={**task.settings, "pdm_variant": index},
+        settings={**task.settings, key: index},
     )
+
+
+def _variant_key(task: HeatExchangerNetworkSynthesisTask) -> str:
+    """The task-settings key that numbers a task's extra networks."""
+
+    if task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+        return "heuristic_variant"
+    return "pdm_variant"
 
 
 def _build_and_solve_root_task(
@@ -578,6 +601,7 @@ def _failed_task_outcome(
 def _model_framework(method: HeatExchangerNetworkDesignMethod) -> str:
     return {
         HeatExchangerNetworkDesignMethod.PinchDesign: "PDM",
+        HeatExchangerNetworkDesignMethod.HeuristicPinchDesign: "PDM",
         HeatExchangerNetworkDesignMethod.ThermalDerivative: "TDM",
         HeatExchangerNetworkDesignMethod.NetworkEvolution: "ESM",
     }[method]
@@ -614,6 +638,8 @@ def _task_model_approach_temperature(
 def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
     if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
         return f"P-+--PDM-m{task.dt_cont_multiplier:g}"
+    if task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+        return f"P-+--HPDM-m{task.dt_cont_multiplier:g}"
     if task.method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         stages = task.stage_count if task.stage_count is not None else "unknown"
         return f"P-S{stages}--TDM-{task.derivative_threshold}"
@@ -623,7 +649,7 @@ def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 
 def _solver_for_task(problem, method: HeatExchangerNetworkDesignMethod) -> str:
     hens = problem.master_zone.config.hens
-    if method == HeatExchangerNetworkDesignMethod.PinchDesign:
+    if method in _PINCH_DESIGN_METHODS:
         return str(hens.solver_pdm)
     if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         return str(hens.solver_tdm)
@@ -636,7 +662,7 @@ def _solver_options_for_task(
 ) -> dict[str, Any]:
     method = task.method
     hens = problem.master_zone.config.hens
-    if method == HeatExchangerNetworkDesignMethod.PinchDesign:
+    if method in _PINCH_DESIGN_METHODS:
         base_options = dict(hens.solver_options_pdm)
     elif method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         base_options = dict(hens.solver_options_tdm)

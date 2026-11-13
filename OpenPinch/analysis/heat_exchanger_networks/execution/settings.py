@@ -19,6 +19,13 @@ _OPEN_HENS_METHOD_SEQUENCE = (
     HeatExchangerNetworkDesignMethod.NetworkEvolution,
 )
 
+# The heuristic pinch design method realises its networks with the PDM
+# side models, so it runs on the PDM solver settings.
+_PINCH_DESIGN_METHODS = (
+    HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
+)
+
 
 @dataclass(frozen=True, kw_only=True)
 class SynthesisWorkflowSettings:
@@ -40,6 +47,8 @@ class SynthesisWorkflowSettings:
     evm_n_ad_branches: int | None = None
     evm_n_rm_branches: int | None = None
     user_dt_cont_multipliers: bool = False
+    # Cap on heuristic pinch design networks per multiplier; 0 runs none.
+    heuristic_pdm_networks: int = 0
     pdm_solver: str
     tdm_solver: str
     evm_solver: str
@@ -60,7 +69,7 @@ class SynthesisWorkflowSettings:
 
     def solver_for(self, method: HeatExchangerNetworkDesignMethod | None) -> str | None:
         """Return the configured solver name for one workflow method."""
-        if method == HeatExchangerNetworkDesignMethod.PinchDesign:
+        if method in _PINCH_DESIGN_METHODS:
             return self.pdm_solver
         if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
             return self.tdm_solver
@@ -72,7 +81,7 @@ class SynthesisWorkflowSettings:
         self, method: HeatExchangerNetworkDesignMethod | None
     ) -> dict[str, Any]:
         """Return user-provided solver options for one workflow method."""
-        if method == HeatExchangerNetworkDesignMethod.PinchDesign:
+        if method in _PINCH_DESIGN_METHODS:
             return dict(self.pdm_solver_options)
         if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
             return dict(self.tdm_solver_options)

@@ -107,6 +107,7 @@ class HeatExchangerNetworkDesignMethod(str, Enum):
 
     OpenHENS = "open_hens_method"
     PinchDesign = "pinch_design_method"
+    HeuristicPinchDesign = "heuristic_pinch_design_method"
     ThermalDerivative = "thermal_derivative_method"
     NetworkEvolution = "network_evolution_method"
 

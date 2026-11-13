@@ -14,6 +14,9 @@ from .execution.executor import SynthesisExecutor
 from .prepared_problem import SynthesisProblem
 from .results.assembly import SynthesisWorkflowResult
 from .results.seeds import resolve_seed_networks
+from .targeting.heuristic_pinch_design_method import (
+    _execute_heuristic_pinch_design_method_workflow,
+)
 from .targeting.network_evolution_method import (
     _execute_network_evolution_method_workflow,
 )
@@ -64,6 +67,17 @@ def heat_exchanger_network_synthesis_service(
         if initial_networks is not None:
             raise ValueError("pinch_design_method does not accept initial_networks.")
         return heat_exchanger_network_pinch_design_method_service(
+            problem,
+            options=options,
+            workspace_variant=workspace_variant,
+            executor=executor,
+        )
+    if design_method is HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+        if initial_networks is not None:
+            raise ValueError(
+                "heuristic_pinch_design_method does not accept initial_networks."
+            )
+        return heat_exchanger_network_heuristic_pinch_design_method_service(
             problem,
             options=options,
             workspace_variant=workspace_variant,
@@ -170,6 +184,28 @@ def heat_exchanger_network_pinch_design_method_service(
     return finalise_design_result(problem, target_output, workflow_result)
 
 
+def heat_exchanger_network_heuristic_pinch_design_method_service(
+    problem: SynthesisProblem,
+    *,
+    options: dict[str, Any] | None = None,
+    workspace_variant: str | None = None,
+    executor: SynthesisExecutor | None = None,
+) -> HeatExchangerNetworkSynthesisResult:
+    """Run only the heuristic pinch design method and update the problem cache."""
+
+    target_output, settings = prepare_service_context(
+        problem,
+        options=options,
+        workspace_variant=workspace_variant,
+    )
+    workflow_result = _execute_heuristic_pinch_design_method_workflow(
+        problem,
+        settings,
+        executor=executor,
+    )
+    return finalise_design_result(problem, target_output, workflow_result)
+
+
 def heat_exchanger_network_thermal_derivative_method_service(
     problem: SynthesisProblem,
     *,
@@ -268,6 +304,7 @@ def _validate_quality_tier(quality_tier: int) -> int:
 
 __all__ = [
     "heat_exchanger_network_evolution_method_service",
+    "heat_exchanger_network_heuristic_pinch_design_method_service",
     "heat_exchanger_network_open_hens_method_service",
     "heat_exchanger_network_pinch_design_method_service",
     "heat_exchanger_network_synthesis_service",

@@ -1,7 +1,7 @@
 # Heat Exchanger Network Analysis
 
 ## Overview
-Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and controllability scoring. `service.py` dispatches the OpenHENS family of methods (pinch design, thermal derivative, network evolution), `context.py` prepares settings and finalises the cached design, and the subpackages split planning, execution, extraction, reporting (including ranking), results, models, solver and targeting. Equation models live in `models`. The synthesis and duty-optimisation entry points are reached through `PinchProblem.design`; controllability is a standalone function.
+Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and controllability scoring. `service.py` dispatches the OpenHENS family of methods (pinch design, heuristic pinch design, thermal derivative, network evolution), `context.py` prepares settings and finalises the cached design, and the subpackages split planning, execution, extraction, reporting (including ranking), results, models, solver and targeting. Equation models live in `models`. The synthesis and duty-optimisation entry points are reached through `PinchProblem.design`; controllability is a standalone function.
 
 ## Interface
 - `heat_exchanger_network_synthesis_service` and per-method `heat_exchanger_network_*_method_service` functions (`service.py`): dispatch one method and update the problem cache.
@@ -23,7 +23,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 
 ## Invariants
 - Runtime options reaching this package must be a dict or `None` and must not contain `HENS_` keys; persistent controls are loaded with the problem. The `problem.design` accessors move `HENS_` keys from a call's `options` into that call's configuration before this check, so users may pass them there [context.py:normalise_runtime_options].
-- Open-HENS and PDM reject `initial_networks`; `method=None` runs tier 0 and `OpenHENS` runs tier 1 [service.py:heat_exchanger_network_synthesis_service].
+- Open-HENS, PDM and the heuristic pinch design method reject `initial_networks`; `method=None` runs tier 0 and `OpenHENS` runs tier 1 [service.py:heat_exchanger_network_synthesis_service].
 - The call-local quality tier of the OpenHENS entry points must be an integer from 0 to 5; the standalone method services use the configured tier [service.py:_validate_quality_tier].
 - An accepted design is ranked, selected and verified; verification failures raise `RuntimeError` [context.py:finalise_design_result].
 - Analysis code accepts the `PreparedProblem` protocol instead of importing the application layer [prepared_problem.py:PreparedProblem].
