@@ -21,6 +21,11 @@ from ..solver.arrays import (
     nominal_approach_temperature,
     problem_to_solver_arrays,
 )
+from ..solver.backend import require_solver_backend
+from ..solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 from .search import resolve_search
 
 logger = logging.getLogger(__name__)
@@ -649,11 +654,32 @@ def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 
 def _solver_for_task(problem, method: HeatExchangerNetworkDesignMethod) -> str:
     hens = problem.master_zone.config.hens
+    if (
+        method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+        and _highs_installed()
+    ):
+        # Each heuristic side is a small MILP with only its proposed matches
+        # allowed (a side that is not linear moves to Couenne in the side
+        # model), so HiGHS solves it whatever HENS_SOLVER_PDM names, and a
+        # missing or crashing Couenne does not lose the proposals.
+        return "highs"
+    return _configured_solver(hens, method)
+
+
+def _configured_solver(hens, method: HeatExchangerNetworkDesignMethod) -> str:
     if method in _PINCH_DESIGN_METHODS:
         return str(hens.solver_pdm)
     if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         return str(hens.solver_tdm)
     return str(hens.solver_evm)
+
+
+def _highs_installed() -> bool:
+    try:
+        require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
 
 
 def _solver_options_for_task(
@@ -662,7 +688,10 @@ def _solver_options_for_task(
 ) -> dict[str, Any]:
     method = task.method
     hens = problem.master_zone.config.hens
-    if method in _PINCH_DESIGN_METHODS:
+    if _solver_for_task(problem, method) != _configured_solver(hens, method):
+        # The configured options are for the configured solver.
+        base_options = {}
+    elif method in _PINCH_DESIGN_METHODS:
         base_options = dict(hens.solver_options_pdm)
     elif method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         base_options = dict(hens.solver_options_tdm)

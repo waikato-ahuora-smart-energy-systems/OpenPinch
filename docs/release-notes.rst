@@ -204,6 +204,11 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The heuristic pinch design method realises its proposals with HiGHS when
+  highspy is installed, whatever ``HENS_SOLVER_PDM`` names, and without the
+  ``HENS_SOLVER_OPTIONS_PDM`` meant for that solver. With Couenne configured
+  and missing, default synthesis raised; with it installed, Couenne crashed on
+  infeasible proposals that HiGHS reports cleanly.
 - At a dt_cont multiplier where the heuristic pinch design method realises no
   network, the MILP pinch design method now runs in its place, and its
   networks seed evolution as the heuristic ones would. Default synthesis

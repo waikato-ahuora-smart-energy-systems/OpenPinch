@@ -269,7 +269,12 @@ def test_heuristic_tasks_build_pinch_design_problems_with_the_cap():
     assert internal.heuristic_network_limit == 5
     assert internal.pdm_network_limits == (0, 0)
     assert set(internal.pinch_decompositions) == {"above", "below"}
-    assert internal.solver == str(problem.master_zone.config.hens.solver_pdm)
+    # HiGHS realises the heuristic sides when it is installed.
+    assert internal.solver == (
+        "highs"
+        if _highs_available()
+        else str(problem.master_zone.config.hens.solver_pdm)
+    )
 
 
 @pytest.mark.parametrize(
@@ -368,3 +373,28 @@ def test_default_pinch_design_gives_a_network_where_the_heuristic_cannot():
 
     assert design.selected_network.exchangers
     assert verify_network_feasibility(design.selected_network) == ()
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_the_heuristic_realises_its_sides_with_highs_whatever_the_pdm_solver(
+    monkeypatch,
+):
+    from OpenPinch.analysis.heat_exchanger_networks.solver import dependencies
+
+    real = dependencies.require_solver_binary
+
+    def no_couenne(binary_name, *, purpose=None):
+        if binary_name == "couenne":
+            raise MissingSynthesisSolverError("couenne was not found on PATH")
+        return real(binary_name, purpose=purpose)
+
+    monkeypatch.setattr(backend, "require_solver_binary", no_couenne)
+    problem = _pinch_problem(
+        FOUR_STREAM_JSON,
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_SOLVER_PDM": "couenne"},
+    )
+
+    design = problem.design.heat_exchanger_network(depth=0)
+
+    assert design.selected_network.method == HEURISTIC.value
