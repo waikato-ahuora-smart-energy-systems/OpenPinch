@@ -393,6 +393,27 @@ def test_unconverged_outcome_is_demoted_before_ranking() -> None:
     assert demoted.network is not None
 
 
+def test_only_unconverged_outcomes_say_which_solver_limit_to_raise() -> None:
+    # Every task stopped at a solver limit: the error names the options that
+    # raise it, not only the termination.
+    from OpenPinch.analysis.heat_exchanger_networks.results.assembly import (
+        build_synthesis_result,
+    )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)[:1]
+    (outcome,) = FakeSynthesisExecutor().execute(
+        pdm_tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    unconverged = outcome.model_copy(
+        update={"diagnostics": {"unconverged_termination": "maxTimeLimit"}}
+    )
+
+    with pytest.raises(WorkflowContractError, match="HENS_SOLVER_OPTIONS_PDM"):
+        build_synthesis_result(settings, pdm_tasks, [unconverged])
+
+
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
     settings = workflow_settings_from_problem(_small_problem())
 

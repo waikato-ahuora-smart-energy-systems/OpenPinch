@@ -9,7 +9,7 @@ from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..execution.search import reference_dt_cont_multiplier
 from ..execution.settings import SynthesisWorkflowSettings
-from ..results.assembly import SynthesisWorkflowResult
+from ..results.assembly import SynthesisWorkflowResult, demote_infeasible_outcomes
 from ._stage import run_single_method_workflow, run_stage
 from .heuristic_pinch_design_method import (
     execute_heuristic_pinch_design_method_stage,
@@ -58,9 +58,10 @@ def execute_pinch_design_stages(
 ):
     """Run the MILP stage when it is on, then the heuristic stage.
 
-    At a multiplier where the heuristic realises no network, the MILP runs in
-    its place. Returns the MILP tasks and outcomes, then the heuristic ones; a
-    stage that does not run gives empty tuples.
+    At a multiplier where the heuristic realises no network that stays in
+    the result, the MILP runs in its place. Returns the MILP tasks and
+    outcomes, then the heuristic ones; a stage that does not run gives empty
+    tuples.
     """
     milp_tasks, milp_outcomes = (), ()
     if settings.runs_milp_pinch_design:
@@ -75,9 +76,11 @@ def execute_pinch_design_stages(
             )
         )
     if not settings.runs_milp_pinch_design:
+        # Counted after demotion: a network that stopped before converging,
+        # or fails the feasibility check, is not in the result.
         realised = {
             float(outcome.task.dt_cont_multiplier)
-            for outcome in heuristic_outcomes
+            for outcome in demote_infeasible_outcomes(heuristic_outcomes)
             if outcome.status == "success"
         }
         missing = tuple(

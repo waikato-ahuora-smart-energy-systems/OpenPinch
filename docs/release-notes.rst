@@ -265,6 +265,12 @@ Heat exchanger network synthesis
   from the first solution, stops after 60 s with the best network found, and
   replaces the side only if it converged (or is a HiGHS solve with an
   incumbent) with no more units or utility.
+- The MILP pinch design method runs in the heuristic's place at a multiplier
+  where every heuristic network is left out of the result (it stopped before
+  converging, or fails the feasibility check), not only where none was
+  realised. When no converged network remains because a solve stopped at a
+  solver limit, the ``WorkflowContractError`` names the options that raise
+  the limit (``HENS_SOLVER_OPTIONS_PDM``, ``_TDM`` or ``_EVM``).
 - The MILP pinch design method can return several networks per dt_cont
   multiplier. ``HENS_PDM_MIN_UNIT_NETWORKS`` sets how many extra networks with
   the fewest units at the minimum utility cost to collect, and

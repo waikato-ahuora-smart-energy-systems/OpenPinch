@@ -153,6 +153,13 @@ def _accepted_outcome(
     message = "heat exchanger network synthesis produced no successful task outcomes."
     if detail:
         message = f"{message} Failed task details: {detail}"
+    if any("unconverged_termination" in outcome.diagnostics for outcome in outcomes):
+        message = (
+            f"{message} A solve stopped at a solver limit before converging: "
+            "raise the limit (time_limit for HiGHS, max_iter for Ipopt) in "
+            "HENS_SOLVER_OPTIONS_PDM, HENS_SOLVER_OPTIONS_TDM or "
+            "HENS_SOLVER_OPTIONS_EVM."
+        )
     raise WorkflowContractError(message)
 
 

@@ -313,6 +313,33 @@ def test_the_milp_runs_where_the_heuristic_realises_no_network(depth):
     assert TDM not in executor.stage_order
 
 
+def test_the_milp_runs_where_every_heuristic_network_is_later_demoted():
+    # A heuristic network that solved but stopped before converging (or fails
+    # the post-solve feasibility check) is demoted out of the result, so a
+    # multiplier with only such networks needs the MILP too.
+    problem = _problem({"HENS_SEARCH_DEPTH": 0, "HENS_SEARCH_WIDTH": 1})
+    settings = workflow_settings_from_problem(problem)
+
+    class Unconverged(FakeSynthesisExecutor):
+        def execute(self, tasks, **kwargs):
+            return tuple(
+                outcome.model_copy(
+                    update={"diagnostics": {"unconverged_termination": "maxTimeLimit"}}
+                )
+                if outcome.task.method == HEURISTIC
+                and outcome.task.dt_cont_multiplier == 0.75
+                else outcome
+                for outcome in super().execute(tasks, **kwargs)
+            )
+
+    result = workflow_module.execute_open_hens_method(
+        problem, settings, executor=Unconverged()
+    )
+
+    milp = [task for task in result.tasks if task.method == MILP]
+    assert [task.dt_cont_multiplier for task in milp] == [0.75]
+
+
 def test_a_warning_says_when_every_evolution_task_fails():
     from OpenPinch.contracts.synthesis.task import (
         HeatExchangerNetworkSynthesisTaskOutcome,

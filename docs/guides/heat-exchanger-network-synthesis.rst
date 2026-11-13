@@ -253,7 +253,9 @@ limit, is logged as an ``[Unconverged]`` warning. Its network still seeds the
 steps that follow, but it is left out of the final ranking, so a low objective
 from an unconverged model cannot win on cost. Networks that fail
 ``verify_network_feasibility`` are left out in the same way. When no converged,
-feasible network remains, the design method raises ``WorkflowContractError``.
+feasible network remains, the design method raises ``WorkflowContractError``;
+if a solve stopped at a limit, the error names the solver options that raise
+it.
 
 Duty Allocation on a Fixed Network
 ----------------------------------
