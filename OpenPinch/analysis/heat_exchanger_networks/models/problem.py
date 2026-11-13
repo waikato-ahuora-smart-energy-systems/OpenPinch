@@ -453,9 +453,10 @@ class InternalHeatExchangerNetworkProblem:
     ) -> list:
         """The primary side, then its minimum-unit and one-more-unit sides.
 
-        Up to ``quotas[0]`` sides with the primary's (fewest) units, then,
-        with at least one unit more required, up to ``quotas[1]`` with one
-        unit more. Only a sound solve counts (``_sound_side``).
+        Up to ``quotas[0]`` sides with the fewest units (the primary's, or
+        fewer if a side found has fewer), then, with at least one unit more
+        required, up to ``quotas[1]`` with one unit more. Only a sound solve
+        counts (``_sound_side``).
         """
 
         if not primary.side_required or primary.mSuccess != 1:
@@ -502,17 +503,38 @@ class InternalHeatExchangerNetworkProblem:
             excluded.append(side.used_units())
             return side
 
-        for units, quota, floor in (
-            (fewest, at_minimum, None),
-            (fewest + 1, one_more, fewest + 1),
-        ):
-            kept = 0
-            while kept < quota:
-                side = solve(floor)
-                if side is None or side.n_units != units:
-                    break
-                found.append(side)
-                kept += 1
+        # Minimum tier. The cut-only search finds the fewest units first; the
+        # primary was minimised only within its own matches, so a side with
+        # fewer units than it resets the minimum.
+        carried = None
+        kept = 0
+        while kept < at_minimum:
+            side = solve(None)
+            if side is None:
+                break
+            if side.n_units > fewest:
+                carried = side
+                break
+            fewest = side.n_units
+            found.append(side)
+            kept += 1
+        # One-more tier, at least one unit over the minimum.
+        kept = 0
+        if carried is not None:
+            if carried.n_units == fewest + 1 and one_more > 0:
+                found.append(carried)
+                kept = 1
+            else:
+                _cleanup_model(carried)
+        while kept < one_more:
+            side = solve(fewest + 1)
+            if side is None:
+                break
+            if side.n_units != fewest + 1:
+                _cleanup_model(side)
+                break
+            found.append(side)
+            kept += 1
         return [primary, *found]
 
     def _solve_heuristic_pdm(self) -> None:

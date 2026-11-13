@@ -541,11 +541,12 @@ def test_the_one_more_unit_quota_is_filled_after_the_minimum_one():
 
     problem.get_solution(print_output=False)
 
+    # Unit tiers are counted on the pinch sides.
     units = sorted(
-        _units(variant.extract_network(run_id="pdm"))
+        variant.above.n_units + variant.below.n_units
         for variant in problem.pdm_variants
     )
-    assert units and units[-1] > units[0]
+    assert units and units[-1] == units[0] + 1
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
@@ -571,3 +572,19 @@ def test_the_primary_pinch_design_solve_is_time_limited(monkeypatch):
     problem.get_solution(print_output=False)
 
     assert limits and all(limit == backend.PDM_TIME_LIMIT for limit in limits)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_side_with_fewer_units_than_the_primary_is_kept():
+    # The fewest-units re-solve only searches the primary's own matches, so
+    # the primary can have more units than the true minimum (13 against 9
+    # above the pinch on Ten-stream Ahmad); such a side was discarded.
+    source = REPOSITORY_ROOT / "tests/fixtures/openhens/Ten-stream-Ahmad-1985-1.json"
+    problem = _problem(10.0, (3, 3), source=source)
+
+    problem.get_solution(print_output=False)
+
+    # Unit tiers are counted on the pinch sides: amalgamation and stage
+    # reduction change the network's own count.
+    above = [variant.above.n_units for variant in problem.pdm_variants]
+    assert above and min(above) < problem.above.n_units
