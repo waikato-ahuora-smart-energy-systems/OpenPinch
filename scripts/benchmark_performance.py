@@ -531,7 +531,8 @@ class BenchmarkTraceExecutor:
                 continue
 
             outcome = task_outcomes[0]
-            outcomes.append(outcome)
+            # A pinch design task's extra networks follow as extra outcomes.
+            outcomes.extend(task_outcomes)
             self.executed_tasks.append(task)
             self._record_task(
                 _task_record(

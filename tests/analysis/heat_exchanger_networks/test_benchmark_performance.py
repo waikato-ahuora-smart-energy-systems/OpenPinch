@@ -206,6 +206,39 @@ def test_benchmark_trace_executor_forwards_max_parallel_to_delegate() -> None:
     assert trace_executor.task_records[0]["max_parallel"] == 4
 
 
+def test_benchmark_trace_executor_keeps_the_extra_networks_of_a_task() -> None:
+    benchmark = _load_benchmark_module()
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="run-1",
+        method="heuristic_pinch_design_method",
+        dt_cont_multiplier=1.0,
+    )
+    variant = HeatExchangerNetworkSynthesisTask(
+        run_id="run-1",
+        method="heuristic_pinch_design_method",
+        dt_cont_multiplier=1.0,
+        settings={"heuristic_variant": 1},
+    )
+
+    class VariantExecutor:
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            return tuple(
+                HeatExchangerNetworkSynthesisTaskOutcome(
+                    task=each, status="failed", solver_status="failed", error="x"
+                )
+                for each in (tasks[0], variant)
+            )
+
+    trace_executor = benchmark.BenchmarkTraceExecutor(delegate=VariantExecutor())
+
+    outcomes = trace_executor.execute(
+        (task,), problem=None, parent_outcomes={}, max_parallel=1
+    )
+
+    # A pinch design task's extra networks come back as extra outcomes.
+    assert [o.task.task_id for o in outcomes] == [task.task_id, variant.task_id]
+
+
 def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> None:
     benchmark = _load_benchmark_module()
 

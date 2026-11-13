@@ -138,7 +138,7 @@ pinch it:
   utility that can reach them.
 
 It enumerates the alternatives at each decision (pinch matches, optional
-splits and partners away from the pinch), up to
+splits and partners away from the pinch), streams of similar CP first, up to
 ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier, or 10 when
 that is 0. Each proposal is then solved by the pinch design side model with
 only its matches allowed, so its duties and temperatures are consistent and

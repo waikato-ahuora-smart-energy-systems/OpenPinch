@@ -67,6 +67,25 @@ class SideStream:
             np.interp(heat_from_pinch, self.heats[period], self.temperatures[period])
         )
 
+    def cp_at(self, heat_from_pinch: float) -> float:
+        """The period-weighted CP ``heat_from_pinch`` kW from the pinch end.
+
+        In each active period the position is scaled by that period's load,
+        and the CP is that of the profile segment there.
+        """
+
+        values, weights = [], []
+        for n, load in enumerate(self.loads):
+            if load <= 0.0:
+                continue
+            heats, temperatures = self.heats[n], self.temperatures[n]
+            q = min(max(heat_from_pinch * load / self.load, 0.0), heats[-1])
+            k = min(int(np.searchsorted(heats, q, side="right")) - 1, len(heats) - 2)
+            span = abs(temperatures[k + 1] - temperatures[k])
+            values.append((heats[k + 1] - heats[k]) / span if span > 0.0 else 0.0)
+            weights.append(self.weights[n])
+        return _weighted_mean(values, weights) if values else 0.0
+
     def period_view(self, period: int) -> "SideStream":
         """This stream in one period, as a single-period stream."""
 

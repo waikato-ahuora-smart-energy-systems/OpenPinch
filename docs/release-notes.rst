@@ -341,7 +341,11 @@ Heat exchanger network synthesis
   (``heuristic_pinch_design_method``). It proposes networks with the Linnhoff
   pinch design rules: pinch matches by the CP and number-of-streams rules,
   stream splits where they fail, tick-off, then matches away from the pinch
-  and utilities. It enumerates the alternatives at each decision up to a cap.
+  and utilities. It enumerates the alternatives at each decision up to a cap,
+  exploring matches between streams of similar CP first (smallest
+  ``|ln(CP_hot / CP_cold)|``, at the matched end of segmented streams; away
+  from the pinch, after matches that tick a stream off), so the cap keeps the
+  most CP-similar topologies.
   The pinch design side models realise each proposal with only its matches
   allowed, so duties, segmented streams, several utilities and multiperiod
   cases are handled as in the pinch design method; a multiperiod proposal is

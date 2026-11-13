@@ -86,6 +86,8 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   `heuristic`, and `combined_distinct_target_meeting_topologies` counts both; the heuristic stage is labelled
   `heuristic_pdm` and evolution seeded from either pinch design method `direct_evm_from_pdm`
   [benchmark_performance.py:network_meets_pinch_targets, pdm_topology_summary, acceptance_metrics, _stage_label].
+- The benchmark trace executor runs tasks one at a time and returns every outcome the delegate gives for a task, so the
+  extra networks of a pinch design or heuristic task are kept [benchmark_performance.py:BenchmarkTraceExecutor.execute].
 - The OpenHENS comparison needs an OpenHENS checkout that exposes the modules it imports
   [compare_openhens_openpinch_top5.py:_supported_openhens_checkout].
 - Public members of the target, all-period, design and plot accessors (and their batch counterparts) need a tutorial mapping or an entry in

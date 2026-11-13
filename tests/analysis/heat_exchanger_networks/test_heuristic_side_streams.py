@@ -125,3 +125,12 @@ def test_multiperiod_decisions_use_period_weighted_means_over_active_periods():
         sum(weights[n] * stream.pinch_cps[n] for n in active)
         / sum(weights[n] for n in active)
     )
+
+
+def test_segmented_cp_at_a_match_end_follows_the_segment_there():
+    above, _below = _sides(_segmented_problem(cold_second_duty=200.0), 10.0)
+    hot = above.hot[0]
+
+    # From the outlet: 100 kW on the 2 kW/K segment, then 50 kW on 1 kW/K.
+    assert hot.cp_at(50.0) == pytest.approx(2.0)
+    assert hot.cp_at(120.0) == pytest.approx(1.0)

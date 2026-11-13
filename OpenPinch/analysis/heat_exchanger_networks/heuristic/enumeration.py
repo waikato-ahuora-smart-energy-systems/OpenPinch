@@ -11,6 +11,7 @@ topologies only: the pinch side model realises their duties.
 from __future__ import annotations
 
 import heapq
+import math
 from dataclasses import dataclass
 from itertools import combinations
 from typing import Iterator
@@ -23,6 +24,16 @@ LOAD_FRACTION_TOLERANCE = 1e-3
 # DFS nodes allowed per proposal requested, across a side's search.
 _NODES_PER_PROPOSAL = 2000
 _BISECTION_STEPS = 40
+# Pinch-match sets collected per one kept, before ordering by CP similarity.
+_COLLECTED_PER_PROPOSAL = 4
+
+
+def cp_distance(cp_a: float, cp_b: float) -> float:
+    """CP dissimilarity of a match, ``|ln(CP_a / CP_b)|``; 0 for equal CPs."""
+
+    if cp_a <= 0.0 or cp_b <= 0.0:
+        return math.inf
+    return abs(math.log(cp_a / cp_b))
 
 
 @dataclass(frozen=True)
@@ -152,19 +163,22 @@ def _assignments(
         if count == 0 or (exact and count < must_counts[stream.index]):
             return []
         combos = list(combinations(allowed, count))
-        # One-to-one CP rule first, then partners whose load ticks the
-        # stream off most closely.
+        # One-to-one CP rule first, then the most similar CPs, then partners
+        # whose load ticks the stream off most closely.
         return sorted(
             combos,
             key=lambda combo: (
                 not all(cp_rule_met(stream, p) for p in combo),
+                sum(cp_distance(stream.pinch_cp, p.pinch_cp) for p in combo),
                 abs(sum(p.load for p in combo) - stream.load),
                 tuple(p.index for p in combo),
             ),
         )
 
     def search(position: int, edges: list, used: dict[int, int]) -> None:
-        if len(found) >= limit or budget[0] <= 0:
+        # Collect past the cap, within the node budget, so the CP ordering
+        # below decides which sets the cap keeps.
+        if len(found) >= _COLLECTED_PER_PROPOSAL * limit or budget[0] <= 0:
             return
         budget[0] -= 1
         if position == len(order):
@@ -181,7 +195,20 @@ def _assignments(
             search(position + 1, new_edges, new_used)
 
     search(0, [], {})
-    return sorted(found, key=lambda edges: (_split_count(edges), found.index(edges)))
+    # Fewer splits first, then the most similar CPs over the whole set.
+    by_index = {s.index: s for s in must}
+    partner_by_index = {s.index: s for s in partners}
+    return sorted(
+        found,
+        key=lambda edges: (
+            _split_count(edges),
+            sum(
+                cp_distance(by_index[m].pinch_cp, partner_by_index[p].pinch_cp)
+                for m, p in edges
+            ),
+            edges,
+        ),
+    )[:limit]
 
 
 def _split_count(edges) -> int:
@@ -394,9 +421,14 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
         yield _proposal(side, state, streams, must_kind, complete=False)
         return
     must_remaining = state.remaining[(must.kind, must.index)]
+    must_cp = must.cp_at(state.used[(must.kind, must.index)])
+    # Tick-off first, then the most similar CP at the matched ends, then duty.
     candidates.sort(
         key=lambda item: (
             item[1] < must_remaining - _tolerance(must),
+            cp_distance(
+                must_cp, item[0].cp_at(state.used[(item[0].kind, item[0].index)])
+            ),
             -item[1],
             item[0].index,
         )
@@ -525,6 +557,7 @@ def _met(stream: SideStream, remaining: float) -> bool:
 
 __all__ = [
     "LOAD_FRACTION_TOLERANCE",
+    "cp_distance",
     "ProposedMatch",
     "SideProposal",
     "pinch_assignments",

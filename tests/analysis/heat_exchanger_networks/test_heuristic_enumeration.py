@@ -150,3 +150,41 @@ def test_a_multiperiod_proposal_is_the_union_of_each_periods_design():
 
     assert {(m.hot, m.cold, m.stage) for m in first.matches} == {(0, 0, 0), (0, 1, 0)}
     assert first.complete
+
+
+def test_with_a_cap_of_one_the_most_cp_similar_pinch_match_is_kept():
+    # The 6 kW/K cold stream's load would tick the hot stream off exactly,
+    # but the 2.2 kW/K one is closer in CP.
+    above = side(
+        "above",
+        [stream("hot", 0, 2.0, 100.0, 100.0)],
+        [stream("cold", 0, 2.2, 300.0, 90.0), stream("cold", 1, 6.0, 100.0, 90.0)],
+    )
+
+    (kept,) = propose_side_topologies(above, limit=1)
+
+    pinch = {(m.hot, m.cold) for m in kept.matches if m.stage == kept.stages - 1}
+    assert pinch == {(0, 0)}
+    assert pinch_assignments(above, limit=2) == [((0, 0),), ((0, 1),)]
+
+
+def test_away_from_the_pinch_the_most_cp_similar_partner_comes_first():
+    # The hot stream away from the pinch ticks off against either cold
+    # stream; the 1.1 kW/K one is closer in CP than the 6 kW/K one.
+    above = side(
+        "above",
+        [
+            stream("hot", 0, 2.0, 100.0, 100.0),
+            stream("hot", 1, 1.0, 40.0, 200.0, at_pinch=False),
+        ],
+        [
+            stream("cold", 0, 2.0, 100.0, 90.0),
+            stream("cold", 1, 6.0, 300.0, 95.0, at_pinch=False),
+            stream("cold", 2, 1.1, 200.0, 95.0, at_pinch=False),
+        ],
+    )
+
+    (kept,) = propose_side_topologies(above, limit=1)
+
+    away = {(m.hot, m.cold) for m in kept.matches if m.hot == 1}
+    assert away == {(1, 2)}
