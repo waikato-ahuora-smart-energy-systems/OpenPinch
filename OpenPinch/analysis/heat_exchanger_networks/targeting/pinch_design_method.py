@@ -5,11 +5,6 @@ from __future__ import annotations
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
-from ..execution.pathways import (
-    TierPathway,
-    pathway_metadata,
-    tier_pathways,
-)
 from ..execution.settings import SynthesisWorkflowSettings
 from ..results.assembly import SynthesisWorkflowResult
 from ._stage import run_single_method_workflow, run_stage
@@ -99,115 +94,45 @@ def build_pinch_design_method_tasks(
     *,
     problem=None,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate root PDM tasks by sweeping the configured dt_cont multipliers."""
+    """One MILP pinch design task per dt_cont multiplier.
+
+    ``HENS_PDM_STAGE_PAIR_LIMIT`` adds candidates with set stage counts
+    above and below the pinch, at the first multiplier.
+    """
     del problem
-    return _build_pathway_pinch_design_method_tasks(settings)
-
-
-def _build_pathway_pinch_design_method_tasks(
-    settings: SynthesisWorkflowSettings,
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    pathways = tier_pathways(settings)
-    tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    grouped: dict[tuple[str, float], list[TierPathway]] = {}
-
-    for pathway in pathways:
-        if pathway.exact_open_hens:
-            for multiplier in settings.dt_cont_multipliers:
-                tasks.append(
-                    HeatExchangerNetworkSynthesisTask(
-                        run_id=settings.run_id,
-                        method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                        dt_cont_multiplier=multiplier,
-                        problem_id=settings.problem_id,
-                        workspace_variant=settings.workspace_variant,
-                        period_id=settings.period_id,
-                        metadata=pathway_metadata((pathway,)),
-                    )
-                )
-            continue
-        if pathway.multiplier is None:
-            continue
-        key = (pathway.pdm_mode, float(pathway.multiplier))
-        grouped.setdefault(key, []).append(pathway)
-
-    for (pdm_mode, multiplier), grouped_pathways in grouped.items():
-        settings_data = {"pdm_mode": pdm_mode}
+    tasks = [
+        _pinch_design_task(settings, multiplier)
+        for multiplier in dict.fromkeys(settings.dt_cont_multipliers)
+    ]
+    multiplier = float(settings.dt_cont_multipliers[0])
+    for above_stages, below_stages in _PDM_STAGE_PAIR_SWEEP[
+        : settings.quality_pdm_stage_pair_count
+    ]:
         tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                dt_cont_multiplier=multiplier,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                settings=settings_data,
-                metadata=pathway_metadata(grouped_pathways),
-            )
-        )
-
-    if settings.quality_pdm_stage_pair_count <= 0:
-        return tuple(tasks)
-    return _with_quality_pdm_tasks(settings, tuple(tasks))
-
-
-def _with_quality_pdm_tasks(
-    settings: SynthesisWorkflowSettings,
-    tasks: tuple[HeatExchangerNetworkSynthesisTask, ...],
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    seen = {
-        (
-            float(task.dt_cont_multiplier),
-            tuple(int(value) for value in task.settings.get("stage_selection", ())),
-        )
-        for task in tasks
-    }
-    quality_tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    candidate_multipliers = settings.quality_pdm_dt_cont_multipliers
-    for multiplier in candidate_multipliers:
-        key = (float(multiplier), ())
-        if key in seen:
-            continue
-        seen.add(key)
-        quality_tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                dt_cont_multiplier=multiplier,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                metadata={"quality_candidate": "dt_cont_multiplier"},
-            )
-        )
-
-    stage_pair_count = settings.quality_pdm_stage_pair_count
-    if stage_pair_count <= 0:
-        return (*tasks, *quality_tasks)
-
-    stage_pair_multiplier = (
-        candidate_multipliers[0]
-        if candidate_multipliers
-        else float(settings.dt_cont_multipliers[0])
-    )
-    for above_stages, below_stages in _PDM_STAGE_PAIR_SWEEP[:stage_pair_count]:
-        key = (float(stage_pair_multiplier), (above_stages, below_stages))
-        if key in seen:
-            continue
-        seen.add(key)
-        quality_tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.PinchDesign,
-                dt_cont_multiplier=stage_pair_multiplier,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
+            _pinch_design_task(
+                settings,
+                multiplier,
                 settings={"stage_selection": [above_stages, below_stages]},
                 metadata={"quality_candidate": "stage_pair"},
             )
         )
-    return (*tasks, *quality_tasks)
+    return tuple(tasks)
+
+
+def _pinch_design_task(
+    workflow: SynthesisWorkflowSettings,
+    multiplier: float,
+    **fields,
+) -> HeatExchangerNetworkSynthesisTask:
+    return HeatExchangerNetworkSynthesisTask(
+        run_id=workflow.run_id,
+        method=HeatExchangerNetworkDesignMethod.PinchDesign,
+        dt_cont_multiplier=multiplier,
+        problem_id=workflow.problem_id,
+        workspace_variant=workflow.workspace_variant,
+        period_id=workflow.period_id,
+        **fields,
+    )
 
 
 __all__ = [

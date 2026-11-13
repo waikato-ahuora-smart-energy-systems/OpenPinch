@@ -103,7 +103,7 @@ def _pinch_problem(options: dict) -> PinchProblem:
     payload["options"] = payload["options"] | {
         "HENS_SOLVER_PDM": "highs",
         "HENS_DT_CONT_MULTIPLIERS": [1.4],
-        "HENS_SYNTHESIS_QUALITY_TIER": 1,
+        "HENS_SEARCH_DEPTH": 2,
         **options,
     }
     pinch = PinchProblem(source=payload, project_name="Four-stream")
@@ -205,7 +205,7 @@ def test_pdm_variants_seed_evolution_directly_and_skip_the_derivative_method():
 
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
-    assert settings.synthesis_quality_tier == 1
+    assert settings.search_depth == 2
 
     result = execute_open_hens_method(problem, settings, executor=VariantExecutor())
 

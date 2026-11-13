@@ -67,9 +67,10 @@ def _stream_keys(problem: PinchProblem) -> list[str]:
     return list(_streams(problem))
 
 
-def test_dt_cont_multipliers_default_to_one():
-    assert CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default == [1.0]
-    assert Configuration().hens.dt_cont_multipliers == [1.0]
+def test_dt_cont_multipliers_are_unset_by_default():
+    # Unset, the search width picks them.
+    assert CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default is None
+    assert Configuration().hens.dt_cont_multipliers is None
 
 
 def test_approach_temperatures_option_is_retired():
@@ -107,14 +108,12 @@ def test_nominal_approach_temperature_is_twice_the_scaled_reference():
 
 def test_settings_resolve_the_multiplier_sweep():
     default = workflow_settings_from_problem(_basic_pinch())
-    assert default.dt_cont_multipliers == (1.0,)
-    assert default.user_dt_cont_multipliers is False
+    assert default.dt_cont_multipliers == (0.75, 1.0, 1.5)
 
     swept = workflow_settings_from_problem(
         _basic_pinch({"HENS_DT_CONT_MULTIPLIERS": [0.5, 1.5]})
     )
     assert swept.dt_cont_multipliers == (0.5, 1.5)
-    assert swept.user_dt_cont_multipliers is True
 
 
 def test_tier_one_builds_one_pinch_design_task_per_multiplier():

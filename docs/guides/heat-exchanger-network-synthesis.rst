@@ -99,8 +99,7 @@ Named Advanced Methods
 
 .. code-block:: python
 
-   enhanced = problem.design.enhanced_heat_exchanger_network(quality_tier=2)
-   open_hens = problem.design.open_hens()
+   wider = problem.design.heat_exchanger_network(width=2, depth=3)
    pinch_design = problem.design.pinch_design()
    thermal = problem.design.thermal_derivative(
        (pinch_design.selected_network,)
@@ -155,30 +154,86 @@ on its own and a proposal is the union of one design per period, one shared
 topology.
 
 In the main synthesis workflow every heuristic network seeds network
-evolution directly, at every quality tier. Heuristic networks never go to the
+evolution directly (from search depth 1). Heuristic networks never go to the
 thermal derivative method.
 
-Set ``HENS_PDM_MILP`` to also run the MILP pinch design method, which solves
-each side for minimum utility cost and then the fewest units. Its networks go
-to the thermal derivative method as well as to evolution. With
-``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
+From search depth 2, or with ``HENS_PDM_MILP`` set, the MILP pinch design
+method runs as well: it solves each side for minimum utility cost and then the
+fewest units. Its main networks go to the thermal derivative method, and its
+extra minimum-unit networks (and from depth 3 all its networks) straight to
+evolution. With ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
 
 .. code-block:: python
 
-   heuristic_only = problem.design.pinch_design()
-   with_milp = problem.design.pinch_design(options={"HENS_PDM_MILP": True})
+   heuristic_only = problem.design.pinch_design(options={"HENS_SEARCH_DEPTH": 1})
+   with_milp = problem.design.pinch_design()
 
-Quality Tiers and Convergence
------------------------------
+Search Width, Depth and Convergence
+-----------------------------------
 
-The quality tier sets how widely synthesis searches, from 0 to 5.
-``heat_exchanger_network()`` runs tier 0, which skips the thermal derivative
-step; ``enhanced_heat_exchanger_network()`` runs tier 2 unless
-``quality_tier`` is given; ``open_hens()`` always runs tier 1, the standard
-OpenHENS pinch design, thermal derivative and network evolution sequence. A
-``HENS_SYNTHESIS_QUALITY_TIER`` stored in the problem's options replaces the
-first two defaults. The tier that ran is in
-``design.result.manifest.synthesis_quality_tier``. The other ``HENS_*`` keys,
+Synthesis searches in two directions, set by ``width`` and ``depth`` on
+``heat_exchanger_network()`` or by ``HENS_SEARCH_WIDTH`` and
+``HENS_SEARCH_DEPTH``. The width picks the dt_cont multipliers:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Width
+     - dt_cont multipliers
+   * - 0
+     - 1.0
+   * - 1 (default)
+     - 0.75, 1.0, 1.5
+   * - 2
+     - 0.5, 0.75, 1.0, 1.5, 2.0
+   * - 3
+     - 0.5, 0.6, 0.75, 1.0, 1.25, 1.5, 2.0
+
+The depth picks the stages run at each multiplier and their effort:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Depth
+     - Stages
+     - Heuristic networks
+     - MILP networks
+     - Evolution breadth
+   * - 0
+     - heuristic pinch design only
+     - 10
+     - none
+     - none
+   * - 1
+     - heuristic, then evolution
+     - 10
+     - none
+     - 1
+   * - 2 (default)
+     - heuristic and MILP; MILP through the thermal derivative method
+     - 10
+     - 1
+     - 1
+   * - 3
+     - as 2; every MILP network also straight to evolution
+     - 20
+     - 1, 3 more with the fewest units, 2 with one more
+     - 2
+   * - 4
+     - as 3
+     - 50
+     - 1, 5 more with the fewest units, 5 with one more
+     - 3
+
+An option set explicitly overrides the level that would set it:
+``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
+and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
+``HENS_PDM_MIN_UNIT_NETWORKS``, ``HENS_PDM_EXTRA_UNIT_NETWORKS``,
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the depth. A call's
+``width`` and ``depth`` win over the call's ``options``, which win over the
+stored options for that call only. The levels that ran are in
+``design.result.manifest.search_width`` and ``search_depth``. The other
+``HENS_*`` keys,
 such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument),
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_SOLVE_TOLERANCE``, are listed with
 their defaults in :doc:`../api/configuration-options`.

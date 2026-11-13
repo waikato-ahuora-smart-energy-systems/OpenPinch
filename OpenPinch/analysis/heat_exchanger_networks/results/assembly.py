@@ -16,7 +16,6 @@ from ....contracts.synthesis.task import (
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
 from ..execution.fallbacks import _couenne_was_missing
-from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
 from ..reporting.verification import verify_network_feasibility
 
@@ -69,11 +68,9 @@ def build_synthesis_result(
         }.items()
         if value is not None
     }
-    selected_pathway = _selected_pathway_metadata(accepted)
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id=settings.run_id,
-        # The dt_cont multipliers the tasks ran, which expanded tiers widen
-        # with their default multipliers.
+        # The dt_cont multipliers the tasks ran.
         dt_cont_multipliers=tuple(
             sorted({float(task.dt_cont_multiplier) for task in tasks})
         )
@@ -84,7 +81,8 @@ def build_synthesis_result(
         export_formats=settings.output_formats,
         solve_tolerance=settings.solve_tolerance,
         best_solutions_to_save=settings.best_solutions_to_save,
-        synthesis_quality_tier=settings.synthesis_quality_tier,
+        search_width=settings.search_width,
+        search_depth=settings.search_depth,
         pdm_stage_pair_limit=settings.pdm_stage_pair_limit,
         tdm_parent_limit=settings.tdm_parent_limit,
         stage_packing=settings.stage_packing,
@@ -95,11 +93,6 @@ def build_synthesis_result(
         workspace_variant=settings.workspace_variant,
         period_id=settings.period_id,
         design_method=settings.design_method,
-        selected_pathway_id=selected_pathway.get("pathway_id"),
-        selected_pathway_kind=selected_pathway.get("pathway_kind"),
-        selected_pdm_mode=selected_pathway.get("pdm_mode"),
-        selected_tier_origin=selected_pathway.get("tier_origin"),
-        selected_protected_pathway=bool(selected_pathway.get("protected", False)),
         task_count_by_method=_task_count_by_method(tasks),
     )
     return HeatExchangerNetworkSynthesisResult(
@@ -118,16 +111,6 @@ def build_synthesis_result(
         ranked_networks=tuple(outcomes),
         manifest=manifest,
     )
-
-
-def _selected_pathway_metadata(
-    accepted: HeatExchangerNetworkSynthesisTaskOutcome,
-) -> dict[str, object]:
-    pathways = pathways_from_metadata(accepted.task.metadata)
-    if not pathways:
-        return {}
-    pathway = pathways[0]
-    return pathway.metadata()
 
 
 def _executed_method_sequence(

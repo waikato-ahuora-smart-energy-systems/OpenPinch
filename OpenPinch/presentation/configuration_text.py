@@ -324,14 +324,32 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Annualise ORC capital", None,
         "Include the annualised ORC capital in its annual cost change.",
     ),
+    "HENS_SEARCH_WIDTH": FieldText(
+        "HEN synthesis search width", None,
+        (
+            "dt_cont multipliers to synthesise at, from 0 to 3: 0 is 1.0; 1 is 0.75, "
+            "1.0 and 1.5; 2 is 0.5, 0.75, 1.0, 1.5 and 2.0; 3 adds 0.6 and 1.25. "
+            "HENS_DT_CONT_MULTIPLIERS overrides it."
+        ),
+    ),
+    "HENS_SEARCH_DEPTH": FieldText(
+        "HEN synthesis search depth", None,
+        (
+            "Synthesis stages and effort, from 0 to 4: 0 is the heuristic pinch "
+            "design method alone; 1 adds network evolution; 2 adds the MILP pinch "
+            "design method and the thermal derivative method; 3 and 4 make more "
+            "pinch design networks and evolve more widely. The options it sets "
+            "override it when set."
+        ),
+    ),
     "HENS_DT_CONT_MULTIPLIERS": FieldText(
         "HEN dt_cont multipliers", None,
         (
             "Multipliers on every stream and utility dT contribution to synthesise "
             "networks for, as a zone dt_cont multiplier scales them in targeting "
             "(a locked stream keeps its own); one set of design tasks per value. "
-            "1.0 designs at the targeting contributions. Left at the default, "
-            "quality tiers 2 and above add their own multipliers."
+            "1.0 designs at the targeting contributions. Unset, the search width "
+            "sets them."
         ),
     ),
     "HENS_DERIVATIVE_THRESHOLDS": FieldText(
@@ -351,13 +369,6 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "of 1.0 with a 5 K THERMAL_DT_CONT keeps every exchanger at 5 K or more."
         ),
     ),
-    "HENS_SYNTHESIS_QUALITY_TIER": FieldText(
-        "HEN synthesis quality tier", None,
-        (
-            "Search breadth from 0 to 5: 0 skips the thermal derivative method, 1 is "
-            "standard OpenHENS, 2 to 5 search more widely."
-        ),
-    ),
     "HENS_PDM_STAGE_PAIR_LIMIT": FieldText(
         "Pinch design stage pair candidates", None,
         (
@@ -369,29 +380,32 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Pinch design minimum-unit networks", None,
         (
             "Extra pinch design networks per approach temperature with the fewest "
-            "units at the utility targets. Each seeds network evolution. 0 adds none."
+            "units at the utility targets. Each seeds network evolution. 0 adds "
+            "none; unset, the search depth sets it."
         ),
     ),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": FieldText(
         "Pinch design one-more-unit networks", None,
         (
             "Extra pinch design networks per approach temperature with one unit more "
-            "than the fewest. Each seeds network evolution. 0 adds none."
+            "than the fewest. Each seeds network evolution. 0 adds none; unset, the "
+            "search depth sets it."
         ),
     ),
     "HENS_HEURISTIC_PDM_NETWORKS": FieldText(
         "Heuristic pinch design networks", None,
         (
             "Networks per approach temperature from the heuristic (Linnhoff rules) "
-            "pinch design method, the default pinch design method; each seeds "
-            "network evolution. 0 runs the MILP pinch design method instead."
+            "pinch design method, each seeding network evolution. 0 runs the MILP "
+            "pinch design method instead; unset, the search depth sets it."
         ),
     ),
     "HENS_PDM_MILP": FieldText(
         "MILP pinch design", None,
         (
-            "Also run the MILP pinch design method (fewest units at minimum "
-            "utility cost), whose networks go to the thermal derivative method."
+            "Run the MILP pinch design method (fewest units at minimum utility "
+            "cost) as well as the heuristic. Unset, the search depth sets it (on "
+            "from depth 2)."
         ),
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
@@ -450,17 +464,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_EVM_N_AD_BRANCHES": FieldText(
         "Network evolution add branches", None,
         (
-            "Match-adding candidates explored per network evolution step on every "
-            "route, including the standard OpenHENS route. None uses the quality "
-            "tier's default, and 1 on tier 0 and 1 routes."
+            "Match-adding candidates explored per network evolution step. None "
+            "uses the search depth's: 1 up to depth 2, then 2 and 3."
         ),
     ),
     "HENS_EVM_N_RM_BRANCHES": FieldText(
         "Network evolution remove branches", None,
         (
-            "Match-removing candidates explored per network evolution step on every "
-            "route, including the standard OpenHENS route. None uses the quality "
-            "tier's default, and 1 on tier 0 and 1 routes."
+            "Match-removing candidates explored per network evolution step. None "
+            "uses the search depth's: 1 up to depth 2, then 2 and 3."
         ),
     ),
     "HENS_EVM_BEAM_WIDTH": FieldText(

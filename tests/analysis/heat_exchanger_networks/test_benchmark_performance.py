@@ -1,4 +1,4 @@
-"""Benchmark diagnostics tests for HeatExchangerNetworkLabel quality-tier evaluation."""
+"""Benchmark diagnostics tests for HeatExchangerNetworkLabel search-depth evaluation."""
 
 from __future__ import annotations
 
@@ -61,10 +61,10 @@ def test_benchmark_failure_taxonomy_groups_solver_errors() -> None:
     )
 
 
-def test_benchmark_diagnostics_capture_tier_two_pathway_statistics() -> None:
+def test_benchmark_diagnostics_capture_depth_two_stage_statistics() -> None:
     benchmark = _load_benchmark_module()
     problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": 2, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
+        {"HENS_SEARCH_DEPTH": 2, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
     )
     target_output = ensure_target_results(problem, {}, None)
     settings = workflow_settings_from_problem(problem)
@@ -78,34 +78,33 @@ def test_benchmark_diagnostics_capture_tier_two_pathway_statistics() -> None:
     design = finalise_design_result(problem, target_output, workflow_result)
 
     diagnostics = benchmark._benchmark_diagnostics(
-        tier=2,
         trace_executor=trace_executor,
         selected_task_id=design.task_id,
     )
 
-    assert diagnostics["stage_runtime_seconds"].keys() >= {
+    # Depth 2 without the heuristic: MILP pinch design -> TDM -> evolution.
+    assert diagnostics["stage_runtime_seconds"].keys() == {
         "pdm",
-        "direct_evm_from_pdm",
         "tdm",
         "evm_from_tdm",
     }
-    assert diagnostics["task_counts"]["planned_by_pathway"]["tier0-compact-1"] > 0
-    assert diagnostics["task_counts"]["planned_by_pathway"]["tier1-open-hens"] > 0
-    assert diagnostics["task_counts"]["planned_by_pathway"]["tier2-compact-1"] > 0
+    assert "containment" not in diagnostics
+    # Evolution breadth comes from each evolution task's settings.
+    assert diagnostics["task_counts"]["planned_by_evm_setting"]
     assert diagnostics["robustness"]["funnel"]["planned"] == len(
         trace_executor.task_records
     )
     assert diagnostics["robustness"]["funnel"]["accepted"] == 1
 
 
-def test_benchmark_defaults_cover_small_unique_cases_and_tiers_zero_to_four() -> None:
+def test_benchmark_defaults_cover_small_unique_cases_and_depths_zero_to_four() -> None:
     benchmark = _load_benchmark_module()
 
-    assert benchmark.HENS_QUALITY_TIERS == (0, 1, 2, 3, 4)
+    assert benchmark.HENS_SEARCH_DEPTHS == (0, 1, 2, 3, 4)
     assert benchmark.HENS_MAX_PARALLEL == 10
     assert benchmark.HENS_BENCHMARK_OPTIONS["HENS_MAX_PARALLEL"] == 10
     assert benchmark.DEFAULT_HENS_BENCHMARK_JSON == REPO_ROOT / (
-        "results/hens_t0_t4_upto9_fixture_defaults.json"
+        "results/hens_d0_d4_upto9_fixture_defaults.json"
     )
     assert "Nine-stream-Linnhoff-and-Ahmad-1999-1.json" in (
         benchmark.HENS_BENCHMARK_CASES
@@ -131,7 +130,7 @@ def test_benchmark_fixture_default_mode_preserves_fixture_hens_settings() -> Non
             "HENS_MAX_PARALLEL": 6,
             "HENS_DT_CONT_MULTIPLIERS": [99.9],
         },
-        tier=3,
+        depth=3,
         run_id="fixture-default-test",
         use_fixture_defaults=True,
     )
@@ -146,7 +145,7 @@ def test_benchmark_fixture_default_mode_preserves_fixture_hens_settings() -> Non
     )
     assert options["HENS_STAGE_SELECTION"] == fixture_options["HENS_STAGE_SELECTION"]
     assert options["HENS_MAX_PARALLEL"] == 6
-    assert options["HENS_SYNTHESIS_QUALITY_TIER"] == 3
+    assert options["HENS_SEARCH_DEPTH"] == 3
     assert options["HENS_RUN_ID"] == "fixture-default-test"
     assert options["HENS_OUTPUT_FORMATS"] == []
 
@@ -162,7 +161,7 @@ def test_benchmark_standard_mode_applies_benchmark_hens_overrides() -> None:
     options = benchmark._hens_case_options(
         payload,
         options=benchmark.HENS_BENCHMARK_OPTIONS,
-        tier=4,
+        depth=4,
         run_id="standard-mode-test",
         use_fixture_defaults=False,
     )
@@ -171,7 +170,7 @@ def test_benchmark_standard_mode_applies_benchmark_hens_overrides() -> None:
     assert options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5]
     assert options["HENS_STAGE_SELECTION"] == [3]
     assert options["HENS_MAX_PARALLEL"] == 10
-    assert options["HENS_SYNTHESIS_QUALITY_TIER"] == 4
+    assert options["HENS_SEARCH_DEPTH"] == 4
     assert options["HENS_RUN_ID"] == "standard-mode-test"
 
 
@@ -254,7 +253,7 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
         )
 
     monkeypatch.setattr(benchmark.solver_backend, "solve_pyomo_model", fake_solve)
-    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=2)
+    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", depth=2)
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="pinch_design_method",
@@ -281,7 +280,7 @@ def test_benchmark_solver_tracer_records_solve_boundary_calls(monkeypatch) -> No
     assert len(tracer.records) == 1
     record = tracer.records[0]
     assert record["case"] == "case.json"
-    assert record["tier"] == 2
+    assert record["depth"] == 2
     assert record["task_id"] == "task-1"
     assert record["stage_label"] == "pdm"
     assert record["solver_name"] == "highs"
@@ -298,7 +297,7 @@ def test_benchmark_solver_tracer_records_effective_forced_solver(monkeypatch) ->
         return benchmark.solver_backend.SolverRun(name="couenne", status=1)
 
     monkeypatch.setattr(benchmark.solver_backend, "solve_pyomo_model", fake_solve)
-    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=0)
+    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", depth=0)
 
     with tracer.patched_backend():
         benchmark.solver_backend.solve_pyomo_model(
@@ -313,7 +312,6 @@ def test_benchmark_solver_call_summaries_aggregate_by_layer() -> None:
     benchmark = _load_benchmark_module()
 
     diagnostics = benchmark._diagnostics_from_records(
-        tier=4,
         task_records=[],
         stage_records=[],
         solver_call_records=[
@@ -343,7 +341,6 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
         "task_id": "task-1",
         "method": "network_evolution_method",
         "stage_label": "evm_from_tdm",
-        "pathway_ids": ["tier2-compact-1"],
         "status": "running",
     }
     partial_trace["solver_call_records"].append(
@@ -357,14 +354,11 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
     results = [
         benchmark._failed_hens_result(
             "case.json",
-            tier=0,
+            depth=0,
             status="timeout",
             total_seconds=1.0,
             error="exceeded 1 seconds",
-            diagnostics=benchmark._timeout_diagnostics(
-                tier=2,
-                partial_trace=partial_trace,
-            ),
+            diagnostics=benchmark._timeout_diagnostics(partial_trace=partial_trace),
         )
     ]
 
@@ -379,7 +373,7 @@ def test_benchmark_incremental_json_includes_partial_comparisons(tmp_path) -> No
     assert payload[0]["diagnostics"]["in_progress_tasks"][0]["task_id"] == "task-1"
     assert payload[0]["diagnostics"]["solver_call_runtime_seconds"]["pdm"] == 0.5
     assert len(payload[0]["diagnostics"]["solver_calls"]) == 1
-    assert payload[1]["benchmark"] == "hens_quality_tier_comparison"
+    assert payload[1]["benchmark"] == "hens_search_depth_comparison"
     assert payload[1]["status"] == "missing_baseline"
 
 
@@ -470,7 +464,10 @@ def test_pdm_topology_summary_counts_distinct_target_meeting_topologies() -> Non
 
 def test_benchmark_acceptance_metrics_cover_pdm_outcomes_and_top_tacs() -> None:
     benchmark = _load_benchmark_module()
-    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 0})
+    # Depth 0 with the MILP opted in: MILP pinch design only, no evolution.
+    problem = _small_problem_with_options(
+        {"HENS_SEARCH_DEPTH": 0, "HENS_PDM_MILP": True}
+    )
     target_output = ensure_target_results(problem, {}, None)
     settings = workflow_settings_from_problem(problem)
     workflow_result = execute_open_hens_method(
@@ -499,7 +496,11 @@ def test_benchmark_acceptance_metrics_cover_pdm_outcomes_and_top_tacs() -> None:
 def test_benchmark_acceptance_metrics_count_heuristic_networks_on_their_own() -> None:
     benchmark = _load_benchmark_module()
     problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": 0, "HENS_HEURISTIC_PDM_NETWORKS": 2}
+        {
+            "HENS_SEARCH_DEPTH": 0,
+            "HENS_PDM_MILP": True,
+            "HENS_HEURISTIC_PDM_NETWORKS": 2,
+        }
     )
     target_output = ensure_target_results(problem, {}, None)
     workflow_result = execute_open_hens_method(
@@ -564,7 +565,7 @@ def test_benchmark_acceptance_comparison_flags_regressions() -> None:
     benchmark = _load_benchmark_module()
     baseline = {
         "name": "case.json",
-        "tier": 0,
+        "depth": 0,
         "status": "success",
         "total_seconds": 12.0,
         "total_annual_cost": 100.0,
@@ -587,7 +588,7 @@ def test_benchmark_acceptance_comparison_flags_regressions() -> None:
 
     assert comparison == {
         "name": "case.json",
-        "tier": 0,
+        "depth": 0,
         "status": "success",
         "best_total_annual_cost_no_worse": False,
         "best_total_annual_cost_delta": 1.0,
@@ -602,7 +603,7 @@ def test_benchmark_acceptance_comparison_reports_a_baseline_without_metrics() ->
     benchmark = _load_benchmark_module()
     record = {
         "name": "case.json",
-        "tier": 0,
+        "depth": 0,
         "status": "success",
         "total_seconds": 12.0,
         "total_annual_cost": 100.0,
@@ -612,7 +613,7 @@ def test_benchmark_acceptance_comparison_reports_a_baseline_without_metrics() ->
 
     assert benchmark.compare_acceptance(record, variant) == {
         "name": "case.json",
-        "tier": 0,
+        "depth": 0,
         "status": "baseline_without_acceptance_metrics",
     }
 
@@ -672,7 +673,8 @@ def _small_problem_with_options(options: dict) -> PinchProblem:
         "HENS_MAX_PARALLEL": 1,
         "HENS_OUTPUT_FORMATS": [],
         "HENS_RUN_ID": "benchmark-test",
-        # The MILP pinch design -> TDM -> EVM pipeline, without the heuristic.
+        # At depth 2, the MILP pinch design -> TDM -> EVM pipeline without
+        # the heuristic.
         "HENS_HEURISTIC_PDM_NETWORKS": 0,
         **options,
     }
@@ -772,7 +774,7 @@ def test_benchmark_solver_tracer_records_native_pyomo_solves(monkeypatch) -> Non
         return benchmark.solver_backend.SolverRun(name=solver_name, status=1)
 
     monkeypatch.setattr(benchmark.solver_backend, "solve_pyomo_model", fake_solve)
-    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", tier=0)
+    tracer = benchmark.BenchmarkSolverCallTracer(case_name="case.json", depth=0)
 
     with tracer.patched_backend():
         run = benchmark.solver_backend.solve_pyomo_model(

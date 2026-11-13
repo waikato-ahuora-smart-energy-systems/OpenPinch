@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import replace
 from typing import Any
 
 from ...contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -42,9 +41,8 @@ def heat_exchanger_network_synthesis_service(
     if method is None:
         if initial_networks is not None:
             raise ValueError("open_hens_method does not accept initial_networks.")
-        return _run_open_hens_quality_tier_service(
+        return heat_exchanger_network_open_hens_method_service(
             problem,
-            quality_tier=0,
             options=options,
             workspace_variant=workspace_variant,
             executor=executor,
@@ -100,51 +98,13 @@ def heat_exchanger_network_open_hens_method_service(
     workspace_variant: str | None = None,
     executor: SynthesisExecutor | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Run the original tier-1 OpenHENS PDM -> TDM -> EVM sequence."""
+    """Run full synthesis at the configured search width and depth."""
 
-    return _run_open_hens_quality_tier_service(
-        problem,
-        quality_tier=1,
-        options=options,
-        workspace_variant=workspace_variant,
-        executor=executor,
-    )
-
-
-def _heat_exchanger_network_enhanced_synthesis_method_service(
-    problem: SynthesisProblem,
-    *,
-    quality_tier: int = 2,
-    options: dict[str, Any] | None = None,
-    workspace_variant: str | None = None,
-    executor: SynthesisExecutor | None = None,
-) -> HeatExchangerNetworkSynthesisResult:
-    """Run OpenHENS synthesis with an explicit call-local quality tier."""
-
-    return _run_open_hens_quality_tier_service(
-        problem,
-        quality_tier=quality_tier,
-        options=options,
-        workspace_variant=workspace_variant,
-        executor=executor,
-    )
-
-
-def _run_open_hens_quality_tier_service(
-    problem: SynthesisProblem,
-    *,
-    quality_tier: int,
-    options: dict[str, Any] | None,
-    workspace_variant: str | None,
-    executor: SynthesisExecutor | None,
-) -> HeatExchangerNetworkSynthesisResult:
-    resolved_quality_tier = _validate_quality_tier(quality_tier)
     target_output, settings = prepare_service_context(
         problem,
         options=options,
         workspace_variant=workspace_variant,
     )
-    settings = replace(settings, synthesis_quality_tier=resolved_quality_tier)
     workflow_result = execute_open_hens_method(
         problem,
         settings,
@@ -258,14 +218,6 @@ def _coerce_design_method(
             f"Unknown heat exchanger network design method {method!r}. "
             f"Allowed methods are: {allowed}."
         ) from exc
-
-
-def _validate_quality_tier(quality_tier: int) -> int:
-    if isinstance(quality_tier, bool) or not isinstance(quality_tier, int):
-        raise TypeError("quality_tier must be an integer between 0 and 5.")
-    if quality_tier < 0 or quality_tier > 5:
-        raise ValueError("quality_tier must be between 0 and 5.")
-    return int(quality_tier)
 
 
 __all__ = [

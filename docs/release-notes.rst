@@ -288,16 +288,15 @@ Heat exchanger network synthesis
   is linear, as a pinch design reduction is, and with Ipopt otherwise. A
   reduced network can drop a match whose duty an LP solution sets to zero.
 - Heat exchanger network synthesis is keyed on a dt_cont multiplier instead
-  of an approach temperature. ``HENS_DT_CONT_MULTIPLIERS`` (default ``[1.0]``)
-  is the synthesis sweep at every quality tier: each multiplier scales every
+  of an approach temperature. ``HENS_DT_CONT_MULTIPLIERS`` (set by the search
+  width unless given) is the synthesis sweep: each multiplier scales every
   stream's, segment's and utility's effective ΔT contribution, as a zone
   ``dt_cont`` multiplier does in targeting, so the default designs at the
   contributions the pinch targets use (the old 14 K default ran at 1.4 times
   them). A stream whose ``dt_cont`` multiplier is locked keeps its own
   contribution, as in targeting. A contribution of 0 runs at 0.1 K times the
   multiplier (0.1 K for a locked stream) instead of half the approach
-  temperature. Quality tiers 2 to 5 add their own multipliers only while the
-  option is at its default. ``HENS_APPROACH_TEMPERATURES`` is removed and is
+  temperature. ``HENS_APPROACH_TEMPERATURES`` is removed and is
   now an unknown option, and the design accessor's ``approach_temperatures``
   argument is gone. Synthesis tasks, outcomes, manifests and networks record
   ``dt_cont_multiplier`` (manifests ``dt_cont_multipliers``) and no longer an
@@ -360,14 +359,33 @@ Heat exchanger network synthesis
   cases are handled as in the pinch design method; a multiperiod proposal is
   the union of one rules-based design per period. Proposals that cannot be
   solved or verified are dropped. ``HENS_HEURISTIC_PDM_NETWORKS`` (default
-  10) caps the networks per dt_cont multiplier. Each heuristic network seeds
-  network evolution directly at every tier, never the thermal derivative
-  method.
-- The MILP pinch design method is now opt-in: set ``HENS_PDM_MILP`` to run it
-  before the heuristic, or set ``HENS_HEURISTIC_PDM_NETWORKS`` to 0 to run it
-  alone. Only MILP networks go to the thermal derivative method, so by default
-  synthesis no longer runs that method at any quality tier, and
-  ``open_hens()`` runs it only with ``HENS_PDM_MILP``.
+  10 by default) caps the networks per dt_cont multiplier. Each heuristic
+  network seeds network evolution directly, never the thermal derivative
+  method. ``HENS_PDM_MILP`` runs the MILP pinch design method as well (on from
+  search depth 2); with ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs
+  alone. Only MILP networks go to the thermal derivative method.
+- Synthesis now searches in two directions instead of by quality tier.
+  ``HENS_SEARCH_WIDTH`` (0 to 3, default 1) picks the dt_cont multipliers: 1.0;
+  0.75, 1.0 and 1.5; 0.5 to 2.0 in five values; or seven. ``HENS_SEARCH_DEPTH``
+  (0 to 4, default 2) picks the stages and their effort: 0 is the heuristic
+  pinch design method alone; 1 adds network evolution; 2 adds the MILP pinch
+  design method and the thermal derivative method; 3 and 4 make more heuristic
+  and minimum-unit MILP networks, seed evolution with every MILP network and
+  evolve more widely. An option set explicitly (``HENS_DT_CONT_MULTIPLIERS``,
+  ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
+  ``HENS_PDM_MIN_UNIT_NETWORKS``, ``HENS_PDM_EXTRA_UNIT_NETWORKS``,
+  ``HENS_EVM_N_AD_BRANCHES``, ``HENS_EVM_N_RM_BRANCHES``) overrides its level;
+  those options now default to unset. ``design.heat_exchanger_network()`` takes
+  ``width`` and ``depth``. ``HENS_SYNTHESIS_QUALITY_TIER``,
+  ``design.enhanced_heat_exchanger_network()`` and ``design.open_hens()`` are
+  removed, with the tier pathways (protected and expanded routes, compact and
+  raw pinch design modes): the manifest records ``search_width`` and
+  ``search_depth`` in place of ``synthesis_quality_tier`` and the
+  ``selected_pathway_*``, ``selected_pdm_mode``, ``selected_tier_origin`` and
+  ``selected_protected_pathway`` fields. The default run now sweeps three
+  multipliers and runs the thermal derivative method (tier 0 ran one multiplier
+  without it), so it takes longer. Standalone seeded thermal derivative and
+  evolution runs drop repeated seed topologies.
 
 0.8.3 (2026-11-11)
 ------------------

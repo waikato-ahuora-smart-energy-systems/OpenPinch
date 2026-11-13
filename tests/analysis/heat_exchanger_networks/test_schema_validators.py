@@ -121,7 +121,7 @@ def test_export_record_and_manifest_accept_static_fixture_values():
 
     assert manifest.task_ids == ("task-a", "task-b")
     assert manifest.problem_id == "problem-a"
-    assert manifest.selected_pathway_kind == "protected"
+    assert (manifest.search_width, manifest.search_depth) == (2, 3)
     assert manifest.task_count_by_method == {"pinch_design_method": 2}
     assert manifest.export_records[0].record_id == "record-1"
     assert manifest.export_records[0].content_type == "application/json"
@@ -137,12 +137,12 @@ def test_export_record_and_manifest_accept_static_fixture_values():
         ({"stage_selection": [1, 1]}, "unique"),
         ({"solve_tolerance": 0.0}, "finite and positive"),
         ({"best_solutions_to_save": 0}, "positive integer"),
-        ({"synthesis_quality_tier": 6}, "between 0 and 5"),
+        ({"search_width": 4}, "between 0 and 3"),
+        ({"search_depth": 5}, "between 0 and 4"),
         ({"pdm_stage_pair_limit": 13}, "between 0 and 12"),
         ({"tdm_parent_limit": 0}, "positive when supplied"),
         ({"stage_packing": "packed"}, "stage_packing must be one of"),
         ({"task_ids": [" "]}, "identity fields"),
-        ({"selected_tier_origin": -1}, "between 0 and 5"),
         ({"task_count_by_method": {"method": -1}}, "non-negative"),
     ],
 )

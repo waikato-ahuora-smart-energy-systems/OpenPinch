@@ -21,7 +21,7 @@ from ..solver.arrays import (
     nominal_approach_temperature,
     problem_to_solver_arrays,
 )
-from .pathways import pathways_from_metadata, tier_evm_branch_breadth
+from .search import resolve_search
 
 logger = logging.getLogger(__name__)
 
@@ -355,8 +355,8 @@ class LocalSynthesisExecutor:
             pinch_decompositions=decompositions,
             pdm_network_limits=(
                 (
-                    int(problem.master_zone.config.hens.pdm_min_unit_networks),
-                    int(problem.master_zone.config.hens.pdm_extra_unit_networks),
+                    resolve_search(problem.master_zone.config.hens).min_unit_networks,
+                    resolve_search(problem.master_zone.config.hens).extra_unit_networks,
                 )
                 if decompositions is not None and not is_heuristic
                 else (0, 0)
@@ -400,10 +400,10 @@ class LocalSynthesisExecutor:
     ) -> dict[str, Any] | None:
         factories = dict(self.model_factories or {})
         scope = _stage_packing_scope(problem)
-        pdm_mode = str(task.settings.get("pdm_mode", ""))
-        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign and (
-            pdm_mode == "compact" or (not pdm_mode and scope in {"pdm", "all"})
-        ):
+        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign and scope in {
+            "pdm",
+            "all",
+        }:
             factories.setdefault(
                 "pinch_design_method",
                 _stage_packed_pdm_factory(),
@@ -684,62 +684,20 @@ def _evolution_options(
     max_parallel: int,
 ) -> dict[str, int | None]:
     hens = problem.master_zone.config.hens
-    tier = int(getattr(hens, "synthesis_quality_tier", 1))
+    search = resolve_search(hens)
     task_settings = task.settings or {}
-    pathway_options = _pathway_evolution_options(task)
     return {
         "n_ad_branches": int(
-            task_settings.get(
-                "evolution_n_ad_branches",
-                pathway_options.get(
-                    "n_ad_branches",
-                    _branch_breadth(
-                        getattr(hens, "evm_n_ad_branches", None),
-                        tier=tier,
-                    ),
-                ),
-            )
+            task_settings.get("evolution_n_ad_branches", search.evm_n_ad_branches)
         ),
         "n_rm_branches": int(
-            task_settings.get(
-                "evolution_n_rm_branches",
-                pathway_options.get(
-                    "n_rm_branches",
-                    _branch_breadth(
-                        getattr(hens, "evm_n_rm_branches", None),
-                        tier=tier,
-                    ),
-                ),
-            )
+            task_settings.get("evolution_n_rm_branches", search.evm_n_rm_branches)
         ),
         "max_parallel": max(1, int(max_parallel)),
         "no_improvement_patience": _optional_int(
-            task_settings.get(
-                "evolution_no_improvement_patience",
-                pathway_options.get("no_improvement_patience"),
-            )
+            task_settings.get("evolution_no_improvement_patience")
         ),
         "beam_width": max(1, int(getattr(hens, "evm_beam_width", 4) or 4)),
-    }
-
-
-def _branch_breadth(value: int | None, *, tier: int) -> int:
-    if value is not None:
-        return max(1, int(value))
-    return tier_evm_branch_breadth(tier)
-
-
-def _pathway_evolution_options(
-    task: HeatExchangerNetworkSynthesisTask,
-) -> dict[str, int | None]:
-    pathways = pathways_from_metadata(task.metadata)
-    if not pathways:
-        return {}
-    first = pathways[0]
-    return {
-        "n_ad_branches": first.evm_n_ad_branches,
-        "n_rm_branches": first.evm_n_rm_branches,
-        "no_improvement_patience": first.evm_no_improvement_patience,
     }
 
 

@@ -22,7 +22,7 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - `run_id` matches `^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$` [common.py:_validate_run_id].
 - Identity strings are stripped and must be non-empty [common.py:_validate_optional_identity].
 - Approach-temperature and derivative-threshold grids are non-empty, finite and positive; `stage_selection` is non-empty, positive and unique [common.py:HeatExchangerNetworkSynthesisManifest].
-- `synthesis_quality_tier` and `selected_tier_origin` lie in 0..5; `pdm_stage_pair_limit` in 0..12; `stage_packing` is one of auto, none, pdm, tdm, all [common.py:HeatExchangerNetworkSynthesisManifest].
+- `search_width` lies in 0..3 and `search_depth` in 0..4; `pdm_stage_pair_limit` in 0..12; `stage_packing` is one of auto, none, pdm, tdm, all [common.py:HeatExchangerNetworkSynthesisManifest].
 - `task_id` is `hens-task-` plus the first 16 hex characters of a SHA-256 of the sorted-key JSON of the task's identifying fields (`task_id`, `seed_network` and `metadata` are excluded; `settings` must be JSON-serialisable), so equal definitions give equal ids; a supplied `task_id` is kept (stripped of surrounding whitespace) [method.py:HeatExchangerNetworkSynthesisMethodInput.generate_task_id].
 - Method output `objective_value` and result `objective_values` are finite and non-negative; `stage_count` is positive on the method input and the result [method.py:HeatExchangerNetworkSynthesisMethodOutput, result.py:HeatExchangerNetworkSynthesisResult].
 - Topology restriction `stage` is positive and `duty` non-negative and finite [topology.py:HeatExchangerNetworkTopologyRestriction].

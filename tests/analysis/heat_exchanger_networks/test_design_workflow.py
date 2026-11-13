@@ -234,21 +234,20 @@ def test_design_utility_keeps_hot_and_cold_utilities_of_one_name_apart(
         design.utility("Steam")
 
 
-def test_enhanced_synthesis_method_is_public_quality_tier_entrypoint(
+def test_a_call_depth_runs_without_changing_the_stored_depth(
     monkeypatch,
 ) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
-    problem.update_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
-    configured_tier = problem.master_zone.config.hens.synthesis_quality_tier
+    problem.update_options({"HENS_SEARCH_DEPTH": 4})
 
-    design = problem.design.enhanced_heat_exchanger_network(quality_tier=3)
+    design = problem.design.heat_exchanger_network(depth=3)
 
     assert problem.results is not None
     assert problem.results.design == design.result
     assert design.result.manifest is not None
-    assert design.result.manifest.synthesis_quality_tier == 3
-    assert problem.master_zone.config.hens.synthesis_quality_tier == configured_tier
+    assert design.result.manifest.search_depth == 3
+    assert problem.master_zone.config.hens.search_depth == 4
 
 
 def test_problem_design_view_is_created_only_by_explicit_design() -> None:

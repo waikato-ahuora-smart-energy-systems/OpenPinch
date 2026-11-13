@@ -76,6 +76,10 @@ def _positive_float_grid(name: str, value: Any) -> list[float]:
     ]
 
 
+def _positive_float_grid_or_none(name: str, value: Any) -> list[float] | None:
+    return None if value is None else _positive_float_grid(name, value)
+
+
 def _solver_options(name: str, value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{name} must be provided as a dict.")
@@ -375,15 +379,17 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_ORC_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "orc_capital_recovery_enabled"),
 
     # HEN synthesis.
-    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float], [1.0], "hens", "dt_cont_multipliers", validator=_positive_float_grid),
+    # None: set by the search width or depth.
+    "HENS_SEARCH_WIDTH": _spec(int, 1, "hens", "search_width", numeric_min=0.0, numeric_max=3.0),
+    "HENS_SEARCH_DEPTH": _spec(int, 2, "hens", "search_depth", numeric_min=0.0, numeric_max=4.0),
+    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),
-    "HENS_SYNTHESIS_QUALITY_TIER": _spec(int, 1, "hens", "synthesis_quality_tier", numeric_min=0.0, numeric_max=5.0),
     "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
-    "HENS_PDM_MIN_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_min_unit_networks", numeric_min=0.0),
-    "HENS_PDM_EXTRA_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_extra_unit_networks", numeric_min=0.0),
-    "HENS_HEURISTIC_PDM_NETWORKS": _spec(int, 10, "hens", "heuristic_pdm_networks", numeric_min=0.0),
-    "HENS_PDM_MILP": _spec(bool, False, "hens", "pdm_milp"),
+    "HENS_PDM_MIN_UNIT_NETWORKS": _spec(int | None, None, "hens", "pdm_min_unit_networks", numeric_min=0.0),
+    "HENS_PDM_EXTRA_UNIT_NETWORKS": _spec(int | None, None, "hens", "pdm_extra_unit_networks", numeric_min=0.0),
+    "HENS_HEURISTIC_PDM_NETWORKS": _spec(int | None, None, "hens", "heuristic_pdm_networks", numeric_min=0.0),
+    "HENS_PDM_MILP": _spec(bool | None, None, "hens", "pdm_milp"),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),

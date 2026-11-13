@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ....domain.configuration_fields import CONFIG_FIELD_SPECS
 from ....domain.enums import HeatExchangerNetworkDesignMethod
-from .pathways import tier_evm_branch_breadth, tier_pdm_multipliers
+from .search import DEPTH_LEVELS, resolve_search
 
 StagePackingScope = str
 
@@ -40,16 +39,20 @@ class SynthesisWorkflowSettings:
     solve_tolerance: float
     best_solutions_to_save: int
     max_parallel: int
-    synthesis_quality_tier: int = 1
+    # The search levels; workflow_settings_from_problem resolves the options
+    # they set into the fields below.
+    search_width: int = 1
+    search_depth: int = 2
     pdm_stage_pair_limit: int | None = None
     tdm_parent_limit: int | None = None
     stage_packing: StagePackingScope = "auto"
     evm_n_ad_branches: int | None = None
     evm_n_rm_branches: int | None = None
-    user_dt_cont_multipliers: bool = False
     # Cap on heuristic pinch design networks per multiplier; 0 runs none.
     heuristic_pdm_networks: int = 10
     pdm_milp: bool = False
+    pdm_min_unit_networks: int = 0
+    pdm_extra_unit_networks: int = 0
     pdm_solver: str
     tdm_solver: str
     evm_solver: str
@@ -91,40 +94,22 @@ class SynthesisWorkflowSettings:
         return {}
 
     @property
-    def quality_fraction(self) -> float:
-        """Return the tier-2..5 search breadth on a 0..1 scale."""
+    def runs_evolution(self) -> bool:
+        """Whether network evolution runs (search depth 1 and above)."""
 
-        if self.synthesis_quality_tier <= 1:
-            return 0.0
-        return min(1.0, max(0.0, (int(self.synthesis_quality_tier) - 1) / 4.0))
+        return DEPTH_LEVELS[self.search_depth].evolution
 
     @property
-    def is_standard_quality_tier(self) -> bool:
-        """Return whether the workflow should use exact standard OpenHENS."""
+    def runs_thermal_derivative_method(self) -> bool:
+        """Whether MILP networks go through the thermal derivative method."""
 
-        return int(self.synthesis_quality_tier) == 1
-
-    @property
-    def skips_thermal_derivative_method(self) -> bool:
-        """Return whether this tier runs PDM directly into EVM."""
-
-        return int(self.synthesis_quality_tier) == 0
+        return DEPTH_LEVELS[self.search_depth].thermal_derivative
 
     @property
-    def quality_dt_cont_multipliers(self) -> tuple[float, ...]:
-        """Return tier-generated PDM multiplier candidates for expanded paths."""
+    def milp_networks_seed_evolution(self) -> bool:
+        """Whether every MILP network also seeds evolution directly."""
 
-        if self.synthesis_quality_tier <= 1:
-            return ()
-        if self.user_dt_cont_multipliers:
-            return tuple(float(value) for value in self.dt_cont_multipliers)
-        return tier_pdm_multipliers(int(self.synthesis_quality_tier))
-
-    @property
-    def quality_pdm_dt_cont_multipliers(self) -> tuple[float, ...]:
-        """Return the distinct PDM multipliers of the tier candidates."""
-
-        return tuple(dict.fromkeys(self.quality_dt_cont_multipliers))
+        return DEPTH_LEVELS[self.search_depth].milp_seeds_evolution
 
     @property
     def quality_pdm_stage_pair_count(self) -> int:
@@ -146,7 +131,7 @@ class SynthesisWorkflowSettings:
 
     @property
     def quality_derivative_thresholds(self) -> tuple[float, ...]:
-        """Return configured TDM thresholds without tier-generated sweeps."""
+        """Return the distinct configured TDM thresholds."""
 
         return tuple(
             dict.fromkeys(float(value) for value in self.derivative_thresholds)
@@ -166,7 +151,7 @@ class SynthesisWorkflowSettings:
 
         if self.evm_n_ad_branches is not None:
             return max(1, int(self.evm_n_ad_branches))
-        return tier_evm_branch_breadth(self.synthesis_quality_tier)
+        return DEPTH_LEVELS[self.search_depth].evolution_breadth
 
     @property
     def effective_evm_n_rm_branches(self) -> int:
@@ -174,7 +159,7 @@ class SynthesisWorkflowSettings:
 
         if self.evm_n_rm_branches is not None:
             return max(1, int(self.evm_n_rm_branches))
-        return tier_evm_branch_breadth(self.synthesis_quality_tier)
+        return DEPTH_LEVELS[self.search_depth].evolution_breadth
 
 
 def workflow_settings_from_problem(
@@ -191,10 +176,10 @@ def workflow_settings_from_problem(
         )
     config = zone.config
     hens = config.hens
-    dt_cont_multipliers = tuple(float(value) for value in hens.dt_cont_multipliers)
+    search = resolve_search(hens)
     return SynthesisWorkflowSettings(
         run_id=str(hens.run_id),
-        dt_cont_multipliers=dt_cont_multipliers,
+        dt_cont_multipliers=search.dt_cont_multipliers,
         derivative_thresholds=tuple(
             float(value) for value in hens.derivative_thresholds
         ),
@@ -204,7 +189,8 @@ def workflow_settings_from_problem(
         solve_tolerance=float(hens.solve_tolerance),
         best_solutions_to_save=int(hens.best_solutions_to_save),
         max_parallel=int(hens.max_parallel),
-        synthesis_quality_tier=int(hens.synthesis_quality_tier),
+        search_width=search.width,
+        search_depth=search.depth,
         pdm_stage_pair_limit=(
             None
             if hens.pdm_stage_pair_limit is None
@@ -214,17 +200,12 @@ def workflow_settings_from_problem(
             None if hens.tdm_parent_limit is None else int(hens.tdm_parent_limit)
         ),
         stage_packing=_stage_packing_scope(hens),
-        evm_n_ad_branches=(
-            None if hens.evm_n_ad_branches is None else int(hens.evm_n_ad_branches)
-        ),
-        evm_n_rm_branches=(
-            None if hens.evm_n_rm_branches is None else int(hens.evm_n_rm_branches)
-        ),
-        # The default sweep does not count as set, so tiers 2-5 add their own.
-        user_dt_cont_multipliers=list(dt_cont_multipliers)
-        != CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default,
-        heuristic_pdm_networks=int(hens.heuristic_pdm_networks),
-        pdm_milp=bool(hens.pdm_milp),
+        evm_n_ad_branches=search.evm_n_ad_branches,
+        evm_n_rm_branches=search.evm_n_rm_branches,
+        heuristic_pdm_networks=search.heuristic_networks,
+        pdm_milp=search.milp,
+        pdm_min_unit_networks=search.min_unit_networks,
+        pdm_extra_unit_networks=search.extra_unit_networks,
         pdm_solver=str(hens.solver_pdm),
         tdm_solver=str(hens.solver_tdm),
         evm_solver=str(hens.solver_evm),

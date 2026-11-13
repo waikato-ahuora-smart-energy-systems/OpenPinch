@@ -34,7 +34,14 @@ def execute_open_hens_method(
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
-    """Generate, execute, and collect the PDM -> TDM -> EVM task graph."""
+    """Generate, execute, and collect the synthesis task graph.
+
+    The search depth sets the stages: pinch design (heuristic, and MILP when
+    on), then from depth 1 network evolution of the heuristic networks, and
+    from depth 2 the thermal derivative method on the main MILP networks
+    before their evolution. Extra minimum-unit MILP networks, and from depth
+    3 every MILP network, seed evolution directly.
+    """
     settings = replace(
         settings, design_method=HeatExchangerNetworkDesignMethod.OpenHENS
     )
@@ -42,15 +49,24 @@ def execute_open_hens_method(
         executor = LocalSynthesisExecutor()
     start = perf_counter()
 
-    # Heuristic networks seed evolution directly at every tier, as the extra
-    # PDM networks do, and never go to the thermal derivative method; only
-    # MILP networks (HENS_PDM_MILP) do.
     pdm_tasks, pdm_outcomes, heuristic_tasks, heuristic_outcomes = (
         execute_pinch_design_stages(problem, settings, executor=executor)
     )
-
     pdm_outcome_map = _outcome_map(pdm_outcomes) | _outcome_map(heuristic_outcomes)
-    if _can_skip_preliminary_stages_for_missing_couenne(
+    tdm_tasks, tdm_outcomes, esm_tasks, esm_outcomes = (), (), (), ()
+
+    def evolve_from_pinch_design(seeds):
+        return execute_network_evolution_method_from_pinch_design_stage(
+            problem=problem,
+            settings=settings,
+            pdm_outcomes=seeds,
+            parent_outcomes=pdm_outcome_map,
+            executor=executor,
+        )
+
+    if not settings.runs_evolution:
+        pass
+    elif _can_skip_preliminary_stages_for_missing_couenne(
         settings,
         pdm_tasks,
         pdm_outcomes,
@@ -59,95 +75,55 @@ def execute_open_hens_method(
             "Couenne is unavailable for the heat exchanger network "
             "pinch-design-method stage",
         )
-        tdm_tasks = ()
-        tdm_outcomes = ()
         esm_tasks, esm_outcomes = execute_direct_network_evolution_method_stage(
             problem=problem,
             settings=settings,
             executor=executor,
         )
         if heuristic_outcomes:
-            seeded_tasks, seeded_outcomes = (
-                execute_network_evolution_method_from_pinch_design_stage(
-                    problem=problem,
-                    settings=settings,
-                    pdm_outcomes=heuristic_outcomes,
-                    parent_outcomes=pdm_outcome_map,
-                    executor=executor,
-                )
-            )
+            seeded_tasks, seeded_outcomes = evolve_from_pinch_design(heuristic_outcomes)
             esm_tasks = tuple(esm_tasks + seeded_tasks)
             esm_outcomes = tuple(esm_outcomes + seeded_outcomes)
-    elif settings.skips_thermal_derivative_method:
-        tdm_tasks = ()
-        tdm_outcomes = ()
-        esm_tasks, esm_outcomes = (
-            execute_network_evolution_method_from_pinch_design_stage(
-                problem=problem,
-                settings=settings,
-                pdm_outcomes=pdm_outcomes + heuristic_outcomes,
-                parent_outcomes=pdm_outcome_map,
-                executor=executor,
-            )
-        )
     else:
-        direct_esm_tasks = ()
-        direct_esm_outcomes = ()
-        # Above tier 1 every PDM network also seeds evolution directly; at
-        # tier 0 and 1 only the extra minimum-unit networks do, as they skip
-        # the thermal derivative method.
+        refines_milp = settings.runs_thermal_derivative_method
         direct_pdm_outcomes = (
             pdm_outcomes
-            if settings.synthesis_quality_tier > 1
+            if settings.milp_networks_seed_evolution or not refines_milp
             else tuple(o for o in pdm_outcomes if is_pdm_variant_outcome(o))
         ) + heuristic_outcomes
         if direct_pdm_outcomes:
-            direct_esm_tasks, direct_esm_outcomes = (
-                execute_network_evolution_method_from_pinch_design_stage(
-                    problem=problem,
-                    settings=settings,
-                    pdm_outcomes=direct_pdm_outcomes,
-                    parent_outcomes=pdm_outcome_map,
-                    executor=executor,
-                )
-            )
-
-        tdm_tasks, tdm_outcomes = execute_thermal_derivative_method_stage(
-            problem=problem,
-            settings=settings,
-            pdm_outcomes=pdm_outcomes,
-            parent_outcomes=pdm_outcome_map,
-            executor=executor,
-        )
-
-        upstream_outcomes = pdm_outcome_map | _outcome_map(tdm_outcomes)
-        esm_tasks, esm_outcomes = execute_network_evolution_method_stage(
-            problem=problem,
-            settings=settings,
-            tdm_outcomes=tdm_outcomes,
-            parent_outcomes=upstream_outcomes,
-            executor=executor,
-        )
-        esm_tasks = tuple(direct_esm_tasks + esm_tasks)
-        esm_outcomes = tuple(direct_esm_outcomes + esm_outcomes)
-    if not esm_tasks and _can_skip_derivative_stage_for_missing_couenne(
-        settings,
-        tdm_tasks,
-        tdm_outcomes,
-    ):
-        _warn_couenne_fallback(
-            "Couenne is unavailable for the heat exchanger network "
-            "thermal-derivative-method topology stage",
-        )
-        esm_tasks, esm_outcomes = (
-            execute_network_evolution_method_from_pinch_design_stage(
+            esm_tasks, esm_outcomes = evolve_from_pinch_design(direct_pdm_outcomes)
+        if refines_milp and pdm_outcomes:
+            tdm_tasks, tdm_outcomes = execute_thermal_derivative_method_stage(
                 problem=problem,
                 settings=settings,
-                pdm_outcomes=pdm_outcomes + heuristic_outcomes,
+                pdm_outcomes=pdm_outcomes,
                 parent_outcomes=pdm_outcome_map,
                 executor=executor,
             )
-        )
+            if _can_skip_derivative_stage_for_missing_couenne(
+                settings,
+                tdm_tasks,
+                tdm_outcomes,
+            ):
+                _warn_couenne_fallback(
+                    "Couenne is unavailable for the heat exchanger network "
+                    "thermal-derivative-method topology stage",
+                )
+                seeded = {task.parent_task_id for task in esm_tasks}
+                after_tasks, after_outcomes = evolve_from_pinch_design(
+                    tuple(o for o in pdm_outcomes if o.task.task_id not in seeded)
+                )
+            else:
+                after_tasks, after_outcomes = execute_network_evolution_method_stage(
+                    problem=problem,
+                    settings=settings,
+                    tdm_outcomes=tdm_outcomes,
+                    parent_outcomes=pdm_outcome_map | _outcome_map(tdm_outcomes),
+                    executor=executor,
+                )
+            esm_tasks = tuple(esm_tasks + after_tasks)
+            esm_outcomes = tuple(esm_outcomes + after_outcomes)
 
     tasks = tuple(pdm_tasks + heuristic_tasks + tdm_tasks + esm_tasks)
     outcomes = demote_infeasible_outcomes(

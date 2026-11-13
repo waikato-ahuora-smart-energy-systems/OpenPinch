@@ -375,7 +375,8 @@ def test_hen_config_field_specs_use_openpinch_names():
         "HENS_SOLVER_OPTIONS_EVM",
         "HENS_SOLVE_TOLERANCE",
         "HENS_MAX_PARALLEL",
-        "HENS_SYNTHESIS_QUALITY_TIER",
+        "HENS_SEARCH_WIDTH",
+        "HENS_SEARCH_DEPTH",
         "HENS_PDM_STAGE_PAIR_LIMIT",
         "HENS_TDM_PARENT_LIMIT",
         "HENS_STAGE_PACKING",
@@ -394,7 +395,9 @@ def test_hen_config_field_specs_use_openpinch_names():
         "hens",
         "solver_evm",
     )
-    assert CONFIG_FIELD_SPECS["HENS_SYNTHESIS_QUALITY_TIER"].default == 1
+    assert CONFIG_FIELD_SPECS["HENS_SEARCH_WIDTH"].default == 1
+    assert CONFIG_FIELD_SPECS["HENS_SEARCH_DEPTH"].default == 2
+    assert CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default is None
     assert CONFIG_FIELD_SPECS["HENS_EVM_N_AD_BRANCHES"].default is None
     assert CONFIG_FIELD_SPECS["HENS_EVM_N_RM_BRANCHES"].default is None
     assert not any(key.startswith("OPENHENS_") for key in CONFIG_FIELD_SPECS)
@@ -426,7 +429,8 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_SOLVE_TOLERANCE": 1e-3,
         "HENS_MAX_PARALLEL": 2,
-        "HENS_SYNTHESIS_QUALITY_TIER": 3,
+        "HENS_SEARCH_WIDTH": 2,
+        "HENS_SEARCH_DEPTH": 3,
         "HENS_PDM_STAGE_PAIR_LIMIT": 6,
         "HENS_TDM_PARENT_LIMIT": 4,
         "HENS_STAGE_PACKING": "pdm",
@@ -447,11 +451,11 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     assert target_input.options["HENS_DT_CONT_MULTIPLIERS"] == [1.0, 1.5]
     assert target_input.options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5, 0.9]
     assert target_input.options["HENS_STAGE_SELECTION"] == [2, 3]
-    assert cfg.hens.synthesis_quality_tier == 3
+    assert (cfg.hens.search_width, cfg.hens.search_depth) == (2, 3)
     assert cfg.hens.pdm_stage_pair_limit == 6
     assert cfg.hens.tdm_parent_limit == 4
     assert cfg.hens.stage_packing == "pdm"
-    assert target_input.options["HENS_SYNTHESIS_QUALITY_TIER"] == 3
+    assert target_input.options["HENS_SEARCH_DEPTH"] == 3
     assert target_input.options["HENS_STAGE_PACKING"] == "pdm"
     assert cfg.hens.evm_n_ad_branches == 2
     assert cfg.hens.evm_n_rm_branches == 3
@@ -461,41 +465,22 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     assert target_input.options["HENS_SOLVER_OPTIONS_EVM"] == {"max_iter": 500}
 
 
-def test_hen_dt_cont_multipliers_feed_quality_pdm_multiplier_grid():
+def test_hen_dt_cont_multipliers_override_the_search_width():
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
     problem._master_zone.config = Configuration(
-        options={"HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5]}
+        options={"HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5], "HENS_SEARCH_WIDTH": 3}
     )
 
     settings = workflow_settings_from_problem(problem)
 
     assert settings.dt_cont_multipliers == (1.0, 1.5)
-    assert settings.user_dt_cont_multipliers is True
-    assert settings.quality_dt_cont_multipliers == ()
-
-    tier_problem = PinchProblem(
-        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
-    )
-    tier_problem._master_zone.config = Configuration(
-        options={
-            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5, 1.5],
-            "HENS_SYNTHESIS_QUALITY_TIER": 3,
-        }
-    )
-    tier_settings = workflow_settings_from_problem(tier_problem)
-
-    assert tier_settings.quality_dt_cont_multipliers == (1.0, 1.5, 1.5)
-    assert tier_settings.quality_pdm_dt_cont_multipliers == (1.0, 1.5)
 
 
-def test_workflow_settings_solver_options_and_quality_edges() -> None:
+def test_workflow_settings_solver_options_and_parent_limit_edges() -> None:
     standard = _workflow_settings()
-    expanded = _workflow_settings(
-        synthesis_quality_tier=7,
-        tdm_parent_limit=0,
-    )
+    limited = _workflow_settings(tdm_parent_limit=0)
 
     assert standard.solver_for("not-a-method") is None
     assert standard.solver_options_for("thermal_derivative_method") == {
@@ -503,12 +488,8 @@ def test_workflow_settings_solver_options_and_quality_edges() -> None:
     }
     assert standard.solver_options_for("network_evolution_method") == {"time_limit": 30}
     assert standard.solver_options_for("not-a-method") == {}
-    assert standard.quality_fraction == 0.0
-    assert standard.is_standard_quality_tier is True
-    assert standard.quality_pdm_dt_cont_multipliers == ()
     assert standard.quality_tdm_parent_limit == 2
-    assert expanded.quality_fraction == 1.0
-    assert expanded.quality_tdm_parent_limit == 1
+    assert limited.quality_tdm_parent_limit == 1
 
 
 def test_workflow_settings_require_loaded_problem() -> None:
@@ -625,20 +606,16 @@ def test_evm_branch_options_round_trip_to_workflow_settings():
     assert settings.effective_evm_n_rm_branches == 3
 
 
-def test_synthesis_quality_tier_derives_evm_branch_widths() -> None:
+def test_search_depth_derives_evm_branch_widths() -> None:
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
-    problem._master_zone.config = Configuration(
-        options={"HENS_SYNTHESIS_QUALITY_TIER": 5}
-    )
+    problem._master_zone.config = Configuration(options={"HENS_SEARCH_DEPTH": 4})
 
     settings = workflow_settings_from_problem(problem)
 
-    assert settings.evm_n_ad_branches is None
-    assert settings.evm_n_rm_branches is None
-    assert settings.effective_evm_n_ad_branches == 2
-    assert settings.effective_evm_n_rm_branches == 2
+    assert settings.effective_evm_n_ad_branches == 3
+    assert settings.effective_evm_n_rm_branches == 3
 
 
 @pytest.mark.parametrize(
@@ -651,8 +628,11 @@ def test_synthesis_quality_tier_derives_evm_branch_widths() -> None:
         {"HENS_STAGE_SELECTION": [1, 1]},
         {"HENS_OUTPUT_FORMATS": ["xml"]},
         {"HENS_SOLVE_TOLERANCE": 0.0},
-        {"HENS_SYNTHESIS_QUALITY_TIER": -1},
-        {"HENS_SYNTHESIS_QUALITY_TIER": 6},
+        {"HENS_SEARCH_WIDTH": -1},
+        {"HENS_SEARCH_WIDTH": 4},
+        {"HENS_SEARCH_DEPTH": -1},
+        {"HENS_SEARCH_DEPTH": 5},
+        {"HENS_PDM_MILP": "sometimes"},
         {"HENS_PDM_STAGE_PAIR_LIMIT": -1},
         {"HENS_PDM_STAGE_PAIR_LIMIT": 13},
         {"HENS_TDM_PARENT_LIMIT": 0},

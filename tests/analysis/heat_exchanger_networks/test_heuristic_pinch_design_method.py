@@ -2,8 +2,8 @@
 
 Heuristic networks are labelled with their own method, fan out like the
 extra PDM networks, seed network evolution and never go to the thermal
-derivative method. The MILP pinch design method runs only when
-``HENS_PDM_MILP`` is set, or when ``HENS_HEURISTIC_PDM_NETWORKS`` is 0.
+derivative method. The MILP pinch design method runs from search depth 2,
+when ``HENS_PDM_MILP`` is set, or when ``HENS_HEURISTIC_PDM_NETWORKS`` is 0.
 """
 
 from __future__ import annotations
@@ -80,6 +80,8 @@ def _small_problem_with_options(options: dict) -> PinchProblem:
 def _pinch_problem(source, options: dict) -> PinchProblem:
     payload = json.loads(source.read_text(encoding="utf-8"))
     payload["options"] = payload.get("options", {}) | {
+        # The heuristic alone.
+        "HENS_SEARCH_DEPTH": 1,
         "HENS_SOLVER_PDM": "highs",
         "HENS_MAX_PARALLEL": 1,
         **options,
@@ -104,16 +106,20 @@ def test_tasks_run_one_per_multiplier_with_the_network_cap():
     assert all(task.settings["heuristic_networks"] == 4 for task in tasks)
 
 
-def test_by_default_the_heuristic_gives_ten_networks_and_the_milp_is_off():
+def test_the_heuristic_gives_ten_networks_and_depth_two_adds_the_milp():
     settings = workflow_settings_from_problem(_small_problem_with_options({}))
+    shallow = workflow_settings_from_problem(
+        _small_problem_with_options({"HENS_SEARCH_DEPTH": 1})
+    )
 
     assert settings.heuristic_pdm_networks == 10
-    assert settings.pdm_milp is False
-    assert settings.runs_milp_pinch_design is False
-    assert replace(settings, pdm_milp=True).runs_milp_pinch_design
+    assert settings.pdm_milp is True
+    assert shallow.pdm_milp is False
+    assert shallow.runs_milp_pinch_design is False
+    assert replace(shallow, pdm_milp=True).runs_milp_pinch_design
     # With no heuristic networks the MILP runs, or there would be no pinch
     # design networks at all.
-    assert replace(settings, heuristic_pdm_networks=0).runs_milp_pinch_design
+    assert replace(shallow, heuristic_pdm_networks=0).runs_milp_pinch_design
 
 
 @pytest.mark.synthesis
@@ -160,10 +166,10 @@ def test_extra_heuristic_networks_get_their_own_variant_tasks():
         assert outcome.task.task_id in executor.problems_by_task_id
 
 
-@pytest.mark.parametrize("tier", [0, 1, 2])
-def test_heuristic_outcomes_seed_evolution_and_skip_the_derivative_method(tier):
+@pytest.mark.parametrize("depth", [1, 2, 3])
+def test_heuristic_outcomes_seed_evolution_and_skip_the_derivative_method(depth):
     problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": tier, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
+        {"HENS_SEARCH_DEPTH": depth, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
     )
     settings = replace(
         workflow_settings_from_problem(problem), heuristic_pdm_networks=3
@@ -174,8 +180,7 @@ def test_heuristic_outcomes_seed_evolution_and_skip_the_derivative_method(tier):
         problem, settings, executor=executor
     )
 
-    assert executor.stage_order[0] == HEURISTIC
-    assert MILP not in executor.stage_order
+    assert (MILP in executor.stage_order) == (depth >= 2)
     heuristic_ids = {t.task_id for t in result.tasks if t.method == HEURISTIC}
     assert heuristic_ids
     evolution_parents = {
@@ -228,7 +233,7 @@ def test_without_a_network_cap_the_workflow_runs_only_the_milp():
 
 def test_evolution_takes_heuristic_parents_at_every_tier():
     problem = _small_problem_with_options(
-        {"HENS_SYNTHESIS_QUALITY_TIER": 3, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
+        {"HENS_SEARCH_DEPTH": 4, "HENS_DT_CONT_MULTIPLIERS": [1.0]}
     )
     settings = replace(
         workflow_settings_from_problem(problem), heuristic_pdm_networks=2
@@ -269,7 +274,11 @@ def test_heuristic_tasks_build_pinch_design_problems_with_the_cap():
 
 @pytest.mark.parametrize(
     ("options", "stages"),
-    [({}, [HEURISTIC]), ({"HENS_PDM_MILP": True}, [MILP, HEURISTIC])],
+    [
+        ({"HENS_SEARCH_DEPTH": 1}, [HEURISTIC]),
+        ({"HENS_SEARCH_DEPTH": 1, "HENS_PDM_MILP": True}, [MILP, HEURISTIC]),
+        ({}, [MILP, HEURISTIC]),
+    ],
 )
 def test_the_pinch_design_service_runs_the_heuristic_and_optionally_the_milp(
     options, stages
@@ -329,7 +338,9 @@ def test_the_pinch_design_accessor_runs_the_heuristic_method(monkeypatch):
     monkeypatch.setattr(
         heuristic_module, "LocalSynthesisExecutor", FakeSynthesisExecutor
     )
-    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_SEARCH_DEPTH": 1}
+    )
 
     design = problem.design.pinch_design()
 

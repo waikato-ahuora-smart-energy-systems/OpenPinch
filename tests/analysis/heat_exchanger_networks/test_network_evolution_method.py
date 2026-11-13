@@ -141,7 +141,7 @@ def test_quality_seeded_network_evolution_uses_canonical_topology() -> None:
     )
 
     tasks = build_seeded_network_evolution_method_tasks(
-        _settings(synthesis_quality_tier=3),
+        _settings(),
         (seed,),
     )
 
@@ -150,7 +150,7 @@ def test_quality_seeded_network_evolution_uses_canonical_topology() -> None:
     assert tasks[0].stage_count == 2
 
 
-def _settings(*, synthesis_quality_tier: int = 1) -> SynthesisWorkflowSettings:
+def _settings() -> SynthesisWorkflowSettings:
     return SynthesisWorkflowSettings(
         run_id="method-test",
         dt_cont_multipliers=(1.0,),
@@ -161,7 +161,6 @@ def _settings(*, synthesis_quality_tier: int = 1) -> SynthesisWorkflowSettings:
         solve_tolerance=1e-3,
         best_solutions_to_save=1,
         max_parallel=1,
-        synthesis_quality_tier=synthesis_quality_tier,
         pdm_solver="couenne",
         tdm_solver="couenne",
         evm_solver="ipopt-pyomo",

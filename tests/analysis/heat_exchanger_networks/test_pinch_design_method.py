@@ -24,11 +24,9 @@ from OpenPinch.analysis.heat_exchanger_networks.execution import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
     LocalSynthesisExecutor,
-    _branch_breadth,
     _build_and_solve_root_task,
     _failed_task_outcome,
     _optional_int,
-    _pathway_evolution_options,
     _pdm_stage_selection,
     _process_pool,
     _solve_built_task,
@@ -1504,7 +1502,7 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     problem = _four_stream_problem(
         options={
             "HENS_STAGE_SELECTION": [1, 2, 3],
-            "HENS_SYNTHESIS_QUALITY_TIER": 3,
+            "HENS_SEARCH_DEPTH": 3,
         }
     )
     settings = workflow_settings_from_problem(problem)
@@ -1515,20 +1513,6 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     with pytest.raises(WorkflowContractError, match="solver_options"):
         _solver_options_for_task(problem, task)
 
-    assert _branch_breadth(4, tier=1) == 4
-    assert (
-        _pathway_evolution_options(
-            HeatExchangerNetworkSynthesisTask(
-                run_id="no-pathway",
-                method="network_evolution_method",
-                dt_cont_multiplier=1.4,
-                derivative_threshold=0.5,
-                stage_count=2,
-                metadata={},
-            )
-        )
-        == {}
-    )
     assert _optional_int(None) is None
     assert _optional_int("7") == 7
     assert _pdm_stage_selection(problem) == "automated"

@@ -33,7 +33,8 @@
     "export_formats": ["json", "csv"],
     "solve_tolerance": 0.001,
     "best_solutions_to_save": 2,
-    "synthesis_quality_tier": 3,
+    "search_width": 2,
+    "search_depth": 3,
     "pdm_stage_pair_limit": 4,
     "tdm_parent_limit": 2,
     "stage_packing": "pdm",
@@ -43,11 +44,6 @@
     "problem_id": " problem-a ",
     "workspace_variant": " variant-a ",
     "period_id": " peak ",
-    "selected_pathway_id": " path-1 ",
-    "selected_pathway_kind": " protected ",
-    "selected_pdm_mode": " packed ",
-    "selected_tier_origin": 2,
-    "selected_protected_pathway": true,
     "task_count_by_method": {
       " pinch_design_method ": 2
     },

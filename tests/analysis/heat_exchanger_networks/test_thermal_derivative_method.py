@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
-    TierPathway,
-    pathway_metadata,
-)
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     SynthesisWorkflowSettings,
 )
@@ -38,127 +34,37 @@ def test_thermal_derivative_method_builds_seeded_tasks() -> None:
     assert tasks[0].topology_restrictions
 
 
-def test_pinch_design_quality_task_builder_adds_deduped_stage_pair_tasks() -> None:
+def test_pinch_design_tasks_run_each_multiplier_and_the_stage_pair_sweep() -> None:
     settings = _settings(
         method_sequence=("pinch_design_method",),
-        synthesis_quality_tier=2,
-        dt_cont_multipliers=(1.0, 1.5),
-        user_dt_cont_multipliers=True,
+        dt_cont_multipliers=(1.0, 1.5, 1.0),
         pdm_stage_pair_limit=2,
     )
 
-    assert pinch_design_method.build_pinch_design_method_tasks(settings)
-    base_task = HeatExchangerNetworkSynthesisTask(
-        run_id="method-test",
-        method="pinch_design_method",
-        dt_cont_multiplier=1.0,
-    )
-    tasks = pinch_design_method._with_quality_pdm_tasks(settings, (base_task,))
-    quality_tasks = [
-        task for task in tasks if task.metadata.get("quality_candidate") is not None
+    tasks = pinch_design_method.build_pinch_design_method_tasks(settings)
+
+    assert [task.dt_cont_multiplier for task in tasks] == [1.0, 1.5, 1.0, 1.0]
+    assert [task.settings.get("stage_selection") for task in tasks] == [
+        None,
+        None,
+        [1, 2],
+        [2, 1],
     ]
-
-    assert any(
-        task.metadata["quality_candidate"] == "dt_cont_multiplier"
-        and task.dt_cont_multiplier == 1.5
-        for task in quality_tasks
-    )
-    assert [
-        task.settings["stage_selection"]
-        for task in quality_tasks
-        if task.metadata["quality_candidate"] == "stage_pair"
-    ] == [[1, 2], [2, 1]]
-
-    no_stage_pair_settings = _settings(
-        method_sequence=("pinch_design_method",),
-        synthesis_quality_tier=2,
-        dt_cont_multipliers=(1.0, 1.5),
-        user_dt_cont_multipliers=True,
-        pdm_stage_pair_limit=0,
-    )
-    no_stage_pair_tasks = pinch_design_method._with_quality_pdm_tasks(
-        no_stage_pair_settings,
-        (base_task,),
-    )
-    assert all(
-        task.metadata.get("quality_candidate") != "stage_pair"
-        for task in no_stage_pair_tasks
-    )
-
-    duplicate_stage_pair_task = base_task.model_copy(
-        update={"settings": {"stage_selection": [1, 2]}}
-    )
-    duplicate_checked = pinch_design_method._with_quality_pdm_tasks(
-        settings,
-        (base_task, duplicate_stage_pair_task),
-    )
-    assert [
-        task.settings.get("stage_selection")
-        for task in duplicate_checked
-        if task.metadata.get("quality_candidate") == "stage_pair"
-    ] == [[2, 1]]
-
-
-def test_pinch_design_task_builder_skips_non_exact_pathways_without_multiplier(
-    monkeypatch,
-) -> None:
-    path_without_multiplier = TierPathway(
-        pathway_id="bad",
-        tier_origin=2,
-        pathway_kind="quality",
-        pdm_mode="compact",
-        multiplier=None,
-        uses_tdm=False,
-        evm_n_ad_branches=1,
-        evm_n_rm_branches=1,
-        evm_no_improvement_patience=None,
-        protected=False,
-        exact_open_hens=False,
-    )
-    monkeypatch.setattr(
-        pinch_design_method,
-        "tier_pathways",
-        lambda _settings: (path_without_multiplier,),
-    )
-
     assert (
-        pinch_design_method.build_pinch_design_method_tasks(
-            _settings(method_sequence=("pinch_design_method",)),
+        len(
+            pinch_design_method.build_pinch_design_method_tasks(
+                _settings(dt_cont_multipliers=(1.0, 1.5), pdm_stage_pair_limit=0)
+            )
         )
-        == ()
+        == 2
     )
 
 
-def test_thermal_derivative_skips_non_tdm_pathways_and_empty_default_stage():
-    non_tdm_pathway = TierPathway(
-        pathway_id="compact-only",
-        tier_origin=0,
-        pathway_kind="tier0_pdm_evm",
-        pdm_mode="compact",
-        multiplier=1.0,
-        uses_tdm=False,
-        evm_n_ad_branches=1,
-        evm_n_rm_branches=1,
-        evm_no_improvement_patience=None,
-        protected=True,
-    )
+def test_thermal_derivative_skips_failed_parents_and_empty_default_stage():
     task = HeatExchangerNetworkSynthesisTask(
         run_id="method-test",
         method="pinch_design_method",
         dt_cont_multiplier=1.0,
-        metadata=pathway_metadata((non_tdm_pathway,)),
-    )
-    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
-        task=task,
-        status="success",
-    )
-
-    assert (
-        thermal_derivative_method.build_thermal_derivative_method_tasks(
-            _settings(),
-            [outcome],
-        )
-        == ()
     )
 
     tasks, outcomes = thermal_derivative_method.execute_thermal_derivative_method_stage(
@@ -172,7 +78,7 @@ def test_thermal_derivative_skips_non_tdm_pathways_and_empty_default_stage():
     assert outcomes == ()
 
     failed_outcome = HeatExchangerNetworkSynthesisTaskOutcome(
-        task=task.model_copy(update={"metadata": {}}),
+        task=task,
         status="failed",
         error="solver failed",
     )
@@ -186,10 +92,7 @@ def test_thermal_derivative_skips_non_tdm_pathways_and_empty_default_stage():
 
 
 def test_seeded_quality_thermal_derivative_tasks_deduplicate_topologies() -> None:
-    settings = _settings(
-        synthesis_quality_tier=2,
-        derivative_thresholds=(0.25, 0.25, 0.5),
-    )
+    settings = _settings(derivative_thresholds=(0.25, 0.25, 0.5))
     seed = _seed_network(method="pinch_design_method")
 
     tasks = build_seeded_thermal_derivative_method_tasks(settings, (seed, seed))

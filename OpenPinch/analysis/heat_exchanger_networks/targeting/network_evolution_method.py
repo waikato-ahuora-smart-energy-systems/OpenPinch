@@ -12,21 +12,13 @@ from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestric
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
-from ..execution.pathways import (
-    TierPathway,
-    pathway_metadata,
-    pathways_from_metadata,
-)
 from ..execution.settings import SynthesisWorkflowSettings
 from ..execution.task_builders import (
     _required_stage_count,
     _successful_method,
     derivative_threshold_from_network,
-    dt_cont_multiplier_from_network,
     is_utility_only_outcome,
     required_topology_restrictions_from_outcome,
-    stage_count_from_network,
-    topology_restrictions_from_network,
 )
 from ..results.assembly import SynthesisWorkflowResult
 from ._stage import build_seeded_quality_tasks, run_single_method_workflow, run_stage
@@ -139,7 +131,6 @@ def build_network_evolution_method_tasks(
             continue
         if is_utility_only_outcome(outcome):
             continue  # utility-only: a final candidate, nothing to refine
-        pathways = pathways_from_metadata(outcome.task.metadata)
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
             HeatExchangerNetworkDesignMethod.NetworkEvolution,
@@ -147,19 +138,6 @@ def build_network_evolution_method_tasks(
         stage_count = _required_stage_count(
             outcome, HeatExchangerNetworkDesignMethod.NetworkEvolution
         )
-        if pathways:
-            tasks.extend(
-                _evolution_tasks_for_pathways(
-                    settings=settings,
-                    parent_outcome=outcome,
-                    pathways=pathways,
-                    dt_cont_multiplier=outcome.task.dt_cont_multiplier,
-                    derivative_threshold=outcome.task.derivative_threshold,
-                    stage_count=stage_count,
-                    topology_restrictions=restrictions,
-                )
-            )
-            continue
         tasks.append(
             _standard_evolution_task(
                 settings=settings,
@@ -177,41 +155,16 @@ def build_seeded_network_evolution_method_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate standalone evolution tasks from existing seed-network topologies."""
-    if settings.synthesis_quality_tier > 1:
-        return _build_seeded_quality_network_evolution_method_tasks(
-            settings,
-            seed_networks,
-        )
-
-    tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    for seed_index, network in enumerate(seed_networks):
-        restrictions = topology_restrictions_from_network(
-            network,
-            downstream_method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-        )
-        stage_count = stage_count_from_network(
-            network,
-            downstream_method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-        )
-        tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-                dt_cont_multiplier=dt_cont_multiplier_from_network(
-                    network,
-                    settings,
-                ),
-                derivative_threshold=derivative_threshold_from_network(network),
-                stage_count=stage_count,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                seed_network_index=seed_index,
-                topology_restrictions=restrictions,
-            )
-        )
-    return tuple(tasks)
+    """Standalone evolution tasks, one per distinct seed topology."""
+    return build_seeded_quality_tasks(
+        settings,
+        seed_networks,
+        method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
+        derivative_thresholds=lambda network: (
+            derivative_threshold_from_network(network),
+        ),
+        distinct_thresholds=False,
+    )
 
 
 def build_network_evolution_method_tasks_from_pinch_design_method(
@@ -219,11 +172,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
     *,
     settings: SynthesisWorkflowSettings | None = None,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate ESM tasks directly from PDM or heuristic pinch design outcomes.
-
-    Heuristic networks carry no tier pathways and seed evolution at every
-    tier, with the run's branch breadth.
-    """
+    """Generate ESM tasks directly from PDM or heuristic pinch design outcomes."""
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     for outcome in pdm_outcomes:
         heuristic = _successful_method(
@@ -235,18 +184,6 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
             continue
         if is_utility_only_outcome(outcome):
             continue  # utility-only: a final candidate, nothing to refine
-        pathways = tuple(
-            pathway
-            for pathway in pathways_from_metadata(outcome.task.metadata)
-            if not pathway.uses_tdm
-        )
-        if (
-            settings is not None
-            and settings.synthesis_quality_tier > 1
-            and not pathways
-            and not heuristic
-        ):
-            continue
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
             HeatExchangerNetworkDesignMethod.NetworkEvolution,
@@ -254,19 +191,6 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
         stage_count = _required_stage_count(
             outcome, HeatExchangerNetworkDesignMethod.NetworkEvolution
         )
-        if pathways and settings is not None:
-            tasks.extend(
-                _evolution_tasks_for_pathways(
-                    settings=settings,
-                    parent_outcome=outcome,
-                    pathways=pathways,
-                    dt_cont_multiplier=outcome.task.dt_cont_multiplier,
-                    derivative_threshold=None,
-                    stage_count=stage_count,
-                    topology_restrictions=restrictions,
-                )
-            )
-            continue
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=outcome.task.run_id,
@@ -309,88 +233,14 @@ def _standard_evolution_task(
     )
 
 
-def _evolution_tasks_for_pathways(
-    *,
-    settings: SynthesisWorkflowSettings,
-    parent_outcome: HeatExchangerNetworkSynthesisTaskOutcome,
-    pathways: tuple[TierPathway, ...],
-    dt_cont_multiplier: float,
-    derivative_threshold: float | None,
-    stage_count: int,
-    topology_restrictions: tuple[HeatExchangerNetworkTopologyRestriction, ...],
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    grouped: dict[tuple[int, int, int | None], list[TierPathway]] = {}
-    for pathway in pathways:
-        key = (
-            pathway.evm_n_ad_branches,
-            pathway.evm_n_rm_branches,
-            pathway.evm_no_improvement_patience,
-        )
-        grouped.setdefault(key, []).append(pathway)
-
-    tasks = []
-    for (n_ad, n_rm, patience), grouped_pathways in grouped.items():
-        task_settings = _evolution_task_settings(
-            n_ad_branches=n_ad,
-            n_rm_branches=n_rm,
-            no_improvement_patience=patience,
-        )
-        tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-                dt_cont_multiplier=dt_cont_multiplier,
-                derivative_threshold=derivative_threshold,
-                stage_count=stage_count,
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                parent_task_id=parent_outcome.task.task_id,
-                settings=task_settings,
-                topology_restrictions=topology_restrictions,
-                metadata=pathway_metadata(grouped_pathways),
-            )
-        )
-    return tuple(tasks)
-
-
-def _evolution_task_settings(
-    *,
-    n_ad_branches: int,
-    n_rm_branches: int,
-    no_improvement_patience: int | None,
-) -> dict[str, int]:
-    settings: dict[str, int] = {}
-    if n_ad_branches != 1:
-        settings["evolution_n_ad_branches"] = int(n_ad_branches)
-    if n_rm_branches != 1:
-        settings["evolution_n_rm_branches"] = int(n_rm_branches)
-    if no_improvement_patience is not None:
-        settings["evolution_no_improvement_patience"] = int(no_improvement_patience)
-    return settings
-
-
 def _run_breadth_settings(settings: SynthesisWorkflowSettings) -> dict[str, int]:
-    """Branch breadth of this run, for a task with no pathway to carry it."""
-    return {
-        "evolution_n_ad_branches": settings.effective_evm_n_ad_branches,
-        "evolution_n_rm_branches": settings.effective_evm_n_rm_branches,
-    }
-
-
-def _build_seeded_quality_network_evolution_method_tasks(
-    settings: SynthesisWorkflowSettings,
-    seed_networks: Sequence[HeatExchangerNetwork],
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    return build_seeded_quality_tasks(
-        settings,
-        seed_networks,
-        method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-        derivative_thresholds=lambda network: (
-            derivative_threshold_from_network(network),
-        ),
-        distinct_thresholds=False,
-    )
+    """Branch breadth of this run; wider searches stop after two idle rounds."""
+    n_ad = settings.effective_evm_n_ad_branches
+    n_rm = settings.effective_evm_n_rm_branches
+    breadth = {"evolution_n_ad_branches": n_ad, "evolution_n_rm_branches": n_rm}
+    if max(n_ad, n_rm) > 1:
+        breadth["evolution_no_improvement_patience"] = 2
+    return breadth
 
 
 def build_direct_network_evolution_method_tasks(

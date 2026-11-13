@@ -197,9 +197,14 @@ def problem_to_solver_arrays(
         configuration={
             "HENS_BEST_SOLUTIONS_TO_SAVE": hens.best_solutions_to_save,
             "HENS_DERIVATIVE_THRESHOLDS": list(hens.derivative_thresholds),
-            "HENS_DT_CONT_MULTIPLIERS": list(hens.dt_cont_multipliers),
+            "HENS_SEARCH_WIDTH": hens.search_width,
+            "HENS_SEARCH_DEPTH": hens.search_depth,
+            "HENS_DT_CONT_MULTIPLIERS": (
+                None
+                if hens.dt_cont_multipliers is None
+                else list(hens.dt_cont_multipliers)
+            ),
             "HENS_MIN_EXCHANGER_APPROACH_SHARE": hens.min_exchanger_approach_share,
-            "HENS_SYNTHESIS_QUALITY_TIER": hens.synthesis_quality_tier,
             "HENS_PDM_STAGE_PAIR_LIMIT": hens.pdm_stage_pair_limit,
             "HENS_TDM_PARENT_LIMIT": hens.tdm_parent_limit,
             "HENS_STAGE_PACKING": hens.stage_packing,

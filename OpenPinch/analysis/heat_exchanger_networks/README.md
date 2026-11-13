@@ -12,7 +12,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 - `WorkflowContractError` (`errors.py`): raised when a synthesis workflow breaks its task contract or no task outcome succeeds.
 - `build_index_grid`, `ordered_mapping_keys` (`indexing.py`): nested index grids and index-ordered mapping keys.
 - Subdirectories:
-  - [execution](./execution/README.md): settings, pathways, executors and task-builder helpers.
+  - [execution](./execution/README.md): settings, search levels, executors and task-builder helpers.
   - [extraction](./extraction/README.md): solved model to domain network.
   - [heuristic](./heuristic/README.md): rules-based (Linnhoff) pinch design topology proposals.
   - [models](./models/README.md): concrete HEN equation models.
@@ -23,8 +23,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 
 ## Invariants
 - Runtime options reaching this package must be a dict or `None` and must not contain `HENS_` keys; persistent controls are loaded with the problem. The `problem.design` accessors move `HENS_` keys from a call's `options` into that call's configuration before this check, so users may pass them there [context.py:normalise_runtime_options].
-- Open-HENS and PDM reject `initial_networks`, and the heuristic pinch design method is not a method of its own (PDM runs it); `method=None` runs tier 0 and `OpenHENS` runs tier 1 [service.py:heat_exchanger_network_synthesis_service].
-- The call-local quality tier of the OpenHENS entry points must be an integer from 0 to 5; the standalone method services use the configured tier [service.py:_validate_quality_tier].
+- Open-HENS and PDM reject `initial_networks`, and the heuristic pinch design method is not a method of its own (PDM runs it); `method=None` and `OpenHENS` run the full workflow at the configured search width and depth [service.py:heat_exchanger_network_synthesis_service].
 - An accepted design is ranked, selected and verified; verification failures raise `RuntimeError` [context.py:finalise_design_result].
 - Analysis code accepts the `PreparedProblem` protocol instead of importing the application layer [prepared_problem.py:PreparedProblem].
 - Duty optimisation: `"area"` needs a utility cap, `"cost"` and `"utility"` reject caps, and every process stream needs at least one exchanger, checked at solve time (including after each idle-exchanger removal) so a violation surfaces as a failed task and `WorkflowContractError` from the service [duty_optimisation.py:build_duty_optimisation_request] [duty_optimisation.py:_require_every_stream_served].

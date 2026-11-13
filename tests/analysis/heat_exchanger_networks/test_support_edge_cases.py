@@ -20,16 +20,12 @@ from OpenPinch.analysis.heat_exchanger_networks.errors import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution import (
     fallbacks,
-    pathways,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
     _fake_network,
     _first_stream,
     _temperature,
-)
-from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
-    pathways_from_metadata,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
     dt_cont_multiplier_from_network,
@@ -130,7 +126,7 @@ def _settings(**overrides):
         "problem_id": "problem-1",
         "workspace_variant": "baseline",
         "period_id": None,
-        "synthesis_quality_tier": 1,
+        "search_depth": 2,
         "dt_cont_multipliers": (1.0,),
         "stage_selection": (1,),
         "evm_n_ad_branches": None,
@@ -234,32 +230,6 @@ def test_couenne_fallback_predicates_reject_non_matching_inputs():
         )
         is False
     )
-
-
-def test_pathway_metadata_skips_invalid_items_and_uses_explicit_breadth():
-    metadata = {
-        "pathways": [
-            "not-a-pathway",
-            {
-                "pathway_id": "p1",
-                "tier_origin": 2,
-                "pathway_kind": "quality",
-                "pdm_mode": "compact",
-                "pdm_multiplier": None,
-                "uses_tdm": False,
-                "evm_n_ad_branches": 2,
-                "evm_n_rm_branches": 3,
-                "evm_no_improvement_patience": None,
-                "protected": False,
-            },
-        ]
-    }
-
-    rehydrated = pathways_from_metadata(metadata)
-
-    assert len(rehydrated) == 1
-    assert rehydrated[0].pathway_id == "p1"
-    assert pathways._branch_breadth(0, tier=5) == 1
 
 
 def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Path):
@@ -496,14 +466,12 @@ def test_network_evolution_task_edges(monkeypatch):
     )
     assert len(standard_tasks) == 1
 
-    assert evolution._evolution_task_settings(
-        n_ad_branches=2,
-        n_rm_branches=3,
-        no_improvement_patience=4,
+    assert evolution._run_breadth_settings(
+        _settings(effective_evm_n_ad_branches=2, effective_evm_n_rm_branches=3)
     ) == {
         "evolution_n_ad_branches": 2,
         "evolution_n_rm_branches": 3,
-        "evolution_no_improvement_patience": 4,
+        "evolution_no_improvement_patience": 2,
     }
 
     monkeypatch.setattr(
@@ -528,7 +496,7 @@ def test_network_evolution_task_edges(monkeypatch):
     )
 
     seeded_tasks = evolution.build_seeded_network_evolution_method_tasks(
-        _settings(synthesis_quality_tier=2),
+        _settings(),
         (HeatExchangerNetwork(), HeatExchangerNetwork()),
     )
 
