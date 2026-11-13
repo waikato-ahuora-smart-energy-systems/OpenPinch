@@ -204,6 +204,11 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The MILP pinch design method no longer rounds below-pinch stage
+  temperatures and cooler duties to five decimals when it joins the two pinch
+  sides (issue 332). On a stream with a near-flat segment, such as boiling
+  over 0.01 K, that rounding moved a stage's heat by several watts and the
+  segment area check then rejected the network.
 - A Couenne or Ipopt solve that stops early, for example at an iteration or
   time limit, now fails unless the solver returned a point. Before, such a
   solve passed with the variables at their start values, and the unsolved

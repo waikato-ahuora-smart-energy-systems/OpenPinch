@@ -3431,6 +3431,30 @@ def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> 
 
 @pytest.mark.synthesis
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
+def test_below_only_pdm_amalgamation_keeps_solved_values_at_full_precision() -> None:
+    # Issue #332: a boiling segment of 41.84 kW over 0.01 K holds about
+    # 4184 kW/K, so rounding the stage temperature 342.24531825 K to five
+    # decimals moved its heat coordinate by 7.3 W and failed the segment
+    # area check, which allows 1 W. Amalgamation must copy values as solved.
+    driver = _pdm_amalgamation_driver()
+    below = _pdm_side_result(cold_utility_target=1.0)
+    stage_temperature = 342.2453182513
+    cooler_duty = 16.5637583012345
+    below.T_c_by_period[0][0][1].value = stage_temperature
+    below.T_h_by_period[0][0][1].value = stage_temperature + 71.8016615321
+    below.Q_c_by_period[0][0][0].value = cooler_duty
+
+    network = driver.amalgamate_networks(
+        above_case=_pdm_side_result(), below_case=below
+    )
+
+    assert network.T_c_by_period[0][0][1].value == stage_temperature
+    assert network.T_h_by_period[0][0][1].value == stage_temperature + 71.8016615321
+    assert network.Q_c_by_period[0][0][0].value == cooler_duty
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> None:
     driver = _pdm_amalgamation_driver(multiperiod=True, non_isothermal=True)
 
