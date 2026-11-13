@@ -331,3 +331,25 @@ def test_a_wide_split_among_many_partners_finishes_quickly():
 
     assert proposals
     assert time.perf_counter() - start < 10.0
+
+
+def test_a_fruitless_search_stops_once_its_incomplete_proposals_are_kept():
+    # Every match is temperature-limited, so no proposal completes. Once the
+    # cap of incomplete proposals was kept, the search still spent its whole
+    # node budget (47 s here) looking for a complete one.
+    import time
+
+    above = side(
+        "above",
+        [
+            stream("hot", i, 10.0, 5000.0, 150.0 + 60.0 * i, at_pinch=False)
+            for i in range(3)
+        ],
+        [stream("cold", j, 1.0, 5000.0, 90.0, at_pinch=False) for j in range(5)],
+    )
+
+    start = time.perf_counter()
+    proposals = propose_side_topologies(above, limit=10)
+
+    assert proposals and not any(proposal.complete for proposal in proposals)
+    assert time.perf_counter() - start < 5.0

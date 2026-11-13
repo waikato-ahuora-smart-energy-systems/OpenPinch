@@ -322,14 +322,21 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
     complete: list[SideProposal] = []
     incomplete: list[SideProposal] = []
     seen: set[tuple] = set()
-    while searches and len(complete) < limit:
+    # Incomplete proposals met since the incomplete list filled: past the
+    # cap of them with no complete one, the search is unlikely to find one.
+    stalled = 0
+    while searches and len(complete) < limit and stalled < limit:
         for search in list(searches):
             proposal = next(search, None)
             if proposal is None:
                 searches.remove(search)
                 continue
             if not proposal.complete and len(incomplete) >= limit:
+                stalled += 1
+                if stalled >= limit:
+                    break
                 continue
+            stalled = 0
             if proposal.signature in seen:
                 continue
             seen.add(proposal.signature)
