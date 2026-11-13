@@ -12,8 +12,13 @@ from OpenPinch.analysis.heat_exchanger_networks.heuristic.side_streams import (
 from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
     InternalHeatExchangerNetworkProblem,
 )
+from OpenPinch.analysis.heat_exchanger_networks.solver import backend
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
+)
+from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver.pinch_design_decomposition import (
     build_pinch_design_decomposition,
@@ -29,7 +34,20 @@ FOUR_STREAM_JSON = (
     / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
 )
 
-pytestmark = pytest.mark.synthesis
+
+def _highs_available() -> bool:
+    try:
+        backend.require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+# The side models are built for HiGHS, which needs highspy (absent in Pyodide).
+pytestmark = [
+    pytest.mark.synthesis,
+    pytest.mark.skipif("not _highs_available()", reason="needs highspy"),
+]
 
 
 def _sides(pinch: PinchProblem, dTmin: float):
