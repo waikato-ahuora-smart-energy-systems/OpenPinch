@@ -130,6 +130,7 @@ def test_valid_options_are_written_to_the_option_file(monkeypatch, tmp_path):
     )
 
     assert Path(run.option_file).read_text(encoding="utf-8") == (
+        "feasibility_bt no\naggressive_fbbt no\n"
         "node_limit 50\ntime_limit 120.5\ndelete_redundant no\n"
     )
 

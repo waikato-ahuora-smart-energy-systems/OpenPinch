@@ -10,6 +10,17 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Couenne no longer reports small stage-wise models infeasible when a
+  feasible network exists. Couenne now defaults to ``feasibility_bt no`` and
+  ``aggressive_fbbt no`` (set either to ``yes`` in
+  ``HENS_SOLVER_OPTIONS_TDM`` to restore it), and Chen's mean temperature
+  difference smooths each heater's and cooler's terminal difference rather
+  than the cubed base, whose square reached about 1e12 K^6. On the
+  segmented-stream test case Couenne now proves the optimum in about 2 s,
+  where it previously reached no proof within 60 s.
+- With the default ``highs`` pinch design solver, a nonlinear pinch design
+  model handed to Couenne now takes the missing-Couenne fallback to network
+  evolution when Couenne is not installed, as a configured ``couenne`` did.
 - The MILP pinch design method no longer rounds below-pinch stage
   temperatures and cooler duties to five decimals when it joins the two pinch
   sides (issue 332). On a stream with a near-flat segment, such as boiling

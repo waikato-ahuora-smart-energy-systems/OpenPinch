@@ -325,6 +325,8 @@ def test_user_couenne_options_are_written_to_model_run_directory(
 
     assert run.option_file == str(option_file)
     assert run.solver_options == {
+        "feasibility_bt": "no",
+        "aggressive_fbbt": "no",
         "node_limit": 50,
         "delete_redundant": "no",
         "time_limit": 120,
@@ -348,7 +350,7 @@ def test_user_couenne_options_are_written_to_model_run_directory(
     assert solve_run.failure_reason is None
 
 
-def test_couenne_without_user_options_matches_source_no_option_file(
+def test_couenne_without_user_options_writes_its_bound_tightening_defaults(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -372,18 +374,22 @@ def test_couenne_without_user_options_matches_source_no_option_file(
 
     run = backend.configure_pyomo_solver(model, "couenne")
 
-    assert run.option_file is None
-    assert run.solver_options is None
-    assert not (tmp_path / "run" / "couenne.opt").exists()
+    # Couenne's feasibility-based bound tightening prunes feasible networks
+    # from small stage-wise models, so it is off unless the user turns it on.
+    option_file = tmp_path / "run" / "couenne.opt"
+    assert run.option_file == str(option_file)
+    assert run.solver_options == {"feasibility_bt": "no", "aggressive_fbbt": "no"}
+    assert option_file.read_text(encoding="utf-8") == (
+        "feasibility_bt no\naggressive_fbbt no\n"
+    )
 
     original_cwd = Path.cwd()
     solve_cwds = _patch_recording_pyomo_solve(monkeypatch)
     solve_run = backend.solve_pyomo_model(model, solver_name="couenne")
 
     assert Path.cwd() == original_cwd
-    assert solve_cwds == [original_cwd]
-    assert solve_run.option_file is None
-    assert solve_run.solver_options is None
+    assert solve_cwds == [option_file.parent]
+    assert solve_run.option_file == str(option_file)
 
 
 def test_ipopt_pyomo_options_use_keyword_factory_availability(

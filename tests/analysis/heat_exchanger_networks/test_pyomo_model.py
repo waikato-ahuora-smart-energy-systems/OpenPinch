@@ -155,7 +155,9 @@ def test_pyomo_solver_options_go_to_an_option_file_removed_on_cleanup():
     option_file = Path(run.option_file)
 
     assert option_file.name == "couenne.opt"
-    assert option_file.read_text(encoding="utf-8") == "max_iter 50\n"
+    assert option_file.read_text(encoding="utf-8") == (
+        "feasibility_bt no\naggressive_fbbt no\nmax_iter 50\n"
+    )
     assert solved.failure_reason is None
     assert solved.option_file == run.option_file
     assert x.value == pytest.approx(4.0, abs=1e-6)

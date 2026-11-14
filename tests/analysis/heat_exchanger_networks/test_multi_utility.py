@@ -122,9 +122,7 @@ def _solved_model(hot_target: float, *, glycol_first: bool):
         min_dqda=0.0,
         minimisation_goal="total cost",
         non_isothermal_model=False,
-        # Relaxed match binaries: with integer binaries Couenne reports this
-        # one-stage case infeasible, while the relaxed model solves.
-        integers=False,
+        integers=True,
         tol=1e-6,
     )
     model.optimise(False)
