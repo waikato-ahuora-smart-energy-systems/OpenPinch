@@ -22,7 +22,7 @@ from ..solver.arrays import (
     problem_to_solver_arrays,
 )
 from .search import resolve_search
-from .settings import heuristic_solver
+from .settings import configured_stage_solver, heuristic_solver
 
 logger = logging.getLogger(__name__)
 
@@ -659,16 +659,34 @@ def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 def _solver_for_task(problem, method: HeatExchangerNetworkDesignMethod) -> str:
     hens = problem.master_zone.config.hens
     if method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
-        return heuristic_solver(str(hens.solver_pdm))
-    return _configured_solver(hens, method)
+        return heuristic_solver(configured_stage_solver(hens, "HENS_SOLVER_PDM"))
+    return configured_stage_solver(hens, _SOLVER_OPTIONS[_stage(method)])
 
 
+# A task's solver can differ from its stage's configured one (HiGHS for the
+# heuristic, or SCIP for a missing default); the stage's options are for the
+# configured solver only.
 def _configured_solver(hens, method: HeatExchangerNetworkDesignMethod) -> str:
     if method in _PINCH_DESIGN_METHODS:
         return str(hens.solver_pdm)
     if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         return str(hens.solver_tdm)
     return str(hens.solver_evm)
+
+
+_SOLVER_OPTIONS = {
+    "pdm": "HENS_SOLVER_PDM",
+    "tdm": "HENS_SOLVER_TDM",
+    "evm": "HENS_SOLVER_EVM",
+}
+
+
+def _stage(method: HeatExchangerNetworkDesignMethod) -> str:
+    if method in _PINCH_DESIGN_METHODS:
+        return "pdm"
+    if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
+        return "tdm"
+    return "evm"
 
 
 def _solver_options_for_task(

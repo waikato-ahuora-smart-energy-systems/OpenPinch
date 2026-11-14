@@ -80,9 +80,16 @@ synthesis = [
   "kaleido>=1.3.0",
   "openpyxl>=3.1.5",
   "wakepy>=1.0.0",
-  "idaes-pse>=2.11.0",
-  "highspy>=1.11.0",
   "pyscipopt>=5.5.0",
+]
+# Faster solvers on top of the synthesis extra: HiGHS for pinch design, and
+# Couenne (with Ipopt) through the IDAES solver download. A stage left on its
+# default solver falls back to SCIP without them.
+highs = [
+  "highspy>=1.11.0",
+]
+couenne = [
+  "idaes-pse>=2.11.0",
 ]
 notebook = [
   "ipykernel>=7.2.0",

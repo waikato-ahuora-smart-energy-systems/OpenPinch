@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -67,6 +68,7 @@ def test_missing_synthesis_dependency_error_names_extra_and_docs():
 
 def test_missing_solver_binary_error_names_binary_and_solver_marker(monkeypatch):
     monkeypatch.setattr(_dependencies, "which", lambda _binary: None)
+    monkeypatch.setattr(_dependencies, "_openpinch_solvers_bin_directory", lambda: None)
     monkeypatch.setattr(_dependencies, "_idaes_bin_directory", lambda: None)
 
     with pytest.raises(
@@ -87,6 +89,7 @@ def test_solver_binary_falls_back_to_idaes_bin_directory(
     solver.write_text("#!/bin/sh\n", encoding="utf-8")
     solver.chmod(0o755)
     monkeypatch.setattr(_dependencies, "which", lambda _binary: None)
+    monkeypatch.setattr(_dependencies, "_openpinch_solvers_bin_directory", lambda: None)
     monkeypatch.setattr(_dependencies, "_idaes_bin_directory", lambda: tmp_path)
     monkeypatch.setenv("PATH", "/usr/bin")
 
@@ -97,3 +100,42 @@ def test_solver_binary_falls_back_to_idaes_bin_directory(
 
     assert path == str(solver)
     assert os.environ["PATH"].split(os.pathsep)[0] == str(tmp_path)
+
+
+def test_solver_binary_comes_from_openpinch_solvers_before_idaes(
+    tmp_path,
+    monkeypatch,
+):
+    # The synthesis extra installs Ipopt as the openpinch-solvers wheel;
+    # IDAES's older download is only a fallback.
+    package_bin = tmp_path / "openpinch_solvers"
+    idaes_bin = tmp_path / "idaes"
+    for directory in (package_bin, idaes_bin):
+        directory.mkdir()
+        solver = directory / "ipopt"
+        solver.write_text("#!/bin/sh\n", encoding="utf-8")
+        solver.chmod(0o755)
+    monkeypatch.setattr(_dependencies, "which", lambda _binary: None)
+    monkeypatch.setattr(
+        _dependencies, "_openpinch_solvers_bin_directory", lambda: package_bin
+    )
+    monkeypatch.setattr(_dependencies, "_idaes_bin_directory", lambda: idaes_bin)
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    path = _dependencies.require_solver_binary("ipopt")
+
+    assert path == str(package_bin / "ipopt")
+    assert os.environ["PATH"].split(os.pathsep)[0] == str(package_bin)
+
+
+def test_openpinch_solvers_bin_directory_reads_the_installed_package(monkeypatch):
+    fake = type("Module", (), {"bin_directory": "/opt/openpinch_solvers/bin"})
+    monkeypatch.setattr(
+        _dependencies,
+        "import_module",
+        lambda name: fake if name == "openpinch_solvers" else None,
+    )
+
+    assert _dependencies._openpinch_solvers_bin_directory() == Path(
+        "/opt/openpinch_solvers/bin"
+    )

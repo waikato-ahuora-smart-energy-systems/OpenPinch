@@ -54,7 +54,7 @@ from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor, _failed_task_outcome
 from .execution.search import reference_dt_cont_multiplier
-from .execution.settings import SynthesisWorkflowSettings
+from .execution.settings import SynthesisWorkflowSettings, configured_stage_solver
 from .models.fixed_structure import (
     COOLER,
     HEATER,
@@ -484,7 +484,7 @@ class FixedStructureDutyExecutor:
                 )
                 model = factory(
                     name=f"fixed-structure-{request.objective}",
-                    solver=str(hens.solver_evm),
+                    solver=configured_stage_solver(hens, "HENS_SOLVER_EVM"),
                     solver_arrays=arrays,
                     spec=structure.spec,
                     minimisation_goal=request.minimisation_goal,

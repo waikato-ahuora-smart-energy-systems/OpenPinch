@@ -131,12 +131,14 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
         "kaleido>=1.3.0",
         "openpyxl>=3.1.5",
         "wakepy>=1.0.0",
-        "idaes-pse>=2.11.0",
-        "highspy>=1.11.0",
         "pyscipopt>=5.5.0",
     ]
+    # HiGHS and Couenne are faster solvers on top of the synthesis extra; a
+    # stage left on its default falls back to SCIP without them.
+    assert optional_deps["highs"] == ["highspy>=1.11.0"]
+    assert optional_deps["couenne"] == ["idaes-pse>=2.11.0"]
 
-    synthesis_only = {
+    solver_only = {
         "pyomo",
         "kaleido",
         "wakepy",
@@ -151,13 +153,13 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
     unrelated_optional_deps = {
         _dependency_name(dep)
         for extra_name, deps in optional_deps.items()
-        if extra_name not in {"synthesis", "full"}
+        if extra_name not in {"synthesis", "highs", "couenne", "full"}
         for dep in deps
     }
 
-    assert synthesis_only.isdisjoint(core_deps)
-    assert synthesis_only <= full_deps
-    assert synthesis_only.isdisjoint(unrelated_optional_deps)
+    assert solver_only.isdisjoint(core_deps)
+    assert solver_only <= full_deps
+    assert solver_only.isdisjoint(unrelated_optional_deps)
 
 
 def test_full_extra_aggregates_every_optional_runtime_surface_without_duplicates():

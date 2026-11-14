@@ -23,9 +23,24 @@ The synthesis dependency set is:
 - ``kaleido>=1.3.0``
 - ``openpyxl>=3.1.5``
 - ``wakepy>=1.0.0``
-- ``idaes-pse>=2.11.0``
-- ``highspy>=1.11.0``
 - ``pyscipopt>=5.5.0``
+
+Two further extras add faster solvers on top of it:
+
+- ``highs``: ``highspy>=1.11.0``, the HiGHS MILP solver, the default for the
+  pinch design method and stage reduction, and the master solver of
+  ``mindtpy``.
+- ``couenne``: ``idaes-pse>=2.11.0``, whose ``idaes get-extensions`` download
+  supplies Couenne (the default for the thermal derivative method) and Ipopt.
+
+A stage left on its default solver (``HENS_SOLVER_PDM``, ``HENS_SOLVER_TDM``
+or ``HENS_SOLVER_EVM``) falls back to SCIP, with a ``RuntimeWarning``, when
+that solver is not installed, and the stage's solver options are then not
+passed on. A solver set explicitly is never replaced. A pinch design model
+that HiGHS cannot take goes to Couenne, or to SCIP without Couenne.
+
+Solver executables are found on ``PATH`` first, then in the
+``openpinch-solvers`` package (Ipopt) and then in the IDAES download.
 
 Optional Install
 ----------------
@@ -36,6 +51,13 @@ Install the synthesis runtime dependencies explicitly:
 
    python -m pip install "openpinch[synthesis]"
 
+and, for the faster solvers:
+
+.. code-block:: bash
+
+   python -m pip install "openpinch[synthesis,highs,couenne]"
+   idaes get-extensions
+
 Repository development uses the locked ``dev`` group, which already includes
 the synthesis stack:
 
@@ -43,8 +65,8 @@ the synthesis stack:
 
    uv sync --frozen --group dev
 
-The ``full`` extra includes the synthesis stack (Pyomo, Kaleido, wakepy, IDAES,
-HiGHS and SCIP) together with the dashboard, notebook, TESPy, and Brayton-cycle
+The ``full`` extra includes the synthesis stack and both solver extras (Pyomo,
+Kaleido, wakepy, SCIP, HiGHS and IDAES) together with the dashboard, notebook, TESPy, and Brayton-cycle
 surfaces. External solver binaries are still installed separately.
 
 Test Marker Policy

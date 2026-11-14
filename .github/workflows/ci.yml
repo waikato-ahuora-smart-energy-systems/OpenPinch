@@ -303,7 +303,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis, full]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis, highs, couenne, full]
         include:
           - os: windows-latest
             surface: core

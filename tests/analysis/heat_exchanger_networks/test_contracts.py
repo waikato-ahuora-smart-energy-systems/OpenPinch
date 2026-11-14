@@ -749,3 +749,37 @@ def test_highs_options_are_accepted_for_the_pinch_design_solver():
     cfg = Configuration(options={"HENS_SOLVER_OPTIONS_PDM": options})
 
     assert cfg.hens.solver_options_pdm == options
+
+
+def test_default_stage_solvers_fall_back_to_scip_when_not_installed(monkeypatch):
+    # HiGHS and Couenne are optional extras: a stage left on its default
+    # solver runs on SCIP when that solver is missing.
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    def require(solver_name):
+        if solver_name in {"highs", "couenne"}:
+            raise backend.MissingSynthesisSolverError(f"{solver_name} missing")
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+    problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    problem._master_zone.config = Configuration(
+        options={"HENS_SOLVER_OPTIONS_PDM": {"time_limit": 30}}
+    )
+
+    with pytest.warns(RuntimeWarning, match="scip"):
+        settings = workflow_settings_from_problem(problem)
+
+    assert (settings.pdm_solver, settings.tdm_solver) == ("scip", "scip")
+    # Options set for the missing default are not passed to SCIP.
+    assert settings.pdm_solver_options == {}
+    assert settings.evm_solver == "ipopt-pyomo"
+    with pytest.warns(RuntimeWarning, match="scip"):
+        assert (
+            executor._solver_for_task(
+                problem, HeatExchangerNetworkDesignMethod.ThermalDerivative
+            )
+            == "scip"
+        )
