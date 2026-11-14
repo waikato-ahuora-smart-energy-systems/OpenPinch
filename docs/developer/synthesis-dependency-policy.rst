@@ -34,10 +34,13 @@ Two further extras add faster solvers on top of it:
 - ``couenne``: ``idaes-pse>=2.11.0``, whose ``idaes get-extensions`` download
   supplies Couenne (the default for the thermal derivative method) and Ipopt.
 
-A stage left on its default solver (``HENS_SOLVER_PDM``, ``HENS_SOLVER_TDM``
-or ``HENS_SOLVER_EVM``) falls back to SCIP, with a ``RuntimeWarning``, when
-that solver is not installed, and the stage's solver options are then not
-passed on. A solver set explicitly is never replaced. A pinch design model
+A stage on its default solver (``HENS_SOLVER_PDM`` ``highs``,
+``HENS_SOLVER_TDM`` ``couenne`` or ``HENS_SOLVER_EVM`` ``ipopt-pyomo``, left
+unset or set to it) falls back to SCIP, with a ``RuntimeWarning``, when that
+solver is not installed and SCIP is, and the stage's solver options are then
+not passed on. Any other solver is kept, installed or not. Without SCIP the
+default is kept, and a missing Couenne still skips its stage for network
+evolution. A pinch design model
 that HiGHS cannot take goes to Couenne, or to SCIP without Couenne.
 
 Solver executables are found on ``PATH`` first, then in the

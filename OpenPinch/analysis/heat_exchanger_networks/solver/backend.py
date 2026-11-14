@@ -157,9 +157,10 @@ FALLBACK_SOLVER = "scip"
 def stage_solver(solver_name: str, *, default: str) -> str:
     """Return a stage's solver, or SCIP for a default that is not installed.
 
-    HiGHS and Couenne are optional, so a stage left on its default solver
-    falls back to SCIP, with a warning, when that solver is missing. A solver
-    the user chose is kept, and a missing one fails when it is configured.
+    HiGHS and Couenne are optional, so a stage on its default solver (left
+    unset or set to it) falls back to SCIP, with a warning, when that solver
+    is missing and SCIP is installed. Any other solver is kept, and a missing
+    one fails when it is configured.
     """
 
     if solver_name != default:
@@ -167,6 +168,10 @@ def stage_solver(solver_name: str, *, default: str) -> str:
     try:
         require_solver_backend(solver_name)
     except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        try:
+            require_solver_backend(FALLBACK_SOLVER)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            return solver_name
         warnings.warn(
             f"The default solver {solver_name!r} is not installed, so "
             f"{FALLBACK_SOLVER!r} solves this stage instead.",

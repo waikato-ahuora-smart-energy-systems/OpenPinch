@@ -41,7 +41,7 @@ Everything between a prepared problem and the equation models: solver arrays bui
 - For a `PyomoModel` with Couenne options, creates a temporary run directory as the model's `_path` and writes `couenne.opt` into it [backend.py:configure_pyomo_solver, _write_solver_option_file].
 - Deletes a model's run directory and recreates it, with its option file, on re-solve [backend.py:cleanup_model_run_directory, _restore_run_directory].
 - Imports optional packages (`pyomo`, `openpinch_solvers`, `idaes`, `highspy`, `pyscipopt`) lazily. A solver executable is found on `PATH` first, then in the `openpinch_solvers` package (Ipopt) and then in the IDAES download, and the directory it is found in is prepended to `PATH` [dependencies.py:require_synthesis_dependency, require_solver_binary, _prepend_path].
-- `stage_solver(solver_name, default=...)` returns `FALLBACK_SOLVER` (`scip`) when `solver_name` is its stage's default and that solver's backend is missing, emitting a `RuntimeWarning`; any other solver name is returned unchanged, installed or not [backend.py:stage_solver].
+- `stage_solver(solver_name, default=...)` returns `FALLBACK_SOLVER` (`scip`) when `solver_name` is its stage's default, whether left unset or set to it, and that solver's backend is missing while SCIP's is installed, emitting a `RuntimeWarning`; otherwise it returns `solver_name` unchanged, installed or not [backend.py:stage_solver].
 - Launches solver executables, or HiGHS in process, through Pyomo [backend.py:solve_pyomo_model].
 - `pyomo_model.py` imports `pyomo.environ` only when a `PyomoModel` is created or used [pyomo_model.py:_pyomo].
 

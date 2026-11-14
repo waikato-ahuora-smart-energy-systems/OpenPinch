@@ -519,3 +519,20 @@ def test_an_installed_default_stage_solver_is_kept(monkeypatch):
     monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
 
     assert backend.stage_solver("highs", default="highs") == "highs"
+
+
+def test_a_missing_default_is_kept_when_scip_is_missing_too(monkeypatch, recwarn):
+    # Without SCIP there is nothing to fall back to: the configured solver
+    # stays, so the missing-Couenne skip to network evolution still applies.
+    _missing_backends(monkeypatch, "couenne")
+    real = backend.require_solver_backend
+
+    def require(solver_name):
+        if solver_name == "scip":
+            raise backend.MissingSynthesisDependencyError("pyscipopt missing")
+        real(solver_name)
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+
+    assert backend.stage_solver("couenne", default="couenne") == "couenne"
+    assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]

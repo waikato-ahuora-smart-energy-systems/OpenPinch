@@ -99,7 +99,9 @@ class _NoCouenneForMethod(FakeSynthesisExecutor):
 def test_manifest_method_sequence_omits_a_stage_couenne_could_not_run(
     missing_for: str,
     expected_sequence: tuple[str, ...],
+    monkeypatch,
 ) -> None:
+    _neither_couenne_nor_scip(monkeypatch)
     problem = _small_problem()
 
     with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
@@ -200,7 +202,10 @@ def test_every_evolution_task_and_the_manifest_use_the_depth_breadth(
 @pytest.mark.parametrize(
     "missing_for", ["pinch_design_method", "thermal_derivative_method"]
 )
-def test_couenne_fallback_evolution_uses_the_depth_breadth(missing_for: str) -> None:
+def test_couenne_fallback_evolution_uses_the_depth_breadth(
+    missing_for: str, monkeypatch
+) -> None:
+    _neither_couenne_nor_scip(monkeypatch)
     problem = _small_problem_with_options({_DEPTH: 3})
 
     with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
@@ -211,3 +216,22 @@ def test_couenne_fallback_evolution_uses_the_depth_breadth(missing_for: str) -> 
         )
 
     assert _evolution_breadths(problem, result.tasks) == {(2, 2, 2)}
+
+
+def _neither_couenne_nor_scip(monkeypatch) -> None:
+    """Without Couenne and SCIP the TDM stays on Couenne, so its skip applies.
+
+    With SCIP installed, a missing default Couenne falls back to SCIP and the
+    thermal derivative method still runs.
+    """
+
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    real = backend.require_solver_backend
+
+    def require(name):
+        if name in {"couenne", "scip"}:
+            raise backend.MissingSynthesisSolverError(f"{name} missing")
+        real(name)
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
