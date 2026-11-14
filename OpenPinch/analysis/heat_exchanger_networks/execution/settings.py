@@ -256,9 +256,9 @@ def workflow_settings_from_problem(
         pdm_solver=solvers["pdm"],
         tdm_solver=solvers["tdm"],
         evm_solver=solvers["evm"],
-        pdm_solver_options=_options_for(hens, "pdm", solvers["pdm"]),
-        tdm_solver_options=_options_for(hens, "tdm", solvers["tdm"]),
-        evm_solver_options=_options_for(hens, "evm", solvers["evm"]),
+        pdm_solver_options=stage_solver_options(hens, "pdm", solvers["pdm"]),
+        tdm_solver_options=stage_solver_options(hens, "tdm", solvers["tdm"]),
+        evm_solver_options=stage_solver_options(hens, "evm", solvers["evm"]),
         problem_id=problem.project_name,
         workspace_variant=workspace_variant,
         period_id=period_id,
@@ -278,7 +278,7 @@ __all__ = [
 ]
 
 
-def _options_for(hens, stage: str, solver: str) -> dict[str, Any]:
+def stage_solver_options(hens, stage: str, solver: str) -> dict[str, Any]:
     """A stage's options, unless its missing default fell back to SCIP."""
 
     if solver != str(getattr(hens, f"solver_{stage}")):
