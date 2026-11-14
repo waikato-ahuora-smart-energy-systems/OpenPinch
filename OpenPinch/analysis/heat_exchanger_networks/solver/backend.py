@@ -64,11 +64,13 @@ PYOMO_SOLVER_FACTORY_NAMES = {
 }
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
-# Couenne's feasibility-based bound tightening prunes feasible networks from
-# small stage-wise models and reports them infeasible.
+# Couenne's bound tightening prunes feasible networks from small stage-wise
+# models and reports them infeasible, or stalls, with a different model
+# failing on each platform's build; only all three off solves them all.
 DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {
     "feasibility_bt": "no",
     "aggressive_fbbt": "no",
+    "optimality_bt": "no",
 }
 # Ipopt pushes starting values off their bounds by 1e-2 relative to the bound
 # (about 3.5 K at 350 K), which undoes warm starts from solved networks.

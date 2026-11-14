@@ -298,8 +298,11 @@ def duty_aligned_area_contributions(
         raise ValueError("Exchanger duty exceeds an available parent segment profile.")
     remaining = min(remaining, available)
     cold_q = cold_inlet_q + remaining
+    # Duty left over within that noise past the last boundary is dropped too,
+    # rather than reported as a sliver of the next segment.
+    noise = max(tolerance, DUTY_RTOL * remaining)
     contributions = []
-    while remaining > tolerance:
+    while remaining > noise:
         hot_index = hot_profile.segment_index_at_heat(hot_q)
         cold_index = int(
             np.searchsorted(cold_profile.cumulative_duties, cold_q, side="left") - 1
@@ -358,7 +361,7 @@ def duty_aligned_area_contributions(
         hot_q += slice_duty
         cold_q -= slice_duty
 
-    if remaining > tolerance:
+    if remaining > noise:
         raise ValueError("Exchanger duty exceeds an available parent segment profile.")
     return tuple(contributions)
 
