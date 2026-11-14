@@ -81,6 +81,9 @@ synthesis = [
   "openpyxl>=3.1.5",
   "wakepy>=1.0.0",
   "pyscipopt>=5.5.0",
+  # Ipopt (with MUMPS) as platform wheels, for network evolution and duty
+  # optimisation.
+  "openpinch-solvers>=0.1.0",
 ]
 # Faster solvers on top of the synthesis extra: HiGHS for pinch design, and
 # Couenne (with Ipopt) through the IDAES solver download. A stage left on its
@@ -112,6 +115,7 @@ full = [
   "idaes-pse>=2.11.0",
   "highspy>=1.11.0",
   "pyscipopt>=5.5.0",
+  "openpinch-solvers>=0.1.0",
 ]
 
 [dependency-groups]
@@ -144,6 +148,7 @@ dev = [
     "pylint>=4.0.5",
     "graphviz>=0.21",
     "idaes-pse>=2.11.0",
+    "openpinch-solvers>=0.1.0",
     "coverage>=7.14.3",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.0.0",

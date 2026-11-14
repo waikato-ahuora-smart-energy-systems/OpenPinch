@@ -24,6 +24,7 @@ The synthesis dependency set is:
 - ``openpyxl>=3.1.5``
 - ``wakepy>=1.0.0``
 - ``pyscipopt>=5.5.0``
+- ``openpinch-solvers>=0.1.0``, which ships Ipopt (with MUMPS) as platform wheels
 
 Two further extras add faster solvers on top of it:
 

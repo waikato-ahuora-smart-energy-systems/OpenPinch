@@ -16,8 +16,10 @@ Heat exchanger network synthesis
   IDAES's Ipopt. A stage left on its default solver falls back to SCIP, with
   a ``RuntimeWarning``, when that solver is missing, and a pinch design model
   HiGHS cannot take goes to SCIP when Couenne is missing. A solver set
-  explicitly is never replaced. Solver executables are also found in the
-  ``openpinch-solvers`` package.
+  explicitly is never replaced. The ``synthesis`` extra now installs
+  ``openpinch-solvers``, which ships Ipopt 3.14.20 (with MUMPS) as wheels
+  for Linux, macOS and Windows, so network evolution needs no IDAES
+  download; executables on ``PATH`` still come first.
 - Couenne no longer reports small stage-wise models infeasible when a
   feasible network exists. Couenne now defaults to ``feasibility_bt no``,
   ``aggressive_fbbt no`` and ``optimality_bt no`` (set any to ``yes`` in

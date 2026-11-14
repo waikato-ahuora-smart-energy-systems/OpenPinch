@@ -132,6 +132,7 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
         "openpyxl>=3.1.5",
         "wakepy>=1.0.0",
         "pyscipopt>=5.5.0",
+        "openpinch-solvers>=0.1.0",
     ]
     # HiGHS and Couenne are faster solvers on top of the synthesis extra; a
     # stage left on its default falls back to SCIP without them.
@@ -139,6 +140,7 @@ def test_synthesis_extra_declares_optional_solver_stack_only():
     assert optional_deps["couenne"] == ["idaes-pse>=2.11.0"]
 
     solver_only = {
+        "openpinch-solvers",
         "pyomo",
         "kaleido",
         "wakepy",

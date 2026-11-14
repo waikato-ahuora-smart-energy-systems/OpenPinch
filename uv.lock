@@ -1510,6 +1510,7 @@ full = [
     { name = "ipykernel" },
     { name = "kaleido" },
     { name = "nbformat" },
+    { name = "openpinch-solvers" },
     { name = "openpyxl" },
     { name = "plotly" },
     { name = "pyomo" },
@@ -1531,6 +1532,7 @@ notebook = [
 ]
 synthesis = [
     { name = "kaleido" },
+    { name = "openpinch-solvers" },
     { name = "openpyxl" },
     { name = "plotly" },
     { name = "pyomo" },
@@ -1555,6 +1557,7 @@ dev = [
     { name = "jsonschema" },
     { name = "kaleido" },
     { name = "nbformat" },
+    { name = "openpinch-solvers" },
     { name = "openpyxl" },
     { name = "plotly" },
     { name = "pylint" },
@@ -1592,6 +1595,8 @@ requires-dist = [
     { name = "nbformat", marker = "extra == 'notebook'", specifier = ">=5.10.4" },
     { name = "numpy", specifier = ">=2.3.2,<3" },
     { name = "openpinch", extras = ["tespy"], marker = "extra == 'brayton-cycle'" },
+    { name = "openpinch-solvers", marker = "extra == 'full'", specifier = ">=0.1.0" },
+    { name = "openpinch-solvers", marker = "extra == 'synthesis'", specifier = ">=0.1.0" },
     { name = "openpyxl", marker = "extra == 'dashboard'" },
     { name = "openpyxl", marker = "extra == 'full'", specifier = ">=3.1.5" },
     { name = "openpyxl", marker = "extra == 'notebook'" },
@@ -1634,6 +1639,7 @@ dev = [
     { name = "jsonschema", specifier = ">=4.25.1" },
     { name = "kaleido", specifier = ">=1.3.0" },
     { name = "nbformat", specifier = ">=5.10.4" },
+    { name = "openpinch-solvers", specifier = ">=0.1.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "plotly", specifier = ">=6.8.0" },
     { name = "pylint", specifier = ">=4.0.5" },
@@ -1654,6 +1660,18 @@ dev = [
 docs = [
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
+]
+
+[[package]]
+name = "openpinch-solvers"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/46/c00e9b98eb9f5abfeab3bcfbedaa7490b50d10ca2a3671d94405e03a78c2/openpinch_solvers-0.1.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:69ebab6c570ea9cf116caab43f8f9c6f1e8fb1b2288259bfd3809f242e8bcd01", size = 4399675, upload-time = "2026-11-14T08:02:38.542Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/97/4d11e5b2c7e9b662604f851f34f486a1aa3cb6bf982d329d3a4fcf2734de/openpinch_solvers-0.1.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:9b17ab21763ebc004e3521c383c3ff8fb7dc238b47980b4fa26d0651e6834d38", size = 3399786, upload-time = "2026-11-14T08:02:40.752Z" },
+    { url = "https://files.pythonhosted.org/packages/47/57/ae0f81f35855f14e39030b2df254a9b32625d11e9beac82016b59171e634/openpinch_solvers-0.1.0-py3-none-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:92c5a66e8a0705999cba04f68b9ba4f04264b437d152c9cf572234f1604c32da", size = 6167407, upload-time = "2026-11-14T08:02:42.639Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/31/206ddc481b9afd47000c89e08f0e99a9322c4d09d9bbc451a53bfd132441/openpinch_solvers-0.1.0-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3a3c1706d05988a0def7d0e5a7cb6d155929364def0e20f24b16b6db87cab75c", size = 5785431, upload-time = "2026-11-14T08:02:44.551Z" },
+    { url = "https://files.pythonhosted.org/packages/56/ba/ccf2c0032cdbf94ab06f13b12da8049e80a5c7ca79a0d8b7ecbc5e8cc61e/openpinch_solvers-0.1.0-py3-none-win_amd64.whl", hash = "sha256:a2ed8167fccfeb1fbbfb76ad9d969ccfc3279a12d8c80a5054be4f3a1934d9db", size = 7033724, upload-time = "2026-11-14T08:02:46.285Z" },
 ]
 
 [[package]]

@@ -36,6 +36,7 @@ SYNTHESIS_DEPENDENCIES: tuple[SynthesisDependency, ...] = (
     SynthesisDependency("openpyxl", "openpyxl", "workbook export"),
     SynthesisDependency("wakepy", "wakepy", "long local solver runs"),
     SynthesisDependency("pyscipopt", "pyscipopt", "SCIP MINLP solves"),
+    SynthesisDependency("openpinch-solvers", "openpinch_solvers", "Ipopt executable"),
 )
 
 
