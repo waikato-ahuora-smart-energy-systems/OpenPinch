@@ -54,7 +54,11 @@ from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor, _failed_task_outcome
 from .execution.search import reference_dt_cont_multiplier
-from .execution.settings import SynthesisWorkflowSettings
+from .execution.settings import (
+    SynthesisWorkflowSettings,
+    configured_stage_solver,
+    stage_solver_options,
+)
 from .models.fixed_structure import (
     COOLER,
     HEATER,
@@ -464,6 +468,8 @@ class FixedStructureDutyExecutor:
         request = self.request
         hens = problem.master_zone.config.hens
         factory = self.model_factory or FixedStructureModel
+        solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")
+        solver_options = stage_solver_options(hens, "evm", solver)
         user_exchangers = _structural_exchangers(request.network)
         excluded: set[int] = set()
         removed: list[str] = []
@@ -484,7 +490,7 @@ class FixedStructureDutyExecutor:
                 )
                 model = factory(
                     name=f"fixed-structure-{request.objective}",
-                    solver=str(hens.solver_evm),
+                    solver=solver,
                     solver_arrays=arrays,
                     spec=structure.spec,
                     minimisation_goal=request.minimisation_goal,
@@ -492,7 +498,7 @@ class FixedStructureDutyExecutor:
                     max_hot_utility=request.max_hot_utility,
                     max_cold_utility=request.max_cold_utility,
                     tol=float(hens.solve_tolerance),
-                    solver_options=dict(hens.solver_options_evm),
+                    solver_options=dict(solver_options),
                 )
                 model.optimise(print_output=self.print_output)
                 if getattr(model, "mSuccess", 0) != 1:

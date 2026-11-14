@@ -250,6 +250,7 @@ def test_a_nonlinear_highs_pdm_is_solved_with_couenne(monkeypatch):
 
     monkeypatch.setattr(PyomoModel, "is_linear", lambda self: False)
     monkeypatch.setattr(backend, "configure_pyomo_solver", configure)
+    _couenne_installed(monkeypatch, backend)
 
     model = _built_pdm(_four_stream_problem(), dTmin=14.0, side="above")
 
@@ -271,6 +272,7 @@ def test_a_time_limit_follows_a_nonlinear_side_to_couenne(monkeypatch):
 
     monkeypatch.setattr(PyomoModel, "is_linear", lambda self: False)
     monkeypatch.setattr(backend, "configure_pyomo_solver", configure)
+    _couenne_installed(monkeypatch, backend)
 
     _built_pdm(
         _four_stream_problem(),
@@ -406,4 +408,15 @@ def test_min_units_with_a_utility_cost_cap_minimises_units_alone():
     assert model.solver_run.objective_value == pytest.approx(model.n_units)
     assert sum(model.Q_cu_by_utility_by_period[0]) == pytest.approx(
         sum(cheapest.Q_cu_by_utility_by_period[0]), abs=1e-3
+    )
+
+
+def _couenne_installed(monkeypatch, backend) -> None:
+    """Treat Couenne as installed, so the handoff goes to it, not to SCIP."""
+
+    real = backend.require_solver_backend
+    monkeypatch.setattr(
+        backend,
+        "require_solver_backend",
+        lambda name: None if name == "couenne" else real(name),
     )

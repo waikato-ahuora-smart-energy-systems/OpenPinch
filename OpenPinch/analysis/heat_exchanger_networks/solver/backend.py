@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import threading
 import time
+import warnings
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from typing import Any
 
 from ....domain.solver_options import validate_solver_options
 from .dependencies import (
+    MissingSynthesisDependencyError,
     MissingSynthesisSolverError,
     require_solver_binary,
     require_synthesis_dependency,
@@ -145,6 +147,39 @@ def cleanup_model_run_directory(model: Any) -> None:
     if isinstance(path, (str, os.PathLike)) and os.path.isdir(path):
         shutil.rmtree(path, ignore_errors=True)
         model._openpinch_cleaned_up = True
+
+
+# Solves every model class and comes with the synthesis extra (pyscipopt), so
+# it stands in for a stage's default solver that is not installed.
+FALLBACK_SOLVER = "scip"
+
+
+def stage_solver(solver_name: str, *, default: str) -> str:
+    """Return a stage's solver, or SCIP for a default that is not installed.
+
+    HiGHS and Couenne are optional, so a stage on its default solver (left
+    unset or set to it) falls back to SCIP, with a warning, when that solver
+    is missing and SCIP is installed. Any other solver is kept, and a missing
+    one fails when it is configured.
+    """
+
+    if solver_name != default:
+        return solver_name
+    try:
+        require_solver_backend(solver_name)
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        try:
+            require_solver_backend(FALLBACK_SOLVER)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            return solver_name
+        warnings.warn(
+            f"The default solver {solver_name!r} is not installed, so "
+            f"{FALLBACK_SOLVER!r} solves this stage instead.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return FALLBACK_SOLVER
+    return solver_name
 
 
 def require_solver_backend(solver_name: str) -> None:

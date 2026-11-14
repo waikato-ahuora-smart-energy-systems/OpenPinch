@@ -411,7 +411,12 @@ def test_service_context_solver_dependency_and_entry_guards(monkeypatch, tmp_pat
         "import_module",
         lambda name: SimpleNamespace(bin_directory=str(tmp_path)),
     )
-    assert dependencies._idaes_solver_binary("missing-solver") is None
+    assert (
+        dependencies._solver_binary_in(
+            dependencies._idaes_bin_directory(), "missing-solver"
+        )
+        is None
+    )
 
     with pytest.raises(ValueError, match="open_hens_method does not accept"):
         entry.heat_exchanger_network_synthesis_service(object(), initial_networks=())

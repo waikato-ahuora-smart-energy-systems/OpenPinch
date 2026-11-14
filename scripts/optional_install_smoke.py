@@ -191,12 +191,22 @@ def _check_synthesis_surface() -> None:
     assert dependencies.require_declared_synthesis_dependencies()
 
 
+def _check_highs_surface() -> None:
+    _assert_module_present("highspy")
+
+
+def _check_couenne_surface() -> None:
+    _assert_module_present("idaes")
+
+
 def _check_full_surface() -> None:
     _check_dashboard_surface()
     _check_notebook_surface()
     _check_brayton_cycle_surface()
     _check_tespy_surface()
     _check_synthesis_surface()
+    _check_highs_surface()
+    _check_couenne_surface()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -214,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
             "brayton_cycle",
             "tespy",
             "synthesis",
+            "highs",
+            "couenne",
             "full",
         ],
         help="Install surface to verify.",
@@ -238,6 +250,10 @@ def main(argv: list[str] | None = None) -> int:
         _check_tespy_surface()
     elif args.surface == "synthesis":
         _check_synthesis_surface()
+    elif args.surface == "highs":
+        _check_highs_surface()
+    elif args.surface == "couenne":
+        _check_couenne_surface()
     elif args.surface == "full":
         _check_full_surface()
 

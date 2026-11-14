@@ -7,6 +7,7 @@ Resolves synthesis settings, and the options the search width and depth set, fro
 - `SynthesisWorkflowSettings` (`settings.py`): frozen dataclass of resolved HENS controls, with derived properties (`runs_evolution`, `runs_thermal_derivative_method`, `milp_networks_seed_evolution`, EVM branch breadth), `heuristic_pdm_networks` (the heuristic network cap per multiplier, 0 for none), `runs_milp_pinch_design` (the MILP at every multiplier: `pdm_milp`, or no heuristic networks) and `solver_for` / `solver_options_for` per method; for the heuristic pinch design method `solver_for` gives HiGHS when it is installed (`heuristic_solver`), otherwise the PDM solver, and `solver_options_for` gives the PDM options only when that is the PDM solver [settings.py:heuristic_solver] [executor.py:_solver_for_task].
 - `workflow_settings_from_problem` (`settings.py`): reads `master_zone.config.hens` into settings; `dt_cont_multipliers` is `HENS_DT_CONT_MULTIPLIERS`, or the search width's multipliers when it is unset, and the depth-set options resolve the same way [search.py:resolve_search].
 - `StagePackingScope` (`settings.py`): alias for the stage-packing scope string.
+- `configured_stage_solver(hens, option)` and `stage_solver_options(hens, stage, solver)` (`settings.py`): a stage's solver, with SCIP in place of a default (`HENS_SOLVER_PDM`, `_TDM` or `_EVM`) that is not installed, and its options, which are empty when the solver fell back. Workflow settings, the executor's task solvers and fixed-structure duty optimisation all resolve through them [settings.py:configured_stage_solver, stage_solver_options] [executor.py:_solver_for_task] [duty_optimisation.py:FixedStructureDutyExecutor._solve].
 - `WIDTH_MULTIPLIERS`, `DEPTH_LEVELS`, `DepthLevel`, `ResolvedSearch`, `resolve_search`, `reference_dt_cont_multiplier` (`search.py`): the search levels, the options they set after explicit overrides, and the multiplier a run falls back to.
 - `SynthesisExecutor` (`executor.py`): protocol with `execute(tasks, *, problem, parent_outcomes, max_parallel)`.
 - `LocalSynthesisExecutor` (`executor.py`): builds an internal model per task, solves it (optionally in a process pool), extracts the network and returns outcomes.
@@ -36,6 +37,7 @@ Resolves synthesis settings, and the options the search width and depth set, fro
 - Emits progress events [executor.py:LocalSynthesisExecutor._report_progress].
 - Mutates its own bookkeeping (`executed_tasks`, `stage_order`, `problems_by_task_id`, `best_objective`) [executor.py:LocalSynthesisExecutor].
 - Emits a `RuntimeWarning` when the Couenne fallback is taken [fallbacks.py:_warn_couenne_fallback].
+- Emits a `RuntimeWarning` each time a missing default stage solver resolves to SCIP [settings.py:configured_stage_solver].
 - Imports stage-packed model classes lazily [executor.py:_stage_packed_pdm_factory, _stage_packed_stagewise_factory].
 
 ## Verification

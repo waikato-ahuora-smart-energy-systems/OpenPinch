@@ -35,9 +35,8 @@ SYNTHESIS_DEPENDENCIES: tuple[SynthesisDependency, ...] = (
     SynthesisDependency("kaleido", "kaleido", "static plot export"),
     SynthesisDependency("openpyxl", "openpyxl", "workbook export"),
     SynthesisDependency("wakepy", "wakepy", "long local solver runs"),
-    SynthesisDependency("idaes-pse", "idaes", "IDAES solver binary discovery"),
-    SynthesisDependency("highspy", "highspy", "HiGHS MILP solves"),
     SynthesisDependency("pyscipopt", "pyscipopt", "SCIP MINLP solves"),
+    SynthesisDependency("openpinch-solvers", "openpinch_solvers", "Ipopt executable"),
 )
 
 
@@ -80,10 +79,11 @@ def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> st
     path = which(binary_name)
     if path is not None:
         return path
-    idaes_path = _idaes_solver_binary(binary_name)
-    if idaes_path is not None:
-        _prepend_path(idaes_path.parent)
-        return str(idaes_path)
+    for bin_directory in (_openpinch_solvers_bin_directory(), _idaes_bin_directory()):
+        package_path = _solver_binary_in(bin_directory, binary_name)
+        if package_path is not None:
+            _prepend_path(package_path.parent)
+            return str(package_path)
 
     purpose_text = f" for {purpose}" if purpose else ""
     raise MissingSynthesisSolverError(
@@ -94,22 +94,34 @@ def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> st
     )
 
 
-def _idaes_solver_binary(binary_name: str) -> Path | None:
-    bin_directory = _idaes_bin_directory()
+def _solver_binary_in(bin_directory: Path | None, binary_name: str) -> Path | None:
     if bin_directory is None:
         return None
-    path = bin_directory / binary_name
-    if path.is_file() and os.access(path, os.X_OK):
-        return path
+    for name in (binary_name, f"{binary_name}.exe"):
+        path = bin_directory / name
+        if path.is_file() and os.access(path, os.X_OK):
+            return path
     return None
 
 
+def _openpinch_solvers_bin_directory() -> Path | None:
+    """The ``openpinch-solvers`` wheel's executables (Ipopt), if installed."""
+
+    return _package_bin_directory("openpinch_solvers")
+
+
 def _idaes_bin_directory() -> Path | None:
+    """IDAES's downloaded solver executables (Ipopt, Couenne), if installed."""
+
+    return _package_bin_directory("idaes")
+
+
+def _package_bin_directory(module_name: str) -> Path | None:
     try:
-        idaes = import_module("idaes")
+        module = import_module(module_name)
     except ImportError:
         return None
-    raw_path = getattr(idaes, "bin_directory", None)
+    raw_path = getattr(module, "bin_directory", None)
     if raw_path is None:
         return None
     return Path(raw_path)

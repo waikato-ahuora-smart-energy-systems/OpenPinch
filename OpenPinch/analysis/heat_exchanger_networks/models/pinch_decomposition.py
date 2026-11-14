@@ -8,6 +8,10 @@ from typing import Any, Literal
 
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
+from ..solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
 from ._pinch_design import amalgamation as _amalgamation
 from ._pinch_design import equations as _equations
@@ -95,18 +99,25 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         _equations.exclude_units(self, pattern)
 
     def _solve_nonlinear_models_with_couenne(self) -> None:
-        """Send a model HiGHS cannot take to Couenne.
+        """Send a model HiGHS cannot take to Couenne, or SCIP without it.
 
-        HiGHS options do not apply to Couenne, except a time limit, which is
-        carried over.
+        HiGHS options do not apply to the new solver, except a time limit,
+        which is carried over. Couenne is an optional extra; SCIP comes with
+        the synthesis extra.
         """
 
         if self.solver != "highs" or self.m.is_linear():
             return
+        solver = "couenne"
+        try:
+            backend.require_solver_backend(solver)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            solver = backend.FALLBACK_SOLVER
         logger.warning(
-            "[%s] The pinch design model is not linear, so Couenne solves it "
+            "[%s] The pinch design model is not linear, so %s solves it "
             "instead of HiGHS.",
             self.name,
+            solver,
         )
         options = self.solver_options
         limit = (
@@ -114,9 +125,9 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             if isinstance(options, dict)
             else None
         )
-        self.solver = "couenne"
+        self.solver = solver
         self.solver_options = (
-            None if limit is None else {backend.TIME_LIMIT_OPTIONS["couenne"]: limit}
+            None if limit is None else {backend.TIME_LIMIT_OPTIONS[solver]: limit}
         )
         self.solver_run = backend.configure_pyomo_solver(
             self.m, self.solver, solver_options=self.solver_options

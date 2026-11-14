@@ -1481,3 +1481,44 @@ def test_numeric_unwraps_nested_solver_values() -> None:
     assert _numeric(_Wrapped([3.0])) == 3.0
     assert _numeric(_Wrapped(_Wrapped([4.0, 5.0]))) == 4.0
     assert _numeric(2.5) == 2.5
+
+
+def test_executor_drops_ipopt_options_when_it_falls_back_to_scip(monkeypatch) -> None:
+    # Without an Ipopt executable the default EVM solver falls back to SCIP,
+    # which would reject Ipopt options such as max_iter.
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    def require(solver_name):
+        if solver_name == "ipopt-pyomo":
+            raise backend.MissingSynthesisSolverError("ipopt missing")
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
+    payload = json.loads(FOUR_STREAM_FIXTURE.read_text(encoding="utf-8"))
+    payload["options"] = {
+        key: value
+        for key, value in payload.get("options", {}).items()
+        if key != "HENS_SOLVER_EVM"
+    } | {"HENS_SOLVER_OPTIONS_EVM": {"max_iter": 50}}
+    problem = PinchProblem(payload)
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    seen = []
+
+    class _Recording(_ScriptedModel):
+        def __init__(self, *, spec, solver, solver_options, **kwargs) -> None:
+            seen.append((solver, solver_options))
+            super().__init__(spec=spec, **kwargs)
+
+    _ScriptedModel.calls = []
+    _ScriptedModel.zero_by_call = [set()]
+
+    with pytest.warns(RuntimeWarning, match="scip"):
+        FixedStructureDutyExecutor(request, model_factory=_Recording).execute(
+            (_scripted_task(request),),
+            problem=problem,
+            parent_outcomes={},
+            max_parallel=1,
+        )
+
+    assert seen == [("scip", {})]

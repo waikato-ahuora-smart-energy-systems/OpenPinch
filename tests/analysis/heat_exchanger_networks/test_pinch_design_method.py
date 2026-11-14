@@ -3502,3 +3502,32 @@ def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() 
     assert amalgamated.TAC == 24.0
     assert amalgamated.solve_time == 5.0
     assert amalgamated.z_allowed[0][0] == [1, 1]
+
+
+def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch):
+    # Couenne is an optional extra; SCIP comes with the synthesis extra and
+    # also solves a pinch design side that is not linear.
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.name = "nonlinear-side"
+    model.solver = "highs"
+    model.solver_options = {"time_limit": 9.0}
+    model.m = SimpleNamespace(is_linear=lambda: False)
+    configured = []
+
+    def require(solver_name):
+        if solver_name == "couenne":
+            raise backend.MissingSynthesisSolverError("couenne missing")
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+    monkeypatch.setattr(
+        backend,
+        "configure_pyomo_solver",
+        lambda _m, solver, solver_options=None: configured.append(
+            (solver, solver_options)
+        ),
+    )
+
+    model._solve_nonlinear_models_with_couenne()
+
+    assert model.solver == "scip"
+    assert configured == [("scip", {"limits/time": 9.0})]

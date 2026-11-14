@@ -173,7 +173,11 @@ def test_seeded_method_task_builders_use_consistent_method_inputs() -> None:
     assert evolution_tasks[0].topology_restrictions
 
 
-def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
+def test_missing_couenne_skips_derivative_stage_and_runs_evolution(
+    monkeypatch,
+) -> None:
+    _neither_couenne_nor_scip(monkeypatch)
+
     class MissingCouenneForTopologyExecutor(FakeSynthesisExecutor):
         def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
             if tasks and tasks[0].method == "thermal_derivative_method":
@@ -1226,3 +1230,22 @@ def test_a_call_level_wins_over_the_stored_options_it_governs(monkeypatch) -> No
         )
         > 0
     )
+
+
+def _neither_couenne_nor_scip(monkeypatch) -> None:
+    """Without Couenne and SCIP the TDM stays on Couenne, so its skip applies.
+
+    With SCIP installed, a missing default Couenne falls back to SCIP and the
+    thermal derivative method still runs.
+    """
+
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    real = backend.require_solver_backend
+
+    def require(name):
+        if name in {"couenne", "scip"}:
+            raise backend.MissingSynthesisSolverError(f"{name} missing")
+        real(name)
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)

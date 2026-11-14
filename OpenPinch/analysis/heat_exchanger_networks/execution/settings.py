@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ....domain.configuration_fields import CONFIG_FIELD_SPECS
 from ....domain.enums import HeatExchangerNetworkDesignMethod
-from ..solver.backend import require_solver_backend
+from ..solver.backend import require_solver_backend, stage_solver
 from ..solver.dependencies import (
     MissingSynthesisDependencyError,
     MissingSynthesisSolverError,
@@ -38,6 +39,19 @@ def heuristic_solver(pdm_solver: str) -> str:
     except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
         return pdm_solver
     return "highs"
+
+
+def configured_stage_solver(hens, option: str) -> str:
+    """Return a stage's configured solver, with SCIP for a missing default.
+
+    ``option`` is the stage's ``HENS_SOLVER_*`` key; HiGHS and Couenne are
+    optional extras, so a default that is not installed falls back to SCIP.
+    """
+
+    field = CONFIG_FIELD_SPECS[option].config_path[1]
+    return stage_solver(
+        str(getattr(hens, field)), default=str(CONFIG_FIELD_SPECS[option].default)
+    )
 
 
 # The heuristic pinch design method realises its networks with the PDM
@@ -208,6 +222,10 @@ def workflow_settings_from_problem(
     config = zone.config
     hens = config.hens
     search = resolve_search(hens)
+    solvers = {
+        stage: configured_stage_solver(hens, f"HENS_SOLVER_{stage.upper()}")
+        for stage in ("pdm", "tdm", "evm")
+    }
     return SynthesisWorkflowSettings(
         run_id=str(hens.run_id),
         dt_cont_multipliers=search.dt_cont_multipliers,
@@ -235,12 +253,12 @@ def workflow_settings_from_problem(
         evm_n_rm_branches=search.evm_n_rm_branches,
         heuristic_pdm_networks=search.heuristic_networks,
         pdm_milp=search.milp,
-        pdm_solver=str(hens.solver_pdm),
-        tdm_solver=str(hens.solver_tdm),
-        evm_solver=str(hens.solver_evm),
-        pdm_solver_options=dict(hens.solver_options_pdm),
-        tdm_solver_options=dict(hens.solver_options_tdm),
-        evm_solver_options=dict(hens.solver_options_evm),
+        pdm_solver=solvers["pdm"],
+        tdm_solver=solvers["tdm"],
+        evm_solver=solvers["evm"],
+        pdm_solver_options=stage_solver_options(hens, "pdm", solvers["pdm"]),
+        tdm_solver_options=stage_solver_options(hens, "tdm", solvers["tdm"]),
+        evm_solver_options=stage_solver_options(hens, "evm", solvers["evm"]),
         problem_id=problem.project_name,
         workspace_variant=workspace_variant,
         period_id=period_id,
@@ -258,3 +276,11 @@ __all__ = [
     "heuristic_solver",
     "workflow_settings_from_problem",
 ]
+
+
+def stage_solver_options(hens, stage: str, solver: str) -> dict[str, Any]:
+    """A stage's options, unless its missing default fell back to SCIP."""
+
+    if solver != str(getattr(hens, f"solver_{stage}")):
+        return {}
+    return dict(getattr(hens, f"solver_options_{stage}"))

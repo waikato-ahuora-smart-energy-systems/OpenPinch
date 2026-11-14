@@ -481,3 +481,58 @@ def test_a_time_limited_solve_with_an_incumbent_is_kept(monkeypatch, incumbent, 
 
     assert run.status == status
     assert not run.converged
+
+
+def _missing_backends(monkeypatch, *missing):
+    real = backend.require_solver_backend
+
+    def require(solver_name):
+        if solver_name in missing:
+            raise backend.MissingSynthesisSolverError(f"{solver_name} missing")
+        if solver_name == "scip":
+            return
+        real(solver_name)
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+
+
+@pytest.mark.parametrize("default", ["highs", "couenne", "ipopt-pyomo"])
+def test_a_missing_default_stage_solver_falls_back_to_scip(monkeypatch, default):
+    # HiGHS and Couenne are optional extras; SCIP comes with the synthesis
+    # extra and solves every model class.
+    _missing_backends(monkeypatch, default)
+
+    with pytest.warns(RuntimeWarning, match=f"{default}.*scip"):
+        solver = backend.stage_solver(default, default=default)
+
+    assert solver == "scip"
+
+
+def test_an_explicit_stage_solver_is_kept_even_when_missing(monkeypatch):
+    _missing_backends(monkeypatch, "couenne", "highs")
+
+    assert backend.stage_solver("couenne", default="highs") == "couenne"
+
+
+def test_an_installed_default_stage_solver_is_kept(monkeypatch):
+    _missing_backends(monkeypatch)
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+
+    assert backend.stage_solver("highs", default="highs") == "highs"
+
+
+def test_a_missing_default_is_kept_when_scip_is_missing_too(monkeypatch, recwarn):
+    # Without SCIP there is nothing to fall back to: the configured solver
+    # stays, so the missing-Couenne skip to network evolution still applies.
+    _missing_backends(monkeypatch, "couenne")
+    real = backend.require_solver_backend
+
+    def require(solver_name):
+        if solver_name == "scip":
+            raise backend.MissingSynthesisDependencyError("pyscipopt missing")
+        real(solver_name)
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+
+    assert backend.stage_solver("couenne", default="couenne") == "couenne"
+    assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
