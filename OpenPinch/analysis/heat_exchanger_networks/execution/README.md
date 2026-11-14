@@ -27,7 +27,7 @@ Resolves synthesis settings, and the options the search width and depth set, fro
 - Outcomes are returned in the order of the input tasks [executor.py:LocalSynthesisExecutor._collect_outcomes].
 - Settings are a frozen dataclass; only `evm_solver_options` is copied on construction, while `pdm_solver_options` and `tdm_solver_options` are shared references [settings.py:SynthesisWorkflowSettings.__post_init__].
 - An option the width or depth sets keeps its explicit value when the configuration sets it (`None` means unset): `HENS_DT_CONT_MULTIPLIERS` for the width; `HENS_HEURISTIC_PDM_NETWORKS`, `HENS_PDM_MILP`, `HENS_EVM_N_AD_BRANCHES` and `HENS_EVM_N_RM_BRANCHES` for the depth. The minimum-unit network counts are not set by the depth. The executor resolves evolution breadth the same way [search.py:resolve_search] [executor.py:_evolution_options].
-- The Couenne fallback applies only when the stage's configured solver (`pdm_solver` or `tdm_solver`) is `couenne`, the stage has tasks and outcomes, and every outcome failed with a "couenne ... not found on PATH" error [fallbacks.py:_missing_couenne_failure].
+- The Couenne fallback applies only when the stage's configured solver is `couenne` (for pinch design, also `highs`, which hands a nonlinear model to Couenne), the stage has tasks and outcomes, and every outcome failed with a "couenne ... not found on PATH" error [fallbacks.py:_missing_couenne_failure].
 - Utility-only networks (no active staged recovery exchanger) are not valid seeds [task_builders.py:has_recovery_topology].
 - The fake executor requires successful parents for downstream tasks [fake_executor.py:FakeSynthesisExecutor.execute].
 

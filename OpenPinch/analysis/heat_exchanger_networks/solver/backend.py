@@ -64,7 +64,12 @@ PYOMO_SOLVER_FACTORY_NAMES = {
 }
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
-DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {}
+# Couenne's feasibility-based bound tightening prunes feasible networks from
+# small stage-wise models and reports them infeasible.
+DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {
+    "feasibility_bt": "no",
+    "aggressive_fbbt": "no",
+}
 # Ipopt pushes starting values off their bounds by 1e-2 relative to the bound
 # (about 3.5 K at 350 K), which undoes warm starts from solved networks.
 DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
@@ -74,6 +79,7 @@ DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
 # Defaults under the given options: SCIP prints nothing, and MindtPy runs
 # outer approximation with HiGHS masters and Ipopt subproblems.
 DEFAULT_SOLVER_OPTIONS: dict[str, dict[str, Any]] = {
+    "couenne": DEFAULT_COUENNE_OPTIONS,
     "ipopt-pyomo": DEFAULT_IPOPT_PYOMO_OPTIONS,
     "scip": {"display/verblevel": 0},
     "mindtpy": {"strategy": "OA", "mip_solver": "appsi_highs", "nlp_solver": "ipopt"},

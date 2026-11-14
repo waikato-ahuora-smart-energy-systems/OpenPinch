@@ -65,6 +65,8 @@ _COUENNE_OPTIONS = frozenset(
         "delete_redundant",
         "log_num_obbt_per_level",
         "max_fbbt_iter",
+        "feasibility_bt",
+        "aggressive_fbbt",
     }
 )
 

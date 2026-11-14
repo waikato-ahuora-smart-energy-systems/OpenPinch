@@ -232,6 +232,21 @@ def test_couenne_fallback_predicates_reject_non_matching_inputs():
     )
 
 
+def test_missing_couenne_fallback_covers_the_highs_handoff():
+    # HiGHS hands a nonlinear pinch design model to Couenne, so with the
+    # default solver a missing Couenne still fails every MILP task.
+    missing = _outcome(error="couenne was not found on PATH")
+
+    assert (
+        fallbacks._can_skip_preliminary_stages_for_missing_couenne(
+            _settings(pdm_solver="highs"),
+            (_task(),),
+            (missing,),
+        )
+        is True
+    )
+
+
 def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Path):
     with pytest.raises(TypeError, match="live PinchProblem"):
         exports.export_heat_exchanger_network_synthesis_results(object(), tmp_path)
