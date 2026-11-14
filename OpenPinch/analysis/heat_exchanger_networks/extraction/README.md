@@ -4,7 +4,7 @@
 Converts a solved equation model (and the solver arrays it was built from) into identity-labelled domain objects: a `HeatExchangerNetwork` of `HeatExchanger` records with per-period states, and the synthesis result contract. The solved model is read only through `getattr`, so both period-native and single-period model attributes are accepted. It sits between `../models` / `../solver` and `../results`.
 
 ## Interface
-- `extract_heat_exchanger_network` (`service.py`): builds the network (recovery, hot-utility and cold-utility exchangers, costs, summary metrics, solver axis metadata and source metadata).
+- `extract_heat_exchanger_network` (`service.py`): builds the network (recovery, hot-utility and cold-utility exchangers, costs, summary metrics, solver axis metadata and source metadata); a `dt_cont_multiplier` argument is recorded as `dt_cont_multiplier` in the summary metrics and source metadata.
 - `extract_network_synthesis_result` (`service.py`): wraps the network in a `HeatExchangerNetworkSynthesisResult` with objective values.
 - Private helper modules, imported only within this package:
   - `metadata.py`: period ids, costs, summary metrics, scalar coercion, axis identities.

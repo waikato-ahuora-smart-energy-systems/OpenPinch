@@ -48,8 +48,13 @@ def extract_heat_exchanger_network(
     objective_value: float | None = None,
     tolerance: float = tol,
     include_inactive: bool = False,
+    dt_cont_multiplier: float | None = None,
 ) -> HeatExchangerNetwork:
-    """Convert a solved model into identity-labelled OpenPinch records."""
+    """Convert a solved model into identity-labelled OpenPinch records.
+
+    ``dt_cont_multiplier``, the synthesis task's multiplier, is recorded in
+    the network's summary metrics and source metadata when given.
+    """
 
     hot_streams = _identities_by_axis(solver_arrays, "hot_process_streams")
     cold_streams = _identities_by_axis(solver_arrays, "cold_process_streams")
@@ -112,7 +117,7 @@ def extract_heat_exchanger_network(
         total_annual_cost=total_annual_cost,
         utility_cost=_utility_cost(solved_model),
         capital_cost=_capital_cost(solved_model),
-        summary_metrics=_summary_metrics(solved_model),
+        summary_metrics=_summary_metrics(solved_model, dt_cont_multiplier),
         solver_axis_metadata={
             "axis_maps": solver_arrays.axis_maps,
             "source_array_names": (
@@ -138,7 +143,7 @@ def extract_heat_exchanger_network(
             "solver_non_isothermal_model": bool(
                 getattr(solved_model, "non_isothermal_model", False)
             ),
-            "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
+            "dt_cont_multiplier": _optional_float(dt_cont_multiplier),
             # Each recovery pair's own minimum approach (hot + cold stream
             # contributions), by period: [period][hot][cold].
             "recovery_minimum_approach_by_period": _float_tensor(

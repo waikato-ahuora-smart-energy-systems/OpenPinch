@@ -183,12 +183,16 @@ class CostingConfig:
 class HensConfig:
     """Heat exchanger network synthesis settings."""
 
-    approach_temperatures: list[float]
+    search_width: int
+    search_depth: int
     dt_cont_multipliers: list[float] | None
     derivative_thresholds: list[float]
     min_exchanger_approach_share: float
-    synthesis_quality_tier: int
     pdm_stage_pair_limit: int | None
+    pdm_min_unit_networks: int
+    pdm_extra_unit_networks: int
+    heuristic_pdm_networks: int | None
+    pdm_milp: bool | None
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]

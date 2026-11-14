@@ -21,9 +21,7 @@ Ranked Synthesis
        project_name="Four Stream",
    )
    design = problem.design.heat_exchanger_network(
-       approach_temperatures=[10.0, 14.0, 18.0],
-       stages=[3],
-       best_solutions=3,
+       dt_cont_multipliers=[1.0, 1.4, 1.8],
    )
 
    top = design.top(3)
@@ -37,27 +35,40 @@ utility duty, and ``utility(name)``. Serialize the complete result with
 Exchanger Approach Temperatures
 -------------------------------
 
-``approach_temperatures`` (``HENS_APPROACH_TEMPERATURES``) sets the approach of
-the pinch design step: the energy targets the seed networks meet and the
-minimum approach of their exchangers. The thermal derivative and network
-evolution steps that follow minimise total annual cost and choose each
-exchanger's approach from the cost settings, down to 0.1 K. With cheap area,
-exchangers can close well below the requested approach; with dear area, they
-open up and the network uses more utility than the target.
+Synthesis runs once per ``dt_cont_multipliers`` value
+(``HENS_DT_CONT_MULTIPLIERS``; unset, the search width sets them: 0.75, 1.0
+and 1.5 at the default width). A multiplier scales every
+stream's, segment's and utility's ΔT contribution, as a zone ``dt_cont``
+multiplier does in targeting, so 1.0 designs at the contributions the pinch
+targets use, and a match between two streams needs the sum of their scaled
+contributions. A stream whose ``dt_cont`` multiplier is locked keeps its own
+contribution, as in targeting. A contribution of 0 runs at 0.1 K times the
+multiplier. Results, manifests and networks record the multiplier; to reuse
+an older approach-temperature grid, use multiplier = dTmin / (2 x
+``THERMAL_DT_CONT``), so 14 K at the 5 K default is 1.4.
 
-``HENS_MIN_EXCHANGER_APPROACH_SHARE`` raises that floor to a share of the
-requested approach. It defaults to 0, which keeps the 0.1 K floor. At 0.5, a
-10 K design keeps every exchanger at 5 K or more:
+The multipliers set the pinch design step: the energy targets the seed
+networks meet and the minimum approach of their exchangers. The thermal
+derivative and network evolution steps that follow minimise total annual cost
+and choose each exchanger's approach from the cost settings, down to 0.1 K.
+With cheap area, exchangers can close well below the pinch design approach;
+with dear area, they open up and the network uses more utility than the
+target.
+
+``HENS_MIN_EXCHANGER_APPROACH_SHARE`` raises that floor to a share of twice
+the scaled ``THERMAL_DT_CONT``. It defaults to 0, which keeps the 0.1 K floor.
+At 0.5, a multiplier of 1.0 with the 5 K default keeps every exchanger at 5 K
+or more:
 
 .. code-block:: python
 
    design = problem.design.heat_exchanger_network(
-       approach_temperatures=[10.0],
+       dt_cont_multipliers=[1.0],
        options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.5},
    )
 
 The share must be below 1: at 1, evolution cannot start from a pinch design
-network whose exchangers sit exactly at the requested approach.
+network whose exchangers sit exactly at that approach.
 ``verify_network_feasibility`` still checks approaches against the 0.1 K
 floor, not against this share.
 
@@ -77,8 +88,12 @@ finished by the cheapest utility that reaches its target. In
   temperatures. Synthesis does not place one utility after another along a
   stream, for example cooling water first and then glycol; each unit spans
   the stream's whole utility duty range.
-- The pinch design method meets the utility targets and, where a side has a
-  choice of utilities, prefers the cheaper ones.
+- The pinch design method solves each side of the pinch at its utility
+  target and, where a side has a choice of utilities, prefers the cheaper
+  ones. Heuristic networks and the extra MILP networks keep those targets.
+  The main MILP network then drops stages that carry a small share of its
+  recovery, which can move that recovery to utility (about 10% more utility
+  on the ten-stream Ahmad case).
 - The default ``HU`` and ``CU`` that input preparation adds as backups take
   part only when they are the only utility on their side.
 
@@ -87,8 +102,7 @@ Named Advanced Methods
 
 .. code-block:: python
 
-   enhanced = problem.design.enhanced_heat_exchanger_network(quality_tier=2)
-   open_hens = problem.design.open_hens()
+   wider = problem.design.heat_exchanger_network(width=2, depth=3)
    pinch_design = problem.design.pinch_design()
    thermal = problem.design.thermal_derivative(
        (pinch_design.selected_network,)
@@ -96,6 +110,14 @@ Named Advanced Methods
    evolved = problem.design.network_evolution(
        (thermal.selected_network,)
    )
+
+Called without seed networks, ``thermal_derivative()`` and
+``network_evolution()`` start from the design already stored on the problem,
+whichever method made it: its selected network first, then its other ranked
+topologies, up to ``HENS_BEST_SOLUTIONS_TO_SAVE`` networks in all. So
+``problem.design.pinch_design()`` followed by
+``problem.design.network_evolution()`` evolves the pinch design networks:
+only the selected one at the default ``HENS_BEST_SOLUTIONS_TO_SAVE`` of 1.
 
 Successful synthesis stores the serializable result on
 ``problem.results.design`` (the ``TargetOutput.design`` field). The design view
@@ -106,19 +128,127 @@ For multiple operating periods, call
 ``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
 all-period targeting.
 
-Quality Tiers and Convergence
------------------------------
+Heuristic Pinch Design
+----------------------
 
-The quality tier sets how widely synthesis searches, from 0 to 5.
-``heat_exchanger_network()`` runs tier 0, which skips the thermal derivative
-step; ``enhanced_heat_exchanger_network()`` runs tier 2 unless
-``quality_tier`` is given; ``open_hens()`` always runs tier 1, the standard
-OpenHENS pinch design, thermal derivative and network evolution sequence. A
-``HENS_SYNTHESIS_QUALITY_TIER`` stored in the problem's options replaces the
-first two defaults. The tier that ran is in
-``design.result.manifest.synthesis_quality_tier``. The other ``HENS_*`` keys,
-such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument),
-``HENS_EVM_N_AD_BRANCHES`` and ``HENS_SOLVE_TOLERANCE``, are listed with
+The pinch design step, in ``problem.design.pinch_design()`` and the main
+synthesis workflow, designs networks with the classic Linnhoff pinch design
+rules by default. On each side of the pinch it:
+
+- matches the streams at the pinch that cannot use a utility on that side
+  (hot streams above the pinch, cold streams below), with partners whose CP
+  is at least their own and no more such streams than partners, splitting
+  streams where either rule fails;
+- ticks each pinch match off at the smaller of its two loads, also allowing
+  the match one stage further out when a split's mixed branches would break
+  the approach;
+- matches the remaining loads away from the pinch, the stream nearest the
+  pinch first, with partners whose temperatures keep both ends of the match at
+  the minimum approach (a pair matches again further out only when no new
+  partner can take the load);
+- gives the loads left on the other streams to utilities, allowing every
+  utility that can reach them.
+
+It enumerates the alternatives at each decision (pinch matches, optional
+splits and partners away from the pinch), streams of similar CP first, up to
+``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier (default
+10). Each proposal is then solved by the pinch design side model with
+only its matches allowed, so its duties and temperatures are consistent and
+it meets the utility targets; the sides are joined, stage-reduced and
+verified like the pinch design networks. Proposals the model cannot solve or
+verify are dropped. With several operating periods, each period is designed
+on its own and a proposal is the union of one design per period, one shared
+topology.
+
+In the main synthesis workflow every heuristic network seeds network
+evolution directly (from search depth 1). Heuristic networks never go to the
+thermal derivative method.
+
+From search depth 2, or with ``HENS_PDM_MILP`` set, the MILP pinch design
+method runs as well: it solves each side for minimum utility cost and then the
+fewest units. From depth 2 its main networks go to the thermal derivative
+method, and its extra minimum-unit networks (and from depth 3 all its
+networks) straight to evolution; below depth 2, with ``HENS_PDM_MILP``, all
+its networks seed evolution directly. With ``HENS_HEURISTIC_PDM_NETWORKS`` at 0 the MILP runs on its own.
+At any depth, the MILP also runs at each dt_cont multiplier where the
+heuristic realises no network, and its networks take the heuristic's place.
+The heuristic's side models are solved with HiGHS when it is installed,
+whatever ``HENS_SOLVER_PDM`` names.
+
+.. code-block:: python
+
+   heuristic_only = problem.design.pinch_design()
+   with_milp = problem.design.pinch_design(options={"HENS_SEARCH_DEPTH": 2})
+
+Search Width, Depth and Convergence
+-----------------------------------
+
+Synthesis searches in two directions, set by ``width`` and ``depth`` on
+``heat_exchanger_network()`` or by ``HENS_SEARCH_WIDTH`` and
+``HENS_SEARCH_DEPTH``. The width picks the dt_cont multipliers:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Width
+     - dt_cont multipliers
+   * - 0
+     - 1.0
+   * - 1 (default)
+     - 0.75, 1.0, 1.5
+   * - 2
+     - 0.5, 0.75, 1.0, 1.5, 2.0
+   * - 3
+     - 0.5, 0.6, 0.75, 1.0, 1.25, 1.5, 2.0
+
+The depth picks the stages run at each multiplier and their effort:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Depth
+     - Stages
+     - Heuristic networks
+     - Evolution breadth
+   * - 0
+     - heuristic pinch design only
+     - 10
+     - none
+   * - 1 (default)
+     - heuristic, then evolution
+     - 10
+     - 1
+   * - 2
+     - heuristic and MILP; MILP through the thermal derivative method
+     - 10
+     - 1
+   * - 3
+     - as 2; every MILP network also straight to evolution
+     - 20
+     - 2
+   * - 4
+     - as 3
+     - 50
+     - 3
+
+The extra minimum-unit MILP networks are not part of the depth: set
+``HENS_PDM_MIN_UNIT_NETWORKS`` and ``HENS_PDM_EXTRA_UNIT_NETWORKS`` (both 0 by
+default) to add them at any depth that runs the MILP.
+
+An option set explicitly overrides the level that would set it:
+``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
+and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the depth. A call's
+``width`` and ``depth`` win over the call's ``options``, which win over the
+stored options for that call only. A governed option stored on the problem
+also wins over a stored level: a stored ``HENS_PDM_MILP: false`` keeps the
+MILP off even with a stored depth of 2. A width or depth given in the call, as an
+argument or in its ``options``, also sets the options it governs, over stored
+ones, unless the same call sets them: ``heat_exchanger_network(width=2)`` on a problem that stores
+``HENS_DT_CONT_MULTIPLIERS`` runs the width-2 multipliers. The levels that ran
+are in ``design.result.manifest.search_width`` and ``search_depth``. The other
+``HENS_*`` keys, such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument)
+and ``HENS_SOLVE_TOLERANCE``, are listed with
 their defaults in :doc:`../api/configuration-options`.
 
 A solve that stopped before converging, for example at the IPOPT iteration
@@ -126,7 +256,9 @@ limit, is logged as an ``[Unconverged]`` warning. Its network still seeds the
 steps that follow, but it is left out of the final ranking, so a low objective
 from an unconverged model cannot win on cost. Networks that fail
 ``verify_network_feasibility`` are left out in the same way. When no converged,
-feasible network remains, the design method raises ``WorkflowContractError``.
+feasible network remains, the design method raises ``WorkflowContractError``;
+if a solve stopped at a limit, the error names the solver options that raise
+it.
 
 Duty Allocation on a Fixed Network
 ----------------------------------
@@ -270,7 +402,7 @@ identities. Stage balances advance a cumulative parent heat coordinate through
 the piecewise ``T(Q)`` profile. Pinch decomposition can split the active profile
 while preserving the one physical parent identity.
 
-APOPT and Couenne use interval-disjunctive piecewise mappings. IPOPT uses
+Couenne and HiGHS use interval-disjunctive piecewise mappings. IPOPT uses
 active-segment refinement and repeats the continuous solve until the selected
 intervals stabilize. An unresolved active-segment solve is rejected with solver
 guidance; OpenPinch does not silently substitute an average parent ``CP``.

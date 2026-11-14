@@ -111,7 +111,7 @@ def test_pinch_design_solves_when_the_pinch_stream_has_a_many_decimal_supply():
     )
     problem.target.direct_heat_integration()
 
-    view = problem.design.pinch_design(approach_temperatures=[10.0])
+    view = problem.design.pinch_design(dt_cont_multipliers=[1.0])
 
     # H1 is too cold to heat C1, so steam supplies all of C1's 500 kW.
     assert view.total_hot_utility == pytest.approx(500.0, abs=1e-3)

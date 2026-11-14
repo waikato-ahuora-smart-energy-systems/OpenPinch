@@ -20,7 +20,7 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     workflow_settings_from_problem,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
-    approach_temperature_from_network,
+    dt_cont_multiplier_from_network,
     stage_count_from_network,
 )
 from OpenPinch.application.problem import PinchProblem
@@ -85,7 +85,7 @@ def _network() -> HeatExchangerNetwork:
 def _workflow_settings(**updates) -> SynthesisWorkflowSettings:
     params = {
         "run_id": "contract-test",
-        "approach_temperatures": (10.0,),
+        "dt_cont_multipliers": (1.0,),
         "derivative_thresholds": (0.5,),
         "stage_selection": (1,),
         "method_sequence": ("pinch_design_method",),
@@ -108,7 +108,7 @@ def test_synthesis_task_generates_deterministic_task_id():
     first = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         derivative_threshold=0.5,
         stage_count=3,
         problem_id="problem-a",
@@ -116,7 +116,7 @@ def test_synthesis_task_generates_deterministic_task_id():
     second = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         derivative_threshold=0.5,
         stage_count=3,
         problem_id="problem-a",
@@ -141,12 +141,12 @@ def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
     pdm = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
     tdm = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
         method="thermal_derivative_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         derivative_threshold=0.5,
         stage_count=3,
         seed_network_index=0,
@@ -154,7 +154,7 @@ def test_method_input_is_consistent_task_contract_for_all_synthesis_methods():
     evolution = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
         method="network_evolution_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         stage_count=3,
         seed_network_index=1,
     )
@@ -172,7 +172,7 @@ def test_method_output_is_consistent_outcome_contract_for_all_synthesis_methods(
     method_input = HeatExchangerNetworkSynthesisMethodInput(
         run_id="run-1",
         method="network_evolution_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         stage_count=3,
     )
     output = HeatExchangerNetworkSynthesisMethodOutput(
@@ -195,7 +195,7 @@ def test_synthesis_schema_serialization_round_trips():
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="thermal_derivative_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         derivative_threshold=0.5,
         stage_count=3,
     )
@@ -213,7 +213,7 @@ def test_synthesis_schema_serialization_round_trips():
     )
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id="run-1",
-        approach_temperatures=(10.0, 14.0),
+        dt_cont_multipliers=(1.0, 1.4),
         derivative_thresholds=(0.5, 0.9),
         stage_selection=(2, 3),
         export_formats=("json", "csv"),
@@ -264,7 +264,7 @@ def test_target_output_accepts_design_result_payload():
             {
                 "run_id": "run-1",
                 "method": "pinch_design_method",
-                "approach_temperature": 0.0,
+                "dt_cont_multiplier": 0.0,
             },
             "finite and positive",
         ),
@@ -272,7 +272,7 @@ def test_target_output_accepts_design_result_payload():
             {
                 "run_id": "bad run id",
                 "method": "pinch_design_method",
-                "approach_temperature": 14.0,
+                "dt_cont_multiplier": 1.4,
             },
             "run_id",
         ),
@@ -280,7 +280,7 @@ def test_target_output_accepts_design_result_payload():
             {
                 "run_id": "run-1",
                 "method": "pinch_design_method",
-                "approach_temperature": 14.0,
+                "dt_cont_multiplier": 1.4,
                 "stage_count": 0,
             },
             "stage_count",
@@ -297,40 +297,40 @@ def test_synthesis_task_rejects_invalid_values(payload, message):
     [
         {
             "run_id": "run-1",
-            "approach_temperatures": [14.0],
+            "dt_cont_multipliers": [1.4],
             "derivative_thresholds": [0.5],
             "stage_selection": [1],
             "export_formats": ["xml"],
         },
         {
             "run_id": "run-1",
-            "approach_temperatures": [14.0],
+            "dt_cont_multipliers": [1.4],
             "derivative_thresholds": [0.5],
             "stage_selection": [1, 1],
         },
         {
             "run_id": "run-1",
-            "approach_temperatures": [float("nan")],
+            "dt_cont_multipliers": [float("nan")],
             "derivative_thresholds": [0.5],
             "stage_selection": [1],
         },
         {
             "run_id": "run-1",
-            "approach_temperatures": [14.0],
+            "dt_cont_multipliers": [1.4],
             "derivative_thresholds": [0.5],
             "stage_selection": [1],
             "solve_tolerance": -1.0,
         },
         {
             "run_id": "run-1",
-            "approach_temperatures": [14.0],
+            "dt_cont_multipliers": [1.4],
             "derivative_thresholds": [0.5],
             "stage_selection": [1],
             "evm_n_ad_branches": 0,
         },
         {
             "run_id": "run-1",
-            "approach_temperatures": [14.0],
+            "dt_cont_multipliers": [1.4],
             "derivative_thresholds": [0.5],
             "stage_selection": [1],
             "evm_n_rm_branches": 0,
@@ -349,7 +349,7 @@ def test_manifest_rejects_invalid_grids_formats_stages_and_tolerances(payload):
 def test_openhens_legacy_aliases_are_not_accepted(legacy_key):
     payload = {
         "run_id": "run-1",
-        "approach_temperatures": [14.0],
+        "dt_cont_multipliers": [1.4],
         "derivative_thresholds": [0.5],
         "stage_selection": [1],
         legacy_key: [1.0],
@@ -364,7 +364,7 @@ def test_openhens_legacy_aliases_are_not_accepted(legacy_key):
 
 def test_hen_config_field_specs_use_openpinch_names():
     expected = {
-        "HENS_APPROACH_TEMPERATURES",
+        "HENS_DT_CONT_MULTIPLIERS",
         "HENS_DERIVATIVE_THRESHOLDS",
         "HENS_STAGE_SELECTION",
         "HENS_SOLVER_PDM",
@@ -375,7 +375,8 @@ def test_hen_config_field_specs_use_openpinch_names():
         "HENS_SOLVER_OPTIONS_EVM",
         "HENS_SOLVE_TOLERANCE",
         "HENS_MAX_PARALLEL",
-        "HENS_SYNTHESIS_QUALITY_TIER",
+        "HENS_SEARCH_WIDTH",
+        "HENS_SEARCH_DEPTH",
         "HENS_PDM_STAGE_PAIR_LIMIT",
         "HENS_TDM_PARENT_LIMIT",
         "HENS_STAGE_PACKING",
@@ -394,7 +395,9 @@ def test_hen_config_field_specs_use_openpinch_names():
         "hens",
         "solver_evm",
     )
-    assert CONFIG_FIELD_SPECS["HENS_SYNTHESIS_QUALITY_TIER"].default == 1
+    assert CONFIG_FIELD_SPECS["HENS_SEARCH_WIDTH"].default == 1
+    assert CONFIG_FIELD_SPECS["HENS_SEARCH_DEPTH"].default == 1
+    assert CONFIG_FIELD_SPECS["HENS_DT_CONT_MULTIPLIERS"].default is None
     assert CONFIG_FIELD_SPECS["HENS_EVM_N_AD_BRANCHES"].default is None
     assert CONFIG_FIELD_SPECS["HENS_EVM_N_RM_BRANCHES"].default is None
     assert not any(key.startswith("OPENHENS_") for key in CONFIG_FIELD_SPECS)
@@ -420,14 +423,14 @@ def test_hen_config_rejects_retired_solver_option_names(legacy_key):
 
 def test_hen_config_options_accept_valid_values_on_canonical_paths():
     options = {
-        "HENS_APPROACH_TEMPERATURES": [10, 14.0],
         "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 0.9],
         "HENS_STAGE_SELECTION": [2, 3],
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_SOLVE_TOLERANCE": 1e-3,
         "HENS_MAX_PARALLEL": 2,
-        "HENS_SYNTHESIS_QUALITY_TIER": 3,
+        "HENS_SEARCH_WIDTH": 2,
+        "HENS_SEARCH_DEPTH": 3,
         "HENS_PDM_STAGE_PAIR_LIMIT": 6,
         "HENS_TDM_PARENT_LIMIT": 4,
         "HENS_STAGE_PACKING": "pdm",
@@ -443,17 +446,16 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     cfg = Configuration(options=options)
     target_input = TargetInput(streams=[], options=options)
 
-    assert cfg.hens.approach_temperatures == [10.0, 14.0]
     assert cfg.hens.dt_cont_multipliers == [1.0, 1.5]
     assert cfg.hens.output_formats == ["json", "csv"]
     assert target_input.options["HENS_DT_CONT_MULTIPLIERS"] == [1.0, 1.5]
     assert target_input.options["HENS_DERIVATIVE_THRESHOLDS"] == [0.5, 0.9]
     assert target_input.options["HENS_STAGE_SELECTION"] == [2, 3]
-    assert cfg.hens.synthesis_quality_tier == 3
+    assert (cfg.hens.search_width, cfg.hens.search_depth) == (2, 3)
     assert cfg.hens.pdm_stage_pair_limit == 6
     assert cfg.hens.tdm_parent_limit == 4
     assert cfg.hens.stage_packing == "pdm"
-    assert target_input.options["HENS_SYNTHESIS_QUALITY_TIER"] == 3
+    assert target_input.options["HENS_SEARCH_DEPTH"] == 3
     assert target_input.options["HENS_STAGE_PACKING"] == "pdm"
     assert cfg.hens.evm_n_ad_branches == 2
     assert cfg.hens.evm_n_rm_branches == 3
@@ -463,46 +465,22 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     assert target_input.options["HENS_SOLVER_OPTIONS_EVM"] == {"max_iter": 500}
 
 
-def test_hen_dt_cont_multipliers_feed_quality_pdm_multiplier_grid():
+def test_hen_dt_cont_multipliers_override_the_search_width():
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
     problem._master_zone.config = Configuration(
-        options={
-            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
-            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
-        }
+        options={"HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5], "HENS_SEARCH_WIDTH": 3}
     )
 
     settings = workflow_settings_from_problem(problem)
 
-    assert settings.approach_temperatures == (10.0, 20.0)
     assert settings.dt_cont_multipliers == (1.0, 1.5)
-    assert settings.user_dt_cont_multipliers is True
-    assert settings.quality_dt_cont_multipliers == ()
-
-    tier_problem = PinchProblem(
-        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
-    )
-    tier_problem._master_zone.config = Configuration(
-        options={
-            "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
-            "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
-            "HENS_SYNTHESIS_QUALITY_TIER": 3,
-        }
-    )
-    tier_settings = workflow_settings_from_problem(tier_problem)
-
-    assert tier_settings.quality_dt_cont_multipliers == (1.0, 1.5)
-    assert tier_settings.quality_pdm_approach_temperatures == (10.0, 15.0)
 
 
-def test_workflow_settings_solver_options_and_quality_edges() -> None:
+def test_workflow_settings_solver_options_and_parent_limit_edges() -> None:
     standard = _workflow_settings()
-    expanded = _workflow_settings(
-        synthesis_quality_tier=7,
-        tdm_parent_limit=0,
-    )
+    limited = _workflow_settings(tdm_parent_limit=0)
 
     assert standard.solver_for("not-a-method") is None
     assert standard.solver_options_for("thermal_derivative_method") == {
@@ -510,12 +488,8 @@ def test_workflow_settings_solver_options_and_quality_edges() -> None:
     }
     assert standard.solver_options_for("network_evolution_method") == {"time_limit": 30}
     assert standard.solver_options_for("not-a-method") == {}
-    assert standard.quality_fraction == 0.0
-    assert standard.is_standard_quality_tier is True
-    assert standard.quality_pdm_approach_temperatures == ()
     assert standard.quality_tdm_parent_limit == 2
-    assert expanded.quality_fraction == 1.0
-    assert expanded.quality_tdm_parent_limit == 1
+    assert limited.quality_tdm_parent_limit == 1
 
 
 def test_workflow_settings_require_loaded_problem() -> None:
@@ -543,7 +517,10 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 ),
             ),
         ),
-        source_metadata={"solver_dTmin": 9.0},
+        source_metadata={"dt_cont_multiplier": 0.9},
+    )
+    summary_network = HeatExchangerNetwork(
+        exchangers=(), summary_metrics={"dt_cont_multiplier": 0.7}
     )
     no_stage_network = HeatExchangerNetwork(
         exchangers=(
@@ -563,28 +540,8 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
             ),
         )
     )
-    approach_from_exchanger = HeatExchangerNetwork(
-        exchangers=(
-            HeatExchanger(
-                kind=HeatExchangerKind.RECOVERY,
-                source_stream="H1",
-                sink_stream="C1",
-                source_stream_role=StreamID.Process,
-                sink_stream_role=StreamID.Process,
-                stage=1,
-                period_states=(
-                    HeatExchangerPeriodState(
-                        period_id="0",
-                        period_idx=0,
-                        duty=100.0,
-                        approach_temperatures=(7.0,),
-                    ),
-                ),
-            ),
-        )
-    )
     approach_from_settings = HeatExchangerNetwork(exchangers=())
-    settings = _workflow_settings(approach_temperatures=(11.0,))
+    settings = _workflow_settings(dt_cont_multipliers=(1.1,))
 
     assert (
         stage_count_from_network(
@@ -598,24 +555,24 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
             no_stage_network,
             downstream_method="thermal_derivative_method",
         )
-    assert approach_temperature_from_network(staged_network, settings) == pytest.approx(
-        9.0
+    assert dt_cont_multiplier_from_network(staged_network, settings) == pytest.approx(
+        0.9
     )
-    assert approach_temperature_from_network(
-        approach_from_exchanger,
-        settings,
-    ) == pytest.approx(7.0)
-    assert approach_temperature_from_network(
+    assert dt_cont_multiplier_from_network(summary_network, settings) == pytest.approx(
+        0.7
+    )
+    # A network without a multiplier runs at the first configured one.
+    assert dt_cont_multiplier_from_network(
         approach_from_settings,
         settings,
-    ) == pytest.approx(11.0)
+    ) == pytest.approx(1.1)
 
 
 def test_required_stage_count_reports_missing_stage_metadata() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="run-1",
         method="pinch_design_method",
-        approach_temperature=10.0,
+        dt_cont_multiplier=1.0,
         task_id="seed",
     )
     outcome = HeatExchangerNetworkSynthesisTaskOutcome(
@@ -649,34 +606,33 @@ def test_evm_branch_options_round_trip_to_workflow_settings():
     assert settings.effective_evm_n_rm_branches == 3
 
 
-def test_synthesis_quality_tier_derives_evm_branch_widths() -> None:
+def test_search_depth_derives_evm_branch_widths() -> None:
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
-    problem._master_zone.config = Configuration(
-        options={"HENS_SYNTHESIS_QUALITY_TIER": 5}
-    )
+    problem._master_zone.config = Configuration(options={"HENS_SEARCH_DEPTH": 4})
 
     settings = workflow_settings_from_problem(problem)
 
-    assert settings.evm_n_ad_branches is None
-    assert settings.evm_n_rm_branches is None
-    assert settings.effective_evm_n_ad_branches == 2
-    assert settings.effective_evm_n_rm_branches == 2
+    assert settings.effective_evm_n_ad_branches == 3
+    assert settings.effective_evm_n_rm_branches == 3
 
 
 @pytest.mark.parametrize(
     "options",
     [
-        {"HENS_APPROACH_TEMPERATURES": [0.0]},
         {"HENS_DT_CONT_MULTIPLIERS": [0.0]},
+        {"HENS_DT_CONT_MULTIPLIERS": []},
         {"HENS_DERIVATIVE_THRESHOLDS": [float("inf")]},
         {"HENS_STAGE_SELECTION": [0]},
         {"HENS_STAGE_SELECTION": [1, 1]},
         {"HENS_OUTPUT_FORMATS": ["xml"]},
         {"HENS_SOLVE_TOLERANCE": 0.0},
-        {"HENS_SYNTHESIS_QUALITY_TIER": -1},
-        {"HENS_SYNTHESIS_QUALITY_TIER": 6},
+        {"HENS_SEARCH_WIDTH": -1},
+        {"HENS_SEARCH_WIDTH": 4},
+        {"HENS_SEARCH_DEPTH": -1},
+        {"HENS_SEARCH_DEPTH": 5},
+        {"HENS_PDM_MILP": "sometimes"},
         {"HENS_PDM_STAGE_PAIR_LIMIT": -1},
         {"HENS_PDM_STAGE_PAIR_LIMIT": 13},
         {"HENS_TDM_PARENT_LIMIT": 0},
@@ -777,3 +733,53 @@ def test_openhens_compatibility_surfaces_are_absent():
 
     assert importlib.util.find_spec("OpenPinch.openhens") is None
     assert importlib.util.find_spec("OpenPinch.OpenHENS") is None
+
+
+def test_highs_options_are_accepted_for_the_pinch_design_solver():
+    # HiGHS is the default PDM solver; its gap and thread options were
+    # rejected while only time_limit passed.
+    options = {
+        "mip_rel_gap": 0.01,
+        "mip_abs_gap": 1.0,
+        "threads": 2,
+        "mip_feasibility_tolerance": 1e-7,
+        "presolve": "on",
+    }
+
+    cfg = Configuration(options={"HENS_SOLVER_OPTIONS_PDM": options})
+
+    assert cfg.hens.solver_options_pdm == options
+
+
+def test_default_stage_solvers_fall_back_to_scip_when_not_installed(monkeypatch):
+    # HiGHS and Couenne are optional extras: a stage left on its default
+    # solver runs on SCIP when that solver is missing.
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    def require(solver_name):
+        if solver_name in {"highs", "couenne"}:
+            raise backend.MissingSynthesisSolverError(f"{solver_name} missing")
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+    problem = PinchProblem(
+        source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
+    )
+    problem._master_zone.config = Configuration(
+        options={"HENS_SOLVER_OPTIONS_PDM": {"time_limit": 30}}
+    )
+
+    with pytest.warns(RuntimeWarning, match="scip"):
+        settings = workflow_settings_from_problem(problem)
+
+    assert (settings.pdm_solver, settings.tdm_solver) == ("scip", "scip")
+    # Options set for the missing default are not passed to SCIP.
+    assert settings.pdm_solver_options == {}
+    assert settings.evm_solver == "ipopt-pyomo"
+    with pytest.warns(RuntimeWarning, match="scip"):
+        assert (
+            executor._solver_for_task(
+                problem, HeatExchangerNetworkDesignMethod.ThermalDerivative
+            )
+            == "scip"
+        )

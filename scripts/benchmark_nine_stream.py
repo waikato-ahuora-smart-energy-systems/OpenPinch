@@ -31,7 +31,7 @@ ESM_ATTEMPT_WEIGHT = 11
 
 EXPECTED = {
     "best_solution": 2905508.6335796523,
-    "best_dTmin": 18,
+    "best_dt_cont_multiplier": 1.8,
     "total_cases_attempted": 1133,
     "total_cases_solved_min": 840,
     "solved_esm_count_min": 67,
@@ -140,7 +140,7 @@ def main() -> int:
             CASE_ID,
             network,
             expected_total=EXPECTED["best_solution"],
-            d_tmin=EXPECTED["best_dTmin"],
+            d_tmin=reg._openhens_d_tmin(EXPECTED["best_dt_cont_multiplier"]),
         )
     except AssertionError as exc:
         failures.append(f"heat and cost contract: {exc}")

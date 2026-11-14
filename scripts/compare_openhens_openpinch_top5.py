@@ -443,7 +443,10 @@ def _parse_args() -> argparse.Namespace:
         "--approach-temperatures",
         type=_float_csv,
         default=OPENHENS_DT_GRID,
-        help="Comma-separated dTmin grid. Defaults to the OpenHENS grid.",
+        help=(
+            "Comma-separated OpenHENS dTmin grid; OpenPinch runs the dt_cont "
+            "multipliers dTmin / (2 * THERMAL_DT_CONT). Defaults to the OpenHENS grid."
+        ),
     )
     parser.add_argument(
         "--derivative-thresholds",
@@ -773,9 +776,12 @@ def _run_openpinch_grid(
     fixture_path = repo_root / "tests" / "fixtures" / "openhens" / f"{case_id}.json"
     problem = PinchProblem(source=fixture_path)
     problem.target.all_heat_integration()
+    # OpenHENS sweeps dTmin; OpenPinch sweeps dt_cont multipliers, and a
+    # multiplier m matches OpenHENS's dTmin 2 * THERMAL_DT_CONT * m.
+    reference = _reference_dt_cont(fixture_path)
     settings = replace(
         workflow_settings_from_problem(problem),
-        approach_temperatures=d_tmin_grid,
+        dt_cont_multipliers=tuple(d_tmin / (2.0 * reference) for d_tmin in d_tmin_grid),
         derivative_thresholds=dqda_grid,
         best_solutions_to_save=top_n,
         max_parallel=max_parallel,
@@ -945,6 +951,7 @@ def _openpinch_ranked_networks(
     fixture_path: Path,
 ) -> list[RankedNetwork]:
     stream_maps = _stream_index_maps(fixture_path)
+    reference = _reference_dt_cont(fixture_path)
     rows: list[RankedNetwork] = []
     for outcome in outcomes:
         network = outcome.network
@@ -956,7 +963,7 @@ def _openpinch_ranked_networks(
                 case_id=case_id,
                 rank=len(rows) + 1,
                 tac=float(outcome.objective_value),
-                d_tmin=_task_parameter(outcome.task, "approach_temperature"),
+                d_tmin=2.0 * reference * outcome.task.dt_cont_multiplier,
                 min_dq=_task_parameter(outcome.task, "derivative_threshold"),
                 stages=network.stage_count,
                 recovery_units=_optional_int(
@@ -1076,6 +1083,11 @@ def _add_stream_aliases(
         mapping[alias] = index
         if zone_name:
             mapping[f"{zone_name}.{alias}"] = index
+
+
+def _reference_dt_cont(fixture_path: Path) -> float:
+    """The fixture's THERMAL_DT_CONT, which relates multipliers to dTmin."""
+    return float(PinchProblem(source=fixture_path).master_zone.config.thermal.dt_cont)
 
 
 def _task_parameter(task: Any, key: str) -> float | None:

@@ -304,3 +304,9 @@ def test_update_values_does_not_keep_the_callers_objects():
 
     assert cfg._values["HPR_REFRIGERANTS"] == ["water", "ammonia"]
     assert list(cfg.hpr.refrigerants) == ["water", "ammonia"]
+
+
+def test_pinch_design_solver_defaults_to_highs():
+    # The pinch design model is linear for unsegmented streams, so the MILP
+    # solver HiGHS is the default; nonlinear models still go to Couenne.
+    assert Configuration().hens.solver_pdm == "highs"

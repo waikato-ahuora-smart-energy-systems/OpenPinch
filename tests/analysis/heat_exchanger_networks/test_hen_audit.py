@@ -209,9 +209,26 @@ def test_hen_costs_are_annualised_like_area_targeting():
 # verify() compares the solver's utility cost with a recomputation
 
 
+def _solver_available(solver_name: str) -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend(solver_name)
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 @pytest.mark.synthesis
-def test_apopt_stagewise_verify_compares_solver_utility_cost():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not _solver_available('ipopt-pyomo')", reason="needs ipopt and pyomo"
+)
+def test_stagewise_verify_compares_solver_utility_cost():
     import json
 
     from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
@@ -230,7 +247,7 @@ def test_apopt_stagewise_verify_compares_solver_utility_cost():
     model = StageWiseModel(
         name="verify-utility-cost",
         framework="TDM",
-        solver="apopt",
+        solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(
             PinchProblem(source=json.loads(fixture.read_text())), 2.0
         ),
@@ -249,43 +266,11 @@ def test_apopt_stagewise_verify_compares_solver_utility_cost():
 
     # A solver whose cost expression disagrees with its duties must fail,
     # even though post-processing recomputed hu_cost_total from the duties.
-    solved = model.hu_cost_solver_by_period[0]
-    solved.VALUE.value = [2.0 * verification._value(solved)]
+    model.hu_cost_solver_by_period[0] = 2.0 * verification._value(
+        model.hu_cost_solver_by_period[0]
+    )
 
     assert verification._check_utility_costs(model) is False
-
-
-# First-audit H10: the first stage has no cold flow-on, whatever S is
-
-
-@pytest.mark.parametrize(("stages", "cold_flow_on_stages"), [(1, []), (2, [1])])
-def test_only_stages_after_the_first_get_cold_gamma_flow_on(
-    monkeypatch, stages, cold_flow_on_stages
-):
-    from OpenPinch.analysis.heat_exchanger_networks.models._base import alpha
-
-    cold_calls: list[int] = []
-    monkeypatch.setattr(
-        alpha,
-        "_cold_gamma_flow_on",
-        lambda model, i, j, k: cold_calls.append(k) or 1.0,
-    )
-    monkeypatch.setattr(alpha, "_hot_gamma_flow_on", lambda model, i, j, k: 1.0)
-    model = SimpleNamespace(
-        I=1,
-        J=1,
-        S=stages,
-        z_allowed=[[[1] * stages]],
-        gamma_h=[[[0.0] * stages]],
-        gamma_c=[[[0.0] * stages]],
-    )
-    equations = SimpleNamespace(Equation=lambda expression: expression)
-
-    alpha._set_gamma_equations(model, equations)
-
-    # A single stage is both the last and the first: gamma_c used to take
-    # flow-on from stage k - 1 = -1, the stage itself.
-    assert cold_calls == cold_flow_on_stages
 
 
 # M7: the accepted network is the cheapest feasible one from any method
@@ -447,14 +432,26 @@ def test_isothermal_split_branches_report_mixing_outlets_and_split_fractions():
 
 
 class _Variable:
+    """A Pyomo-shaped variable."""
+
     def __init__(self):
-        self.lower, self.upper = -1e9, 1e9
-        self.VALUE = SimpleNamespace(value=None)
+        self.lb, self.ub = -1e9, 1e9
+        self.fixed = False
+        self.value = None
+
+    def is_variable_type(self) -> bool:
+        return True
+
+    def set_value(self, value, skip_validation: bool = False) -> None:
+        self.value = value
 
 
 class _ReducedModel:
     def __init__(self, **kwargs):
         stages = kwargs["stages"]
+        self.solver = kwargs["solver"]
+        # Reduction picks HiGHS or Ipopt by the reduced model's linearity.
+        self.m = SimpleNamespace(is_linear=lambda: True)
 
         def grid(*shape):
             if not shape:
@@ -478,9 +475,9 @@ class _ReducedModel:
     def optimise(self, print_output=False):
         self.mSuccess = 1
         type(self).flags_at_solve = {
-            "z": [[[f.VALUE.value for f in row] for row in hot] for hot in self.z],
-            "z_hu": [[f.VALUE.value for f in row] for row in self.z_hu],
-            "z_cu": [[f.VALUE.value for f in row] for row in self.z_cu],
+            "z": [[[f.value for f in row] for row in hot] for hot in self.z],
+            "z_hu": [[f.value for f in row] for row in self.z_hu],
+            "z_cu": [[f.value for f in row] for row in self.z_cu],
         }
 
     def verify(self):
@@ -534,6 +531,7 @@ def test_stage_reduction_sets_shared_flags_from_every_period(monkeypatch):
     case.TAC_model = case.TAC = case.solve_time = 1.0
     case.Q_h_by_period = [[[[0.0]]], [[[6.0]]]]
     case.Q_h = case.Q_h_by_period[0]
+    case.solver_run = SimpleNamespace(converged=True)
 
     InternalHeatExchangerNetworkProblem(
         solver_arrays=object(), framework="TDM", stages=3

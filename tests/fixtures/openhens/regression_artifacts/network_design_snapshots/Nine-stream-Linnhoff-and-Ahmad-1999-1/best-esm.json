@@ -6,7 +6,7 @@
   "method": "network_evolution_method",
   "expected": {
     "total_annual_cost": 2905807.275299348,
-    "best_dTmin": 18,
+    "best_dt_cont_multiplier": 1.8,
     "best_derivative_threshold": 1.7,
     "stage_count": 4,
     "recovery_unit_count": 11,

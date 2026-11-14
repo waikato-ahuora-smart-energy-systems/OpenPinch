@@ -18,7 +18,7 @@ Checks, ranks and exports synthesis designs. Feasibility checks work on service-
 - Structure signatures ignore duty and count only active matches [ranking.py:network_structure_signature].
 - Summary totals are checked only for single-period networks; stream balances are checked per period otherwise [verification.py:verify_network_feasibility].
 - Networks whose `source_metadata["solver_non_isothermal_model"]` is explicitly falsy and whose `solver_framework` is PDM or TDM (isothermal stage boundaries) skip per-exchanger duty and LMTD checks and the area-consistency check; stream-level balances and segment contribution checks still apply [verification.py:_uses_isothermal_stage_boundaries].
-- Each match is checked against its own required approach when the network records it, not only the global dTmin [verification.py:_check_minimum_approach].
+- Each match is checked against its own required approach when the network records it; a recovery match without one falls back to the network's `minimum_recovery_approach` source metadata (a duty-optimised network records it) [verification.py:_check_minimum_approach].
 - Tolerances are module constants (duty 1.0 absolute and 1e-4 relative, cost 1.0 and 1e-4, temperature 1e-3, area 1e-3 and 1e-4) [verification.py:_DUTY_ABS_TOL].
 - Export requires a live problem with a cached design, else `TypeError` or `RuntimeError` [exports.py:export_heat_exchanger_network_synthesis_results].
 - Export paths in the manifest are relative to the output directory in POSIX form [exports.py:_record].

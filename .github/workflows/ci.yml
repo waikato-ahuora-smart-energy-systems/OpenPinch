@@ -303,7 +303,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis, full]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis, highs, couenne, full]
         include:
           - os: windows-latest
             surface: core
@@ -437,12 +437,10 @@ jobs:
           read -ra paths <<< "$PATHS"
           excluded=(
             # Emscripten cannot start processes: these check import
-            # isolation in a fresh interpreter, and gekko runs the APOPT
-            # solver binary.
+            # isolation in a fresh interpreter.
             --deselect tests/analysis/heat_exchanger_networks/test_full_sequence.py::test_synthesis_imports_do_not_load_live_solver_dependencies
             --deselect tests/analysis/heat_exchanger_networks/test_pinch_design_method.py::test_models_package_import_is_optional_and_lazy
             --deselect tests/analysis/heat_exchanger_networks/test_synthesis_dependency_boundaries.py::test_import_openpinch_does_not_import_synthesis_only_packages
-            -k "not test_apopt_"
             # Emscripten cannot start threads: these start threads
             # themselves to check thread safety and parallel speed-up.
             --deselect tests/analysis/heat_exchanger_networks/test_pinch_design_method.py::test_local_executor_honours_max_parallel_for_stage_tasks

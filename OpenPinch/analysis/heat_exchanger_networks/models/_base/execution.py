@@ -6,15 +6,22 @@ import logging
 from typing import Any
 
 from ...solver import backend
+from ...solver.pyomo_model import PyomoModel
 from . import piecewise as _piecewise
 
 logger = logging.getLogger(__name__)
 
 
+def _pyomo_value(expression: Any) -> Any:
+    from pyomo.environ import value
+
+    return value(expression)
+
+
 def optimise(model, print_output: bool) -> None:
     """Solve the concrete model and extract plain result data on success.
 
-    The GEKKO run directory is removed afterwards: post-processing has read
+    The model's run directory is removed afterwards: post-processing has read
     the solved values onto the model's variables by then.
     """
 
@@ -29,12 +36,7 @@ def _solve_and_post_process(model, print_output: bool) -> None:
     piecewise_mappings = getattr(model, "_piecewise_active_mappings", [])
     active_mapping_stable = not piecewise_mappings or getattr(model, "integers", False)
     for _attempt in range(8):
-        model.solver_run = backend.solve_gekko_model(
-            model.m,
-            solver_name=model.solver,
-            disp=False,
-            debug=0,
-        )
+        model.solver_run = backend.solve_pyomo_model(model.m, solver_name=model.solver)
         total_solve_time += float(model.solver_run.solve_time or 0.0)
         if model.solver_run.failure_reason is not None:
             break
@@ -60,7 +62,7 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             solve_time=total_solve_time,
             failure_reason=(
                 f"{model.solver_run.failure_reason}; segmented-stream active "
-                "interval solve was unresolved, so use APOPT or Couenne"
+                "interval solve was unresolved, so use Couenne or HiGHS"
             ),
         )
 
@@ -72,54 +74,59 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             objective_value=model.solver_run.objective_value,
             solve_time=total_solve_time,
             failure_reason=(
-                "piecewise active segments did not stabilise; use APOPT or "
-                "Couenne for interval-disjunctive segmented-stream solving"
+                "piecewise active segments did not stabilise; use Couenne or "
+                "HiGHS for interval-disjunctive segmented-stream solving"
             ),
         )
 
+    status = model.solver_run.status
+    path = getattr(model.m, "_path", None)
+    # A caller that expects some solves to fail (trial topologies) lowers
+    # the level those failures are logged at.
+    failure_level = getattr(model, "failure_log_level", logging.ERROR)
     if model.solver_run.failure_reason is not None:
         model.mSuccess = 0
-        logger.error("[Failed] [model: %s] [path: %s]", model.name, model.m._path)
-    elif model.m.options.SOLVESTATUS == 1:
-        if model.m.options.objfcnval + model.tol < 0:
+        logger.log(failure_level, "[Failed] [model: %s] [path: %s]", model.name, path)
+    elif status == 1:
+        objective = model.solver_run.objective_value
+        if objective is None or objective + model.tol < 0:
             model.mSuccess = 0
             model.solver_run = backend.SolverRun(
                 name=model.solver_run.name,
                 extension=model.solver_run.extension,
                 status=model.solver_run.status,
-                objective_value=model.solver_run.objective_value,
+                objective_value=objective,
                 solve_time=model.solver_run.solve_time,
-                failure_reason="negative objective value",
+                failure_reason=(
+                    "solver returned no objective value"
+                    if objective is None
+                    else "negative objective value"
+                ),
             )
-            logger.error(
-                "[Failed] [model: %s] [path: %s]",
-                model.name,
-                model.m._path,
+            logger.log(
+                failure_level, "[Failed] [model: %s] [path: %s]", model.name, path
             )
         elif not model.solver_run.converged:
             # The values are kept (evolution can start from them), but the
             # objective is not a converged optimum to compare against.
-            model.mSuccess = model.m.options.SOLVESTATUS
+            model.mSuccess = status
             logger.warning(
                 "[Unconverged] [model: %s] [path: %s] [termination: %s]",
                 model.name,
-                model.m._path,
+                path,
                 model.solver_run.termination_condition,
             )
         else:
-            model.mSuccess = model.m.options.SOLVESTATUS
-            logger.info(
-                "[Success] [model: %s] [path: %s]",
-                model.name,
-                model.m._path,
-            )
+            model.mSuccess = status
+            logger.info("[Success] [model: %s] [path: %s]", model.name, path)
     else:
-        model.mSuccess = model.m.options.SOLVESTATUS
-        logger.error(
+        model.mSuccess = status
+        logger.log(
+            failure_level,
             "[Failed] [model: %s] [path: %s] [status: %s]",
             model.name,
-            model.m._path,
-            model.m.options.SOLVESTATUS,
+            path,
+            status,
         )
 
     if model.mSuccess:
@@ -129,17 +136,22 @@ def _solve_and_post_process(model, print_output: bool) -> None:
 
 
 def cleanup_model(model) -> None:
-    """Remove the model's GEKKO run directory; safe to call more than once."""
+    """Remove the model's run directory; safe to call more than once."""
 
-    backend.cleanup_gekko_model(getattr(model, "m", None))
+    backend.cleanup_model_run_directory(getattr(model, "m", None))
 
 
 def setup_model(model) -> None:
-    """Create and configure the GEKKO model behind optional guards."""
+    """Create a native Pyomo model and check its solver.
 
-    model.m = backend.create_gekko_model(remote=False)
+    The solver is checked first, so a missing binary is reported as such even
+    where Pyomo itself is not installed.
+    """
+
+    backend.require_solver_backend(model.solver)
+    model.m = PyomoModel()
     model.mSuccess: int = 0
-    model.solver_run = backend.configure_gekko_solver(
+    model.solver_run = backend.configure_pyomo_solver(
         model.m,
         model.solver,
         solver_options=model.solver_options,
@@ -150,22 +162,54 @@ def _solver_value(model, value: Any) -> float:
     try:
         return float(value[0])
     except (TypeError, IndexError, KeyError):
+        # A Pyomo variable or parameter holds its number in ``value``.
+        return float(getattr(value, "value", value))
+
+
+def _value(value) -> float:
+    """Read a number from a plain number, a ``[value]`` list, or a Pyomo component."""
+
+    if hasattr(value, "is_expression_type") and value.is_expression_type():
+        # A Pyomo expression, such as an Intermediate of a PyomoModel.
+        return float(_pyomo_value(value))
+    if isinstance(value, int | float):
         return float(value)
+    try:
+        return float(value[0])
+    except (TypeError, IndexError, KeyError):
+        pass
+    if hasattr(value, "value"):
+        return float(value.value)
+    return float(value)
 
 
-def _set_value(model, variable: Any, value: float, *, brackets: bool = False) -> None:
-    """Assign GEKKO values while preserving source bound-clamping behavior."""
+def _assign_value(variable: Any, value: Any) -> None:
+    """Write a value onto a Pyomo variable or parameter, unclamped.
 
-    if type(variable).__name__ == "GKVariable":
-        if variable.lower is not None:
-            value = max(variable.lower, value)
-        if variable.upper is not None:
-            value = min(variable.upper, value)
-        variable.VALUE.value = [value] if brackets else value
-        return
-    if type(variable).__name__ == "GKParameter":
-        variable.VALUE.value = [value] if brackets else value
-        return
+    The value may be given bracketed (``[value]``).
+    """
+
+    if isinstance(value, list | tuple):
+        (value,) = value
+    if variable.fixed:
+        variable.fix(value)
+    else:
+        variable.set_value(value, skip_validation=True)
+
+
+def _set_value(model, variable: Any, value: float) -> None:
+    """Assign Pyomo values while preserving source bound-clamping behavior."""
+
+    if getattr(variable, "is_variable_type", lambda: False)():
+        # A PyomoModel variable, or a parameter (a fixed variable).
+        if variable.fixed:
+            variable.fix(value)
+            return
+        if variable.lb is not None:
+            value = max(variable.lb, value)
+        if variable.ub is not None:
+            value = min(variable.ub, value)
+        variable.set_value(value)
 
 
 def output_to_cmd_line(model) -> None:
@@ -173,8 +217,10 @@ def output_to_cmd_line(model) -> None:
 
     if model.mSuccess != 1:
         return
-    logger.info("Successful Solve.Path %s name %s", model.m._path, model.name)
-    logger.info("Objective 0: %s", model.m.options.objfcnval)
+    logger.info(
+        "Successful Solve.Path %s name %s", getattr(model.m, "_path", None), model.name
+    )
+    logger.info("Objective 0: %s", model.solver_run.objective_value)
     logger.info("Objective 1: %s", model.TAC)
     logger.info("Total Units: %s", model.n_units)
     logger.info("Total Recovery Units: %s", model.n_recovery_units)

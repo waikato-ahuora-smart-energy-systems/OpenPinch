@@ -119,7 +119,7 @@ def test_design_options_are_validated_at_their_owner_boundary(monkeypatch) -> No
     with pytest.raises(ValueError, match="TargetInput.options"):
         heat_exchanger_network_synthesis_service(
             problem,
-            options={"HENS_APPROACH_TEMPERATURES": [99.0]},
+            options={"HENS_DT_CONT_MULTIPLIERS": [9.9]},
         )
 
     configured = problem.master_zone.config.hens.derivative_thresholds
@@ -164,7 +164,7 @@ def test_openhens_field_aliases_are_rejected_by_public_schemas() -> None:
     with pytest.raises(ValidationError):
         HeatExchangerNetworkSynthesisManifest(
             run_id="example-run",
-            approach_temperatures=(2.0,),
+            dt_cont_multipliers=(0.2,),
             derivative_thresholds=(0.5,),
             stage_selection=(2,),
             min_dT_values=(2.0,),
@@ -234,21 +234,20 @@ def test_design_utility_keeps_hot_and_cold_utilities_of_one_name_apart(
         design.utility("Steam")
 
 
-def test_enhanced_synthesis_method_is_public_quality_tier_entrypoint(
+def test_a_call_depth_runs_without_changing_the_stored_depth(
     monkeypatch,
 ) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
-    problem.update_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
-    configured_tier = problem.master_zone.config.hens.synthesis_quality_tier
+    problem.update_options({"HENS_SEARCH_DEPTH": 4})
 
-    design = problem.design.enhanced_heat_exchanger_network(quality_tier=3)
+    design = problem.design.heat_exchanger_network(depth=3)
 
     assert problem.results is not None
     assert problem.results.design == design.result
     assert design.result.manifest is not None
-    assert design.result.manifest.synthesis_quality_tier == 3
-    assert problem.master_zone.config.hens.synthesis_quality_tier == configured_tier
+    assert design.result.manifest.search_depth == 3
+    assert problem.master_zone.config.hens.search_depth == 4
 
 
 def test_problem_design_view_is_created_only_by_explicit_design() -> None:
@@ -275,7 +274,7 @@ def test_public_design_accessor_returns_ranked_networks(
             adjusted = []
             for outcome in outcomes:
                 network = outcome.network
-                if network is None or outcome.task.approach_temperature != 4.0:
+                if network is None or outcome.task.dt_cont_multiplier != 0.4:
                     adjusted.append(outcome)
                     continue
 
@@ -306,7 +305,7 @@ def test_public_design_accessor_returns_ranked_networks(
     payload = _public_example_payload()
     payload["options"] = {
         **payload["options"],
-        "HENS_APPROACH_TEMPERATURES": [2.0, 4.0],
+        "HENS_DT_CONT_MULTIPLIERS": [0.2, 0.4],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 1.0],
         "HENS_STAGE_SELECTION": [2],
     }

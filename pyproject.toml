@@ -37,7 +37,7 @@ dependencies=[
   "pydantic>=2.12,<3",
   "scipy>=1.16.1,<2",
 ]
-version = "0.8.4"
+version = "0.9.0"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -76,11 +76,22 @@ tespy = [
 ]
 synthesis = [
   "pyomo>=6.10.0",
-  "gekko>=1.3.2",
   "plotly>=6.8.0",
   "kaleido>=1.3.0",
   "openpyxl>=3.1.5",
   "wakepy>=1.0.0",
+  "pyscipopt>=5.5.0",
+  # Ipopt (with MUMPS) as platform wheels, for network evolution and duty
+  # optimisation.
+  "openpinch-solvers>=0.1.0",
+]
+# Faster solvers on top of the synthesis extra: HiGHS for pinch design, and
+# Couenne (with Ipopt) through the IDAES solver download. A stage left on its
+# default solver falls back to SCIP without them.
+highs = [
+  "highspy>=1.11.0",
+]
+couenne = [
   "idaes-pse>=2.11.0",
 ]
 notebook = [
@@ -99,10 +110,12 @@ full = [
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",
   "pyomo>=6.10.0",
-  "gekko>=1.3.2",
   "kaleido>=1.3.0",
   "wakepy>=1.0.0",
   "idaes-pse>=2.11.0",
+  "highspy>=1.11.0",
+  "pyscipopt>=5.5.0",
+  "openpinch-solvers>=0.1.0",
 ]
 
 [dependency-groups]
@@ -126,7 +139,6 @@ dev = [
     "black>=23.9",
     "streamlit",
     "pyomo>=6.10.0",
-    "gekko>=1.3.2",
     "plotly>=6.8.0",
     "kaleido>=1.3.0",
     "openpyxl>=3.1.5",
@@ -136,9 +148,12 @@ dev = [
     "pylint>=4.0.5",
     "graphviz>=0.21",
     "idaes-pse>=2.11.0",
+    "openpinch-solvers>=0.1.0",
     "coverage>=7.14.3",
     "pytest-xdist>=3.8.0",
     "pytest-cov>=7.0.0",
+    "highspy>=1.11.0",
+    "pyscipopt>=5.5.0",
 ]
 
 [tool.black]

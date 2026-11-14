@@ -1,9 +1,9 @@
-"""Tiny GEKKO-shaped NLP backend on SciPy SLSQP for no-GEKKO model tests.
+"""Tiny NLP backend on SciPy SLSQP for solver-free HEN model tests.
 
 It supports exactly what the fixed-structure HEN model uses: ``Var``,
 ``Param``, ``Equation`` (``==`` and ``>=``), ``Intermediate``, ``Minimize``
 and arithmetic with ``+ - * / **``. Solved values are written back to
-``var.value`` as one-element lists, matching GEKKO.
+``var.value`` as one-element lists.
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def _wrap(value):
 
 
 class ScipyModel:
-    """Collects a GEKKO-style model and solves it with SLSQP."""
+    """Collects a model through the ``PyomoModel`` calls and solves it with SLSQP."""
 
     def __init__(self) -> None:
         self.variables: list[Variable] = []

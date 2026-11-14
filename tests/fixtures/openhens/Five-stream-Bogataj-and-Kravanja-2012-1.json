@@ -6,18 +6,6 @@
     "COSTING_HX_AREA_EXP": 1.0,
     "COSTING_HX_UNIT_COST": 7400.0,
     "COSTING_SERVICE_LIFE": 1.0,
-    "HENS_APPROACH_TEMPERATURES": [
-      2.0,
-      4.0,
-      6.0,
-      8.0,
-      10.0,
-      12.0,
-      14.0,
-      16.0,
-      18.0,
-      20.0
-    ],
     "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
     "HENS_DERIVATIVE_THRESHOLDS": [
       0.5,
@@ -30,6 +18,18 @@
       3.2,
       3.6,
       4.0
+    ],
+    "HENS_DT_CONT_MULTIPLIERS": [
+      0.2,
+      0.4,
+      0.6,
+      0.8,
+      1.0,
+      1.2,
+      1.4,
+      1.6,
+      1.8,
+      2.0
     ],
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,

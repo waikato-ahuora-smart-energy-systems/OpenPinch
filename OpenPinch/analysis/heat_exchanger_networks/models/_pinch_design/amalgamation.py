@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .._base.execution import _assign_value
+from .._stagewise.verification import _value
 from ..stagewise import StageWiseModel
 
 if TYPE_CHECKING:
@@ -58,20 +60,20 @@ def amalgamate_networks(
             for k in range(above_case.K):
                 for n in range(amalgamated.N_periods):
                     value = (
-                        above_case.T_h_by_period[n][i][k][0]
+                        _value(above_case.T_h_by_period[n][i][k])
                         if above_case.z_i_active_period[n][i] > 0
                         else amalgamated.T_h_in_period[n][i]
                     )
-                    amalgamated.T_h_by_period[n][i][k].VALUE.value = [value]
+                    _assign_value(amalgamated.T_h_by_period[n][i][k], [value])
         for j in range(owner.J):
             for k in range(above_case.K):
                 for n in range(amalgamated.N_periods):
                     value = (
-                        above_case.T_c_by_period[n][j][k][0]
+                        _value(above_case.T_c_by_period[n][j][k])
                         if above_case.z_j_active_period[n][j] > 0
                         else amalgamated.T_c_out_period[n][j]
                     )
-                    amalgamated.T_c_by_period[n][j][k].VALUE.value = [value]
+                    _assign_value(amalgamated.T_c_by_period[n][j][k], [value])
         _copy_utility_matches(amalgamated, above_case, "hot")
         if not below_required:
             _clear_utility_matches(amalgamated, "cold")
@@ -101,26 +103,26 @@ def amalgamate_networks(
                 for n in range(amalgamated.N_periods):
                     if below_case.z_i_active_period[n][i] > 0:
                         value = (
-                            below_case.T_h_by_period[n][i][k - above_case.K + 1][0]
+                            _value(below_case.T_h_by_period[n][i][k - above_case.K + 1])
                             if above_required
-                            else round(below_case.T_h_by_period[n][i][k][0], 5)
+                            else _value(below_case.T_h_by_period[n][i][k])
                         )
                     else:
                         value = amalgamated.T_h_out_period[n][i]
-                    amalgamated.T_h_by_period[n][i][k].VALUE.value = [value]
+                    _assign_value(amalgamated.T_h_by_period[n][i][k], [value])
         for j in range(owner.J):
             for k in range(above_case.K, amalgamated.K):
                 for n in range(amalgamated.N_periods):
                     if below_case.z_j_active_period[n][j] > 0:
                         value = (
-                            below_case.T_c_by_period[n][j][k - above_case.K + 1][0]
+                            _value(below_case.T_c_by_period[n][j][k - above_case.K + 1])
                             if above_required
-                            else round(below_case.T_c_by_period[n][j][k][0], 5)
+                            else _value(below_case.T_c_by_period[n][j][k])
                         )
                     else:
                         value = amalgamated.T_c_in_period[n][j]
-                    amalgamated.T_c_by_period[n][j][k].VALUE.value = [value]
-        _copy_utility_matches(amalgamated, below_case, "cold", digits=5)
+                    _assign_value(amalgamated.T_c_by_period[n][j][k], [value])
+        _copy_utility_matches(amalgamated, below_case, "cold")
         if not above_required:
             _clear_utility_matches(amalgamated, "hot")
             amalgamated.minimisation_goal = "cold utility"
@@ -144,11 +146,11 @@ def amalgamate_networks(
                     1
                     if (
                         max(
-                            amalgamated.Q_r_by_period[n][i][j][k][0]
+                            _value(amalgamated.Q_r_by_period[n][i][j][k])
                             for n in range(amalgamated.N_periods)
                         )
                         if hasattr(amalgamated, "Q_r_by_period")
-                        else amalgamated.Q_r[i][j][k][0]
+                        else _value(amalgamated.Q_r[i][j][k])
                     )
                     > owner.tol
                     else 0
@@ -172,8 +174,6 @@ def _copy_utility_matches(
     target: StageWiseModel,
     source: "PinchDecompModel",
     side: str,
-    *,
-    digits: int | None = None,
 ) -> None:
     """Copy each (stream, utility) heater or cooler from one side's solution."""
     target_duties, target_flags = _utility_grids(target, side)
@@ -181,11 +181,10 @@ def _copy_utility_matches(
     for index, row in enumerate(target_flags):
         for u, flag in enumerate(row):
             for n in range(target.N_periods):
-                duty = source_duties[n][index][u][0]
-                target_duties[n][index][u].VALUE.value = [
-                    duty if digits is None else round(duty, digits)
-                ]
-            flag.VALUE.value = [source_flags[index][u][0]]
+                _assign_value(
+                    target_duties[n][index][u], [_value(source_duties[n][index][u])]
+                )
+            _assign_value(flag, [_value(source_flags[index][u])])
 
 
 def _clear_utility_matches(target: StageWiseModel, side: str) -> None:
@@ -194,8 +193,8 @@ def _clear_utility_matches(target: StageWiseModel, side: str) -> None:
     for index, row in enumerate(target_flags):
         for u, flag in enumerate(row):
             for n in range(target.N_periods):
-                target_duties[n][index][u].VALUE.value = [0]
-            flag.VALUE.value = [0]
+                _assign_value(target_duties[n][index][u], [0])
+            _assign_value(flag, [0])
 
 
 def _copy_recovery_match(
@@ -207,30 +206,37 @@ def _copy_recovery_match(
     source_stage: int,
     target_stage: int,
 ) -> None:
-    target.z[i][j][target_stage].VALUE.value = [source.z[i][j][source_stage][0]]
+    _assign_value(target.z[i][j][target_stage], [_value(source.z[i][j][source_stage])])
     if target.N_periods != source.N_periods:
         raise ValueError("PDM side period counts must match during amalgamation.")
     for n in range(target.N_periods):
-        target.Q_r_by_period[n][i][j][target_stage].VALUE.value = [
-            source.Q_r_by_period[n][i][j][source_stage][0]
-        ]
-        target.theta_1_by_period[n][i][j][target_stage].VALUE.value = [
-            source.theta_1_by_period[n][i][j][source_stage][0]
-        ]
-        target.theta_2_by_period[n][i][j][target_stage].VALUE.value = [
-            source.theta_2_by_period[n][i][j][source_stage][0]
-        ]
+        _assign_value(
+            target.Q_r_by_period[n][i][j][target_stage],
+            [_value(source.Q_r_by_period[n][i][j][source_stage])],
+        )
+        _assign_value(
+            target.theta_1_by_period[n][i][j][target_stage],
+            [_value(source.theta_1_by_period[n][i][j][source_stage])],
+        )
+        _assign_value(
+            target.theta_2_by_period[n][i][j][target_stage],
+            [_value(source.theta_2_by_period[n][i][j][source_stage])],
+        )
     if source.non_isothermal_model:
         for n in range(target.N_periods):
-            target.X_by_period[n][i][j][target_stage].VALUE.value = [
-                source.X_by_period[n][i][j][source_stage][0]
-            ]
-            target.Y_by_period[n][j][i][target_stage].VALUE.value = [
-                source.Y_by_period[n][j][i][source_stage][0]
-            ]
-            target.T_h_out_x_by_period[n][i][j][target_stage].VALUE.value = [
-                source.T_h_out_x_by_period[n][i][j][source_stage][0]
-            ]
-            target.T_c_out_y_by_period[n][j][i][target_stage].VALUE.value = [
-                source.T_c_out_y_by_period[n][j][i][source_stage][0]
-            ]
+            _assign_value(
+                target.X_by_period[n][i][j][target_stage],
+                [_value(source.X_by_period[n][i][j][source_stage])],
+            )
+            _assign_value(
+                target.Y_by_period[n][j][i][target_stage],
+                [_value(source.Y_by_period[n][j][i][source_stage])],
+            )
+            _assign_value(
+                target.T_h_out_x_by_period[n][i][j][target_stage],
+                [_value(source.T_h_out_x_by_period[n][i][j][source_stage])],
+            )
+            _assign_value(
+                target.T_c_out_y_by_period[n][j][i][target_stage],
+                [_value(source.T_c_out_y_by_period[n][j][i][source_stage])],
+            )

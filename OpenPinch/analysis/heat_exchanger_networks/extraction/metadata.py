@@ -89,7 +89,9 @@ def _capital_cost(solved_model: Any) -> float | None:
     return total if found else None
 
 
-def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | None]:
+def _summary_metrics(
+    solved_model: Any, dt_cont_multiplier: float | None = None
+) -> dict[str, float | int | str | bool | None]:
     fields = {
         "total_units": "n_units",
         "recovery_units": "n_recovery_units",
@@ -98,9 +100,6 @@ def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | 
         "hot_utility_load": "Q_hu_total",
         "cold_utility_load": "Q_cu_total",
         "recovery_load": "Q_r_total",
-        # Also in source_metadata, which is not serialised: a seed network
-        # sent as JSON needs it to run seeded tasks at the same approach.
-        "approach_temperature": "dTmin",
     }
     metrics: dict[str, float | int | str | bool | None] = {}
     for label, attribute in fields.items():
@@ -109,6 +108,9 @@ def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | 
             metrics[label] = _optional_int(value)
         else:
             metrics[label] = _optional_float(value)
+    # Also in source_metadata, which is not serialised: a seed network sent as
+    # JSON needs it to run seeded tasks at the same multiplier.
+    metrics["dt_cont_multiplier"] = _optional_float(dt_cont_multiplier)
     return {name: value for name, value in metrics.items() if value is not None}
 
 
@@ -225,9 +227,6 @@ def _optional_float(value: Any) -> float | None:
     except (TypeError, IndexError, KeyError):
         pass
     value_attr = getattr(value, "value", None)
-    if value_attr is not None:
-        return _optional_float(value_attr)
-    value_attr = getattr(value, "VALUE", None)
     if value_attr is not None:
         return _optional_float(value_attr)
     return None

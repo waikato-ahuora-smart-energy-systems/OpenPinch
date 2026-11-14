@@ -12,6 +12,7 @@ from typing import Any, Literal
 from ....parallelism import supported_workers
 from ...indexing import build_index_grid
 from .._base import approach as _approach
+from .._base.execution import _assign_value
 from .verification import _value
 
 logger = logging.getLogger(__name__)
@@ -500,7 +501,7 @@ def _update_with_best_model(owner, best_model) -> None:
         lambda i, j, k: best_model.z_allowed[i][j][k],
         (owner.I, owner.J, owner.S),
     )
-    owner.set_initial_values_for_variables(best_model, brackets=True)
+    owner.set_initial_values_for_variables(best_model)
 
     owner.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
     owner.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
@@ -608,14 +609,16 @@ def _build_and_solve_evolution(
         solver_options=owner.solver_options,
     )
 
+    # Start from the parent's solution, then apply the move over it.
+    child.set_initial_values_for_variables(prev_case)
     if kind == "minus":
-        child.Q_r[i][j][k].VALUE.value = 0.0
-        child.z[i][j][k].VALUE.value = 0
+        _assign_value(child.Q_r[i][j][k], 0.0)
+        _assign_value(child.z[i][j][k], 0)
         approach = _approach._recovery_approach_temperature(owner, i, j)
-        child.theta_1[i][j][k].VALUE.value = approach
-        child.theta_2[i][j][k].VALUE.value = approach
+        _assign_value(child.theta_1[i][j][k], approach)
+        _assign_value(child.theta_2[i][j][k], approach)
     else:
-        child.z[i][j][k].VALUE.value = 1
+        _assign_value(child.z[i][j][k], 1)
 
     child.optimise(print_output=print_output)
     return child
@@ -676,8 +679,8 @@ def _set_recovery_binary_value(
         pass
     except IndexError:
         pass
-    if hasattr(element, "VALUE"):
-        element.VALUE.value = int(value)
+    if hasattr(element, "VALUE") or hasattr(element, "is_variable_type"):
+        _assign_value(element, int(value))
         return
     z_values[i][j][k] = int(value)
 
@@ -707,7 +710,7 @@ def _count_allowed_matches(values) -> int:
                 if isinstance(element, int):
                     count += 1 if element == 1 else 0
                 else:
-                    count += 1 if element[0] == 1 else 0
+                    count += 1 if _value(element) == 1 else 0
     return count
 
 

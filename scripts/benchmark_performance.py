@@ -1,8 +1,11 @@
-"""Manual HEN synthesis quality-tier benchmark with robustness diagnostics.
+"""Manual HEN synthesis search-depth benchmark with robustness diagnostics.
 
 This script is intentionally non-gating. It runs the maintained OpenHENS public
-method at selected quality tiers and emits incremental JSON records that can be
-compared across changes.
+method at selected search depths and emits incremental JSON records that can be
+compared across changes. Each successful record carries acceptance metrics:
+target-meeting PDM networks, their distinct topologies and unit counts, and the
+best ranked total annual costs. ``--baseline-json`` compares them with an
+earlier run, for example one made on ``develop``.
 """
 
 from __future__ import annotations
@@ -33,8 +36,17 @@ from OpenPinch.analysis.heat_exchanger_networks.execution import (
 from OpenPinch.analysis.heat_exchanger_networks.execution import (
     settings as settings_module,
 )
+from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+    network_structure_signature,
+)
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     backend as solver_backend,
+)
+from OpenPinch.analysis.heat_exchanger_networks.solver import (
+    pinch_design_decomposition,
+)
+from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+    nominal_approach_temperature,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     open_hens_method,
@@ -47,24 +59,29 @@ from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _HENS_FIXTURE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "openhens"
+_SAMPLE_CASE_ROOT = _REPO_ROOT / "OpenPinch" / "tutorials" / "sample_cases"
 LocalSynthesisExecutor = executor_module.LocalSynthesisExecutor
 workflow_settings_from_problem = settings_module.workflow_settings_from_problem
 execute_open_hens_method = open_hens_method.execute_open_hens_method
 HENS_MAX_STREAMS = 9
 HENS_MAX_PARALLEL = 10
 DEFAULT_HENS_BENCHMARK_JSON = (
-    _REPO_ROOT / "results" / "hens_t0_t4_upto9_fixture_defaults.json"
+    _REPO_ROOT / "results" / "hens_d0_d4_upto9_fixture_defaults.json"
 )
 HENS_BENCHMARK_CASES = ()
-HENS_QUALITY_TIERS = (0, 1, 2, 3, 4)
+HENS_SEARCH_DEPTHS = (0, 1, 2, 3, 4)
 HENS_BENCHMARK_OPTIONS = {
-    "HENS_APPROACH_TEMPERATURES": [10.0],
+    "HENS_DT_CONT_MULTIPLIERS": [1.0],
     "HENS_DERIVATIVE_THRESHOLDS": [0.5],
     "HENS_STAGE_SELECTION": [3],
     "HENS_BEST_SOLUTIONS_TO_SAVE": 3,
     "HENS_MAX_PARALLEL": HENS_MAX_PARALLEL,
     "HENS_OUTPUT_FORMATS": [],
 }
+ACCEPTANCE_TOP_N = 5
+# Utility off the pinch target that still counts as meeting it: solver noise.
+TARGET_ABSOLUTE_TOLERANCE_KW = 1e-3
+TARGET_RELATIVE_TOLERANCE = 1e-6
 SOLVER_STAGE_LABELS = (
     "pdm",
     "tdm",
@@ -75,11 +92,11 @@ SOLVER_STAGE_LABELS = (
 
 
 class BenchmarkSolverCallTracer:
-    """Benchmark-local wrapper around the concrete GEKKO/Pyomo solve boundary."""
+    """Benchmark-local wrapper around the native Pyomo solve boundary."""
 
-    def __init__(self, *, case_name: str, tier: int, progress_queue=None) -> None:
+    def __init__(self, *, case_name: str, depth: int, progress_queue=None) -> None:
         self.case_name = case_name
-        self.tier = int(tier)
+        self.depth = int(depth)
         self.progress_queue = progress_queue
         self.records: list[dict[str, Any]] = []
         self._lock = threading.RLock()
@@ -89,24 +106,18 @@ class BenchmarkSolverCallTracer:
 
     @contextmanager
     def patched_backend(self):
-        original_solve = solver_backend.solve_gekko_model
+        original_pyomo_solve = solver_backend.solve_pyomo_model
 
-        def traced_solve(
-            model, *, solver_name: str, disp: bool = False, debug: int = 0
-        ):
+        def traced_pyomo_solve(model, *, solver_name: str, disp: bool = False):
             return self._trace_solve(
-                original_solve,
-                model,
-                solver_name=solver_name,
-                disp=disp,
-                debug=debug,
+                original_pyomo_solve, model, solver_name=solver_name, disp=disp
             )
 
-        solver_backend.solve_gekko_model = traced_solve
+        solver_backend.solve_pyomo_model = traced_pyomo_solve
         try:
             yield self
         finally:
-            solver_backend.solve_gekko_model = original_solve
+            solver_backend.solve_pyomo_model = original_pyomo_solve
 
     @contextmanager
     def task_context(self, record: dict[str, Any]):
@@ -125,19 +136,13 @@ class BenchmarkSolverCallTracer:
         model,
         *,
         solver_name: str,
-        disp: bool,
-        debug: int,
+        **solve_options: Any,
     ):
         start = time.perf_counter()
         solver_run = None
         error = None
         try:
-            solver_run = solve_function(
-                model,
-                solver_name=solver_name,
-                disp=disp,
-                debug=debug,
-            )
+            solver_run = solve_function(model, solver_name=solver_name, **solve_options)
             return solver_run
         except BaseException as exc:
             error = exc
@@ -168,7 +173,7 @@ class BenchmarkSolverCallTracer:
             call_index_within_task = self._task_solver_counts[task_id]
             record = {
                 "case": self.case_name,
-                "tier": self.tier,
+                "depth": self.depth,
                 "solver_call_index": self._solver_call_index,
                 "task_solver_call_index": call_index_within_task,
                 "task_id": context.get("task_id"),
@@ -189,19 +194,10 @@ class BenchmarkSolverCallTracer:
                 ),
                 "parent_task_id": context.get("parent_task_id"),
                 "parent_method": context.get("parent_method"),
-                "approach_temperature": context.get("approach_temperature"),
+                "dt_cont_multiplier": context.get("dt_cont_multiplier"),
                 "derivative_threshold": context.get("derivative_threshold"),
                 "stage_count": context.get("stage_count"),
                 "settings": context.get("settings") or {},
-                "pathway_ids": context.get("pathway_ids") or [],
-                "pathway_id": context.get("pathway_id"),
-                "tier_origins": context.get("tier_origins") or [],
-                "tier_origin": context.get("tier_origin"),
-                "pathway_kind": context.get("pathway_kind"),
-                "pdm_mode": context.get("pdm_mode"),
-                "pdm_multiplier": context.get("pdm_multiplier"),
-                "protected_pathway": context.get("protected_pathway"),
-                "exact_open_hens": context.get("exact_open_hens"),
                 "evm_n_ad_branches": context.get("evm_n_ad_branches"),
                 "evm_n_rm_branches": context.get("evm_n_rm_branches"),
                 "evm_no_improvement_patience": context.get(
@@ -233,17 +229,193 @@ def small_hens_benchmark_cases(
 HENS_BENCHMARK_CASES = small_hens_benchmark_cases()
 
 
+def resolve_hens_case(case_name: str) -> Path:
+    """Return an OpenHENS fixture, a packaged sample case, or a case file path."""
+
+    for root in (_HENS_FIXTURE_ROOT, _SAMPLE_CASE_ROOT):
+        candidate = root / case_name
+        if candidate.is_file():
+            return candidate
+    path = Path(case_name)
+    if path.is_file():
+        return path
+    raise FileNotFoundError(
+        f"{case_name} is not an OpenHENS fixture, a sample case or a file."
+    )
+
+
+def network_meets_pinch_targets(network, targets) -> bool:
+    """Return whether every period's hot and cold utility is at its target.
+
+    Utility above the target misses it; utility below it breaks the energy
+    balance. Either beyond the tolerance fails.
+    """
+
+    for target in targets:
+        for kind, utility_target in (
+            ("hot_utility", target.hot_utility_target),
+            ("cold_utility", target.cold_utility_target),
+        ):
+            duty = sum(
+                state.duty
+                for exchanger in network.exchangers
+                if exchanger.kind.value == kind
+                for state in exchanger.period_states
+                if state.period_idx == target.period_idx and state.active
+            )
+            allowance = max(
+                TARGET_ABSOLUTE_TOLERANCE_KW,
+                TARGET_RELATIVE_TOLERANCE * abs(utility_target),
+            )
+            if abs(duty - utility_target) > allowance:
+                return False
+    return True
+
+
+def _unit_count(network) -> int:
+    return sum(
+        1
+        for exchanger in network.exchangers
+        if any(state.active for state in exchanger.period_states)
+    )
+
+
+def pdm_topology_summary(entries) -> dict[str, Any]:
+    """Summarise PDM networks given as ``(network, meets_targets)`` pairs.
+
+    Topologies are distinct sets of active matches, recovery matches by stage,
+    whatever their duties, and only target-meeting networks count.
+    """
+
+    entries = list(entries)
+    unit_counts = {
+        network_structure_signature(network): _unit_count(network)
+        for network, meets_targets in entries
+        if meets_targets
+    }
+    by_unit_count = Counter(unit_counts.values())
+    return {
+        "pdm_network_count": len(entries),
+        "target_meeting_network_count": sum(1 for _, meets in entries if meets),
+        "distinct_target_meeting_topologies": len(unit_counts),
+        "topologies_by_unit_count": {
+            str(units): by_unit_count[units] for units in sorted(by_unit_count)
+        },
+        "min_units": min(by_unit_count) if by_unit_count else None,
+    }
+
+
+def acceptance_metrics(
+    problem,
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+    ranked_networks: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+    *,
+    top_n: int = ACCEPTANCE_TOP_N,
+) -> dict[str, Any]:
+    """Return the PDM topology summary and the best ranked total annual costs.
+
+    Each PDM network is checked against the pinch targets at its own dt_cont
+    multiplier. Heuristic pinch design networks get their own summary under
+    ``heuristic``, and ``combined_distinct_target_meeting_topologies`` counts
+    the target-meeting topologies of both.
+    """
+
+    config = problem.master_zone.config
+    targets_by_multiplier: dict[float, Any] = {}
+    entries: dict[HeatExchangerNetworkDesignMethod, list] = {
+        HeatExchangerNetworkDesignMethod.PinchDesign: [],
+        HeatExchangerNetworkDesignMethod.HeuristicPinchDesign: [],
+    }
+    for outcome in outcomes:
+        if (
+            outcome.task.method not in entries
+            or outcome.status != "success"
+            or outcome.network is None
+        ):
+            continue
+        multiplier = float(outcome.task.dt_cont_multiplier)
+        if multiplier not in targets_by_multiplier:
+            targets_by_multiplier[multiplier] = (
+                pinch_design_decomposition._calculate_openpinch_targets(
+                    problem,
+                    dTmin=nominal_approach_temperature(config, multiplier),
+                )
+            )
+        entries[outcome.task.method].append(
+            (
+                outcome.network,
+                network_meets_pinch_targets(
+                    outcome.network, targets_by_multiplier[multiplier]
+                ),
+            )
+        )
+    pdm = entries[HeatExchangerNetworkDesignMethod.PinchDesign]
+    heuristic = entries[HeatExchangerNetworkDesignMethod.HeuristicPinchDesign]
+    return pdm_topology_summary(pdm) | {
+        "heuristic": pdm_topology_summary(heuristic),
+        "combined_distinct_target_meeting_topologies": pdm_topology_summary(
+            pdm + heuristic
+        )["distinct_target_meeting_topologies"],
+        "top_total_annual_costs": sorted(
+            float(outcome.objective_value)
+            for outcome in ranked_networks
+            if outcome.objective_value is not None
+        )[:top_n],
+    }
+
+
+def compare_acceptance(
+    baseline: dict[str, Any], variant: dict[str, Any]
+) -> dict[str, Any]:
+    """Compare a variant run's acceptance metrics with a baseline run's."""
+
+    comparison = {"name": variant["name"], "depth": variant["depth"]}
+    if not _successful_hens_result(baseline):
+        return comparison | {"status": "baseline_not_successful"}
+    if not _successful_hens_result(variant):
+        return comparison | {"status": "variant_not_successful"}
+    if "acceptance" not in baseline:
+        return comparison | {"status": "baseline_without_acceptance_metrics"}
+    before = baseline["acceptance"]
+    after = variant["acceptance"]
+    best_delta = float(variant["total_annual_cost"]) - float(
+        baseline["total_annual_cost"]
+    )
+    return comparison | {
+        "status": "success",
+        "best_total_annual_cost_no_worse": best_delta <= 0.0,
+        "best_total_annual_cost_delta": best_delta,
+        "distinct_topologies": (
+            before["distinct_target_meeting_topologies"],
+            after["distinct_target_meeting_topologies"],
+        ),
+        "min_units": (before["min_units"], after["min_units"]),
+        "topologies_by_unit_count": (
+            before["topologies_by_unit_count"],
+            after["topologies_by_unit_count"],
+        ),
+        "top_total_annual_cost_deltas": [
+            new - old
+            for old, new in zip(
+                before["top_total_annual_costs"],
+                after["top_total_annual_costs"],
+                strict=False,
+            )
+        ],
+    }
+
+
 def _hens_case_options(
     case_input: dict[str, Any],
     *,
     options: dict[str, Any],
-    tier: int,
+    depth: int,
     run_id: str,
     use_fixture_defaults: bool,
 ) -> dict[str, Any]:
     fixture_options = copy.deepcopy(case_input.get("options", {}))
     benchmark_overrides = {
-        "HENS_SYNTHESIS_QUALITY_TIER": int(tier),
+        "HENS_SEARCH_DEPTH": int(depth),
         "HENS_RUN_ID": run_id,
     }
     if use_fixture_defaults:
@@ -350,7 +522,8 @@ class BenchmarkTraceExecutor:
                 continue
 
             outcome = task_outcomes[0]
-            outcomes.append(outcome)
+            # A pinch design task's extra networks follow as extra outcomes.
+            outcomes.extend(task_outcomes)
             self.executed_tasks.append(task)
             self._record_task(
                 _task_record(
@@ -390,28 +563,28 @@ class BenchmarkTraceExecutor:
             self.progress_queue.put(event_data)
 
 
-def time_hens_tier_case(
+def time_hens_depth_case(
     case_name: str,
     *,
-    tier: int,
+    depth: int,
     options: dict[str, Any],
     use_fixture_defaults: bool = False,
     progress_queue=None,
 ) -> dict[str, Any]:
-    fixture_path = _HENS_FIXTURE_ROOT / case_name
+    fixture_path = resolve_hens_case(case_name)
     case_input = copy.deepcopy(json.loads(fixture_path.read_text(encoding="utf-8")))
-    run_id = f"benchmark-{fixture_path.stem}-tier-{tier}"
+    run_id = f"benchmark-{fixture_path.stem}-depth-{depth}"
     case_input["options"] = _hens_case_options(
         case_input,
         options=options,
-        tier=tier,
+        depth=depth,
         run_id=run_id,
         use_fixture_defaults=use_fixture_defaults,
     )
     problem = PinchProblem(source=case_input, project_name=case_name)
     solver_tracer = BenchmarkSolverCallTracer(
         case_name=case_name,
-        tier=tier,
+        depth=depth,
         progress_queue=progress_queue,
     )
     executor = BenchmarkTraceExecutor(
@@ -434,12 +607,11 @@ def time_hens_tier_case(
         elapsed = time.perf_counter() - start
         return _failed_hens_result(
             case_name,
-            tier=tier,
+            depth=depth,
             status="failed",
             total_seconds=elapsed,
             error=f"{type(exc).__name__}: {exc}",
             diagnostics=_benchmark_diagnostics(
-                tier=tier,
                 trace_executor=executor,
                 solver_call_records=solver_tracer.records,
                 selected_task_id=None,
@@ -451,16 +623,15 @@ def time_hens_tier_case(
     manifest = design.manifest
     ranked = tuple(design.ranked_networks)
     diagnostics = _benchmark_diagnostics(
-        tier=tier,
         trace_executor=executor,
         solver_call_records=solver_tracer.records,
         selected_task_id=design.task_id,
     )
     return {
         "name": case_name,
-        "benchmark": "hens_quality_tier",
-        "variant": f"tier_{tier}",
-        "tier": int(tier),
+        "benchmark": "hens_search_depth",
+        "variant": f"depth_{depth}",
+        "depth": int(depth),
         "status": "success",
         "verification": {
             "verified": True,
@@ -486,24 +657,25 @@ def time_hens_tier_case(
         "hot_utility_duty": network.total_duty(kind="hot_utility"),
         "cold_utility_duty": network.total_duty(kind="cold_utility"),
         "task_id": design.task_id,
+        "acceptance": acceptance_metrics(problem, workflow_result.outcomes, ranked),
         "selected_settings": _manifest_settings(manifest),
         "fallback_usage": _fallback_usage(network.summary_metrics),
         "diagnostics": diagnostics,
     }
 
 
-def time_hens_tier_case_with_timeout(
+def time_hens_depth_case_with_timeout(
     case_name: str,
     *,
-    tier: int,
+    depth: int,
     options: dict[str, Any],
     timeout_seconds: float | None,
     use_fixture_defaults: bool = False,
 ) -> dict[str, Any]:
     if timeout_seconds is None:
-        return time_hens_tier_case(
+        return time_hens_depth_case(
             case_name,
-            tier=tier,
+            depth=depth,
             options=options,
             use_fixture_defaults=use_fixture_defaults,
         )
@@ -513,8 +685,8 @@ def time_hens_tier_case_with_timeout(
     partial_trace = _empty_partial_trace()
     start = time.perf_counter()
     process = ctx.Process(
-        target=_time_hens_tier_case_worker,
-        args=(queue, case_name, tier, options, use_fixture_defaults),
+        target=_time_hens_depth_case_worker,
+        args=(queue, case_name, depth, options, use_fixture_defaults),
     )
     process.start()
     result = _wait_for_worker_result(
@@ -529,7 +701,7 @@ def time_hens_tier_case_with_timeout(
             return result["result_data"]
         return _failed_hens_result(
             case_name,
-            tier=tier,
+            depth=depth,
             status=result["status"],
             total_seconds=elapsed,
             error=result["error"],
@@ -539,45 +711,47 @@ def time_hens_tier_case_with_timeout(
         _terminate_worker(process)
         return _failed_hens_result(
             case_name,
-            tier=tier,
+            depth=depth,
             status="timeout",
             total_seconds=elapsed,
             error=f"exceeded {timeout_seconds:g} seconds",
-            diagnostics=_timeout_diagnostics(tier=tier, partial_trace=partial_trace),
+            diagnostics=_timeout_diagnostics(partial_trace=partial_trace),
         )
     return _failed_hens_result(
         case_name,
-        tier=tier,
+        depth=depth,
         status="failed",
         total_seconds=elapsed,
         error=f"worker exited with code {process.exitcode}",
-        diagnostics=_timeout_diagnostics(tier=tier, partial_trace=partial_trace),
+        diagnostics=_timeout_diagnostics(partial_trace=partial_trace),
     )
 
 
-def summarize_hens_tier_comparisons(
+def summarize_hens_depth_comparisons(
     results: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     grouped: dict[str, dict[int, dict[str, Any]]] = {}
     for result in results:
-        if result.get("benchmark") != "hens_quality_tier":
+        if result.get("benchmark") != "hens_search_depth":
             continue
-        grouped.setdefault(str(result["name"]), {})[int(result["tier"])] = result
+        grouped.setdefault(str(result["name"]), {})[int(result["depth"])] = result
 
     comparisons = []
-    for case_name, tier_results in sorted(grouped.items()):
-        baseline = tier_results.get(1)
-        for tier in sorted(tier_results):
-            if tier == 1:
+    for case_name, depth_results in sorted(grouped.items()):
+        baseline = depth_results.get(2)
+        for depth in sorted(depth_results):
+            if depth == 2:
                 continue
-            comparisons.append(_summarize_tier(case_name, baseline, tier_results[tier]))
+            comparisons.append(
+                _summarize_depth(case_name, baseline, depth_results[depth])
+            )
     return comparisons
 
 
-def _time_hens_tier_case_worker(
+def _time_hens_depth_case_worker(
     queue,
     case_name: str,
-    tier: int,
+    depth: int,
     options: dict[str, Any],
     use_fixture_defaults: bool,
 ) -> None:
@@ -586,9 +760,9 @@ def _time_hens_tier_case_worker(
     except OSError:
         pass
     try:
-        result_data = time_hens_tier_case(
+        result_data = time_hens_depth_case(
             case_name,
-            tier=tier,
+            depth=depth,
             options=options,
             use_fixture_defaults=use_fixture_defaults,
             progress_queue=queue,
@@ -685,7 +859,7 @@ def _terminate_worker(process) -> None:
 def _failed_hens_result(
     case_name: str,
     *,
-    tier: int,
+    depth: int,
     status: str,
     total_seconds: float,
     error: str,
@@ -693,9 +867,9 @@ def _failed_hens_result(
 ) -> dict[str, Any]:
     result_data = {
         "name": case_name,
-        "benchmark": "hens_quality_tier",
-        "variant": f"tier_{tier}",
-        "tier": int(tier),
+        "benchmark": "hens_search_depth",
+        "variant": f"depth_{depth}",
+        "depth": int(depth),
         "status": status,
         "total_seconds": total_seconds,
         "error": error,
@@ -707,13 +881,11 @@ def _failed_hens_result(
 
 def _benchmark_diagnostics(
     *,
-    tier: int,
     trace_executor: BenchmarkTraceExecutor,
     solver_call_records: list[dict[str, Any]] | None = None,
     selected_task_id: str | None,
 ) -> dict[str, Any]:
     return _diagnostics_from_records(
-        tier=tier,
         task_records=trace_executor.task_records,
         stage_records=trace_executor.stage_records,
         solver_call_records=list(solver_call_records or []),
@@ -724,7 +896,6 @@ def _benchmark_diagnostics(
 
 def _diagnostics_from_records(
     *,
-    tier: int,
     task_records: list[dict[str, Any]],
     stage_records: list[dict[str, Any]],
     solver_call_records: list[dict[str, Any]],
@@ -744,7 +915,6 @@ def _diagnostics_from_records(
             task_records,
             in_progress_tasks=in_progress_tasks,
         ),
-        "containment": _containment_statistics(tier, task_records),
         "slowest_tasks": _slowest_tasks(task_records, limit=10),
         "in_progress_tasks": in_progress_tasks,
         "solver_calls": solver_call_records,
@@ -759,12 +929,10 @@ def _diagnostics_from_records(
 
 def _timeout_diagnostics(
     *,
-    tier: int = -1,
     partial_trace: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     partial_trace = partial_trace or _empty_partial_trace()
     diagnostics = _diagnostics_from_records(
-        tier=tier,
         task_records=list(partial_trace["task_records"]),
         stage_records=list(partial_trace["stage_records"]),
         solver_call_records=list(partial_trace["solver_call_records"]),
@@ -787,7 +955,6 @@ def _task_start_record(
     stage_index: int,
     max_parallel: int,
 ) -> dict[str, Any]:
-    pathway = _pathway_summary(task)
     return {
         "task_id": task.task_id,
         "method": str(task.method),
@@ -795,23 +962,16 @@ def _task_start_record(
         "stage_index": stage_index,
         "parent_task_id": task.parent_task_id,
         "parent_method": _parent_method(task, parent_outcomes),
-        "approach_temperature": task.approach_temperature,
+        "dt_cont_multiplier": task.dt_cont_multiplier,
         "derivative_threshold": task.derivative_threshold,
         "stage_count": task.stage_count,
         "settings": dict(task.settings),
         "max_parallel": int(max_parallel),
-        "pathway_ids": pathway["pathway_ids"],
-        "pathway_id": pathway["pathway_id"],
-        "tier_origins": pathway["tier_origins"],
-        "tier_origin": pathway["tier_origin"],
-        "pathway_kind": pathway["pathway_kind"],
-        "pdm_mode": pathway["pdm_mode"],
-        "pdm_multiplier": pathway["pdm_multiplier"],
-        "protected_pathway": pathway["protected_pathway"],
-        "exact_open_hens": pathway["exact_open_hens"],
-        "evm_n_ad_branches": pathway["evm_n_ad_branches"],
-        "evm_n_rm_branches": pathway["evm_n_rm_branches"],
-        "evm_no_improvement_patience": pathway["evm_no_improvement_patience"],
+        "evm_n_ad_branches": task.settings.get("evolution_n_ad_branches"),
+        "evm_n_rm_branches": task.settings.get("evolution_n_rm_branches"),
+        "evm_no_improvement_patience": task.settings.get(
+            "evolution_no_improvement_patience"
+        ),
         "status": "running",
     }
 
@@ -827,7 +987,6 @@ def _task_record(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome | None,
     exception: BaseException | None,
 ) -> dict[str, Any]:
-    pathway = _pathway_summary(task)
     status = "failed"
     solver_status = None
     objective_value = None
@@ -849,23 +1008,16 @@ def _task_record(
         "stage_index": stage_index,
         "parent_task_id": task.parent_task_id,
         "parent_method": _parent_method(task, parent_outcomes),
-        "approach_temperature": task.approach_temperature,
+        "dt_cont_multiplier": task.dt_cont_multiplier,
         "derivative_threshold": task.derivative_threshold,
         "stage_count": task.stage_count,
         "settings": dict(task.settings),
         "max_parallel": int(max_parallel),
-        "pathway_ids": pathway["pathway_ids"],
-        "pathway_id": pathway["pathway_id"],
-        "tier_origins": pathway["tier_origins"],
-        "tier_origin": pathway["tier_origin"],
-        "pathway_kind": pathway["pathway_kind"],
-        "pdm_mode": pathway["pdm_mode"],
-        "pdm_multiplier": pathway["pdm_multiplier"],
-        "protected_pathway": pathway["protected_pathway"],
-        "exact_open_hens": pathway["exact_open_hens"],
-        "evm_n_ad_branches": pathway["evm_n_ad_branches"],
-        "evm_n_rm_branches": pathway["evm_n_rm_branches"],
-        "evm_no_improvement_patience": pathway["evm_no_improvement_patience"],
+        "evm_n_ad_branches": task.settings.get("evolution_n_ad_branches"),
+        "evm_n_rm_branches": task.settings.get("evolution_n_rm_branches"),
+        "evm_no_improvement_patience": task.settings.get(
+            "evolution_no_improvement_patience"
+        ),
         "duration_seconds": duration,
         "status": status,
         "solver_status": solver_status,
@@ -876,66 +1028,6 @@ def _task_record(
     }
 
 
-def _pathway_summary(task: HeatExchangerNetworkSynthesisTask) -> dict[str, Any]:
-    raw_pathways = task.metadata.get("pathways", ())
-    pathways = [item for item in raw_pathways if isinstance(item, dict)]
-    first = pathways[0] if pathways else {}
-    pathway_ids = [
-        str(item.get("pathway_id"))
-        for item in pathways
-        if item.get("pathway_id") is not None
-    ]
-    tier_origins = sorted(
-        {
-            int(item["tier_origin"])
-            for item in pathways
-            if item.get("tier_origin") is not None
-        }
-    )
-    return {
-        "pathway_ids": pathway_ids,
-        "pathway_id": pathway_ids[0] if pathway_ids else None,
-        "tier_origins": tier_origins,
-        "tier_origin": (
-            int(first["tier_origin"]) if first.get("tier_origin") is not None else None
-        ),
-        "pathway_kind": first.get("pathway_kind"),
-        "pdm_mode": task.settings.get("pdm_mode") or first.get("pdm_mode"),
-        "pdm_multiplier": first.get("pdm_multiplier"),
-        "protected_pathway": any(bool(item.get("protected")) for item in pathways),
-        "exact_open_hens": any(bool(item.get("exact_open_hens")) for item in pathways),
-        "evm_n_ad_branches": _setting_or_pathway(
-            task,
-            "evolution_n_ad_branches",
-            first,
-            "evm_n_ad_branches",
-        ),
-        "evm_n_rm_branches": _setting_or_pathway(
-            task,
-            "evolution_n_rm_branches",
-            first,
-            "evm_n_rm_branches",
-        ),
-        "evm_no_improvement_patience": _setting_or_pathway(
-            task,
-            "evolution_no_improvement_patience",
-            first,
-            "evm_no_improvement_patience",
-        ),
-    }
-
-
-def _setting_or_pathway(
-    task: HeatExchangerNetworkSynthesisTask,
-    setting_key: str,
-    pathway: dict[str, Any],
-    pathway_key: str,
-):
-    if setting_key in task.settings:
-        return task.settings[setting_key]
-    return pathway.get(pathway_key)
-
-
 def _stage_label(
     tasks: Sequence[HeatExchangerNetworkSynthesisTask],
     parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
@@ -943,6 +1035,8 @@ def _stage_label(
     method = str(tasks[0].method)
     if method == "pinch_design_method":
         return "pdm"
+    if method == "heuristic_pinch_design_method":
+        return "heuristic_pdm"
     if method == "thermal_derivative_method":
         return "tdm"
     if method != "network_evolution_method":
@@ -953,7 +1047,11 @@ def _stage_label(
         for task in tasks
         if task.parent_task_id is not None
     }
-    if parent_methods == {"pinch_design_method"}:
+    # Heuristic pinch design networks seed evolution alongside PDM ones.
+    if parent_methods and parent_methods <= {
+        "pinch_design_method",
+        "heuristic_pinch_design_method",
+    }:
         return "direct_evm_from_pdm"
     if parent_methods == {"thermal_derivative_method"}:
         return "evm_from_tdm"
@@ -1009,10 +1107,7 @@ def _task_count_statistics(task_records: list[dict[str, Any]]) -> dict[str, Any]
     return {
         "planned_by_method": _count_by(task_records, "method"),
         "planned_by_stage": _count_by(task_records, "stage_label"),
-        "planned_by_pathway": _count_by_pathway(task_records),
-        "planned_by_tier_origin": _count_by_tier_origin(task_records),
-        "planned_by_pdm_mode": _count_by(task_records, "pdm_mode"),
-        "planned_by_multiplier": _count_by(task_records, "pdm_multiplier"),
+        "planned_by_multiplier": _count_by(task_records, "dt_cont_multiplier"),
         "planned_by_evm_setting": _count_by_evm_setting(task_records),
         "success_by_method": _count_by(
             [record for record in task_records if record["status"] == "success"],
@@ -1061,64 +1156,13 @@ def _robustness_statistics(
             record["failure_category"] for record in failures
         ),
         "failure_by_method": _count_by(failures, "method"),
-        "failure_by_pathway": _count_by_pathway(failures),
         "status_by_method": _nested_status_count(task_records, "method"),
-        "status_by_pathway": _nested_status_count_by_pathway(task_records),
         "evm_child_branch_failures_observed": None,
         "evm_child_branch_failure_note": (
             "Child branch failures are isolated inside EVM and are not surfaced "
             "as task outcomes by the production solver path."
         ),
         "in_progress_tasks": in_progress_tasks,
-    }
-
-
-def _containment_statistics(
-    tier: int,
-    task_records: list[dict[str, Any]],
-) -> dict[str, Any]:
-    evm_success = [
-        record
-        for record in task_records
-        if record["method"] == "network_evolution_method"
-        and record["status"] == "success"
-        and record["objective_value"] is not None
-    ]
-    protected_tier1 = [
-        record for record in evm_success if "tier1-open-hens" in record["pathway_ids"]
-    ]
-    protected_tier0 = [
-        record
-        for record in evm_success
-        if any(pathway_id.startswith("tier0-") for pathway_id in record["pathway_ids"])
-    ]
-    current_expanded = [
-        record
-        for record in evm_success
-        if not record["protected_pathway"]
-        and any(
-            pathway_id.startswith(f"tier{tier}-")
-            for pathway_id in record["pathway_ids"]
-        )
-    ]
-    protected_tier1_best = _best_objective(protected_tier1)
-    current_expanded_best = _best_objective(current_expanded)
-    return {
-        "protected_tier0_best_tac": _best_objective(protected_tier0),
-        "protected_tier1_best_tac": protected_tier1_best,
-        "expanded_current_tier_best_tac": current_expanded_best,
-        "expanded_current_tier_beats_protected_tier1": (
-            None
-            if protected_tier1_best is None or current_expanded_best is None
-            else current_expanded_best < protected_tier1_best
-        ),
-        "successful_evm_pathway_count": len(
-            {
-                pathway_id
-                for record in evm_success
-                for pathway_id in record["pathway_ids"]
-            }
-        ),
     }
 
 
@@ -1131,7 +1175,6 @@ def _slowest_tasks(
         "task_id",
         "method",
         "stage_label",
-        "pathway_ids",
         "parent_task_id",
         "duration_seconds",
         "status",
@@ -1168,7 +1211,6 @@ def _slowest_solver_calls(
         "solver_status",
         "objective_value",
         "failure_reason",
-        "pathway_ids",
     )
     return [
         {field: record.get(field) for field in fields}
@@ -1209,39 +1251,8 @@ def _failure_category(
     return "failed"
 
 
-def _best_objective(records: list[dict[str, Any]]) -> float | None:
-    values = [
-        float(record["objective_value"])
-        for record in records
-        if record["objective_value"] is not None
-    ]
-    return min(values) if values else None
-
-
 def _count_by(records: list[dict[str, Any]], field: str) -> dict[str, int]:
     return _counter_dict(_normalise_key(record.get(field)) for record in records)
-
-
-def _count_by_pathway(records: list[dict[str, Any]]) -> dict[str, int]:
-    counter: Counter[str] = Counter()
-    for record in records:
-        pathway_ids = record.get("pathway_ids") or ()
-        if not pathway_ids:
-            counter["untagged"] += 1
-            continue
-        counter.update(str(pathway_id) for pathway_id in pathway_ids)
-    return dict(sorted(counter.items()))
-
-
-def _count_by_tier_origin(records: list[dict[str, Any]]) -> dict[str, int]:
-    counter: Counter[str] = Counter()
-    for record in records:
-        tier_origins = record.get("tier_origins") or ()
-        if not tier_origins:
-            counter["untagged"] += 1
-            continue
-        counter.update(str(tier_origin) for tier_origin in tier_origins)
-    return dict(sorted(counter.items()))
 
 
 def _count_by_evm_setting(records: list[dict[str, Any]]) -> dict[str, int]:
@@ -1265,19 +1276,6 @@ def _nested_status_count(
     nested: defaultdict[str, Counter[str]] = defaultdict(Counter)
     for record in records:
         nested[_normalise_key(record.get(field))][str(record["status"])] += 1
-    return {
-        key: dict(sorted(counter.items())) for key, counter in sorted(nested.items())
-    }
-
-
-def _nested_status_count_by_pathway(
-    records: list[dict[str, Any]],
-) -> dict[str, dict[str, int]]:
-    nested: defaultdict[str, Counter[str]] = defaultdict(Counter)
-    for record in records:
-        pathway_ids = record.get("pathway_ids") or ("untagged",)
-        for pathway_id in pathway_ids:
-            nested[str(pathway_id)][str(record["status"])] += 1
     return {
         key: dict(sorted(counter.items())) for key, counter in sorted(nested.items())
     }
@@ -1351,18 +1349,14 @@ def _manifest_settings(manifest) -> dict[str, Any] | None:
     if manifest is None:
         return None
     return {
-        "synthesis_quality_tier": manifest.synthesis_quality_tier,
+        "search_width": manifest.search_width,
+        "search_depth": manifest.search_depth,
         "pdm_stage_pair_limit": manifest.pdm_stage_pair_limit,
         "tdm_parent_limit": manifest.tdm_parent_limit,
         "stage_packing": manifest.stage_packing,
         "derivative_thresholds": list(manifest.derivative_thresholds),
         "evm_n_ad_branches": manifest.evm_n_ad_branches,
         "evm_n_rm_branches": manifest.evm_n_rm_branches,
-        "selected_pathway_id": manifest.selected_pathway_id,
-        "selected_pathway_kind": manifest.selected_pathway_kind,
-        "selected_pdm_mode": manifest.selected_pdm_mode,
-        "selected_tier_origin": manifest.selected_tier_origin,
-        "selected_protected_pathway": manifest.selected_protected_pathway,
         "task_count_by_method": dict(manifest.task_count_by_method),
     }
 
@@ -1376,17 +1370,17 @@ def _fallback_usage(summary_metrics: dict[str, Any]) -> dict[str, bool]:
     }
 
 
-def _summarize_tier(
+def _summarize_depth(
     case_name: str,
     baseline: dict[str, Any] | None,
     result: dict[str, Any],
 ) -> dict[str, Any]:
     summary = {
         "name": case_name,
-        "benchmark": "hens_quality_tier_comparison",
-        "baseline_variant": "tier_1",
+        "benchmark": "hens_search_depth_comparison",
+        "baseline_variant": "depth_2",
         "variant": result["variant"],
-        "tier": result["tier"],
+        "depth": result["depth"],
     }
     if baseline is None:
         return summary | {
@@ -1425,13 +1419,7 @@ def _summarize_tier(
         "variant_total_annual_cost": variant_tac,
         "total_annual_cost_delta": tac_delta,
         "total_annual_cost_delta_percent": tac_delta_percent,
-        "no_worse_than_tier_1": variant_tac <= baseline_tac,
-        "selected_pathway_id": (result.get("selected_settings") or {}).get(
-            "selected_pathway_id"
-        ),
-        "selected_protected_pathway": (result.get("selected_settings") or {}).get(
-            "selected_protected_pathway"
-        ),
+        "no_worse_than_depth_2": variant_tac <= baseline_tac,
     }
 
 
@@ -1444,7 +1432,7 @@ def _successful_hens_result(result: dict[str, Any]) -> bool:
 
 
 def _results_data(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [*results, *summarize_hens_tier_comparisons(results)]
+    return [*results, *summarize_hens_depth_comparisons(results)]
 
 
 def _write_incremental_results(path: Path, results: list[dict[str, Any]]) -> None:
@@ -1457,7 +1445,7 @@ def _write_incremental_results(path: Path, results: list[dict[str, Any]]) -> Non
 
 def _format_result_row(result: dict[str, Any]) -> str:
     name = str(result["name"]).replace(".json", "")
-    tier = result["tier"]
+    depth = result["depth"]
     status = result.get("status", "success")
     seconds = float(result.get("total_seconds", 0.0))
     diagnostics = result.get("diagnostics") or {}
@@ -1478,7 +1466,7 @@ def _format_result_row(result: dict[str, Any]) -> str:
     if status != "success":
         error = result.get("error", "")
         return (
-            f"{name:48s} tier {tier}: {status:8s} total={seconds:8.2f}s "
+            f"{name:48s} depth {depth}: {status:8s} total={seconds:8.2f}s "
             f"pdm={_stage_total(stage_seconds, ('pdm',)):7.2f}s "
             f"tdm={_stage_total(stage_seconds, ('tdm',)):7.2f}s "
             f"evm_direct={evm_direct_seconds:7.2f}s "
@@ -1488,9 +1476,8 @@ def _format_result_row(result: dict[str, Any]) -> str:
             f"evmD={int(evm_direct_calls)},evmT={int(evm_from_tdm_calls)}] "
             f"slowest={slowest_solver} category={failure_category} error={error}"
         )
-    settings = result.get("selected_settings") or {}
     return (
-        f"{name:48s} tier {tier}: success  total={seconds:8.2f}s "
+        f"{name:48s} depth {depth}: success  total={seconds:8.2f}s "
         f"pdm={_stage_total(stage_seconds, ('pdm',)):7.2f}s "
         f"tdm={_stage_total(stage_seconds, ('tdm',)):7.2f}s "
         f"evm_direct={evm_direct_seconds:7.2f}s "
@@ -1499,32 +1486,28 @@ def _format_result_row(result: dict[str, Any]) -> str:
         f"tdm={int(_stage_total(call_counts, ('tdm',)))},"
         f"evmD={int(evm_direct_calls)},evmT={int(evm_from_tdm_calls)}] "
         f"slowest={slowest_solver} "
-        f"TAC={float(result['total_annual_cost']):12.2f} "
-        f"selected={settings.get('selected_pathway_id') or 'untagged'}"
+        f"TAC={float(result['total_annual_cost']):12.2f}"
     )
 
 
 def _format_comparison_row(comparison: dict[str, Any]) -> str:
     name = str(comparison["name"]).replace(".json", "")
-    tier = comparison["tier"]
+    depth = comparison["depth"]
     status = comparison.get("status", "success")
     if status != "success":
         return (
-            f"{name:48s} tier {tier} vs tier 1: {status} "
+            f"{name:48s} depth {depth} vs depth 2: {status} "
             f"baseline={comparison.get('baseline_status', 'n/a')} "
             f"variant={comparison.get('variant_status', 'n/a')}"
         )
     speedup = comparison.get("speedup")
     delta = float(comparison.get("total_annual_cost_delta") or 0.0)
     percent = comparison.get("total_annual_cost_delta_percent")
-    route = "protected" if comparison.get("selected_protected_pathway") else "expanded"
     return (
-        f"{name:48s} tier {tier} vs tier 1: "
+        f"{name:48s} depth {depth} vs depth 2: "
         f"speedup={_format_ratio(speedup)} "
         f"TAC_delta={delta:+12.2f} ({_format_percent(percent)}) "
-        f"no_worse={comparison.get('no_worse_than_tier_1')} "
-        f"winner={route} "
-        f"selected={comparison.get('selected_pathway_id') or 'untagged'}"
+        f"no_worse={comparison.get('no_worse_than_depth_2')}"
     )
 
 
@@ -1572,7 +1555,7 @@ def main() -> None:
         "--use-fixture-defaults",
         action="store_true",
         help=(
-            "Use each OpenHENS fixture's native HENS options; only tier, run id, "
+            "Use each OpenHENS fixture's native HENS options; only depth, run id, "
             "max parallelism, and output formats are overridden."
         ),
     )
@@ -1581,16 +1564,27 @@ def main() -> None:
         action="store_true",
         help="Include reordered duplicate OpenHENS fixture variants.",
     )
-    parser.add_argument("--tier", type=int, action="append", dest="tiers")
+    parser.add_argument("--depth", type=int, action="append", dest="depths")
+    parser.add_argument(
+        "--baseline-json",
+        type=Path,
+        help=(
+            "Results JSON from an earlier run (for example on develop) to compare "
+            "acceptance metrics with, case by case and depth by depth."
+        ),
+    )
     parser.add_argument(
         "--hens-case",
         action="append",
         dest="hens_cases",
-        help="OpenHENS fixture filename to benchmark. May be passed multiple times.",
+        help=(
+            "OpenHENS fixture or packaged sample case filename, or a case file "
+            "path, to benchmark. May be passed multiple times."
+        ),
     )
     args = parser.parse_args()
 
-    tiers = tuple(args.tiers or HENS_QUALITY_TIERS)
+    depths = tuple(args.depths or HENS_SEARCH_DEPTHS)
     cases = tuple(
         args.hens_cases
         or small_hens_benchmark_cases(
@@ -1608,10 +1602,10 @@ def main() -> None:
     )
     results: list[dict[str, Any]] = []
     for case_name in cases:
-        for tier in tiers:
-            result = time_hens_tier_case_with_timeout(
+        for depth in depths:
+            result = time_hens_depth_case_with_timeout(
                 case_name,
-                tier=tier,
+                depth=depth,
                 options=options,
                 timeout_seconds=args.hens_timeout_seconds,
                 use_fixture_defaults=bool(args.use_fixture_defaults),
@@ -1621,11 +1615,25 @@ def main() -> None:
                 _write_incremental_results(args.json, results)
             print(_format_result_row(result), flush=True)
 
-    comparisons = summarize_hens_tier_comparisons(results)
+    comparisons = summarize_hens_depth_comparisons(results)
     if comparisons:
-        print("\nTier comparison vs tier 1", flush=True)
+        print("\nDepth comparison vs depth 2", flush=True)
         for comparison in comparisons:
             print(_format_comparison_row(comparison), flush=True)
+
+    if args.baseline_json is not None:
+        baseline = {
+            (record["name"], record["depth"]): record
+            for record in json.loads(args.baseline_json.read_text(encoding="utf-8"))
+            if record.get("benchmark") == "hens_search_depth"
+        }
+        print(f"\nAcceptance vs {args.baseline_json}", flush=True)
+        for result in results:
+            match = baseline.get((result["name"], result["depth"]))
+            if match is None:
+                print(f"{result['name']} depth {result['depth']}: no baseline record")
+                continue
+            print(json.dumps(compare_acceptance(match, result)), flush=True)
 
     if args.json is None:
         print(json.dumps(_results_data(results), indent=2))

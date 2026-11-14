@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from .._base import costing as _costing
+from .._base.execution import _value
 
 
 def verify(owner) -> tuple[bool, list[str]]:
@@ -68,12 +69,12 @@ def _check_temperatures(
     for i in range(case.I):
         for j in range(case.J):
             for k in range(case.S):
-                if case.Q_r[i][j][k][0] <= q_tol:
+                if _value(case.Q_r[i][j][k]) <= q_tol:
                     continue
                 if case.non_isothermal_model:
-                    t_h_in = case.T_h[i][k][0]
-                    t_c_out_y = case.T_c_out_y[j][i][k][0]
-                    theta_1 = case.theta_1[i][j][k][0]
+                    t_h_in = _value(case.T_h[i][k])
+                    t_c_out_y = _value(case.T_c_out_y[j][i][k])
+                    theta_1 = _value(case.theta_1[i][j][k])
                     if (
                         not math.isclose(
                             t_h_in,
@@ -85,9 +86,9 @@ def _check_temperatures(
                     ):
                         issues = True
 
-                    t_h_out = case.T_h_out_x[i][j][k][0]
-                    t_c_in = case.T_c[j][k + 1][0]
-                    theta_2 = case.theta_2[i][j][k][0]
+                    t_h_out = _value(case.T_h_out_x[i][j][k])
+                    t_c_in = _value(case.T_c[j][k + 1])
+                    theta_2 = _value(case.theta_2[i][j][k])
                     if (
                         not math.isclose(
                             t_h_out,
@@ -99,9 +100,9 @@ def _check_temperatures(
                     ):
                         issues = True
                 else:
-                    if case.T_h[i][k][0] < case.T_c[j][k][0]:
+                    if _value(case.T_h[i][k]) < _value(case.T_c[j][k]):
                         issues = True
-                    if case.T_h[i][k + 1][0] < case.T_c[j][k + 1][0]:
+                    if _value(case.T_h[i][k + 1]) < _value(case.T_c[j][k + 1]):
                         issues = True
     return not issues
 
@@ -263,23 +264,23 @@ def _check_area_costs(
             if not allowed_hots:
                 continue
 
-            total_duty = sum(case.Q_r[i][j][k][0] for i in allowed_hots)
+            total_duty = sum(_value(case.Q_r[i][j][k]) for i in allowed_hots)
             if abs(total_duty) <= q_tol:
                 continue
 
             post_area_chen = (
                 sum(
                     (
-                        case.Q_r[hot_idx][j][k][0]
+                        _value(case.Q_r[hot_idx][j][k])
                         / (
                             case.U_r[hot_idx][j]
                             * (
                                 (
-                                    case.theta_1[hot_idx][j][k][0]
-                                    * case.theta_2[hot_idx][j][k][0]
+                                    _value(case.theta_1[hot_idx][j][k])
+                                    * _value(case.theta_2[hot_idx][j][k])
                                     * (
-                                        case.theta_1[hot_idx][j][k][0]
-                                        + case.theta_2[hot_idx][j][k][0]
+                                        _value(case.theta_1[hot_idx][j][k])
+                                        + _value(case.theta_2[hot_idx][j][k])
                                     )
                                     / 2
                                     + 1e-3
@@ -401,28 +402,3 @@ def _check_shared_area_costs(
 
 def _chen_mean(delta_1: float, delta_2: float) -> float:
     return (delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3) ** (1 / 3)
-
-
-def _value(value) -> float:
-    if isinstance(value, int | float):
-        return float(value)
-    try:
-        return float(value[0])
-    except (TypeError, IndexError, KeyError):
-        pass
-    for attr in ("VALUE", "value"):
-        if not hasattr(value, attr):
-            continue
-        raw = getattr(value, attr)
-        try:
-            return float(raw[0])
-        except (TypeError, IndexError, KeyError):
-            pass
-        raw_value = getattr(raw, "value", raw)
-        if isinstance(raw_value, int | float):
-            return float(raw_value)
-        try:
-            return float(raw_value[0])
-        except (TypeError, IndexError, KeyError):
-            return float(raw_value)
-    return float(value)

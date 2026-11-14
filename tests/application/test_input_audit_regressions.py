@@ -396,12 +396,13 @@ def test_absent_utility_price_uses_default_price_without_warning():
 @pytest.mark.parametrize(
     "dt_cont, expected",
     [
-        (5.0, 10.0),  # the THERMAL_DT_CONT default gives exactly dTmin / 2
-        (2.0, 4.0),  # other contributions keep their ratio to the default
-        (0.0, 10.0),  # an unset contribution falls back to dTmin / 2
+        # dTmin 20 against THERMAL_DT_CONT 5 is a dt_cont multiplier of 2.
+        (5.0, 10.0),
+        (2.0, 4.0),
+        (0.0, 0.2),  # a zero contribution becomes 0.1 K times the multiplier
     ],
 )
-def test_hen_dtmin_tier_scales_every_stream_contribution(dt_cont, expected):
+def test_hen_multiplier_scales_every_stream_contribution(dt_cont, expected):
     from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
         _temperature_contribution,
     )

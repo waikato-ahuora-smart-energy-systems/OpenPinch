@@ -7,7 +7,6 @@ import math
 import subprocess
 import sys
 import threading
-import warnings
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
@@ -25,11 +24,9 @@ from OpenPinch.analysis.heat_exchanger_networks.execution import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
     LocalSynthesisExecutor,
-    _branch_breadth,
     _build_and_solve_root_task,
     _failed_task_outcome,
     _optional_int,
-    _pathway_evolution_options,
     _pdm_stage_selection,
     _process_pool,
     _solve_built_task,
@@ -81,7 +78,7 @@ from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     arrays as arrays_module,
 )
-from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+from OpenPinch.analysis.heat_exchanger_networks.solver import backend, pyomo_model
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     pinch_design_decomposition as pdm_decomposition,
 )
@@ -118,7 +115,6 @@ FOUR_STREAM_JSON = (
     REPO_ROOT / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
 )
 SYNTHESIS_ONLY_MODULES = [
-    "gekko",
     "pyomo",
     "pyomo.environ",
     "pyomo.opt",
@@ -141,6 +137,7 @@ def test_pinch_decomposition_setup_preserves_solver_construction_order() -> None
         "set_match_restrictions",
         "set_stage_wise_superstructure",
         "set_obj",
+        "_solve_nonlinear_models_with_couenne",
     )
     for method_name in ordered_steps:
         if method_name == "set_match_restrictions":
@@ -169,6 +166,7 @@ def test_pinch_decomposition_setup_preserves_solver_construction_order() -> None
         ("set_match_restrictions", ["allowed"]),
         "set_stage_wise_superstructure",
         "set_obj",
+        "_solve_nonlinear_models_with_couenne",
     ]
 
 
@@ -200,22 +198,6 @@ if loaded:
     assert result.returncode == 0, result.stderr or result.stdout
 
 
-def test_create_gekko_model_reports_missing_optional_dependency(monkeypatch) -> None:
-    def missing_dependency(*_args, **_kwargs):
-        raise MissingSynthesisDependencyError(
-            "gekko is required for GEKKO heat exchanger network equation model construction. "
-            'Install "openpinch[synthesis]".'
-        )
-
-    monkeypatch.setattr(backend, "require_synthesis_dependency", missing_dependency)
-
-    with pytest.raises(
-        MissingSynthesisDependencyError,
-        match=r"gekko.*GEKKO heat exchanger network equation model construction.*openpinch\[synthesis\]",
-    ):
-        backend.create_gekko_model()
-
-
 def test_pyomo_solver_configuration_reports_missing_binary_before_factory_import(
     monkeypatch,
 ) -> None:
@@ -237,6 +219,25 @@ def test_pyomo_solver_configuration_reports_missing_binary_before_factory_import
 def test_solver_backend_rejects_unsupported_solver_name() -> None:
     with pytest.raises(MissingSynthesisSolverError, match="Unsupported.*not-real"):
         backend.require_solver_backend("not-real")
+
+
+# Building a model needs Pyomo and its solver's package, which the Pyodide
+# lane does not install. A string condition is evaluated when the test runs.
+def _highs_available() -> bool:
+    try:
+        backend.require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.parametrize("solver_name", ["apopt", "ipopt-GEKKO"])
+def test_solver_backend_rejects_removed_gekko_solver_names(solver_name) -> None:
+    with pytest.raises(
+        MissingSynthesisSolverError,
+        match=rf"Unsupported.*{solver_name}.*couenne, highs, ipopt-pyomo, mindtpy, scip\.$",
+    ):
+        backend.require_solver_backend(solver_name)
 
 
 def test_default_process_pool_uses_interpreter_start_method(monkeypatch) -> None:
@@ -287,94 +288,6 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
     assert "main guard" in caplog.text
 
 
-def test_gekko_solver_configuration_preserves_source_defaults(monkeypatch) -> None:
-    calls = []
-
-    def present_dependency(import_name: str, **_kwargs):
-        calls.append(import_name)
-        return object()
-
-    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
-    model = _FakeGekkoModel()
-
-    run = backend.configure_gekko_solver(model, "apopt")
-
-    assert run.name == "apopt"
-    assert run.extension == 0
-    assert model.options.SOLVER == "apopt"
-    assert model.options.SOLVER_EXTENSION == 0
-    assert model.options.MAX_ITER == 1000
-    assert model.options.RTOL == 1e-2
-    assert model.options.OTOL == 1e-2
-    assert calls == ["gekko"]
-
-
-def test_gekko_solver_configuration_merges_ipopt_and_apopt_options(monkeypatch):
-    monkeypatch.setattr(
-        backend,
-        "require_synthesis_dependency",
-        lambda *_args, **_kwargs: object(),
-    )
-
-    ipopt_model = _FakeGekkoModel()
-    ipopt_run = backend.configure_gekko_solver(
-        ipopt_model,
-        "ipopt-GEKKO",
-        solver_options=["max_iter 20", "# ignored", "mu_strategy adaptive"],
-    )
-
-    assert ipopt_run.extension == 0
-    assert ipopt_run.solver_options["max_iter"] == "20"
-    assert ipopt_run.solver_options["mu_strategy"] == "adaptive"
-    assert "tol 1e-3" in ipopt_model.solver_options
-    assert "max_iter 20" in ipopt_model.solver_options
-    assert "mu_strategy adaptive" in ipopt_model.solver_options
-
-    apopt_model = _FakeGekkoModel()
-    apopt_run = backend.configure_gekko_solver(
-        apopt_model,
-        "apopt",
-        solver_options={
-            "minlp_maximum_iterations": 4,
-            "skip_none": None,
-            "use_warm_start": True,
-        },
-    )
-
-    assert apopt_run.solver_options == {
-        "minlp_maximum_iterations": 4,
-        "use_warm_start": True,
-    }
-    assert "use_warm_start yes" in apopt_model.solver_options
-
-
-def test_gekko_solve_suppresses_known_numpy_array_copy_warning_only() -> None:
-    class WarningGekkoModel(_FakeGekkoModel):
-        def solve(self, *, disp: bool = False, debug: int = 0) -> None:
-            warnings.warn_explicit(
-                "__array__ implementation doesn't accept a copy keyword, so "
-                "passing copy=False failed. __array__ must implement 'dtype' "
-                "and 'copy' keyword arguments.",
-                DeprecationWarning,
-                filename="/site-packages/gekko/gk_write_files.py",
-                lineno=159,
-                module="gekko.gk_write_files",
-            )
-            warnings.warn("unrelated solver warning", RuntimeWarning, stacklevel=2)
-            super().solve(disp=disp, debug=debug)
-
-    model = WarningGekkoModel()
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        run = backend.solve_gekko_model(model, solver_name="apopt")
-
-    assert run.failure_reason is None
-    assert [(warning.category, str(warning.message)) for warning in caught] == [
-        (RuntimeWarning, "unrelated solver warning")
-    ]
-
-
 def test_user_couenne_options_are_written_to_model_run_directory(
     monkeypatch,
     tmp_path: Path,
@@ -395,9 +308,9 @@ def test_user_couenne_options_are_written_to_model_run_directory(
 
     monkeypatch.setattr(backend, "require_solver_binary", present_binary)
     monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
-    model = _FakeGekkoModel(tmp_path / "gekko-run")
+    model = _FakePyomoModel(tmp_path / "run")
 
-    run = backend.configure_gekko_solver(
+    run = backend.configure_pyomo_solver(
         model,
         "couenne",
         solver_options={
@@ -407,17 +320,19 @@ def test_user_couenne_options_are_written_to_model_run_directory(
         },
     )
 
-    option_file = tmp_path / "gekko-run" / "couenne.opt"
+    option_file = tmp_path / "run" / "couenne.opt"
     couenne_options = option_file.read_text(encoding="utf-8")
 
     assert run.option_file == str(option_file)
     assert run.solver_options == {
+        "feasibility_bt": "no",
+        "aggressive_fbbt": "no",
+        "optimality_bt": "no",
         "node_limit": 50,
         "delete_redundant": "no",
         "time_limit": 120,
     }
-    assert model.options.SOLVER == "couenne"
-    assert model.options.SOLVER_EXTENSION == "pyomo"
+    assert run.extension == "pyomo"
     assert "node_limit 50" in couenne_options
     assert "node_limit 2000" not in couenne_options
     assert "feas_tolerance" not in couenne_options
@@ -427,15 +342,16 @@ def test_user_couenne_options_are_written_to_model_run_directory(
     assert "time_limit 120" in couenne_options
 
     original_cwd = Path.cwd()
-    solve_run = backend.solve_gekko_model(model, solver_name="couenne")
+    solve_cwds = _patch_recording_pyomo_solve(monkeypatch)
+    solve_run = backend.solve_pyomo_model(model, solver_name="couenne")
 
     assert Path.cwd() == original_cwd
-    assert model.cwd_during_solve == option_file.parent
+    assert solve_cwds == [option_file.parent]
     assert solve_run.option_file == str(option_file)
     assert solve_run.failure_reason is None
 
 
-def test_couenne_without_user_options_matches_source_no_option_file(
+def test_couenne_without_user_options_writes_its_bound_tightening_defaults(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -455,24 +371,33 @@ def test_couenne_without_user_options_matches_source_no_option_file(
 
     monkeypatch.setattr(backend, "require_solver_binary", present_binary)
     monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
-    model = _FakeGekkoModel(tmp_path / "gekko-run")
+    model = _FakePyomoModel(tmp_path / "run")
 
-    run = backend.configure_gekko_solver(model, "couenne")
+    run = backend.configure_pyomo_solver(model, "couenne")
 
-    assert run.option_file is None
-    assert run.solver_options is None
-    assert not (tmp_path / "gekko-run" / "couenne.opt").exists()
+    # Couenne's feasibility-based bound tightening prunes feasible networks
+    # from small stage-wise models, so it is off unless the user turns it on.
+    option_file = tmp_path / "run" / "couenne.opt"
+    assert run.option_file == str(option_file)
+    assert run.solver_options == {
+        "feasibility_bt": "no",
+        "aggressive_fbbt": "no",
+        "optimality_bt": "no",
+    }
+    assert option_file.read_text(encoding="utf-8") == (
+        "feasibility_bt no\naggressive_fbbt no\noptimality_bt no\n"
+    )
 
     original_cwd = Path.cwd()
-    solve_run = backend.solve_gekko_model(model, solver_name="couenne")
+    solve_cwds = _patch_recording_pyomo_solve(monkeypatch)
+    solve_run = backend.solve_pyomo_model(model, solver_name="couenne")
 
     assert Path.cwd() == original_cwd
-    assert model.cwd_during_solve == original_cwd
-    assert solve_run.option_file is None
-    assert solve_run.solver_options is None
+    assert solve_cwds == [option_file.parent]
+    assert solve_run.option_file == str(option_file)
 
 
-def test_ipopt_pyomo_option_file_uses_keyword_factory_availability(
+def test_ipopt_pyomo_options_use_keyword_factory_availability(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -494,18 +419,18 @@ def test_ipopt_pyomo_option_file_uses_keyword_factory_availability(
 
     monkeypatch.setattr(backend, "require_solver_binary", present_binary)
     monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
-    model = _FakeGekkoModel(tmp_path / "gekko-run")
+    model = _FakePyomoModel(tmp_path / "run")
 
-    run = backend.configure_gekko_solver(
+    run = backend.configure_pyomo_solver(
         model,
         "ipopt-pyomo",
         solver_options=["tol 1e-6"],
     )
 
-    option_file = tmp_path / "gekko-run" / "ipopt.opt"
-    assert run.option_file == str(option_file)
-    assert run.solver_options == {"tol": "1e-6"}
-    assert option_file.read_text(encoding="utf-8") == "tol 1e-6\n"
+    # Ipopt takes its options on the command line, so no option file.
+    assert run.option_file is None
+    assert run.solver_options == {**backend.DEFAULT_IPOPT_PYOMO_OPTIONS, "tol": "1e-6"}
+    assert not (tmp_path / "run").exists()
     assert availability_calls == [False]
 
 
@@ -534,7 +459,7 @@ def test_pyomo_factory_signature_type_error_propagates_without_retry(
     monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
 
     with pytest.raises(TypeError, match="keyword form unsupported"):
-        backend.configure_gekko_solver(_FakeGekkoModel(), "ipopt-pyomo")
+        backend.configure_pyomo_solver(_FakePyomoModel(), "ipopt-pyomo")
 
     assert availability_calls == [((), {"exception_flag": False})]
 
@@ -560,38 +485,35 @@ def test_pyomo_solver_configuration_reports_unavailable_factory(monkeypatch) -> 
     monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
 
     with pytest.raises(MissingSynthesisSolverError, match="not available"):
-        backend.configure_gekko_solver(_FakeGekkoModel(), "ipopt-pyomo")
+        backend.configure_pyomo_solver(_FakePyomoModel(), "ipopt-pyomo")
 
 
-def test_solver_backend_solve_reports_exceptions_and_non_success_status():
-    class FailingModel(_FakeGekkoModel):
-        def solve(self, *, disp: bool = False, debug: int = 0) -> None:
-            del disp, debug
-            self.options.SOLVESTATUS = None
-            self.options.objfcnval = "not-a-number"
-            raise RuntimeError("solver exploded")
+def test_solver_backend_solve_reports_exceptions_and_non_success_status(
+    monkeypatch,
+) -> None:
+    def failing_solve(_model, tee=False):
+        del tee
+        raise RuntimeError("solver exploded")
 
-    failed_run = backend.solve_gekko_model(FailingModel(), solver_name="apopt")
+    _patch_pyomo_solve(monkeypatch, failing_solve)
+    failed_run = backend.solve_pyomo_model(_FakePyomoModel(), solver_name="highs")
 
     assert failed_run.failure_reason == "solver exploded"
+    assert failed_run.status == 0
     assert failed_run.objective_value is None
 
-    class StatusOnlyFailureModel(_FakeGekkoModel):
-        def solve(self, *, disp: bool = False, debug: int = 0) -> None:
-            del disp, debug
-            self.options.SOLVESTATUS = 2
-            self.options.objfcnval = 9.5
-
-    status_run = backend.solve_gekko_model(
-        StatusOnlyFailureModel(),
-        solver_name="apopt",
+    _patch_pyomo_solve(
+        monkeypatch,
+        lambda _model, tee=False: _solver_results("error", "unknown"),
     )
+    status_run = backend.solve_pyomo_model(_FakePyomoModel(), solver_name="highs")
 
-    assert status_run.failure_reason == "solver status 2"
-    assert status_run.objective_value == 9.5
+    assert status_run.failure_reason == "Solver exited with status: error"
+    assert status_run.status == 0
+    assert status_run.objective_value is None
 
 
-def test_solver_backend_low_level_option_helpers_cover_edge_cases(monkeypatch):
+def test_solver_backend_low_level_option_helpers_cover_edge_cases():
     assert backend._as_float_or_none(None) is None
     assert backend._as_float_or_none("bad") is None
     assert backend._normalise_solver_options(["", "# comment", "tol 1e-6"]) == {
@@ -603,19 +525,10 @@ def test_solver_backend_low_level_option_helpers_cover_edge_cases(monkeypatch):
 
     with pytest.raises(RuntimeError, match="does not expose a run path"):
         backend._write_solver_option_file(
-            _FakeGekkoModel(),
+            _FakePyomoModel(),
             "missing.opt",
             {"tol": "1e-6"},
         )
-
-    monkeypatch.setattr(backend, "require_solver_backend", lambda _solver_name: None)
-    model = _FakeGekkoModel()
-    model.options.SOLVER_EXTENSION = "legacy"
-
-    run = backend.configure_gekko_solver(model, "custom")
-
-    assert run.extension == "legacy"
-    assert model.options.SOLVER == "custom"
 
 
 def test_internal_problem_runs_stage_reduction_before_evolution(monkeypatch) -> None:
@@ -972,6 +885,7 @@ def test_solver_array_optional_value_helper_accepts_supported_shapes() -> None:
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
     arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
     incomplete_arrays = {
@@ -993,7 +907,7 @@ def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
         StageWiseModel(
             name="solver-arrays-without-state",
             framework="ESM",
-            solver="apopt",
+            solver="highs",
             solver_arrays=bad_arrays,
             stages=1,
             dTmin=14.0,
@@ -1017,6 +931,7 @@ def test_solver_arrays_reject_zero_total_period_weight() -> None:
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() -> None:
     arrays = problem_to_solver_arrays(
         _two_state_problem(
@@ -1032,7 +947,7 @@ def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() ->
     model = StageWiseModel(
         name="two-state-cost",
         framework="ESM",
-        solver="apopt",
+        solver="highs",
         solver_arrays=arrays,
         stages=1,
         dTmin=14.0,
@@ -1056,12 +971,13 @@ def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() ->
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
     pdm_problem = InternalHeatExchangerNetworkProblem(
         solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
         name="pdm",
         framework="PDM",
-        solver="apopt",
+        solver="highs",
         dTmin=14.0,
         pinch_decompositions=_pdm_decompositions(_four_stream_problem(), dTmin=14.0),
     )
@@ -1091,7 +1007,7 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
 ) -> None:
     problem = _four_stream_problem(
         options={
-            "HENS_APPROACH_TEMPERATURES": [14.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.4],
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_STAGE_SELECTION": [3],
             "HENS_RUN_ID": "hens-07-parent-test",
@@ -1168,7 +1084,7 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
 def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> None:
     problem = _four_stream_problem(
         options={
-            "HENS_APPROACH_TEMPERATURES": [14.0, 16.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.4, 1.6],
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_STAGE_SELECTION": [3],
             "HENS_RUN_ID": "hens-parallel-test",
@@ -1441,7 +1357,7 @@ def test_solve_built_task_model_args_failures_and_verification_paths() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-helper",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
 
     class FailedInternalProblem:
@@ -1508,7 +1424,7 @@ def test_solve_built_task_marks_a_solve_that_did_not_converge() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-unconverged",
         method="thermal_derivative_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         stage_count=2,
         derivative_threshold=0.5,
     )
@@ -1538,7 +1454,7 @@ def test_solve_built_task_success_exception_and_root_build_failure(monkeypatch) 
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-success",
         method="pinch_design_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
     )
 
     class SuccessfulInternalProblem:
@@ -1597,7 +1513,7 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     problem = _four_stream_problem(
         options={
             "HENS_STAGE_SELECTION": [1, 2, 3],
-            "HENS_SYNTHESIS_QUALITY_TIER": 3,
+            "HENS_SEARCH_DEPTH": 3,
         }
     )
     settings = workflow_settings_from_problem(problem)
@@ -1608,20 +1524,6 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     with pytest.raises(WorkflowContractError, match="solver_options"):
         _solver_options_for_task(problem, task)
 
-    assert _branch_breadth(4, tier=1) == 4
-    assert (
-        _pathway_evolution_options(
-            HeatExchangerNetworkSynthesisTask(
-                run_id="no-pathway",
-                method="network_evolution_method",
-                approach_temperature=14.0,
-                derivative_threshold=0.5,
-                stage_count=2,
-                metadata={},
-            )
-        )
-        == {}
-    )
     assert _optional_int(None) is None
     assert _optional_int("7") == 7
     assert _pdm_stage_selection(problem) == "automated"
@@ -1658,7 +1560,7 @@ def test_executor_stage_packing_scope_and_factory_helpers() -> None:
     tdm_task = HeatExchangerNetworkSynthesisTask(
         run_id="tdm-stage-packed",
         method="thermal_derivative_method",
-        approach_temperature=14.0,
+        dt_cont_multiplier=1.4,
         derivative_threshold=0.5,
         stage_count=2,
     )
@@ -1698,6 +1600,33 @@ def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) ->
         solver="couenne",
         dTmin=14.0,
         pinch_decompositions=decompositions,
+    )
+
+    with pytest.raises(MissingSynthesisSolverError, match="couenne.*synthesis solves"):
+        problem.load_model()
+
+
+def test_missing_pdm_solver_binary_is_reported_before_pyomo_is_needed(
+    monkeypatch,
+) -> None:
+    # Without the solver binary, the missing binary is the error to report,
+    # even where Pyomo itself is not installed (the Pyodide lane, for example).
+    def missing_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        raise MissingSynthesisSolverError(
+            f"The {binary_name!r} solver executable is required for {purpose}."
+        )
+
+    def missing_pyomo() -> None:
+        raise MissingSynthesisDependencyError("pyomo is not installed.")
+
+    monkeypatch.setattr(backend, "require_solver_binary", missing_binary)
+    monkeypatch.setattr(pyomo_model, "_pyomo", missing_pyomo)
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
+        framework="PDM",
+        solver="couenne",
+        dTmin=14.0,
+        pinch_decompositions=_pdm_decompositions(_four_stream_problem(), dTmin=14.0),
     )
 
     with pytest.raises(MissingSynthesisSolverError, match="couenne.*synthesis solves"):
@@ -2008,7 +1937,7 @@ def _moved_pdm_models(stage_selection="automated"):
     above = PinchDecompModel(
         name="moved-above",
         framework="PDM",
-        solver="apopt",
+        solver="highs",
         solver_arrays=arrays,
         dTmin=14.0,
         z_restriction=None,
@@ -2024,7 +1953,7 @@ def _moved_pdm_models(stage_selection="automated"):
     below = PinchDecompModel(
         name="moved-below",
         framework="PDM",
-        solver="apopt",
+        solver="highs",
         solver_arrays=arrays,
         dTmin=14.0,
         z_restriction=None,
@@ -2110,6 +2039,8 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.alpha = [[[[1.0], [1.0]]]]
     model.get_alpha_values = lambda: [[[[1.0], [1.0]]]]
     model.m = SimpleNamespace(options=SimpleNamespace(objfcnval=123.45))
+    # The PDM reads its objective from the solve record.
+    model.solver_run = backend.SolverRun(name="fake", objective_value=123.45)
     return model
 
 
@@ -2235,11 +2166,19 @@ class _AlgebraModel:
 
 
 class _ValueCell:
-    def __init__(self, value: float) -> None:
-        self.VALUE = SimpleNamespace(value=[value])
+    """A solved model variable, shaped like a Pyomo variable."""
 
-    def __getitem__(self, index: int) -> float:
-        return self.VALUE.value[index]
+    fixed = False
+
+    def __init__(self, value: float) -> None:
+        self.value = value
+
+    def is_variable_type(self) -> bool:
+        return True
+
+    def set_value(self, value: float, skip_validation: bool = False) -> None:
+        del skip_validation
+        self.value = value
 
 
 def _pdm_amalgamation_driver(
@@ -2249,7 +2188,7 @@ def _pdm_amalgamation_driver(
 ) -> PinchDecompModel:
     driver = PinchDecompModel.__new__(PinchDecompModel)
     driver.framework = "PDM"
-    driver.solver = "apopt"
+    driver.solver = "highs"
     driver.solver_arrays = problem_to_solver_arrays(
         _two_state_problem() if multiperiod else _four_stream_problem(),
         14.0,
@@ -2400,29 +2339,54 @@ def _value_cell_grid(
     ]
 
 
-class _FakeOptions:
-    SOLVER_EXTENSION = None
-    SOLVER = None
-    MAX_ITER = None
-    RTOL = None
-    OTOL = None
-    SOLVESTATUS = None
-    objfcnval = None
+class _FakePyomoModel:
+    """The attributes the solver backend reads from a ``PyomoModel``."""
 
-
-class _FakeGekkoModel:
     def __init__(self, path: Path | None = None) -> None:
-        self.options = _FakeOptions()
-        self.solver_options = []
-        self.cwd_during_solve = None
-        if path is not None:
-            self._path = str(path)
+        self._path = None if path is None else str(path)
+        self.model = object()
+        self.objective = 1.0
 
-    def solve(self, *, disp: bool = False, debug: int = 0) -> None:
-        del disp, debug
-        self.cwd_during_solve = Path.cwd()
-        self.options.SOLVESTATUS = 1
-        self.options.objfcnval = 1.0
+
+def _solver_results(status: str, termination_condition: str):
+    return SimpleNamespace(
+        solver=SimpleNamespace(
+            status=status, termination_condition=termination_condition
+        )
+    )
+
+
+class _FakeSolver:
+    def __init__(self, solve) -> None:
+        self.options = {}
+        self._solve = solve
+
+    def solve(self, model, tee=False, **_kwargs):
+        return self._solve(model, tee=tee)
+
+
+def _patch_pyomo_solve(monkeypatch, solve) -> None:
+    pyomo = SimpleNamespace(
+        SolverFactory=lambda _name: _FakeSolver(solve),
+        value=lambda expression, exception=True: expression,
+    )
+    monkeypatch.setattr(
+        backend, "require_synthesis_dependency", lambda *_args, **_kwargs: pyomo
+    )
+
+
+def _patch_recording_pyomo_solve(monkeypatch) -> list[Path]:
+    """Patch a solve that succeeds and records its working directory."""
+
+    cwds: list[Path] = []
+
+    def solve(_model, tee=False):
+        del tee
+        cwds.append(Path.cwd())
+        return _solver_results("ok", "optimal")
+
+    _patch_pyomo_solve(monkeypatch, solve)
+    return cwds
 
 
 class _ParentCase:
@@ -2797,7 +2761,6 @@ def test_extraction_operating_state_metadata_and_optional_float_edges() -> None:
     assert extraction_metadata._optional_float(object()) is None
     assert extraction_metadata._optional_float({}) is None
     assert extraction_metadata._optional_float(SimpleNamespace(value=["4.5"])) == 4.5
-    assert extraction_metadata._optional_float(SimpleNamespace(VALUE=["6.5"])) == 6.5
 
 
 def test_pdm_target_and_decomposition_validators_reject_bad_inputs() -> None:
@@ -2996,16 +2959,26 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
             dTmin=14.0,
         )
 
+    # dTmin 14 against THERMAL_DT_CONT 5 is a multiplier of 1.4; a missing or
+    # zero contribution becomes 0.1 K times it.
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
         dTmin=14.0,
-    ) == {"value": 7.0, "unit": "delta_degC"}
+        reference_dt_cont=5.0,
+    ) == {"value": pytest.approx(0.14), "unit": "delta_degC"}
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(
             effective_delta_t_contribution=Value([0.0, 1.0, 9.0], "delta_degC")
         ),
         dTmin=14.0,
-    ) == {"values": [7.0, 1.0, 9.0], "unit": "delta_degC"}
+        reference_dt_cont=5.0,
+    ) == {"values": pytest.approx([0.14, 1.4, 12.6]), "unit": "delta_degC"}
+    assert pdm_decomposition._stream_dt_cont_with_fallback(
+        SimpleNamespace(),
+        dTmin=14.0,
+        reference_dt_cont=5.0,
+        locked=True,
+    ) == {"value": pytest.approx(0.1), "unit": "delta_degC"}
 
     assert (
         pdm_decomposition._shifted_pinch_temperature(
@@ -3273,12 +3246,84 @@ def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
     model.Q_c_by_period = [[[3.0]]]
     model.Q_r_by_period = [[[[4.0]]]]
     model.z = [[[1.0]]]
+    # Min units counts heater and cooler binaries too, linked to their duty.
+    model.z_hu = [[1.0]]
+    model.z_cu = [[1.0]]
+    model.tol = 1e-3
     model.period_weights = [1.0]
     model.period_weight_sum = 1.0
 
     model.set_obj()
 
-    assert model.m.actions[-1][0] == expected_action
+    assert [action for action, _expression in model.m.actions] == [expected_action]
+
+
+def _pdm_objective_model_with_a_utility_choice(goal: str) -> PinchDecompModel:
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.m = _AlgebraModel()
+    model.minimisation_goal = goal
+    model.N_periods = 1
+    model.I = 1
+    model.J = 1
+    model.S = 1
+    model.NHU = 2
+    model.NCU = 1
+    model.Q_h_by_period = [[[2.0, 7.0]]]
+    model.Q_c_by_period = [[[3.0]]]
+    model.Q_r_by_period = [[[[4.0]]]]
+    model.Qtot_sh_period = [[20.0]]
+    model.z = [[[1.0]]]
+    model.z_hu = [[1.0, 1.0]]
+    model.z_cu = [[1.0]]
+    model.tol = 1e-3
+    model.hu_cost_period = [[10.0, 1.0]]
+    model.cu_cost_period = [[5.0]]
+    model.HU_target_by_period = [9.0]
+    model.CU_target_by_period = [3.0]
+    model.period_weights = [1.0]
+    model.period_weight_sum = 1.0
+    model.utility_cost_cap = None
+    return model
+
+
+# Utility cost: 10 * 2 + 1 * 7 for the heaters and 5 * 3 for the cooler.
+_CHOICE_UTILITY_COST = 42.0
+
+
+@pytest.mark.parametrize("goal", ["hot utility", "cold utility", "total utility"])
+def test_pinch_decomp_utility_goals_with_a_utility_choice_minimise_utility_cost(
+    goal: str,
+) -> None:
+    # The targets already fix the utility duty, so utility cost alone is the
+    # objective.
+    model = _pdm_objective_model_with_a_utility_choice(goal)
+
+    model.set_obj()
+
+    assert model.m.actions == [("minimize", pytest.approx(_CHOICE_UTILITY_COST))]
+
+
+@pytest.mark.parametrize(
+    "goal, goal_term",
+    [
+        # Unrecovered hot-stream heat, 20 - 4: minimising it maximises
+        # recovery and keeps the objective non-negative.
+        ("heat recovery", 16.0),
+        # One match, two heaters and one cooler.
+        ("min units", 4.0),
+    ],
+)
+def test_pinch_decomp_other_goals_with_a_utility_choice_combine_one_objective(
+    goal: str,
+    goal_term: float,
+) -> None:
+    model = _pdm_objective_model_with_a_utility_choice(goal)
+
+    model.set_obj()
+
+    assert model.m.actions == [
+        ("minimize", pytest.approx(_CHOICE_UTILITY_COST + goal_term))
+    ]
 
 
 @pytest.mark.parametrize(
@@ -3325,10 +3370,10 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
 
     _copy_recovery_match(copier, target, source, 0, 0, 0, 0)
 
-    assert target.z[0][0][0][0] == 1.0
-    assert target.Q_r_by_period[0][0][0][0][0] == 12.0
-    assert target.theta_1_by_period[0][0][0][0][0] == 30.0
-    assert target.theta_2_by_period[0][0][0][0][0] == 20.0
+    assert target.z[0][0][0].value == 1.0
+    assert target.Q_r_by_period[0][0][0][0].value == 12.0
+    assert target.theta_1_by_period[0][0][0][0].value == 30.0
+    assert target.theta_2_by_period[0][0][0][0].value == 20.0
 
     non_iso_source = SimpleNamespace(
         N_periods=1,
@@ -3356,14 +3401,15 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
 
     _copy_recovery_match(copier, non_iso_target, non_iso_source, 0, 0, 0, 0)
 
-    assert non_iso_target.Q_r_by_period[0][0][0][0][0] == 10.0
-    assert non_iso_target.X_by_period[0][0][0][0][0] == 1.0
-    assert non_iso_target.Y_by_period[0][0][0][0][0] == 0.0
-    assert non_iso_target.T_h_out_x_by_period[0][0][0][0][0] == 470.0
-    assert non_iso_target.T_c_out_y_by_period[0][0][0][0][0] == 330.0
+    assert non_iso_target.Q_r_by_period[0][0][0][0].value == 10.0
+    assert non_iso_target.X_by_period[0][0][0][0].value == 1.0
+    assert non_iso_target.Y_by_period[0][0][0][0].value == 0.0
+    assert non_iso_target.T_h_out_x_by_period[0][0][0][0].value == 470.0
+    assert non_iso_target.T_c_out_y_by_period[0][0][0][0].value == 330.0
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> None:
     driver = _pdm_amalgamation_driver()
 
@@ -3395,6 +3441,31 @@ def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> 
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
+def test_below_only_pdm_amalgamation_keeps_solved_values_at_full_precision() -> None:
+    # Issue #332: a boiling segment of 41.84 kW over 0.01 K holds about
+    # 4184 kW/K, so rounding the stage temperature 342.24531825 K to five
+    # decimals moved its heat coordinate by 7.3 W and failed the segment
+    # area check, which allows 1 W. Amalgamation must copy values as solved.
+    driver = _pdm_amalgamation_driver()
+    below = _pdm_side_result(cold_utility_target=1.0)
+    stage_temperature = 342.2453182513
+    cooler_duty = 16.5637583012345
+    below.T_c_by_period[0][0][1].value = stage_temperature
+    below.T_h_by_period[0][0][1].value = stage_temperature + 71.8016615321
+    below.Q_c_by_period[0][0][0].value = cooler_duty
+
+    network = driver.amalgamate_networks(
+        above_case=_pdm_side_result(), below_case=below
+    )
+
+    assert network.T_c_by_period[0][0][1].value == stage_temperature
+    assert network.T_h_by_period[0][0][1].value == stage_temperature + 71.8016615321
+    assert network.Q_c_by_period[0][0][0].value == cooler_duty
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> None:
     driver = _pdm_amalgamation_driver(multiperiod=True, non_isothermal=True)
 
@@ -3404,18 +3475,19 @@ def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> N
     )
 
     assert network.N_periods == 2
-    assert network.Q_r_by_period[0][0][0][0][0] == pytest.approx(0.0)
-    assert network.Q_r_by_period[1][0][0][0][0] == pytest.approx(12.0)
-    assert network.Q_h_by_period[0][0][0][0] == pytest.approx(0.0)
-    assert network.Q_h_by_period[1][0][0][0] == pytest.approx(6.0)
+    assert network.Q_r_by_period[0][0][0][0].value == pytest.approx(0.0)
+    assert network.Q_r_by_period[1][0][0][0].value == pytest.approx(12.0)
+    assert network.Q_h_by_period[0][0][0].value == pytest.approx(0.0)
+    assert network.Q_h_by_period[1][0][0].value == pytest.approx(6.0)
     assert network.z_allowed[0][0][0] == 1
-    assert network.X_by_period[1][0][0][0][0] == pytest.approx(0.25)
-    assert network.Y_by_period[1][0][0][0][0] == pytest.approx(0.5)
-    assert network.T_h_out_x_by_period[1][0][0][0][0] == pytest.approx(470.0)
-    assert network.T_c_out_y_by_period[1][0][0][0][0] == pytest.approx(330.0)
+    assert network.X_by_period[1][0][0][0].value == pytest.approx(0.25)
+    assert network.Y_by_period[1][0][0][0].value == pytest.approx(0.5)
+    assert network.T_h_out_x_by_period[1][0][0][0].value == pytest.approx(470.0)
+    assert network.T_c_out_y_by_period[1][0][0][0].value == pytest.approx(330.0)
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
 def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() -> None:
     driver = _pdm_amalgamation_driver()
 
@@ -3430,3 +3502,32 @@ def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() 
     assert amalgamated.TAC == 24.0
     assert amalgamated.solve_time == 5.0
     assert amalgamated.z_allowed[0][0] == [1, 1]
+
+
+def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch):
+    # Couenne is an optional extra; SCIP comes with the synthesis extra and
+    # also solves a pinch design side that is not linear.
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.name = "nonlinear-side"
+    model.solver = "highs"
+    model.solver_options = {"time_limit": 9.0}
+    model.m = SimpleNamespace(is_linear=lambda: False)
+    configured = []
+
+    def require(solver_name):
+        if solver_name == "couenne":
+            raise backend.MissingSynthesisSolverError("couenne missing")
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+    monkeypatch.setattr(
+        backend,
+        "configure_pyomo_solver",
+        lambda _m, solver, solver_options=None: configured.append(
+            (solver, solver_options)
+        ),
+    )
+
+    model._solve_nonlinear_models_with_couenne()
+
+    assert model.solver == "scip"
+    assert configured == [("scip", {"limits/time": 9.0})]

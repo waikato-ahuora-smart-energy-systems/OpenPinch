@@ -112,6 +112,8 @@ def test_every_ci_lane_is_present():
         "brayton_cycle",
         "tespy",
         "synthesis",
+        "highs",
+        "couenne",
         "full",
     }
     assert {row["os"] for row in smoke["include"]} == {"windows-latest", "macos-latest"}
@@ -135,7 +137,15 @@ def test_every_extra_has_a_smoke_surface_the_script_accepts():
 
 def test_full_smoke_runs_every_other_optional_surface(monkeypatch):
     checked = []
-    surfaces = ("dashboard", "notebook", "brayton_cycle", "tespy", "synthesis")
+    surfaces = (
+        "dashboard",
+        "notebook",
+        "brayton_cycle",
+        "tespy",
+        "synthesis",
+        "highs",
+        "couenne",
+    )
     for surface in surfaces:
         monkeypatch.setattr(
             optional_install_smoke,

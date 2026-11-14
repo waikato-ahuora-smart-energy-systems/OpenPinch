@@ -37,8 +37,8 @@ def _couenne_available() -> bool:
     "not _couenne_available()",
     reason="needs the couenne binary",
 )
-@pytest.mark.parametrize("d_tmin", [5.0, 10.0, 20.0])
-def test_crude_multiperiod_pinch_design_solves(d_tmin):
+@pytest.mark.parametrize("dt_cont_multiplier", [0.5, 1.0, 2.0])
+def test_crude_multiperiod_pinch_design_solves(dt_cont_multiplier):
     from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
         LocalSynthesisExecutor,
     )
@@ -56,7 +56,7 @@ def test_crude_multiperiod_pinch_design_solves(d_tmin):
     problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
-        approach_temperatures=(d_tmin,),
+        dt_cont_multipliers=(dt_cont_multiplier,),
         max_parallel=1,
     )
 

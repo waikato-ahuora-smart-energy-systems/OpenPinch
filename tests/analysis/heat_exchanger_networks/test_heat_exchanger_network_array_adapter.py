@@ -161,6 +161,8 @@ def test_packaged_four_stream_sample_matches_converted_fixture_without_outputs()
         "HENS_OUTPUT_FOLDER": "",
         "HENS_OUTPUT_FORMATS": [],
     }
+    for key in converter.PACKAGE_SAMPLE_DEFAULTED_OPTIONS:
+        del expected_sample["options"][key]
 
     assert json.loads(sample_path.read_text()) == expected_sample
 
@@ -201,7 +203,9 @@ def test_converted_openhens_json_loads_through_prepared_problem(
 def test_four_stream_adapter_snapshot_matches_openhens_source_arrays() -> None:
     case_id = "Four-stream-Yee-and-Grossmann-1990-1"
     fixture_path = FIXTURE_ROOT / f"{case_id}.json"
-    snapshot_path = ADAPTER_ARRAY_SNAPSHOT_ROOT / case_id / "dTmin-14.json"
+    snapshot_path = (
+        ADAPTER_ARRAY_SNAPSHOT_ROOT / case_id / "dt-cont-multiplier-1.4.json"
+    )
     snapshot = json.loads(snapshot_path.read_text())
     payload = problem_to_solver_arrays(PinchProblem(source=fixture_path), 14.0)
     current = payload.to_json_dict()
@@ -435,7 +439,7 @@ def test_adapter_requires_prepared_problem_and_rejects_bypass_payloads() -> None
     cached_arrays = problem_to_solver_arrays(good_problem, 14.0)
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id="run-1",
-        approach_temperatures=(14.0,),
+        dt_cont_multipliers=(1.4,),
         derivative_thresholds=(0.5,),
         stage_selection=(1,),
     )

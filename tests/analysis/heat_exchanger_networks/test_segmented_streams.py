@@ -289,6 +289,7 @@ def test_flat_utility_dt_cont_keeps_scalar_contribution():
 
 
 @pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints():
     arrays = problem_to_solver_arrays(
         _segmented_problem(
@@ -303,7 +304,7 @@ def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints()
     model = StageWiseModel(
         name="utility-dt-cont",
         framework="TDM",
-        solver="apopt",
+        solver="highs",
         solver_arrays=arrays,
         stages=1,
         dTmin=10.0,
@@ -452,9 +453,9 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
     [
         (3.0, 2.0, 6.0),
         (12.0, 2.0, 24.0),
-        (0.0, 2.0, 10.0),
-        (tol / 4.0, 2.0, 10.0),
-        (tol / 2.0, 2.0, 10.0),
+        (0.0, 2.0, 0.1),
+        (tol / 4.0, 2.0, 0.1),
+        (tol / 2.0, 2.0, 0.1),
         (tol, 2.0, 2.0 * tol),
     ],
 )
@@ -482,7 +483,7 @@ def test_effective_temperature_contribution_selects_operating_period():
     )
     assert [
         _temperature_contribution(stream, 20.0, period_idx=n) for n in range(3)
-    ] == pytest.approx([10.0, 6.0, 24.0])
+    ] == pytest.approx([0.1, 6.0, 24.0])
 
 
 @seed(20260918)
@@ -573,8 +574,8 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
 
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
 
-    # Effective contributions (2, 18) scale by dTmin / (2 * THERMAL_DT_CONT)
-    # = 14 / 10; contributions at or below tol fall back to dTmin / 2.
+    # Effective contributions (2, 18) scale by the multiplier
+    # dTmin / (2 * THERMAL_DT_CONT) = 14 / 10; a zero becomes 0.1 K times it.
     assert zone.dt_cont_multiplier == 1.0
     assert zone.config.thermal.dt_cont == pytest.approx(7.0)
     np.testing.assert_allclose(
@@ -583,7 +584,7 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     )
     np.testing.assert_allclose(
         stream.segments[1].delta_t_contribution.to("delta_degC").period_values,
-        [7.0, 7.0],
+        [0.14, 0.14],
     )
     np.testing.assert_allclose(
         stream.delta_t_contribution.to("delta_degC").period_values,
@@ -594,8 +595,9 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
 @seed(20260715)
 @given(
     segmented_streams(),
+    # A synthesis task's internal approach is 2 * THERMAL_DT_CONT * m > 0.
     st.floats(
-        min_value=0.0,
+        min_value=0.1,
         max_value=100.0,
         allow_nan=False,
         allow_infinity=False,
@@ -621,8 +623,9 @@ def test_pdm_fallback_matches_arrays_and_is_idempotent_for_segments(stream, dTmi
     zone.dt_cont_multiplier = 2.0
     reference = zone.config.thermal.dt_cont
     effective = np.asarray(original) * 2.0
-    scaled = effective * dTmin / (2.0 * reference)
-    expected = np.where(scaled > tol, scaled, minimum)
+    task_multiplier = dTmin / (2.0 * reference)
+    scaled = effective * task_multiplier
+    expected = np.where(scaled > tol, scaled, 0.1 * task_multiplier)
     from_arrays = [
         _temperature_contribution(segment, dTmin, reference_dt_cont=reference)
         for segment in next(iter(zone.process_streams)).segments
@@ -705,6 +708,23 @@ def test_duty_aligned_area_slices_tolerate_solver_overshoot_relative_to_duty():
             cold_inlet_temperature=323.15,
             period="normal",
         )
+
+
+def test_duty_aligned_area_slices_drop_a_solver_noise_sliver_past_a_boundary():
+    # Couenne on Linux returns a 50 kW hot utility load as 50.000002 kW; the
+    # 2e-6 kW past the first segment's end is solver noise, not a second
+    # segment in use.
+    contributions = duty_aligned_area_contributions(
+        _profile("Hot", hot=True),
+        _profile("Cold", hot=False),
+        duty=50.0 + 2e-6,
+        hot_inlet_temperature=473.15,
+        cold_inlet_temperature=323.15,
+        period="normal",
+    )
+
+    assert {item.hot_segment_identity for item in contributions} == {"Hot.S1"}
+    assert sum(item.duty for item in contributions) == pytest.approx(50.0)
 
 
 def test_piecewise_profile_rejects_discontinuity_and_out_of_range_lookup():
@@ -834,16 +854,32 @@ def test_verification_keeps_segment_failures_without_aggregate_cp_metadata():
     )
 
 
-@pytest.mark.synthesis
+def _binary_available(name: str) -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+        require_solver_binary,
+    )
+
+    try:
+        require_solver_binary(name, purpose="segmented-stream solves")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
-def test_apopt_stagewise_uses_parent_heat_coordinates_and_segment_area_totals(
+def test_couenne_stagewise_uses_parent_heat_coordinates_and_segment_area_totals(
     non_isothermal_model,
 ):
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name=f"segmented-parent-noniso-{non_isothermal_model}",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(_segmented_problem(), 10.0),
         stages=1,
         dTmin=10.0,
@@ -869,13 +905,13 @@ def test_apopt_stagewise_uses_parent_heat_coordinates_and_segment_area_totals(
     assert _check_area_costs(model)
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('ipopt')", reason="needs ipopt")
 def test_ipopt_stagewise_stabilises_or_reports_integer_solver_guidance():
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name="segmented-parent-ipopt",
         framework="TDM",
-        solver="ipopt-GEKKO",
+        solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(_segmented_problem(), 10.0),
         stages=1,
         dTmin=10.0,
@@ -890,19 +926,21 @@ def test_ipopt_stagewise_stabilises_or_reports_integer_solver_guidance():
     model.optimise(False)
 
     assert model._piecewise_active_mappings
-    if model.mSuccess == 1:
+    # Ipopt can stop short of convergence here (termination "other"), which
+    # keeps the values but is no optimum; only a converged solve is checked.
+    if model.solver_run.failure_reason is not None:
+        assert "use Couenne or HiGHS" in model.solver_run.failure_reason
+    elif model.solver_run.converged:
         assert model.Q_r_total == pytest.approx(150.0)
-    else:
-        assert "use APOPT or Couenne" in model.solver_run.failure_reason
 
 
-@pytest.mark.synthesis
-def test_apopt_utility_exchanger_uses_segment_area_contributions():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+def test_couenne_utility_exchanger_uses_segment_area_contributions():
     model = StageWiseModel(
         name="segmented-parent-utility",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(cold_second_duty=50.0),
             10.0,
@@ -915,6 +953,9 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
         non_isothermal_model=False,
         integers=True,
         tol=1e-6,
+        # Couenne finds this network at once but takes minutes to prove it
+        # optimal; the incumbent at the time limit is what is checked.
+        solver_options={"time_limit": 5},
     )
 
     model.optimise(False)
@@ -932,7 +973,8 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
     assert model.verify() == (True, [])
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
 @pytest.mark.parametrize(
     ("cold_second_duty", "expected_load", "expected_cost", "expected_segments"),
     [
@@ -940,17 +982,16 @@ def test_apopt_utility_exchanger_uses_segment_area_contributions():
         (175.0, 75.0, 3000.0, 2),
     ],
 )
-def test_apopt_segmented_hot_utility_uses_exact_traversed_segment_cost(
+def test_couenne_segmented_hot_utility_uses_exact_traversed_segment_cost(
     cold_second_duty,
     expected_load,
     expected_cost,
     expected_segments,
 ):
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name="segmented-priced-hot-utility",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(
                 cold_second_duty=cold_second_duty,
@@ -983,13 +1024,13 @@ def test_apopt_segmented_hot_utility_uses_exact_traversed_segment_cost(
     )
 
 
-@pytest.mark.synthesis
-def test_apopt_segmented_cold_utility_uses_exact_traversed_segment_cost():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+def test_couenne_segmented_cold_utility_uses_exact_traversed_segment_cost():
     model = StageWiseModel(
         name="segmented-priced-cold-utility",
         framework="TDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(
                 cold_second_duty=50.0,
@@ -1022,13 +1063,13 @@ def test_apopt_segmented_cold_utility_uses_exact_traversed_segment_cost():
     }
 
 
-@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('ipopt')", reason="needs ipopt")
 def test_ipopt_segmented_utility_cost_stabilises_or_reports_guidance():
-    pytest.importorskip("gekko")
     model = StageWiseModel(
         name="segmented-priced-hot-utility-ipopt",
         framework="TDM",
-        solver="ipopt-GEKKO",
+        solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(
             _segmented_problem(
                 cold_second_duty=150.0,
@@ -1049,16 +1090,17 @@ def test_ipopt_segmented_utility_cost_stabilises_or_reports_guidance():
     model.optimise(False)
 
     assert model._piecewise_active_mappings
-    if model.mSuccess == 1:
+    # As above, only a converged Ipopt solve is checked.
+    if model.solver_run.failure_reason is not None:
+        assert "use Couenne or HiGHS" in model.solver_run.failure_reason
+    elif model.solver_run.converged:
         assert model.Q_hu_total_by_period[0] == pytest.approx(50.0)
         assert model.hu_cost_total == pytest.approx(1000.0)
-    else:
-        assert "use APOPT or Couenne" in model.solver_run.failure_reason
 
 
-@pytest.mark.synthesis
-def test_apopt_pdm_clips_segment_profile_without_splitting_parent_identity():
-    pytest.importorskip("gekko")
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('couenne')", reason="needs couenne")
+def test_couenne_pdm_clips_segment_profile_without_splitting_parent_identity():
     problem = _segmented_problem()
     arrays = problem_to_solver_arrays(problem, 10.0)
     decomposition = build_pinch_design_decomposition(
@@ -1069,7 +1111,7 @@ def test_apopt_pdm_clips_segment_profile_without_splitting_parent_identity():
     model = PinchDecompModel(
         name="segmented-pdm-above",
         framework="PDM",
-        solver="apopt",
+        solver="couenne",
         solver_arrays=arrays,
         dTmin=10.0,
         z_restriction=None,
@@ -1089,3 +1131,53 @@ def test_apopt_pdm_clips_segment_profile_without_splitting_parent_identity():
     assert model.I == model.J == 1
     assert model.Q_r_total == pytest.approx(150.0)
     assert model.segment_area_contributions_by_period
+
+
+def _highs_available() -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_highs_pdm_maps_segments_with_integer_intervals_in_one_solve():
+    # HiGHS takes integers, so temperature and price profiles use the exact
+    # interval binaries rather than relaxed selectors re-solved until stable.
+    # Only the approach-contribution mappings stay relaxed, as with Couenne.
+    problem = _segmented_problem(segmented_utility=True)
+    model = PinchDecompModel(
+        name="segmented-pdm-above",
+        framework="PDM",
+        solver="highs",
+        solver_arrays=problem_to_solver_arrays(problem, 10.0),
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+        pinch_loc="above",
+        pinch_decomposition=build_pinch_design_decomposition(
+            problem, 10.0, pinch_location="above"
+        ),
+        stage_selection="automated",
+    )
+
+    model.optimise(False)
+
+    assert all(
+        "segment_index_at_heat" in mapping
+        for mapping in model._piecewise_active_mappings
+    )
+    assert model.mSuccess == 1
+    assert model.Q_r_total == pytest.approx(150.0, abs=1e-6)

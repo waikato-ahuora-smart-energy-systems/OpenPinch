@@ -444,7 +444,7 @@ def test_task_records_structure_and_request() -> None:
     request = _request(min_approach_temperature=8.0)
     settings = SimpleNamespace(
         run_id="run",
-        approach_temperatures=(10.0,),
+        dt_cont_multipliers=(1.0,),
         problem_id=None,
         workspace_variant=None,
         period_id=None,
@@ -452,12 +452,15 @@ def test_task_records_structure_and_request() -> None:
 
     task = duty_optimisation_task(request, settings)
 
-    assert task.approach_temperature == 8.0
+    # The requested approach is recorded in the task settings; contributions
+    # use the first configured multiplier.
+    assert task.dt_cont_multiplier == 1.0
+    assert task.settings["min_approach_temperature"] == 8.0
     assert task.stage_count == 2
     assert task.settings["fixed_structure"] is True
     assert task.seed_network == request.network
     assert len(task.topology_restrictions) == 4
-    assert duty_optimisation_task(_request(), settings).approach_temperature == 10.0
+    assert duty_optimisation_task(_request(), settings).dt_cont_multiplier == 1.0
 
 
 # --- model helpers -----------------------------------------------------------
@@ -500,14 +503,14 @@ def test_fixed_structure_model_rejects_other_goals_before_building() -> None:
     with pytest.raises(ValueError, match="supports minimisation goals"):
         fixed_model.FixedStructureModel(
             name="x",
-            solver="apopt",
+            solver="ipopt-pyomo",
             solver_arrays=None,
             spec=fixed_model.FixedStructureSpec(1, (), ()),
             minimisation_goal="hot utility",
         )
 
 
-# --- solved with the SciPy test backend (no GEKKO) ---------------------------
+# --- solved with the SciPy test backend (no solver binary) -------------------
 
 
 def _small_payload(*, hot_cp=10.0, extra_hot_utility=None) -> dict:
@@ -524,7 +527,7 @@ def _small_payload(*, hot_cp=10.0, extra_hot_utility=None) -> dict:
             "COSTING_HX_AREA_COEFF": 150.0,
             "COSTING_HX_AREA_EXP": 1.0,
             "COSTING_HX_UNIT_COST": 5500.0,
-            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
             "HENS_SOLVER_EVM": "ipopt-pyomo",
             "HENS_SOLVE_TOLERANCE": 0.001,
         },
@@ -750,7 +753,7 @@ def _scripted_task(request):
         request,
         SimpleNamespace(
             run_id="run",
-            approach_temperatures=(10.0,),
+            dt_cont_multipliers=(1.0,),
             problem_id=None,
             workspace_variant=None,
             period_id=None,
@@ -769,7 +772,7 @@ def test_executor_removes_zero_duty_exchangers_and_resolves(monkeypatch) -> None
         request,
         SimpleNamespace(
             run_id="run",
-            approach_temperatures=(10.0,),
+            dt_cont_multipliers=(1.0,),
             problem_id=None,
             workspace_variant=None,
             period_id=None,
@@ -900,7 +903,7 @@ def test_executor_reports_solver_failure_after_removals() -> None:
         request,
         SimpleNamespace(
             run_id="run",
-            approach_temperatures=(10.0,),
+            dt_cont_multipliers=(1.0,),
             problem_id=None,
             workspace_variant=None,
             period_id=None,
@@ -997,7 +1000,7 @@ def test_executor_reports_structure_errors_as_failed_outcomes() -> None:
     request = _request(_four_stream_structure(hot_utility="LPS"))
     settings = SimpleNamespace(
         run_id="run",
-        approach_temperatures=(10.0,),
+        dt_cont_multipliers=(1.0,),
         problem_id=None,
         workspace_variant=None,
         period_id=None,
@@ -1012,12 +1015,11 @@ def test_executor_reports_structure_errors_as_failed_outcomes() -> None:
     assert "'LPS' is not a hot utility stream" in outcome.error
 
 
-# --- live solver (GEKKO) ------------------------------------------------------
+# --- live solver (Ipopt) ------------------------------------------------------
 
 
 def _live_solver_available() -> bool:
     try:
-        require_synthesis_dependency("gekko", purpose="fixed-structure duty test")
         require_synthesis_dependency(
             "pyomo.environ", purpose="fixed-structure duty test"
         )
@@ -1031,7 +1033,7 @@ def _live_solver_available() -> bool:
 # does not import the solver packages.
 _needs_live_solver = pytest.mark.skipif(
     "not _live_solver_available()",
-    reason="needs the ipopt binary and the gekko and pyomo packages",
+    reason="needs the ipopt binary and the pyomo package",
 )
 
 
@@ -1466,12 +1468,12 @@ def test_live_solver_area_with_a_stream_off_in_one_period() -> None:
     assert all(state.duty <= 1100.0 + 1e-3 for state in heater.period_states)
 
 
-def test_numeric_unwraps_gekko_param_values() -> None:
+def test_numeric_unwraps_nested_solver_values() -> None:
     from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
         _numeric,
     )
 
-    class _Wrapped:  # GEKKO Param: .value is a GK_Value holding a scalar
+    class _Wrapped:  # .value holds a number, a list or another value
         def __init__(self, value):
             self.value = value
 
@@ -1479,3 +1481,44 @@ def test_numeric_unwraps_gekko_param_values() -> None:
     assert _numeric(_Wrapped([3.0])) == 3.0
     assert _numeric(_Wrapped(_Wrapped([4.0, 5.0]))) == 4.0
     assert _numeric(2.5) == 2.5
+
+
+def test_executor_drops_ipopt_options_when_it_falls_back_to_scip(monkeypatch) -> None:
+    # Without an Ipopt executable the default EVM solver falls back to SCIP,
+    # which would reject Ipopt options such as max_iter.
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    def require(solver_name):
+        if solver_name == "ipopt-pyomo":
+            raise backend.MissingSynthesisSolverError("ipopt missing")
+
+    monkeypatch.setattr(backend, "require_solver_backend", require)
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
+    payload = json.loads(FOUR_STREAM_FIXTURE.read_text(encoding="utf-8"))
+    payload["options"] = {
+        key: value
+        for key, value in payload.get("options", {}).items()
+        if key != "HENS_SOLVER_EVM"
+    } | {"HENS_SOLVER_OPTIONS_EVM": {"max_iter": 50}}
+    problem = PinchProblem(payload)
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    seen = []
+
+    class _Recording(_ScriptedModel):
+        def __init__(self, *, spec, solver, solver_options, **kwargs) -> None:
+            seen.append((solver, solver_options))
+            super().__init__(spec=spec, **kwargs)
+
+    _ScriptedModel.calls = []
+    _ScriptedModel.zero_by_call = [set()]
+
+    with pytest.warns(RuntimeWarning, match="scip"):
+        FixedStructureDutyExecutor(request, model_factory=_Recording).execute(
+            (_scripted_task(request),),
+            problem=problem,
+            parent_outcomes={},
+            max_parallel=1,
+        )
+
+    assert seen == [("scip", {})]

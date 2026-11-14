@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
+from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
+from ..solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
 from ._pinch_design import amalgamation as _amalgamation
 from ._pinch_design import equations as _equations
@@ -13,6 +19,8 @@ from ._pinch_design import postprocess as _postprocess
 from ._pinch_design import preprocessing as _preprocessing
 from .base import BaseHeatExchangerNetworkModel
 from .stagewise import StageWiseModel
+
+logger = logging.getLogger(__name__)
 
 
 class PinchDecompModel(BaseHeatExchangerNetworkModel):
@@ -23,7 +31,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         *,
         name: str,
         framework: Literal["PDM"],
-        solver: Literal["couenne", "ipopt-pyomo", "ipopt-GEKKO", "apopt"],
+        solver: Literal["couenne", "highs", "ipopt-pyomo"],
         solver_arrays: PreparedSolverArrays,
         dTmin: float,
         z_restriction: list | None,
@@ -42,8 +50,12 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         pinch_decomposition: PinchDesignDecomposition,
         stage_selection: Literal["automated"] | list[int] | tuple[int, int],
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
+        utility_cost_cap: float | None = None,
     ) -> None:
         self.pinch_loc = pinch_loc
+        # With a cap, "min units" minimises the unit count alone, keeping
+        # utility cost at or below the cap instead of adding it in.
+        self.utility_cost_cap = utility_cost_cap
         self.pinch_decomposition = pinch_decomposition
         self.stage_selection = stage_selection
         super().__init__(
@@ -69,6 +81,57 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.set_match_restrictions(self.z_restriction)
         self.set_stage_wise_superstructure()
         self.set_obj()
+        self._solve_nonlinear_models_with_couenne()
+
+    def used_units(self) -> dict[str, tuple[int, ...]]:
+        """Return the solved side's used recovery, heater and cooler units."""
+
+        return _equations.used_units(self)
+
+    def require_units(self, at_least: int) -> None:
+        """Require at least ``at_least`` units in this unsolved side."""
+
+        _equations.require_units(self, at_least)
+
+    def exclude_units(self, pattern: dict[str, tuple[int, ...]]) -> None:
+        """Cut ``pattern`` from this unsolved side with a no-good constraint."""
+
+        _equations.exclude_units(self, pattern)
+
+    def _solve_nonlinear_models_with_couenne(self) -> None:
+        """Send a model HiGHS cannot take to Couenne, or SCIP without it.
+
+        HiGHS options do not apply to the new solver, except a time limit,
+        which is carried over. Couenne is an optional extra; SCIP comes with
+        the synthesis extra.
+        """
+
+        if self.solver != "highs" or self.m.is_linear():
+            return
+        solver = "couenne"
+        try:
+            backend.require_solver_backend(solver)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            solver = backend.FALLBACK_SOLVER
+        logger.warning(
+            "[%s] The pinch design model is not linear, so %s solves it "
+            "instead of HiGHS.",
+            self.name,
+            solver,
+        )
+        options = self.solver_options
+        limit = (
+            options.get(backend.TIME_LIMIT_OPTIONS["highs"])
+            if isinstance(options, dict)
+            else None
+        )
+        self.solver = solver
+        self.solver_options = (
+            None if limit is None else {backend.TIME_LIMIT_OPTIONS[solver]: limit}
+        )
+        self.solver_run = backend.configure_pyomo_solver(
+            self.m, self.solver, solver_options=self.solver_options
+        )
 
     def get_model_parameters_from_solver_arrays(self) -> None:
         super().get_model_parameters_from_solver_arrays()

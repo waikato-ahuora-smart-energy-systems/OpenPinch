@@ -8,7 +8,7 @@
 // pydantic builds, and its CoolProp 7.2 stands in for CoolProp 8 (the app
 // uses a CoolProp 8 JS build behind a shim); loadPackage downloads them from
 // the jsDelivr CDN for the pinned Pyodide version. pytest, hypothesis and the
-// optional plotly, pyxlsb, tespy and gekko come from PyPI as pure-Python
+// optional plotly, pyxlsb and tespy come from PyPI as pure-Python
 // wheels at the uv.lock versions pinned in requirements.txt. The checkout is
 // mounted only for its tests; the package under test is the installed wheel.
 import { readFileSync } from 'node:fs'

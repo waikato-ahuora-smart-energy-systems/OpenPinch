@@ -117,9 +117,8 @@ enter through ``PinchProblem.design``:
 
 .. code-block:: python
 
-   problem.design.enhanced_heat_exchanger_network(quality_tier=2)
-   problem.design.open_hens()
    problem.design.heat_exchanger_network()
+   problem.design.heat_exchanger_network(width=2, depth=3)
    problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
    problem.design.network_evolution((existing_network,))
    problem.design.optimise_duties(network, objective="cost")

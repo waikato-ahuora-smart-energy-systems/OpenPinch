@@ -53,7 +53,12 @@ from ...domain.heat_exchanger import HeatExchanger
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor, _failed_task_outcome
-from .execution.settings import SynthesisWorkflowSettings
+from .execution.search import reference_dt_cont_multiplier
+from .execution.settings import (
+    SynthesisWorkflowSettings,
+    configured_stage_solver,
+    stage_solver_options,
+)
 from .models.fixed_structure import (
     COOLER,
     HEATER,
@@ -455,17 +460,27 @@ class FixedStructureDutyExecutor:
         problem,
     ) -> HeatExchangerNetworkSynthesisTaskOutcome:
         from .models.fixed_structure import FixedStructureModel
-        from .solver.arrays import problem_to_solver_arrays
+        from .solver.arrays import (
+            nominal_approach_temperature,
+            problem_to_solver_arrays,
+        )
 
         request = self.request
         hens = problem.master_zone.config.hens
         factory = self.model_factory or FixedStructureModel
+        solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")
+        solver_options = stage_solver_options(hens, "evm", solver)
         user_exchangers = _structural_exchangers(request.network)
         excluded: set[int] = set()
         removed: list[str] = []
         warm: dict[int, float] | None = None
         try:
-            arrays = problem_to_solver_arrays(problem, task.approach_temperature)
+            arrays = problem_to_solver_arrays(
+                problem,
+                nominal_approach_temperature(
+                    problem.master_zone.config, task.dt_cont_multiplier
+                ),
+            )
             while True:
                 structure = fixed_network_structure(
                     request,
@@ -475,7 +490,7 @@ class FixedStructureDutyExecutor:
                 )
                 model = factory(
                     name=f"fixed-structure-{request.objective}",
-                    solver=str(hens.solver_evm),
+                    solver=solver,
                     solver_arrays=arrays,
                     spec=structure.spec,
                     minimisation_goal=request.minimisation_goal,
@@ -483,7 +498,7 @@ class FixedStructureDutyExecutor:
                     max_hot_utility=request.max_hot_utility,
                     max_cold_utility=request.max_cold_utility,
                     tol=float(hens.solve_tolerance),
-                    solver_options=dict(hens.solver_options_evm),
+                    solver_options=dict(solver_options),
                 )
                 model.optimise(print_output=self.print_output)
                 if getattr(model, "mSuccess", 0) != 1:
@@ -577,9 +592,6 @@ def duty_optimisation_task(
     """Build the single synthesis task that records this request."""
 
     exchangers = _structural_exchangers(request.network)
-    approach = request.min_approach_temperature or float(
-        settings.approach_temperatures[0]
-    )
     restrictions = tuple(
         HeatExchangerNetworkTopologyRestriction(
             source_stream=exchanger.source_stream,
@@ -593,7 +605,9 @@ def duty_optimisation_task(
     return HeatExchangerNetworkSynthesisTask(
         run_id=settings.run_id,
         method=_METHOD,
-        approach_temperature=approach,
+        # Contributions at the reference multiplier; a requested minimum
+        # approach overrides them in the model.
+        dt_cont_multiplier=reference_dt_cont_multiplier(settings.dt_cont_multipliers),
         stage_count=_stage_count(request.network, exchangers),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
@@ -844,7 +858,9 @@ def _source_metadata(model, solver_arrays) -> dict[str, Any]:
         "solver_model_name": getattr(model, "name", None),
         "solver_framework": "ESM",
         "solver_non_isothermal_model": True,
-        "solver_dTmin": min(recovery_limits) if recovery_limits else None,
+        "minimum_recovery_approach": (
+            min(recovery_limits) if recovery_limits else None
+        ),
         "segment_profile_version": SEGMENT_PROFILE_VERSION,
         "hot_stream_heat_capacity_flowrates": first("f_h_period"),
         "hot_stream_heat_capacity_flowrates_by_period": by_period("f_h_period"),

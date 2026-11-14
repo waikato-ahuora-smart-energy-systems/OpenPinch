@@ -1,59 +1,134 @@
-"""Alpha and dQ/dA equations for base HEN models."""
+"""Post-optimisation alpha flow-on values for base HEN models."""
 
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
+
 from ...indexing import build_index_grid
-from ...solver import backend
+from . import execution as _execution
 
 logger = logging.getLogger(__name__)
 
+# Alpha and the gammas are fractions of a match's duty, so they lie in [-1, 1].
+_ALPHA_BOUND = 1.0
+_SOLVE_TOLERANCE = 1e-8
+
 
 def get_alpha_values(model) -> list | None:
-    """Calculate source alpha flow-on values in a post-optimisation solve.
+    """Calculate source alpha flow-on values from a solved model.
 
-    Returns ``None`` when the solve fails. The failed values are unsolved
-    initial guesses, so they are not cached on ``model.alpha``: callers treat
-    alpha as unavailable and a later call retries the solve.
+    The alpha and gamma equations are linear once the solved temperatures
+    and duties are fixed, so they are solved as one sparse system. Returns
+    ``None`` when the system is singular or its solution leaves [-1, 1];
+    nothing is cached, callers treat alpha as unavailable, and a later call
+    retries.
     """
 
     if model.alpha != []:
         return model.alpha
 
-    solver_model = backend.create_gekko_model(remote=False)
-    try:
-        solver_model.options.IMODE = 1
-        solver_model.options.SOLVER = 1
-        model.set_alpha_dqda_equations(m=solver_model, postoptimisation=True)
-        try:
-            with backend.suppress_gekko_numpy_array_copy_deprecation():
-                solver_model.solve(disp=False)
-        except Exception:
-            logger.warning(
-                "Post-optimisation alpha solve failed for %s; alpha values are "
-                "unavailable and benefit ranking falls back to neutral alpha.",
-                getattr(model, "name", "model"),
-                exc_info=True,
-            )
-            model.alpha = []
-            return None
-        status = getattr(solver_model.options, "SOLVESTATUS", None)
-        if status != 1:
-            logger.warning(
-                "Post-optimisation alpha solve for %s ended with solver status "
-                "%s; alpha values are unavailable and benefit ranking falls "
-                "back to neutral alpha.",
-                getattr(model, "name", "model"),
-                status,
-            )
-            model.alpha = []
-            return None
-        return model.alpha
-    finally:
-        backend.cleanup_gekko_model(solver_model)
+    _set_postoptimisation_flow_fractions(model)
+    solution = _solve_flow_on_system(model)
+    if solution is None:
+        logger.warning(
+            "Post-optimisation alpha solve for %s has no unique solution in "
+            "[-1, 1]; alpha values are unavailable and benefit ranking falls "
+            "back to neutral alpha.",
+            getattr(model, "name", "model"),
+        )
+        model.alpha = []
+        return None
+    model.alpha = build_index_grid(
+        lambda i, j, k: [float(solution[i, j, k])], _recovery_grid_shape(model)
+    )
+    return model.alpha
+
+
+def _solve_flow_on_system(model) -> np.ndarray | None:
+    """Solve for alpha, ``gamma_h`` and ``gamma_c`` at every recovery index.
+
+    ``alpha = 1 - (gamma_h + gamma_c) / 2``; ``gamma_h`` takes flow-on from the
+    hot stream's matches in the next stage (none in the last), ``gamma_c``
+    from the cold stream's matches in the previous stage (none in the first).
+    Returns the alpha grid, or ``None`` if the solution is not usable.
+    """
+
+    count = model.I * model.J * model.S
+
+    def alpha(i: int, j: int, k: int) -> int:
+        return (i * model.J + j) * model.S + k
+
+    def gamma_h(i: int, j: int, k: int) -> int:
+        return count + alpha(i, j, k)
+
+    def gamma_c(i: int, j: int, k: int) -> int:
+        return 2 * count + alpha(i, j, k)
+
+    rows: list[int] = []
+    columns: list[int] = []
+    coefficients: list[float] = []
+    right_hand_side = np.zeros(3 * count)
+
+    def add(row: int, column: int, coefficient: float) -> None:
+        # Inactive matches give zero flow-on coefficients. Storing them makes
+        # the LU factorisation fill in: on a 64-stream network most of the
+        # matrix would be stored zeros.
+        if coefficient == 0.0:
+            return
+        rows.append(row)
+        columns.append(column)
+        coefficients.append(coefficient)
+
+    for k, j, i in _recovery_indices(model):
+        row = alpha(i, j, k)
+        add(row, row, 1.0)
+        add(row, gamma_h(i, j, k), 0.5)
+        add(row, gamma_c(i, j, k), 0.5)
+        right_hand_side[row] = 1.0
+
+        row = gamma_h(i, j, k)
+        add(row, row, 1.0)
+        if k + 1 < model.S:
+            for j0 in range(model.J):
+                add(
+                    row,
+                    alpha(i, j0, k + 1),
+                    -model.beta_h[i][j0][k + 1] * model.P_h[i][j0][k + 1],
+                )
+            add(row, gamma_h(i, j, k + 1), -(1 - model.z_j[i][k + 1]))
+
+        row = gamma_c(i, j, k)
+        add(row, row, 1.0)
+        if k > 0:
+            for i0 in range(model.I):
+                add(
+                    row,
+                    alpha(i0, j, k - 1),
+                    -model.beta_c[i0][j][k - 1] * model.P_c[i0][j][k - 1],
+                )
+            add(row, gamma_c(i, j, k - 1), -(1 - model.z_i[j][k - 1]))
+
+    matrix = sp.csc_matrix(
+        (coefficients, (rows, columns)), shape=(3 * count, 3 * count)
+    )
+    with warnings.catch_warnings():
+        # A singular matrix is reported by the checks below.
+        warnings.simplefilter("ignore", spla.MatrixRankWarning)
+        solution = spla.spsolve(matrix, right_hand_side)
+    if not np.all(np.isfinite(solution)):
+        return None
+    if np.max(np.abs(matrix @ solution - right_hand_side)) > _SOLVE_TOLERANCE:
+        return None
+    if np.max(np.abs(solution)) > _ALPHA_BOUND + _SOLVE_TOLERANCE:
+        return None
+    return solution[:count].reshape(model.I, model.J, model.S)
 
 
 def alpha_value(model, i: int, j: int, k: int) -> float:
@@ -65,37 +140,7 @@ def alpha_value(model, i: int, j: int, k: int) -> float:
 
     if len(model.alpha) == 0:
         return 1.0
-    return float(model.alpha[i][j][k][0])
-
-
-def set_alpha_dqda_equations(
-    model,
-    *,
-    m: Any | None = None,
-    postoptimisation: bool = False,
-) -> None:
-    """Move the source alpha and dQ/dA equations without changing formulas."""
-
-    if postoptimisation:
-        if m is None:
-            raise ValueError("postoptimisation alpha equations require a model.")
-        _set_postoptimisation_flow_fractions(model)
-    else:
-        m = model.m
-        _set_model_flow_fractions(model, m)
-
-    _set_alpha_gamma_variables(model, m)
-    _set_gamma_equations(model, m)
-    model.alpha_eqn = [
-        m.Equation(
-            model.alpha[i][j][k]
-            == (1 - 0.5 * (model.gamma_h[i][j][k] + model.gamma_c[i][j][k]))
-        )
-        for k, j, i in _recovery_indices(model)
-        if postoptimisation or model.z_allowed[i][j][k] > 0
-    ]
-    if not postoptimisation:
-        _set_dqda_equations(model, m)
+    return float(_execution._value(model.alpha[i][j][k]))
 
 
 def _recovery_grid_shape(model) -> tuple[int, int, int]:
@@ -112,11 +157,7 @@ def _recovery_indices(model):
 
 
 def _solved_value(value: Any) -> Any:
-    return value[0]
-
-
-def _model_value(value: Any) -> Any:
-    return value
+    return _execution._value(value)
 
 
 def _unchanged(value: Any) -> Any:
@@ -205,8 +246,11 @@ def _set_postoptimisation_flow_fractions(model) -> None:
     """Set numeric flow fractions from a solved model's ``[value]`` arrays."""
 
     def flow_fraction(numerator: Callable[[], float], i: int, j: int, k: int):
-        if model.T_h[i][k][0] > model.T_c[j][k + 1][0]:
-            return numerator() / (model.T_h[i][k][0] - model.T_c[j][k + 1][0])
+        if _execution._value(model.T_h[i][k]) > _execution._value(model.T_c[j][k + 1]):
+            return numerator() / (
+                _execution._value(model.T_h[i][k])
+                - _execution._value(model.T_c[j][k + 1])
+            )
         return 0.0
 
     _set_flow_fraction_grids(model, _solved_value, flow_fraction)
@@ -216,132 +260,20 @@ def _set_postoptimisation_flow_fractions(model) -> None:
     )
     model.beta_h = build_index_grid(
         lambda i, j, k: (
-            model.Q_r[i][j][k][0] / model.Sum_Qr_is[i][k][0]
-            if model.Sum_Qr_is[i][k][0] > 0
+            _execution._value(model.Q_r[i][j][k])
+            / _execution._value(model.Sum_Qr_is[i][k])
+            if _execution._value(model.Sum_Qr_is[i][k]) > 0
             else 0.0
         ),
         _recovery_grid_shape(model),
     )
     model.beta_c = build_index_grid(
         lambda i, j, k: (
-            model.Q_r[i][j][k][0] / model.Sum_Qr_js[j][k][0]
-            if model.Sum_Qr_js[j][k][0] > 0
+            _execution._value(model.Q_r[i][j][k])
+            / _execution._value(model.Sum_Qr_js[j][k])
+            if _execution._value(model.Sum_Qr_js[j][k]) > 0
             else 0.0
         ),
         _recovery_grid_shape(model),
     )
     _set_match_indicator_grids(model, _solved_value, _unchanged)
-
-
-def _set_model_flow_fractions(model, m: Any) -> None:
-    """Set flow fractions as GEKKO intermediates of the optimisation model."""
-
-    def flow_fraction(numerator: Callable[[], Any], i: int, j: int, k: int):
-        return m.Intermediate(
-            numerator()
-            * model.z[i][j][k]
-            / ((model.T_h[i][k] - model.T_c[j][k + 1] - 1) * model.z[i][j][k] + 1)
-        )
-
-    _set_flow_fraction_grids(model, _model_value, flow_fraction)
-
-    model.Sum_Qr_j, model.Sum_Qr_i = _heat_load_total_grids(
-        model, _model_value, m.Intermediate
-    )
-    model.beta_h = build_index_grid(
-        lambda i, j, k: m.Intermediate(
-            model.Q_r[i][j][k] / (model.Sum_Qr_j[i][k] + 1 - model.z[i][j][k])
-        ),
-        _recovery_grid_shape(model),
-    )
-    model.beta_c = build_index_grid(
-        lambda i, j, k: m.Intermediate(
-            model.Q_r[i][j][k] / (model.Sum_Qr_i[j][k] + 1 - model.z[i][j][k])
-        ),
-        _recovery_grid_shape(model),
-    )
-    _set_match_indicator_grids(model, _model_value, m.Intermediate)
-
-
-def _set_alpha_gamma_variables(model, m: Any) -> None:
-    """Create the alpha and hot/cold gamma flow-on variables."""
-
-    def variable_grid(prefix: str, initial_value: float) -> list:
-        return build_index_grid(
-            lambda i, j, k: m.Var(
-                value=initial_value,
-                ub=1.0,
-                lb=-1.0,
-                name=f"{prefix}_H{i}_to_C{j}_at_S{k}",
-            ),
-            _recovery_grid_shape(model),
-        )
-
-    model.alpha = variable_grid("alpha", 0.0)
-    model.gamma_h = variable_grid("gamma_h", 0.5)
-    model.gamma_c = variable_grid("gamma_c", 0.5)
-
-
-def _hot_gamma_flow_on(model, i: int, j: int, k: int) -> Any:
-    """Flow-on from the hot stream's matches in the next stage."""
-
-    return (
-        sum(
-            model.beta_h[i][j0][k + 1]
-            * model.P_h[i][j0][k + 1]
-            * model.alpha[i][j0][k + 1]
-            for j0 in range(model.J)
-        )
-        + (1 - model.z_j[i][k + 1]) * model.gamma_h[i][j][k + 1]
-    )
-
-
-def _cold_gamma_flow_on(model, i: int, j: int, k: int) -> Any:
-    """Flow-on from the cold stream's matches in the previous stage."""
-
-    return (
-        sum(
-            model.beta_c[i0][j][k - 1]
-            * model.P_c[i0][j][k - 1]
-            * model.alpha[i0][j][k - 1]
-            for i0 in range(model.I)
-        )
-        + (1 - model.z_i[j][k - 1]) * model.gamma_c[i][j][k - 1]
-    )
-
-
-def _set_gamma_equations(model, m: Any) -> None:
-    """Set gamma equations; the last stage has no hot flow-on, the first no cold."""
-
-    model.gamma_h_eqn = []
-    model.gamma_c_eqn = []
-    for k, j, i in _recovery_indices(model):
-        last_stage = k + 1 >= model.S
-        first_stage = k == 0
-        hot_flow_on = 0.0 if last_stage else _hot_gamma_flow_on(model, i, j, k)
-        model.gamma_h_eqn.append([m.Equation(model.gamma_h[i][j][k] == hot_flow_on)])
-        cold_flow_on = 0.0 if first_stage else _cold_gamma_flow_on(model, i, j, k)
-        model.gamma_c_eqn.append([m.Equation(model.gamma_c[i][j][k] == cold_flow_on)])
-
-
-def _set_dqda_equations(model, m: Any) -> None:
-    """Set the minimum dQ/dA constraint for each allowed match."""
-
-    model.alpha_dQ_dA_eqn = [
-        (
-            m.Equation(
-                (
-                    model.min_dqda * (model.T_h[i][k] - model.T_c[j][k + 1])
-                    - model.alpha[i][j][k]
-                    * model.theta_1[i][j][k]
-                    * model.theta_2[i][j][k]
-                    * model.U_r[i][j]
-                )
-                * model.z[i][j][k]
-                <= 0.0
-            )
-            if model.z_allowed[i][j][k] > 0
-            else None
-        )
-        for k, j, i in _recovery_indices(model)
-    ]

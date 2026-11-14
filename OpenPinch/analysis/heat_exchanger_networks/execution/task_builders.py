@@ -9,6 +9,7 @@ from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestric
 from ....domain.enums import HeatExchangerKind, HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..errors import WorkflowContractError
+from .search import reference_dt_cont_multiplier
 from .settings import SynthesisWorkflowSettings
 
 
@@ -31,6 +32,13 @@ def has_recovery_topology(
         and any(state.active for state in exchanger.period_states)
         for exchanger in network.exchangers
     )
+
+
+def is_pdm_variant_outcome(
+    outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+) -> bool:
+    """Return whether an outcome is one of a PDM task's extra networks."""
+    return "pdm_variant" in outcome.task.settings
 
 
 def is_utility_only_outcome(
@@ -121,23 +129,21 @@ def stage_count_from_network(
     return max(stages)
 
 
-def approach_temperature_from_network(
+def dt_cont_multiplier_from_network(
     network: HeatExchangerNetwork,
     settings: SynthesisWorkflowSettings,
 ) -> float:
-    """Return stable approach-temperature metadata for a seeded method task."""
-    value = network.summary_metrics.get("approach_temperature")
-    if isinstance(value, int | float) and value > 0.0:
-        return float(value)
-    value = network.source_metadata.get("solver_dTmin")
-    if isinstance(value, int | float) and value > 0.0:
-        return float(value)
-    for exchanger in network.exchangers:
-        for state in exchanger.period_states:
-            for approach_temperature in state.approach_temperatures:
-                if approach_temperature > 0.0:
-                    return float(approach_temperature)
-    return float(settings.approach_temperatures[0])
+    """Return the dt_cont multiplier a seeded method task runs at.
+
+    A synthesised network records the multiplier it was solved at. A network
+    without one (a user network, say) runs at the reference multiplier: 1.0
+    when it is configured, otherwise the first configured multiplier.
+    """
+    for metadata in (network.summary_metrics, network.source_metadata):
+        value = metadata.get("dt_cont_multiplier")
+        if isinstance(value, int | float) and value > 0.0:
+            return float(value)
+    return reference_dt_cont_multiplier(settings.dt_cont_multipliers)
 
 
 def derivative_threshold_from_network(network: HeatExchangerNetwork) -> float | None:
@@ -183,8 +189,8 @@ def _outcome_map(
 
 
 __all__ = [
-    "approach_temperature_from_network",
     "derivative_threshold_from_network",
+    "dt_cont_multiplier_from_network",
     "has_recovery_topology",
     "is_utility_only_outcome",
     "required_topology_restrictions_from_outcome",

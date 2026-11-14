@@ -18,6 +18,7 @@ from typing import Any
 
 from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+    nominal_approach_temperature,
     problem_to_solver_arrays,
 )
 
@@ -37,7 +38,20 @@ CASE_IDS = (
     "Thirteen-stream-Kim-et-al-2017-1",
 )
 PACKAGE_SAMPLE_CASE_ID = "Four-stream-Yee-and-Grossmann-1990-1"
+# The package sample shows the synthesis defaults: it drops the OpenHENS
+# solver and the multiplier and threshold grids the fixtures pin.
+PACKAGE_SAMPLE_DEFAULTED_OPTIONS = (
+    "HENS_SOLVER_PDM",
+    "HENS_DT_CONT_MULTIPLIERS",
+    "HENS_DERIVATIVE_THRESHOLDS",
+)
 OPENHENS_DT_GRID = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]
+# The fixtures keep the default THERMAL_DT_CONT of 5 K; synthesis is keyed on
+# dt_cont multipliers, so OpenHENS's dTmin grid becomes dTmin / (2 * 5 K).
+OPENHENS_THERMAL_DT_CONT = 5.0
+OPENHENS_DT_CONT_MULTIPLIERS = [
+    round(d_tmin / (2.0 * OPENHENS_THERMAL_DT_CONT), 12) for d_tmin in OPENHENS_DT_GRID
+]
 OPENHENS_DQDA_GRID = [0.5, 0.9, 1.3, 1.7, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0]
 
 
@@ -253,7 +267,7 @@ def convert_case_to_target_input(
             "COSTING_SERVICE_LIFE": 1.0,
             "COSTING_HX_AREA_EXP": exchange.area_exponent,
             "COSTING_HX_UNIT_COST": exchange.unit_cost,
-            "HENS_APPROACH_TEMPERATURES": OPENHENS_DT_GRID,
+            "HENS_DT_CONT_MULTIPLIERS": OPENHENS_DT_CONT_MULTIPLIERS,
             "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
             "HENS_DERIVATIVE_THRESHOLDS": OPENHENS_DQDA_GRID,
             "HENS_SOLVER_EVM": "ipopt-pyomo",
@@ -312,6 +326,8 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
                 output_folder="",
                 output_formats=[],
             )
+            for key in PACKAGE_SAMPLE_DEFAULTED_OPTIONS:
+                del sample_case["options"][key]
             _write_json(
                 repo_root
                 / "OpenPinch"
@@ -328,7 +344,7 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
         ),
         repo_root,
         openhens_root=openhens_root,
-        dTmin=14.0,
+        dt_cont_multiplier=1.4,
     )
 
 
@@ -337,18 +353,21 @@ def _write_adapter_snapshot(
     repo_root: Path,
     *,
     openhens_root: Path,
-    dTmin: float,
+    dt_cont_multiplier: float,
 ) -> None:
     fixture_path = (
         repo_root / "tests" / "fixtures" / "openhens" / f"{parsed.case_id}.json"
     )
     target_input = json.loads(fixture_path.read_text())
     problem = PinchProblem(source=target_input)
+    # OpenHENS keys its arrays on dTmin; the multiplier's internal approach is
+    # the matching OpenHENS dTmin (14 K at 1.4 with THERMAL_DT_CONT 5 K).
+    dTmin = nominal_approach_temperature(problem.master_zone.config, dt_cont_multiplier)
     adapter = problem_to_solver_arrays(problem, dTmin)
     snapshot = adapter.to_json_dict() | {
         "schema_version": "openpinch-openhens-adapter-snapshot/v1",
         "case_id": parsed.case_id,
-        "active_dTmin": dTmin,
+        "dt_cont_multiplier": dt_cont_multiplier,
         "source_csv_path": _display_path(parsed.source_csv, openhens_root),
         "source_csv_sha256": _sha256(parsed.source_csv),
         "source_fixture_path": _display_path(fixture_path, repo_root),
@@ -372,7 +391,7 @@ def _write_adapter_snapshot(
         / "regression_artifacts"
         / "adapter_array_snapshots"
         / parsed.case_id
-        / "dTmin-14.json",
+        / f"dt-cont-multiplier-{dt_cont_multiplier:g}.json",
         snapshot,
     )
 

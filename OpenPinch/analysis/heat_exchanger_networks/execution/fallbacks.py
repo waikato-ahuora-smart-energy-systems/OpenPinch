@@ -13,6 +13,9 @@ from ....domain.enums import HeatExchangerNetworkDesignMethod
 from .settings import SynthesisWorkflowSettings
 from .task_builders import _successful_method
 
+# HiGHS hands a pinch design model that is not linear to Couenne.
+_COUENNE_BACKED_PDM_SOLVERS = frozenset({"couenne", "highs"})
+
 
 def _can_skip_derivative_stage_for_missing_couenne(
     settings: SynthesisWorkflowSettings,
@@ -34,7 +37,11 @@ def _can_skip_preliminary_stages_for_missing_couenne(
     pdm_tasks: Sequence[HeatExchangerNetworkSynthesisTask],
     pdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> bool:
-    if settings.pdm_solver != "couenne" or not pdm_tasks or not pdm_outcomes:
+    if (
+        settings.pdm_solver not in _COUENNE_BACKED_PDM_SOLVERS
+        or not pdm_tasks
+        or not pdm_outcomes
+    ):
         return False
     if any(
         _successful_method(outcome, HeatExchangerNetworkDesignMethod.PinchDesign)

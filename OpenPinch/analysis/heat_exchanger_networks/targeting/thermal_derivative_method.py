@@ -11,16 +11,13 @@ from ....contracts.synthesis.task import (
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
-from ..execution.pathways import pathway_metadata, pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
 from ..execution.task_builders import (
     _required_stage_count,
     _successful_method,
-    approach_temperature_from_network,
+    is_pdm_variant_outcome,
     is_utility_only_outcome,
     required_topology_restrictions_from_outcome,
-    stage_count_from_network,
-    topology_restrictions_from_network,
 )
 from ..results.assembly import SynthesisWorkflowResult
 from ._stage import build_seeded_quality_tasks, run_single_method_workflow, run_stage
@@ -95,10 +92,8 @@ def build_thermal_derivative_method_tasks(
             continue
         if is_utility_only_outcome(outcome):
             continue  # utility-only: a final candidate, nothing to refine
-        pathways = pathways_from_metadata(outcome.task.metadata)
-        tdm_pathways = tuple(pathway for pathway in pathways if pathway.uses_tdm)
-        if pathways and not tdm_pathways:
-            continue
+        if is_pdm_variant_outcome(outcome):
+            continue  # extra PDM networks seed evolution directly
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
             HeatExchangerNetworkDesignMethod.ThermalDerivative,
@@ -107,12 +102,11 @@ def build_thermal_derivative_method_tasks(
             outcome, HeatExchangerNetworkDesignMethod.ThermalDerivative
         )
         for derivative_threshold in settings.derivative_thresholds:
-            metadata = pathway_metadata(tdm_pathways)
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
                     method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
-                    approach_temperature=outcome.task.approach_temperature,
+                    dt_cont_multiplier=outcome.task.dt_cont_multiplier,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
                     problem_id=settings.problem_id,
@@ -120,7 +114,6 @@ def build_thermal_derivative_method_tasks(
                     period_id=settings.period_id,
                     parent_task_id=outcome.task.task_id,
                     topology_restrictions=restrictions,
-                    metadata=metadata,
                 )
             )
     return tuple(tasks)
@@ -130,46 +123,7 @@ def build_seeded_thermal_derivative_method_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate standalone TDM tasks from existing seed-network topologies."""
-    if settings.synthesis_quality_tier > 1:
-        return _build_seeded_quality_thermal_derivative_method_tasks(
-            settings,
-            seed_networks,
-        )
-
-    tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    for seed_index, network in enumerate(seed_networks):
-        restrictions = topology_restrictions_from_network(
-            network,
-            downstream_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
-        )
-        stage_count = stage_count_from_network(
-            network,
-            downstream_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
-        )
-        approach_temperature = approach_temperature_from_network(network, settings)
-        for derivative_threshold in settings.derivative_thresholds:
-            tasks.append(
-                HeatExchangerNetworkSynthesisTask(
-                    run_id=settings.run_id,
-                    method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
-                    approach_temperature=approach_temperature,
-                    derivative_threshold=derivative_threshold,
-                    stage_count=stage_count,
-                    problem_id=settings.problem_id,
-                    workspace_variant=settings.workspace_variant,
-                    period_id=settings.period_id,
-                    seed_network_index=seed_index,
-                    topology_restrictions=restrictions,
-                )
-            )
-    return tuple(tasks)
-
-
-def _build_seeded_quality_thermal_derivative_method_tasks(
-    settings: SynthesisWorkflowSettings,
-    seed_networks: Sequence[HeatExchangerNetwork],
-) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
+    """Standalone TDM tasks from seed topologies, one per distinct threshold."""
     return build_seeded_quality_tasks(
         settings,
         seed_networks,

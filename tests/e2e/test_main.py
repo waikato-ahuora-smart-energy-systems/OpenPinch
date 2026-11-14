@@ -82,7 +82,6 @@ def test_problem_pipeline_solves_every_shipped_example(problem_path: Path) -> No
 
 def test_root_import_does_not_require_optional_feature_packages() -> None:
     blocked = {
-        "gekko",
         "idaes",
         "kaleido",
         "openpyxl",
