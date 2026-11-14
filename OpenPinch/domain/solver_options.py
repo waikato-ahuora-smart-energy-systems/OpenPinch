@@ -67,6 +67,7 @@ _COUENNE_OPTIONS = frozenset(
         "max_fbbt_iter",
         "feasibility_bt",
         "aggressive_fbbt",
+        "optimality_bt",
     }
 )
 

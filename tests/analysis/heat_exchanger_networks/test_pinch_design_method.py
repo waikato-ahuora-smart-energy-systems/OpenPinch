@@ -327,6 +327,7 @@ def test_user_couenne_options_are_written_to_model_run_directory(
     assert run.solver_options == {
         "feasibility_bt": "no",
         "aggressive_fbbt": "no",
+        "optimality_bt": "no",
         "node_limit": 50,
         "delete_redundant": "no",
         "time_limit": 120,
@@ -378,9 +379,13 @@ def test_couenne_without_user_options_writes_its_bound_tightening_defaults(
     # from small stage-wise models, so it is off unless the user turns it on.
     option_file = tmp_path / "run" / "couenne.opt"
     assert run.option_file == str(option_file)
-    assert run.solver_options == {"feasibility_bt": "no", "aggressive_fbbt": "no"}
+    assert run.solver_options == {
+        "feasibility_bt": "no",
+        "aggressive_fbbt": "no",
+        "optimality_bt": "no",
+    }
     assert option_file.read_text(encoding="utf-8") == (
-        "feasibility_bt no\naggressive_fbbt no\n"
+        "feasibility_bt no\naggressive_fbbt no\noptimality_bt no\n"
     )
 
     original_cwd = Path.cwd()

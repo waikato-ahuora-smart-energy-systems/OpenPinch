@@ -710,6 +710,23 @@ def test_duty_aligned_area_slices_tolerate_solver_overshoot_relative_to_duty():
         )
 
 
+def test_duty_aligned_area_slices_drop_a_solver_noise_sliver_past_a_boundary():
+    # Couenne on Linux returns a 50 kW hot utility load as 50.000002 kW; the
+    # 2e-6 kW past the first segment's end is solver noise, not a second
+    # segment in use.
+    contributions = duty_aligned_area_contributions(
+        _profile("Hot", hot=True),
+        _profile("Cold", hot=False),
+        duty=50.0 + 2e-6,
+        hot_inlet_temperature=473.15,
+        cold_inlet_temperature=323.15,
+        period="normal",
+    )
+
+    assert {item.hot_segment_identity for item in contributions} == {"Hot.S1"}
+    assert sum(item.duty for item in contributions) == pytest.approx(50.0)
+
+
 def test_piecewise_profile_rejects_discontinuity_and_out_of_range_lookup():
     with pytest.raises(ValueError, match="continuous"):
         PiecewiseThermalProfile(
