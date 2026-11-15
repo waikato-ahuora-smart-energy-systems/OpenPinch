@@ -160,6 +160,14 @@ verify are dropped. With several operating periods, each period is designed
 on its own and a proposal is the union of one design per period, one shared
 topology.
 
+A side left with fewer complete proposals than the cap is searched again by
+two fallbacks in turn, least intrusive first, and their new proposals follow
+the first search's: the first also tries the next nearest must streams to the
+pinch, not just the nearest; the second lets a stream that no partner can take
+in series split a partner away from the pinch, matching it in parallel with
+that partner's last match where the stage keeps its approach. A side the first
+search fills is not searched again.
+
 In the main synthesis workflow every heuristic network seeds network
 evolution directly (from search depth 1). Heuristic networks never go to the
 thermal derivative method.

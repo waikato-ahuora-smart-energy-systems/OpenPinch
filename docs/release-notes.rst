@@ -4,6 +4,21 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The heuristic pinch design method searches a pinch side again when it
+  finds fewer complete proposals than ``HENS_HEURISTIC_PDM_NETWORKS``: first
+  trying the next nearest must streams to the pinch as well as the nearest,
+  then splitting a partner away from the pinch when no partner can take a
+  stream's load in series. New proposals follow the first search's, so
+  existing ones and their order are unchanged. On the
+  12 OpenHENS benchmark cases at the default width and depth 0, Ten-stream
+  Ahmad at multiplier 1.0 now gets heuristic networks where the MILP stood
+  in, and distinct target-meeting topologies rise from 87 to 93 in the same
+  time; with 50 networks per multiplier, from 206 to 250 for about 20 %
+  more time. The best network is unchanged or better on every case.
+
 0.9.0 (2026-11-14)
 ------------------
 
