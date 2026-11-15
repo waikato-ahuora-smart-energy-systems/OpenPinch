@@ -327,6 +327,7 @@ class _DesignAccessor:
         period_id: str | None = None,
         design_basis: str | None = None,
         basis_clusters: int | None = None,
+        overdesign_percentage=None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -351,6 +352,14 @@ class _DesignAccessor:
         targeting when there is none. Passing ``period_id`` implies
         ``"period"``. On a single-period case the basis changes nothing.
 
+        ``overdesign_percentage`` (``HENS_OVERDESIGN_PERCENTAGE``) enlarges
+        every heat-recovery area by that margin and rates the network over
+        every period at those areas: each period's duties are re-optimised
+        for the least utility cost, with bypass where a period needs less.
+        ``"optimise"`` picks the margin, up to ``HENS_OVERDESIGN_MAX`` per
+        cent, for the least total annual cost. The result's
+        ``selected_network.summary_metrics["overdesign"]`` reports it.
+
         ``width`` (``HENS_SEARCH_WIDTH``, 0 to 3, default 1) picks the dt_cont
         multipliers: 1.0; 0.75, 1.0 and 1.5; then five and seven values from
         0.5 to 2.0. ``depth`` (``HENS_SEARCH_DEPTH``, 0 to 4, default 1) picks
@@ -369,6 +378,45 @@ class _DesignAccessor:
         to ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times twice
         the scaled ``THERMAL_DT_CONT`` if that is larger.
         """
+        margin = self._overdesign_margin(overdesign_percentage)
+        view = self._synthesise(
+            width=width,
+            depth=depth,
+            options=options,
+            period_id=period_id,
+            design_basis=design_basis,
+            basis_clusters=basis_clusters,
+            dt_cont_multipliers=dt_cont_multipliers,
+            derivative_thresholds=derivative_thresholds,
+            stages=stages,
+            pack_stages=pack_stages,
+            solver=solver,
+            max_parallel=max_parallel,
+            best_solutions=best_solutions,
+            solve_tolerance=solve_tolerance,
+        )
+        if margin is None:
+            return view
+        return self._apply_overdesign(view.selected_network, margin, basis=view)
+
+    def _synthesise(
+        self,
+        *,
+        width,
+        depth,
+        options,
+        period_id,
+        design_basis,
+        basis_clusters,
+        dt_cont_multipliers,
+        derivative_thresholds,
+        stages,
+        pack_stages,
+        solver,
+        max_parallel,
+        best_solutions,
+        solve_tolerance,
+    ) -> HeatExchangerNetworkDesignView:
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_open_hens_method_service,
         )
@@ -414,6 +462,44 @@ class _DesignAccessor:
             configuration=configuration,
             workspace_variant=None,
         )
+
+    def _overdesign_margin(self, overdesign_percentage):
+        from ....analysis.heat_exchanger_networks.overdesign import validate_margin
+
+        if overdesign_percentage is None:
+            hens = self._problem._require_prepared_root_zone().config.hens
+            overdesign_percentage = hens.overdesign_percentage
+        return validate_margin(overdesign_percentage)
+
+    def _apply_overdesign(self, network, margin, *, basis=None):
+        """Rate ``network`` with its recovery areas enlarged by ``margin``."""
+        from ....analysis.heat_exchanger_networks.overdesign import (
+            apply_overdesign,
+            validate_margin,
+        )
+        from ..targeting.provenance import canonical_json
+
+        margin = validate_margin(margin)
+        hens = self._problem._require_prepared_root_zone().config.hens
+        view, metrics = apply_overdesign(
+            network,
+            margin,
+            maximum=float(hens.overdesign_max),
+            rate=lambda installed: self.optimise_duties(installed, objective="rating"),
+        )
+        view.selected_network.summary_metrics["overdesign"] = metrics
+        settings = dict((basis or view).result.provenance.effective_settings) | {
+            "HENS_OVERDESIGN_PERCENTAGE": margin
+        }
+        provenance = view.result.provenance.model_copy(
+            update={
+                "method_id": (basis or view).result.provenance.method_id,
+                "effective_settings_json": canonical_json(settings),
+            }
+        )
+        view.result.provenance = provenance
+        self._problem._results.design = view.result
+        return view
 
     def _design_basis(self, design_basis: str | None, period_id: str | None):
         """The basis a multiperiod design is synthesised from; None for one period."""
@@ -757,6 +843,10 @@ class _DesignAccessor:
           common areas (``COSTING_HX_*`` settings) plus utility cost. Only a
           positive approach is required at both ends of each exchanger,
           ``min_approach_temperature`` defaulting to 1 K.
+        * ``"rating"``: minimise utility cost with every recovery exchanger's
+          area fixed at the network's ``area`` (each needs one). Every
+          period's duty must fit that area; a period needing less runs with
+          a bypass. The approach defaults to 1 K, as for ``"cost"``.
 
         An exchanger left at zero duty in every period is removed, with its
         approach constraint, and the problem is solved again until every

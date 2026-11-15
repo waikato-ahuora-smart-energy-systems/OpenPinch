@@ -159,6 +159,23 @@ one that can serve it there in every period; one no period uses is removed.
    problem.design.heat_exchanger_network(period_id="peak")
    problem.design.heat_exchanger_network(design_basis="all")
 
+``overdesign_percentage`` (stored as ``HENS_OVERDESIGN_PERCENTAGE``) adds a
+margin to every heat-recovery area; heaters and coolers are not scaled. The
+network is then rated over every period at the larger areas: each period's
+duties are re-optimised for the least utility cost, with a bypass where a
+period needs less. ``"optimise"`` chooses the margin, between 0 and
+``HENS_OVERDESIGN_MAX`` (50 %), for the least total annual cost, from about
+15 rating solves. ``selected_network.summary_metrics["overdesign"]`` reports
+the margin, each period's recovery and utility before and after, the cost
+with and without the margin, and every margin tried, for plotting cost
+against margin. ``design.optimise_duties(network, objective="rating")`` rates
+any network with installed areas the same way.
+
+.. code-block:: python
+
+   design = problem.design.heat_exchanger_network(overdesign_percentage="optimise")
+   design.selected_network.summary_metrics["overdesign"]["percentage"]
+
 The result's provenance records the basis (``HENS_DESIGN_BASIS``, with
 ``basis_period_id`` for a period basis, or ``HENS_BASIS_CLUSTERS``,
 ``basis_period_ids`` and ``basis_medoid`` for a median one) and lists every

@@ -200,6 +200,15 @@ def _share_in_unit_interval(name: str, value: Any) -> float:
     return numeric_value
 
 
+def _overdesign_margin(name: str, value: Any) -> float | str | None:
+    if value is None or value == "optimise":
+        return value
+    numeric_value = _float(name, value)
+    if not numeric_value >= 0.0:
+        raise ValueError(f"{name} must be at least 0, or 'optimise'.")
+    return numeric_value
+
+
 def _positive_int(name: str, value: Any) -> int:
     numeric_value = _int(name, value)
     if numeric_value <= 0:
@@ -397,6 +406,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_BASIS_CLUSTERS": _spec(int, 1, "hens", "basis_clusters", numeric_min=1.0),
     "HENS_BASIS_ACTIVE_SHARE": _spec(float, 0.5, "hens", "basis_active_share", validator=_share_in_unit_interval),
     "HENS_BASIS_CANDIDATES": _spec(str, "dominant", "hens", "basis_candidates", validator=partial(_string_choice, choices=HENS_BASIS_CANDIDATES_VALUES)),
+    "HENS_OVERDESIGN_PERCENTAGE": _spec(float | str | None, None, "hens", "overdesign_percentage", validator=_overdesign_margin),
+    "HENS_OVERDESIGN_MAX": _spec(float, 50.0, "hens", "overdesign_max", numeric_min=0.0),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),

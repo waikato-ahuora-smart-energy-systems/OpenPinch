@@ -367,6 +367,18 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "this share of its cluster's period weight."
         ),
     ),
+    "HENS_OVERDESIGN_PERCENTAGE": FieldText(
+        "Overdesign margin", "%",
+        (
+            "Margin on every heat-recovery exchanger's area, then rated over every "
+            "period for the least utility cost: a percentage, or optimise to pick "
+            "the margin with the least total annual cost. Unset adds none."
+        ),
+    ),
+    "HENS_OVERDESIGN_MAX": FieldText(
+        "Overdesign margin limit", "%",
+        "The largest margin an optimised overdesign may choose.",
+    ),
     "HENS_BASIS_CANDIDATES": FieldText(
         "Median basis candidates", None,
         (
