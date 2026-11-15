@@ -69,6 +69,8 @@ METHOD_CATALOG = MappingProxyType(
             periods="nonmutating", adapter="inverse_dt_min"
         ),
         "target.hpr_load_kinks": _spec(periods="nonmutating", adapter="load_kinks"),
+        # Describes the registered cycles; reads no problem data.
+        "target.hpr_cycles": _spec(periods="nonmutating", adapter="cycle_catalog"),
         **{
             f"target.{name}": _spec(
                 scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),

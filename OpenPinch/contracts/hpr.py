@@ -888,7 +888,9 @@ class HprTargetRequest(_RequestModel):
     placement: Literal["process", "utility"] = "process"
     load: HprLoad | None = None
     levels: HprLevels | None = None
-    cycle_options: HprCycleOptions | None = None
+    # A mapping for a cycle registered beyond the four above; the gateway
+    # validates it with that cycle's own options model.
+    cycle_options: HprCycleOptions | dict[str, Any] | None = None
     search: HprSearchLimits | None = None
     zone: str | None = None
     include_subzones: bool = False
@@ -906,18 +908,52 @@ class HprTargetRequest(_RequestModel):
 
     @model_validator(mode="after")
     def _options_match_the_cycle(self) -> Self:
-        if self.cycle_options is not None and self.cycle_options.cycle != self.cycle:
+        options = self.cycle_options
+        named = (
+            options.get("cycle")
+            if isinstance(options, dict)
+            else (None if options is None else options.cycle)
+        )
+        if named is not None and named != self.cycle:
             raise ValueError(
-                f"cycle_options are for the {self.cycle_options.cycle} cycle, "
-                f"not {self.cycle}."
+                f"cycle_options are for the {named} cycle, not {self.cycle}."
             )
         return self
+
+
+class HprCycleInfo(BaseModel):
+    """One registered heat pump and refrigeration cycle, for a client's form.
+
+    ``options_schema`` is the JSON Schema of the cycle's options model.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    label: str
+    duties: tuple[str, ...]
+    topologies: tuple[str, ...]
+    default_topology: str
+    available: bool
+    all_periods: bool
+    dependencies: tuple[str, ...]
+    options_schema: dict[str, Any]
+
+
+class HprCycleCatalog(BaseModel):
+    """Every registered cycle, in registration order."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cycles: tuple[HprCycleInfo, ...]
 
 
 __all__ = [
     "ZERO_USEFUL_DUTY_REASON",
     "BraytonCycleOptions",
     "CarnotCycleOptions",
+    "HprCycleCatalog",
+    "HprCycleInfo",
     "HprCycleOptions",
     "HprLevels",
     "HprLoad",

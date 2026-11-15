@@ -18,6 +18,10 @@ Heat pumps and refrigeration
   also on ``target.all_periods``. The seven named methods
   (``carnot_heat_pump`` and the rest) now run through it with unchanged
   results.
+- ``target.hpr_cycles()`` lists the registered cycles: duties, topologies,
+  availability, optional dependencies and the JSON Schema of each cycle's
+  options, for building a cycle picker and option form. It is also a
+  command.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

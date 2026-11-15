@@ -155,12 +155,15 @@ def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
     designs = {
         name.split(".")[1] for name in METHOD_CATALOG if name.startswith("design.")
     }
+    # hpr_cycles describes the cycle registry, not a case or a period.
     assert names(_CaseBatchTargetAccessor) == targets - {
+        "hpr_cycles",
         "hpr_performance_map",
         "hpr_refrigerant_screen",
     }
     assert names(_CaseBatchDesignAccessor) == designs
     period_names = targets - {
+        "hpr_cycles",
         "hpr_performance_map",
         "hpr_refrigerant_screen",
         "brayton_heat_pump",
@@ -175,6 +178,7 @@ def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
         "placement",
         "hpr_map",
         "refrigerant_screen",
+        "cycle_catalog",
         "hen",
         "residual",
     }
