@@ -1154,6 +1154,75 @@ def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
     assert child.z[0][0][0].value == (0 if kind == "minus" else 1)
 
 
+def test_evolution_solves_a_topology_once_per_search(monkeypatch):
+    # The single-path search cycles through the same add and remove moves,
+    # and re-solved one infeasible removal at every depth.
+    created: list[dict] = []
+
+    class _FakeChild:
+        def __init__(self, **kwargs):
+            created.append(kwargs)
+            self.z = [[[_PyomoLikeVariable()]]]
+
+        def set_initial_values_for_variables(self, parent):
+            pass
+
+        def optimise(self, *, print_output):
+            pass
+
+    monkeypatch.setattr(
+        stagewise_evolution, "_stagewise_model_class", lambda: _FakeChild
+    )
+    owner = _evolution_model()
+    owner.solver = "ipopt-pyomo"
+    owner.solver_options = None
+    owner.tol = 1e-3
+    prev_case = SimpleNamespace(
+        framework="ESM",
+        solver_arrays=object(),
+        stages=1,
+        dTmin=10.0,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=True,
+    )
+    solved: dict = {}
+
+    children = [
+        stagewise_evolution._build_and_solve_evolution(
+            owner,
+            "plus",
+            print_output=False,
+            unit=unit,
+            prev_case=prev_case,
+            position=(0, 0, 0),
+            z_allowed=[[[1]]],
+            solved=solved,
+        )
+        for unit in range(2)
+    ]
+
+    assert len(created) == 1
+    assert children[0] is children[1]
+
+
+def test_source_evolution_shares_its_solved_topologies_across_depths():
+    model = _evolution_model(tac=100.0)
+    seen = []
+
+    def candidate(**kwargs):
+        seen.append(kwargs["solved"])
+        return None
+
+    model.get_n_minus_one_evolution = candidate
+    model.get_n_plus_one_evolution = candidate
+
+    _get_source_net_benefit_evolution(model, print_output=False, max_depth=1)
+
+    assert len(seen) == 2
+    assert seen[0] is seen[1]
+
+
 def _unconverged_start_with_dearer_candidate(monkeypatch):
     # IPOPT stopped at its iteration limit; the solve still passes, and the
     # objective (100) is lower than any real network can cost.

@@ -133,6 +133,7 @@ def _settings(**overrides):
         "evm_n_rm_branches": None,
         "effective_evm_n_ad_branches": 1,
         "effective_evm_n_rm_branches": 1,
+        "heuristic_pdm_evolution_seeds": 3,
         "tdm_solver": "couenne",
         "pdm_solver": "couenne",
     }

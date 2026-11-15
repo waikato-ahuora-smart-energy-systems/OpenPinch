@@ -398,9 +398,18 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Heuristic pinch design networks", None,
         (
             "Networks per dt_cont multiplier from the heuristic (Linnhoff rules) "
-            "pinch design method, each seeding network evolution from depth 1. "
+            "pinch design method; from depth 1 the cheapest seed network evolution "
+            "(HENS_HEURISTIC_PDM_EVOLUTION_SEEDS). "
             "Where it realises none, the MILP pinch design method runs instead. 0 "
             "runs only the MILP; unset, the search depth sets it."
+        ),
+    ),
+    "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS": FieldText(
+        "Heuristic networks evolved", None,
+        (
+            "Heuristic pinch design networks per dt_cont multiplier that seed "
+            "network evolution, cheapest first; the rest stay final candidates. "
+            "0 evolves none; unset, the search depth sets it."
         ),
     ),
     "HENS_PDM_MILP": FieldText(
