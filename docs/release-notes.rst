@@ -18,6 +18,11 @@ Heat exchanger network synthesis
   its slope at an idle unit's zero area moderate: every root solve of the
   dairy chilling sample ended "Restoration Failed" at a feasible point, and
   now all ten converge, with the same final network.
+- The default (single-path) network evolution solves each topology once per
+  search. It cycled through the same add and remove moves and re-solved
+  them, including one infeasible removal at every depth; it now reuses the
+  first solve. On the twelve literature cases and the dairy sample this cuts
+  evolution solves by about a third, with the same final networks.
 
 0.9.0 (2026-11-14)
 ------------------

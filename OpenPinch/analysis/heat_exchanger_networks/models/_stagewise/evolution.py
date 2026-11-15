@@ -185,6 +185,9 @@ def _get_source_net_benefit_evolution(
 
     model = owner
     best_model = _benchmark_model(owner)
+    # Topologies already solved in this search, by signature: the search
+    # cycles through the same moves, and a re-solve finds the same network.
+    solved: dict[tuple[tuple[int, int, int], ...], Any] = {}
     for unit in range(max_depth):
         logger.debug(
             "Evolution step %s/%s - Current TAC: %s",
@@ -196,11 +199,13 @@ def _get_source_net_benefit_evolution(
             print_output=print_output,
             unit=unit,
             prev_case=model,
+            solved=solved,
         )
         model_plus_one = owner.get_n_plus_one_evolution(
             print_output=print_output,
             unit=unit,
             prev_case=model,
+            solved=solved,
         )
         model = _select_source_best_candidate(
             owner,
@@ -539,7 +544,14 @@ def _update_with_best_model(owner, best_model) -> None:
     owner.get_post_process()
 
 
-def get_n_minus_one_evolution(owner, print_output: bool, unit: int, prev_case):
+def get_n_minus_one_evolution(
+    owner,
+    print_output: bool,
+    unit: int,
+    prev_case,
+    *,
+    solved: dict | None = None,
+):
     """Build and solve the source minus-one topology evolution candidate."""
 
     candidates = prev_case.get_lowest_benefit_HX_candidates(1)
@@ -560,6 +572,7 @@ def get_n_minus_one_evolution(owner, print_output: bool, unit: int, prev_case):
         prev_case=prev_case,
         position=position,
         z_allowed=z_allowed_removed,
+        solved=solved,
     )
 
 
@@ -573,11 +586,19 @@ def _build_and_solve_evolution(
     position: Sequence[int],
     z_allowed: list,
     branch_label: str | None = None,
+    solved: dict | None = None,
 ):
     """Build and solve one minus-one or plus-one topology evolution candidate.
 
     The child model is solved with the root EVM model's configured solver.
+    With ``solved``, a topology already in it is returned without a solve,
+    and a new one is added to it.
     """
+
+    if solved is not None:
+        signature = _topology_signature_from_z(owner, z_allowed)
+        if signature in solved:
+            return solved[signature]
 
     i, j, k = (int(index) for index in position)
     logger.debug(
@@ -621,10 +642,19 @@ def _build_and_solve_evolution(
         _assign_value(child.z[i][j][k], 1)
 
     child.optimise(print_output=print_output)
+    if solved is not None:
+        solved[signature] = child
     return child
 
 
-def get_n_plus_one_evolution(owner, print_output: bool, unit: int, prev_case):
+def get_n_plus_one_evolution(
+    owner,
+    print_output: bool,
+    unit: int,
+    prev_case,
+    *,
+    solved: dict | None = None,
+):
     """Build and solve the source plus-one topology evolution candidate."""
 
     candidates = prev_case.get_max_benefit_HX_candidates(1)
@@ -645,6 +675,7 @@ def get_n_plus_one_evolution(owner, print_output: bool, unit: int, prev_case):
         prev_case=prev_case,
         position=position,
         z_allowed=z_allowed_added,
+        solved=solved,
     )
 
 

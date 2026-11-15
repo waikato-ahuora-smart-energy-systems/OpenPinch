@@ -319,7 +319,6 @@ def test_multiperiod_area_costs_have_a_finite_slope_at_zero_area():
         assert pyo.value(slope) < float("inf")
 
 
-
 @pytest.mark.synthesis
 def test_multiperiod_area_costs_are_not_steep_at_zero_area():
     # With a 1e-8 m2 offset the slope at zero area was about 1,600 times the
@@ -362,6 +361,7 @@ def test_multiperiod_area_costs_are_not_steep_at_zero_area():
         slopes.append(pyo.value(slope))
 
     assert slopes[0] / slopes[1] < 100.0
+
 
 def _flatten(grid):
     for item in grid:

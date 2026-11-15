@@ -119,15 +119,33 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             beam_width=beam_width,
         )
 
-    def get_n_minus_one_evolution(self, print_output: bool, unit: int, prev_case):
+    def get_n_minus_one_evolution(
+        self,
+        print_output: bool,
+        unit: int,
+        prev_case,
+        *,
+        solved: dict | None = None,
+    ):
         """Build and solve the source minus-one topology evolution candidate."""
 
-        return _evolution.get_n_minus_one_evolution(self, print_output, unit, prev_case)
+        return _evolution.get_n_minus_one_evolution(
+            self, print_output, unit, prev_case, solved=solved
+        )
 
-    def get_n_plus_one_evolution(self, print_output: bool, unit: int, prev_case):
+    def get_n_plus_one_evolution(
+        self,
+        print_output: bool,
+        unit: int,
+        prev_case,
+        *,
+        solved: dict | None = None,
+    ):
         """Build and solve the source plus-one topology evolution candidate."""
 
-        return _evolution.get_n_plus_one_evolution(self, print_output, unit, prev_case)
+        return _evolution.get_n_plus_one_evolution(
+            self, print_output, unit, prev_case, solved=solved
+        )
 
     def _active_binary_value(self, value) -> float:
         """Delegate _active_binary_value to its owner helper."""
