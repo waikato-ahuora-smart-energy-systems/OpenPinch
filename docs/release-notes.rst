@@ -13,6 +13,11 @@ Heat exchanger network synthesis
   evolution solve ran that Ipopt instead. The IDAES directory is now a
   fallback after ``openpinch-solvers`` however it reached ``PATH``, and Ipopt
   and Couenne run the executable found when their solve is configured.
+- Multiperiod networks converge where Ipopt's restoration phase failed. The
+  area cost's offset at zero area rises from 1e-8 m2 to 1e-4 m2, which keeps
+  its slope at an idle unit's zero area moderate: every root solve of the
+  dairy chilling sample ended "Restoration Failed" at a feasible point, and
+  now all ten converge, with the same final network.
 
 0.9.0 (2026-11-14)
 ------------------

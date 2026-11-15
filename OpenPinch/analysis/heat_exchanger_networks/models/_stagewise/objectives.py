@@ -7,9 +7,10 @@ from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 
 # m^2 added to a shared area under its cost exponent: a unit with no duty has
-# zero area, where the cost's derivative is infinite and stops Ipopt. The
-# added cost is negligible.
-_SHARED_AREA_OFFSET = 1e-8
+# zero area, where the cost's derivative is infinite and stops Ipopt. At
+# 1e-8 the slope there was still steep enough that Ipopt's restoration phase
+# failed at feasible points. The cost of 1e-4 m^2 per idle unit is negligible.
+_SHARED_AREA_OFFSET = 1e-4
 
 
 def set_obj(owner) -> None:
