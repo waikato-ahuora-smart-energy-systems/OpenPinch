@@ -342,10 +342,31 @@ def test_is_linear_checks_constraints_and_objective():
 @pytest.mark.parametrize(
     ("user_options", "expected"),
     [
-        (None, {"bound_push": 1e-6, "bound_frac": 1e-6}),
+        # An acceptable level of 1e-4 over 5 iterations made Nine-stream's
+        # failing evolution solves converge (25/30 to 30/30) with the same
+        # networks; the 120 s wall-time cap is a guard, never reached in the
+        # EVM benchmark (2026-11-15). tol 1e-6 did as well, but made a duty
+        # optimisation's restoration fail and a Four-stream network dearer.
+        (
+            None,
+            {
+                "bound_push": 1e-6,
+                "bound_frac": 1e-6,
+                "acceptable_tol": 1e-4,
+                "acceptable_iter": 5,
+                "max_wall_time": 120.0,
+            },
+        ),
         (
             {"bound_push": 1e-2, "max_iter": 50},
-            {"bound_push": 1e-2, "bound_frac": 1e-6, "max_iter": 50},
+            {
+                "bound_push": 1e-2,
+                "bound_frac": 1e-6,
+                "acceptable_tol": 1e-4,
+                "acceptable_iter": 5,
+                "max_wall_time": 120.0,
+                "max_iter": 50,
+            },
         ),
     ],
 )

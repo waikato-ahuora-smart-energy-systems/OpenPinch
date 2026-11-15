@@ -76,9 +76,16 @@ DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {
 }
 # Ipopt pushes starting values off their bounds by 1e-2 relative to the bound
 # (about 3.5 K at 350 K), which undoes warm starts from solved networks.
+# Stopping at an error of 1e-4 held for 5 iterations converges evolution
+# solves that stalled near the optimum, with the same networks; the
+# wall-time cap stops a solve that hangs. acceptable_iter and max_wall_time
+# need Ipopt 3.14 or later (openpinch-solvers ships it).
 DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
     "bound_push": 1e-6,
     "bound_frac": 1e-6,
+    "acceptable_tol": 1e-4,
+    "acceptable_iter": 5,
+    "max_wall_time": 120.0,
 }
 # Defaults under the given options: SCIP prints nothing, and MindtPy runs
 # outer approximation with HiGHS masters and Ipopt subproblems.

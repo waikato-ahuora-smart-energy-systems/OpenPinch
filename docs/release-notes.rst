@@ -26,6 +26,15 @@ Heat exchanger network synthesis
   them, including one infeasible removal at every depth; it now reuses the
   first solve. On the twelve literature cases and the dairy sample this cuts
   evolution solves by about a third, with the same final networks.
+- Ipopt (``ipopt-pyomo``) now defaults to ``acceptable_tol 1e-4``,
+  ``acceptable_iter 5`` and ``max_wall_time 120`` alongside its bound
+  pushes, so a solve that stalls near the optimum stops there, and a solve
+  that hangs stops after two minutes. On Nine-stream every evolution solve
+  now converges (30 of 30, from 25), with the same networks.
+  ``acceptable_iter`` and ``max_wall_time`` need Ipopt 3.14 or later, which
+  ``openpinch-solvers`` ships; an older Ipopt first on ``PATH`` rejects them
+  and fails its solves. Set any of them in the stage's solver options to
+  change it.
 
 0.9.0 (2026-11-14)
 ------------------
