@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -76,7 +77,7 @@ def require_declared_synthesis_dependencies() -> dict[str, ModuleType]:
 
 def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> str:
     """Return a solver executable path or raise an actionable error."""
-    path = which(binary_name)
+    path = which(binary_name, path=_path_without_imported_idaes())
     if path is not None:
         return path
     for bin_directory in (_openpinch_solvers_bin_directory(), _idaes_bin_directory()):
@@ -92,6 +93,21 @@ def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> st
         "available on PATH, and see the OpenPinch synthesis dependency policy "
         "documentation for solver-test requirements."
     )
+
+
+def _path_without_imported_idaes() -> str:
+    """``PATH`` without the IDAES download that importing ``idaes`` puts first.
+
+    That directory stays a fallback after ``openpinch_solvers``; otherwise
+    looking for Couenne would switch every later Ipopt solve to IDAES's
+    older Ipopt.
+    """
+
+    entries = os.environ.get("PATH", "").split(os.pathsep)
+    idaes_bin = getattr(sys.modules.get("idaes"), "bin_directory", None)
+    if idaes_bin is None:
+        return os.pathsep.join(entries)
+    return os.pathsep.join(entry for entry in entries if entry != str(idaes_bin))
 
 
 def _solver_binary_in(bin_directory: Path | None, binary_name: str) -> Path | None:

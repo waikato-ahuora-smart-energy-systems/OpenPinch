@@ -231,6 +231,11 @@ def configure_pyomo_solver(
             f"solvers are: {', '.join(sorted(PYOMO_SOLVERS))}."
         )
     require_solver_backend(solver_name)
+    if solver_name in SOLUTION_FILE_SOLVERS:
+        # Solved with this executable rather than whichever is first on PATH.
+        model._openpinch_solver_executable = require_solver_binary(
+            PYOMO_SOLVER_BINARIES[solver_name]
+        )
     effective_options = _merge_solver_options(
         DEFAULT_SOLVER_OPTIONS.get(solver_name, {}), solver_options
     )
@@ -312,7 +317,14 @@ def solve_pyomo_model(
     failure_reason = None
     try:
         with _solver_working_directory(model, "pyomo"):
-            solver = pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
+            executable = getattr(model, "_openpinch_solver_executable", None)
+            solver = (
+                pyomo.SolverFactory(
+                    PYOMO_SOLVER_FACTORY_NAMES[solver_name], executable=executable
+                )
+                if executable is not None
+                else pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
+            )
             options = getattr(model, "_openpinch_solver_options", None) or {}
             if solver_name == "mindtpy":
                 # MindtPy takes its configuration as solve arguments.

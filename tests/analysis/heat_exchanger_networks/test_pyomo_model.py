@@ -219,6 +219,41 @@ def test_an_early_stop_without_a_solution_is_failed(monkeypatch, termination):
     assert termination in run.failure_reason
 
 
+@pytest.mark.parametrize(
+    ("solver_name", "binary"), [("ipopt-pyomo", "ipopt"), ("couenne", "couenne")]
+)
+def test_a_solve_runs_the_executable_its_configuration_found(
+    monkeypatch, solver_name, binary
+):
+    # Importing IDAES (to look for Couenne) puts its older Ipopt first on
+    # PATH, so the solve must not look the executable up on PATH again.
+    model, _x, _y = _bounded_model(4.0)
+    seen = {}
+
+    class _Solver:
+        options: dict = {}
+
+        def solve(self, *_args, **_kwargs):
+            raise RuntimeError("not solved")
+
+    def factory(_name, **kwargs):
+        seen.update(kwargs)
+        return _Solver()
+
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+    monkeypatch.setattr(
+        backend, "require_solver_binary", lambda name, **_kwargs: f"/opt/bin/{name}"
+    )
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
+    monkeypatch.setattr(pyo, "SolverFactory", factory)
+
+    backend.configure_pyomo_solver(model, solver_name)
+    backend.solve_pyomo_model(model, solver_name=solver_name)
+    backend.cleanup_model_run_directory(model)
+
+    assert seen["executable"] == f"/opt/bin/{binary}"
+
+
 @pytest.mark.solver
 @pytest.mark.skipif(
     "not _solver_available('ipopt-pyomo')", reason="needs the ipopt binary"

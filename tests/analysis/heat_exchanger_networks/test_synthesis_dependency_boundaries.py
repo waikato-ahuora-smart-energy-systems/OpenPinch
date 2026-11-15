@@ -67,7 +67,7 @@ def test_missing_synthesis_dependency_error_names_extra_and_docs():
 
 
 def test_missing_solver_binary_error_names_binary_and_solver_marker(monkeypatch):
-    monkeypatch.setattr(_dependencies, "which", lambda _binary: None)
+    monkeypatch.setattr(_dependencies, "which", lambda _binary, **_kwargs: None)
     monkeypatch.setattr(_dependencies, "_openpinch_solvers_bin_directory", lambda: None)
     monkeypatch.setattr(_dependencies, "_idaes_bin_directory", lambda: None)
 
@@ -88,7 +88,7 @@ def test_solver_binary_falls_back_to_idaes_bin_directory(
     solver = tmp_path / "ipopt"
     solver.write_text("#!/bin/sh\n", encoding="utf-8")
     solver.chmod(0o755)
-    monkeypatch.setattr(_dependencies, "which", lambda _binary: None)
+    monkeypatch.setattr(_dependencies, "which", lambda _binary, **_kwargs: None)
     monkeypatch.setattr(_dependencies, "_openpinch_solvers_bin_directory", lambda: None)
     monkeypatch.setattr(_dependencies, "_idaes_bin_directory", lambda: tmp_path)
     monkeypatch.setenv("PATH", "/usr/bin")
@@ -115,7 +115,7 @@ def test_solver_binary_comes_from_openpinch_solvers_before_idaes(
         solver = directory / "ipopt"
         solver.write_text("#!/bin/sh\n", encoding="utf-8")
         solver.chmod(0o755)
-    monkeypatch.setattr(_dependencies, "which", lambda _binary: None)
+    monkeypatch.setattr(_dependencies, "which", lambda _binary, **_kwargs: None)
     monkeypatch.setattr(
         _dependencies, "_openpinch_solvers_bin_directory", lambda: package_bin
     )
@@ -126,6 +126,32 @@ def test_solver_binary_comes_from_openpinch_solvers_before_idaes(
 
     assert path == str(package_bin / "ipopt")
     assert os.environ["PATH"].split(os.pathsep)[0] == str(package_bin)
+
+
+def test_ipopt_on_path_from_an_idaes_import_does_not_shadow_openpinch_solvers(
+    tmp_path,
+    monkeypatch,
+):
+    # Importing IDAES (to look for Couenne) puts its older Ipopt download
+    # first on PATH; the openpinch-solvers Ipopt must still be the one found.
+    package_bin = tmp_path / "openpinch_solvers"
+    idaes_bin = tmp_path / "idaes"
+    for directory in (package_bin, idaes_bin):
+        directory.mkdir()
+        solver = directory / "ipopt"
+        solver.write_text("#!/bin/sh\n", encoding="utf-8")
+        solver.chmod(0o755)
+    monkeypatch.setattr(
+        _dependencies, "_openpinch_solvers_bin_directory", lambda: package_bin
+    )
+    monkeypatch.setitem(
+        sys.modules, "idaes", type("Module", (), {"bin_directory": str(idaes_bin)})
+    )
+    monkeypatch.setenv("PATH", os.pathsep.join([str(idaes_bin), "/usr/bin"]))
+
+    path = _dependencies.require_solver_binary("ipopt")
+
+    assert path == str(package_bin / "ipopt")
 
 
 def test_openpinch_solvers_bin_directory_reads_the_installed_package(monkeypatch):

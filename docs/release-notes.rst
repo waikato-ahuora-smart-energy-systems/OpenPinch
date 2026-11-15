@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Network evolution runs the ``openpinch-solvers`` Ipopt again when IDAES is
+  installed. Looking for Couenne (the default TDM solver) imports IDAES,
+  which puts its older Ipopt download first on ``PATH``, so every later
+  evolution solve ran that Ipopt instead. The IDAES directory is now a
+  fallback after ``openpinch-solvers`` however it reached ``PATH``, and Ipopt
+  and Couenne run the executable found when their solve is configured.
+
 0.9.0 (2026-11-14)
 ------------------
 
