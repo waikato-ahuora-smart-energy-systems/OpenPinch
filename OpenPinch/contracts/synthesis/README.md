@@ -6,7 +6,7 @@ records, per-method task inputs and outputs, topology restrictions, the
 problem-owned result, and a frozen design view for clients that draw it. They use
 `HeatExchangerNetwork` and the design-method enum from `OpenPinch/domain`.
 `OpenPinch/contracts/output.py` embeds the result in `TargetOutput`, and
-`OpenPinch/contracts/schema.py` exports the result and view as JSON Schema.
+`OpenPinch/contracts/schema.py` exports the result, the view and the design basis as JSON Schema.
 
 ## Interface
 - `HeatExchangerNetworkSynthesisManifest`, `HeatExchangerNetworkSynthesisExportRecord`, `SynthesisTaskStatus`, `SynthesisOutputFormat` (`common.py`): run manifest (grids, stage selection, method sequence, limits) and export-record types.
@@ -15,6 +15,7 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - `HeatExchangerNetworkTopologyRestriction` (`topology.py`): source/sink stream, stage and duty inherited by downstream tasks.
 - `HeatExchangerNetworkSynthesisResult` (`result.py`): network, identities, solver status, objective values and ranked outcomes.
 - `HeatExchangerNetworkView` and its rows (`view.py`): ranking, utility duties and grid layout (`HeatExchangerNetworkGridLayout`, `...GridMatch`, `...GridStream`, `...GridBranchCount`, `...RankingRow`, `...UtilityDuty`); `GridMatchKind`.
+- `HenDesignBasis`, `HenBasisCluster`, `HenBasisStream` (`basis.py`): the median design basis preview: clusters of operating periods (members, weights, weight shares, medoid), the basis cluster and its synthetic stream table.
 - Private helpers in `common.py` (`_validate_run_id` and similar) are imported by the sibling modules.
 - Subdirectories: none.
 

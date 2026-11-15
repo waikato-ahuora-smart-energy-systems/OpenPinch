@@ -126,6 +126,8 @@ METHOD_CATALOG = MappingProxyType(
             periods="nonmutating",
             adapter="refrigerant_screen",
         ),
+        # Reads the problem's inputs only: no targets, solver or synthesis.
+        "design.design_basis": _spec(periods="shared", adapter="hen"),
         **{
             f"design.{name}": _spec(
                 prerequisites=("direct_heat_integration",),

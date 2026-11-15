@@ -117,29 +117,6 @@ def with_utilities_from(receiver, donor, *, project_name=None):
     return derived
 
 
-def _period_value(value, index, period_id):
-    """``value`` with every per-period quantity reduced to one period's value."""
-    if isinstance(value, list):
-        return [_period_value(item, index, period_id) for item in value]
-    if not isinstance(value, dict):
-        return value
-    if "values" in value:
-        values = value["values"]
-        ids = value.get("period_ids")
-        position = (
-            [str(item) for item in ids].index(period_id)
-            if ids is not None
-            else (index if len(values) > 1 else 0)
-        )
-        reduced = {
-            key: item
-            for key, item in value.items()
-            if key not in ("values", "period_ids", "weights")
-        }
-        return reduced | {"value": _period_value(values[position], index, period_id)}
-    return {key: _period_value(item, index, period_id) for key, item in value.items()}
-
-
 def single_period_case(problem, period_id, *, project_name=None):
     """A new single-period problem holding ``period_id``'s data alone.
 
@@ -159,7 +136,9 @@ def single_period_case(problem, period_id, *, project_name=None):
             "a single-period case cannot be derived from a problem with "
             "process components."
         )
-    source = _period_value(
+    from ..analysis.heat_exchanger_networks.basis.synthetic_case import period_source
+
+    source = period_source(
         problem.to_problem_json(), period_ids.index(period_id), period_id
     )
     source["options"] |= {

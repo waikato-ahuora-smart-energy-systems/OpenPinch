@@ -131,22 +131,38 @@ On a case with several operating periods, ``heat_exchanger_network()``
 designs one network that serves every period. ``design_basis`` (stored as
 ``HENS_DESIGN_BASIS``) sets what it is synthesised from:
 
-- ``"all"`` (the default): every period at once. Synthesis targets every
-  period first when the problem has no period results.
+- ``"median"`` (the default): a synthetic single-period case whose streams
+  take their period-weighted medians, of supply and target temperature, heat
+  flow, film coefficient and ``dt_cont``, over the operating periods (weight
+  above zero, some stream running). With ``basis_clusters`` (stored as
+  ``HENS_BASIS_CLUSTERS``) above 1, the operating periods are first grouped
+  by weighted k-medoids on each stream's temperatures, heat flow and running
+  flag, and the median is over the heaviest group; ``HENS_BASIS_CANDIDATES``
+  ``"all"`` designs from every group's case and keeps the cheapest. A stream
+  running in less than ``HENS_BASIS_ACTIVE_SHARE`` (0.5) of the group's
+  weight is left out; utilities come from the group's medoid period.
 - ``"period"``: one period alone, the ``period_id`` given, for example the
-  peak or the most frequent period. The network is then fitted to every
-  period: each exchanger gets one area, the largest any period needs, and a
-  period needing less runs with a bypass. A stream with no utility at its end
-  first gets the cheapest one that can serve it there in every period; one no
-  period uses is removed. Passing ``period_id`` implies ``"period"``.
+  peak or the most frequent period. Passing ``period_id`` implies
+  ``"period"``.
+- ``"all"``: every period at once, with no fit. Synthesis targets every
+  period first when the problem has no period results.
+
+A median or period design is then fitted to every period: each exchanger
+gets one area, the largest any period needs, and a period needing less runs
+with a bypass. A stream with no utility at its end first gets the cheapest
+one that can serve it there in every period; one no period uses is removed.
 
 .. code-block:: python
 
-   problem.design.heat_exchanger_network(design_basis="all")
+   basis = problem.design.design_basis(basis_clusters=2)  # preview, no synthesis
+   problem.design.heat_exchanger_network()  # the median basis
    problem.design.heat_exchanger_network(period_id="peak")
+   problem.design.heat_exchanger_network(design_basis="all")
 
-The result's provenance records the basis (``HENS_DESIGN_BASIS``, and
-``basis_period_id`` for a period basis) and lists every period.
+The result's provenance records the basis (``HENS_DESIGN_BASIS``, with
+``basis_period_id`` for a period basis, or ``HENS_BASIS_CLUSTERS``,
+``basis_period_ids`` and ``basis_medoid`` for a median one) and lists every
+period.
 
 Heuristic Pinch Design
 ----------------------

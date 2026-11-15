@@ -326,6 +326,7 @@ class _DesignAccessor:
         options: Mapping[str, Any] | None = None,
         period_id: str | None = None,
         design_basis: str | None = None,
+        basis_clusters: int | None = None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -339,13 +340,16 @@ class _DesignAccessor:
 
         On a multiperiod case the network serves every operating period;
         ``design_basis`` (``HENS_DESIGN_BASIS``) is what it is synthesised
-        from. ``"all"`` designs over every period at once, after all-period
-        targeting when there is none. ``"period"`` synthesises on
-        ``period_id`` alone, then fits the network to every period: each
-        exchanger gets one area, with bypass where a period needs less, and
-        a heater or cooler is added at a stream end where a period needs
-        one. Passing ``period_id`` implies ``"period"``. On a single-period
-        case the basis changes nothing.
+        from. ``"median"`` (the default) synthesises on a case of each
+        stream's period-weighted median over the operating periods, or over
+        the heaviest of ``basis_clusters`` clusters of them (weighted
+        k-medoids); ``design_basis()`` previews it. ``"period"`` synthesises
+        on ``period_id`` alone. Both then fit the network to every period:
+        each exchanger gets one area, with bypass where a period needs less,
+        and a heater or cooler is added at a stream end where a period needs
+        one. ``"all"`` designs over every period at once, after all-period
+        targeting when there is none. Passing ``period_id`` implies
+        ``"period"``. On a single-period case the basis changes nothing.
 
         ``width`` (``HENS_SEARCH_WIDTH``, 0 to 3, default 1) picks the dt_cont
         multipliers: 1.0; 0.75, 1.0 and 1.5; then five and seven values from
@@ -370,21 +374,23 @@ class _DesignAccessor:
         )
 
         basis = self._design_basis(design_basis, period_id)
+        arguments = dict(
+            width=width,
+            depth=depth,
+            options=options,
+            dt_cont_multipliers=dt_cont_multipliers,
+            derivative_thresholds=derivative_thresholds,
+            stages=stages,
+            pack_stages=pack_stages,
+            solver=solver,
+            max_parallel=max_parallel,
+            best_solutions=best_solutions,
+            solve_tolerance=solve_tolerance,
+        )
         if basis == "period":
-            return self._design_on_basis_period(
-                period_id,
-                width=width,
-                depth=depth,
-                options=options,
-                dt_cont_multipliers=dt_cont_multipliers,
-                derivative_thresholds=derivative_thresholds,
-                stages=stages,
-                pack_stages=pack_stages,
-                solver=solver,
-                max_parallel=max_parallel,
-                best_solutions=best_solutions,
-                solve_tolerance=solve_tolerance,
-            )
+            return self._design_on_basis_period(period_id, **arguments)
+        if basis == "median":
+            return self._design_on_median_basis(basis_clusters, **arguments)
         if basis == "all" and not self._problem.period_results:
             self._problem.target.all_periods.all_heat_integration()
         runtime, configuration = self._arguments(
@@ -435,17 +441,134 @@ class _DesignAccessor:
             raise ValueError("design_basis='period' needs a period_id to design on.")
         return basis
 
+    def design_basis(self, *, design_basis="median", basis_clusters=None):
+        """Preview the median design basis without synthesising a network.
+
+        Returns the clusters of operating periods (members, weights, weight
+        shares and medoids) and the synthetic stream table of the heaviest
+        cluster: each stream's period-weighted medians, and whether it runs
+        in enough of the cluster's weight to be in.
+        """
+        from ....contracts.synthesis.basis import (
+            HenBasisCluster,
+            HenBasisStream,
+            HenDesignBasis,
+        )
+
+        if design_basis != "median":
+            raise ValueError(
+                f"only the 'median' design basis has a preview; got {design_basis!r}."
+            )
+        basis, clusters = self._median_basis(basis_clusters)
+        total = sum(cluster.weight for cluster in basis.clusters)
+        return HenDesignBasis(
+            design_basis="median",
+            basis_clusters=clusters,
+            clusters=tuple(
+                HenBasisCluster(
+                    period_ids=tuple(basis.period_ids[i] for i in cluster.members),
+                    weights=cluster.weights,
+                    weight_share=cluster.weight / total,
+                    medoid=basis.period_ids[cluster.medoid],
+                )
+                for cluster in basis.clusters
+            ),
+            basis_cluster=basis.basis_cluster,
+            streams=tuple(
+                HenBasisStream(
+                    name=stream.name,
+                    zone=stream.zone,
+                    included=stream.included,
+                    active_share=stream.active_share,
+                    quantities=stream.quantities,
+                    units=stream.units,
+                )
+                for stream in basis.streams[basis.basis_cluster]
+            ),
+        )
+
+    def _median_basis(self, basis_clusters):
+        import warnings
+
+        from ....analysis.heat_exchanger_networks.basis.synthetic_case import (
+            median_basis,
+        )
+
+        hens = self._problem._require_prepared_root_zone().config.hens
+        clusters = int(
+            hens.basis_clusters if basis_clusters is None else basis_clusters
+        )
+        basis = median_basis(
+            self._problem.to_problem_json(),
+            tuple(self._problem.period_ids),
+            tuple(self._problem.master_zone.weights),
+            clusters=clusters,
+            active_share=float(hens.basis_active_share),
+        )
+        lone = [
+            basis.period_ids[cluster.members[0]]
+            for cluster in basis.clusters
+            if len(cluster.members) == 1
+        ]
+        if clusters > 1 and lone:
+            warnings.warn(
+                "median design basis clusters with one period: "
+                + ", ".join(lone)
+                + "; their basis is that period alone.",
+                RuntimeWarning,
+                stacklevel=3,
+            )
+        return basis, clusters
+
+    def _design_on_median_basis(self, basis_clusters, **arguments):
+        """Synthesise on median cases, fit every period, keep the cheapest."""
+        basis, clusters = self._median_basis(basis_clusters)
+        hens = self._problem._require_prepared_root_zone().config.hens
+        candidates = (
+            range(len(basis.clusters))
+            if hens.basis_candidates == "all"
+            else (basis.basis_cluster,)
+        )
+        best = None
+        for n in candidates:
+            cluster = basis.clusters[n]
+            case = type(self._problem)(
+                basis.sources[n], project_name=self._problem.project_name
+            )
+            view = self._design_on_derived_basis(
+                case,
+                {
+                    "HENS_DESIGN_BASIS": "median",
+                    "HENS_BASIS_CLUSTERS": clusters,
+                    "basis_period_ids": [basis.period_ids[i] for i in cluster.members],
+                    "basis_medoid": basis.period_ids[cluster.medoid],
+                },
+                **arguments,
+            )
+            cost = view.selected_network.total_annual_cost
+            if best is None or cost < best[0]:
+                best = (cost, view)
+        self._problem._results.design = best[1].result
+        return best[1]
+
     def _design_on_basis_period(self, period_id: str, **arguments):
         """Synthesise on ``period_id`` alone, then fit every period."""
         from ...case_derivation import single_period_case
+
+        return self._design_on_derived_basis(
+            single_period_case(self._problem, period_id),
+            {"HENS_DESIGN_BASIS": "period", "basis_period_id": str(period_id)},
+            **arguments,
+        )
+
+    def _design_on_derived_basis(self, case, basis_settings, **arguments):
+        """Synthesise on a derived single-period ``case``, then fit every period."""
         from ..targeting.provenance import canonical_json
 
-        basis = single_period_case(self._problem, period_id)
-        network = basis.design.heat_exchanger_network(**arguments).selected_network
+        network = case.design.heat_exchanger_network(**arguments).selected_network
         view = self._fit_to_all_periods(network)
         provenance = view.result.provenance
-        settings = dict(provenance.effective_settings)
-        settings |= {"HENS_DESIGN_BASIS": "period", "basis_period_id": str(period_id)}
+        settings = dict(provenance.effective_settings) | basis_settings
         provenance = provenance.model_copy(
             update={
                 "method_id": "design.heat_exchanger_network",

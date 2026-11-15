@@ -15,6 +15,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 - Subdirectories:
   - [execution](./execution/README.md): settings, search levels, executors and task-builder helpers.
   - [extraction](./extraction/README.md): solved model to domain network.
+  - [basis](./basis/README.md): the median design basis, clustered operating periods and their synthetic single-period case.
   - [heuristic](./heuristic/README.md): rules-based (Linnhoff) pinch design topology proposals.
   - [models](./models/README.md): concrete HEN equation models.
   - [reporting](./reporting/README.md): feasibility checks, ranking and exports.

@@ -186,6 +186,9 @@ class HensConfig:
     search_width: int
     search_depth: int
     design_basis: str
+    basis_clusters: int
+    basis_active_share: float
+    basis_candidates: str
     dt_cont_multipliers: list[float] | None
     derivative_thresholds: list[float]
     min_exchanger_approach_share: float
