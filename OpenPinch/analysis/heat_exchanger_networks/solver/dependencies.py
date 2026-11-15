@@ -173,10 +173,15 @@ def _package_bin_directory(module_name: str) -> Path | None:
 
 
 def _append_path(directory: Path) -> None:
+    """Put ``directory`` last on ``PATH``, moving it there if it is earlier."""
+
     directory_text = str(directory)
-    path_entries = os.environ.get("PATH", "").split(os.pathsep)
-    if directory_text not in path_entries:
-        os.environ["PATH"] = os.pathsep.join([*path_entries, directory_text])
+    path_entries = [
+        entry
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry != directory_text
+    ]
+    os.environ["PATH"] = os.pathsep.join([*path_entries, directory_text])
 
 
 def _prepend_path(directory: Path) -> None:

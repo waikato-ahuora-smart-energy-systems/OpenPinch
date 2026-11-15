@@ -104,6 +104,25 @@ def test_solver_binary_falls_back_to_idaes_bin_directory(
     assert os.environ["PATH"].split(os.pathsep) == ["/usr/bin", str(tmp_path)]
 
 
+def test_a_solver_found_in_idaes_moves_its_directory_to_the_end_of_path(
+    tmp_path,
+    monkeypatch,
+):
+    # An earlier idaes import already put the directory first; leaving it
+    # there would let MindtPy and worker processes pick up IDAES's Ipopt.
+    solver = tmp_path / "couenne"
+    solver.write_text("#!/bin/sh\n", encoding="utf-8")
+    solver.chmod(0o755)
+    monkeypatch.setattr(_dependencies, "which", lambda _binary, **_kwargs: None)
+    monkeypatch.setattr(_dependencies, "_openpinch_solvers_bin_directory", lambda: None)
+    monkeypatch.setattr(_dependencies, "_idaes_bin_directory", lambda: tmp_path)
+    monkeypatch.setenv("PATH", os.pathsep.join([str(tmp_path), "/usr/bin"]))
+
+    _dependencies.require_solver_binary("couenne")
+
+    assert os.environ["PATH"].split(os.pathsep) == ["/usr/bin", str(tmp_path)]
+
+
 def test_looking_up_idaes_leaves_path_unchanged(monkeypatch):
     # Importing idaes puts its solver directory first on PATH, where worker
     # processes, which inherit PATH but not the import, would run its Ipopt.
