@@ -182,8 +182,11 @@ def stage_solver(solver_name: str, *, default: str) -> str:
     return solver_name
 
 
-def require_solver_backend(solver_name: str) -> None:
-    """Validate optional Python packages and executables for one solver name."""
+def require_solver_backend(solver_name: str) -> str | None:
+    """Validate optional Python packages and executables for one solver name.
+
+    Returns the solver's executable, or None for a solver with none.
+    """
 
     if solver_name in PYOMO_SOLVERS:
         if solver_name in PYOMO_SOLVER_MODULES:
@@ -191,8 +194,9 @@ def require_solver_backend(solver_name: str) -> None:
                 PYOMO_SOLVER_MODULES[solver_name],
                 purpose=f"{solver_name} heat exchanger network synthesis solves",
             )
+        executable = None
         if solver_name in PYOMO_SOLVER_BINARIES:
-            require_solver_binary(
+            executable = require_solver_binary(
                 PYOMO_SOLVER_BINARIES[solver_name],
                 purpose=f"{solver_name} heat exchanger network synthesis solves",
             )
@@ -201,7 +205,7 @@ def require_solver_backend(solver_name: str) -> None:
             package="pyomo",
             purpose=f"{solver_name} solver factory access",
         )
-        return
+        return executable
 
     raise MissingSynthesisSolverError(
         "Unsupported heat exchanger network synthesis solver "
@@ -230,12 +234,10 @@ def configure_pyomo_solver(
             f"{solver_name!r} cannot solve a native Pyomo model. Supported "
             f"solvers are: {', '.join(sorted(PYOMO_SOLVERS))}."
         )
-    require_solver_backend(solver_name)
-    if solver_name in SOLUTION_FILE_SOLVERS:
+    executable = require_solver_backend(solver_name)
+    if executable is not None and solver_name in SOLUTION_FILE_SOLVERS:
         # Solved with this executable rather than whichever is first on PATH.
-        model._openpinch_solver_executable = require_solver_binary(
-            PYOMO_SOLVER_BINARIES[solver_name]
-        )
+        model._openpinch_solver_executable = executable
     effective_options = _merge_solver_options(
         DEFAULT_SOLVER_OPTIONS.get(solver_name, {}), solver_options
     )

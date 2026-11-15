@@ -240,9 +240,8 @@ def test_a_solve_runs_the_executable_its_configuration_found(
         seen.update(kwargs)
         return _Solver()
 
-    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
     monkeypatch.setattr(
-        backend, "require_solver_binary", lambda name, **_kwargs: f"/opt/bin/{name}"
+        backend, "require_solver_backend", lambda _name: f"/opt/bin/{binary}"
     )
     monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
     monkeypatch.setattr(pyo, "SolverFactory", factory)
