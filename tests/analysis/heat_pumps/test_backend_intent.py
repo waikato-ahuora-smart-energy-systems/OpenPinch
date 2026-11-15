@@ -30,6 +30,11 @@ from tests.analysis.heat_pumps.helpers import _base_args, _patch_output_model_va
 from tests.contracts.test_hpr_target_simulation_record import _record
 
 
+def _patch_placement(monkeypatch, handler):
+    """Make the registry's placement lookup return ``handler`` for any cycle."""
+    monkeypatch.setattr(hp, "_placement_handler", lambda _hpr_type: handler)
+
+
 def test_preprocessing_carries_normalized_backend_intent() -> None:
     args = construct_HPRTargetInputs(
         Q_hpr_target=10.0,
@@ -64,9 +69,8 @@ def test_service_passes_backend_to_preprocessing_and_output(monkeypatch) -> None
         "preflight_tespy_hpr_targeting",
         lambda args: captured.__setitem__("preflight_backend", args.simulation_backend),
     )
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS,
-        HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+    _patch_placement(
+        monkeypatch,
         lambda args, *, prepared_tespy: HPRBackendResult.failure().with_updates(
             simulation_backend=args.simulation_backend
         ),

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from importlib import import_module
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -65,6 +66,31 @@ class MvrOptions(_CycleOptions):
 
 
 @dataclass(frozen=True)
+class CycleFamilyHandlers:
+    """The analysis code one model family runs, as lazy ``module:function`` paths.
+
+    ``placement`` optimises one period's heat pump placement;
+    ``multiperiod_setup`` returns the shared multiperiod starts, bounds,
+    objective and stage lifts (``None``: no multiperiod support);
+    ``topology_identifier`` names the simulated topology, for CoolProp
+    preflight and the accepted target (``None`` for idealised cycles).
+    """
+
+    placement: str
+    multiperiod_setup: str | None = None
+    topology_identifier: HPRTopologyIdentifier | None = None
+
+
+def resolve_handler(path: str | None):
+    """The function a ``package.module:function`` path names, imported now."""
+
+    if path is None:
+        return None
+    module, name = path.split(":")
+    return getattr(import_module(module), name)
+
+
+@dataclass(frozen=True)
 class HprCycleSpec:
     """One registered heat pump and refrigeration cycle."""
 
@@ -82,6 +108,8 @@ class HprCycleSpec:
     )
     available: bool = True
     all_periods: bool = True
+    # Topology -> the analysis handlers of the model family it selects.
+    handlers: Mapping[str, CycleFamilyHandlers] = field(default_factory=dict)
 
     def to_configuration(self, options) -> dict[str, Any]:
         """The ``HPR_*`` configuration the given options set.
@@ -123,6 +151,8 @@ def register_cycle(spec: HprCycleSpec) -> HprCycleSpec:
         raise ValueError(
             f"cycle {spec.id!r} has no {spec.default_topology!r} topology."
         )
+    if set(spec.handlers) != set(spec.topologies):
+        raise ValueError(f"cycle {spec.id!r} needs handlers for every topology.")
     if not spec.duties or not spec.duties <= DUTIES:
         raise ValueError(f"cycle {spec.id!r} duties must be among {sorted(DUTIES)}.")
     _REGISTRY[spec.id] = spec
@@ -158,6 +188,19 @@ def spec_for_cycle(member: HeatPumpAndRefrigerationCycle) -> tuple[HprCycleSpec,
     raise ValueError(f"no registered cycle selects {member.value!r}.")
 
 
+def family_handlers(hpr_type: str) -> CycleFamilyHandlers:
+    """The handlers of the model family whose ``HPR_TYPE`` value is ``hpr_type``."""
+
+    for spec in _REGISTRY.values():
+        for topology, family in spec.topologies.items():
+            if family.value == hpr_type:
+                return spec.handlers[topology]
+    raise ValueError(f"no registered cycle selects {hpr_type!r}.")
+
+
+_TARGETING = "OpenPinch.analysis.heat_pumps.targeting"
+_SETUP = "OpenPinch.analysis.heat_pumps._multiperiod.setup"
+
 _VAPOUR_COMPRESSION_KEYS = {
     "refrigerants": "HPR_REFRIGERANTS",
     "initialize_from_carnot": "HPR_INITIALISE_SIMULATED_CYCLE",
@@ -177,6 +220,18 @@ register_cycle(
         default_topology="cascade",
         duties=DUTIES,
         options_model=CarnotOptions,
+        handlers={
+            "cascade": CycleFamilyHandlers(
+                placement=f"{_TARGETING}.cascade_carnot"
+                ":optimise_cascade_carnot_heat_pump_placement",
+                multiperiod_setup=f"{_SETUP}:_cascade_carnot_setup",
+            ),
+            "parallel": CycleFamilyHandlers(
+                placement=f"{_TARGETING}.parallel_carnot"
+                ":optimise_parallel_carnot_heat_pump_placement",
+                multiperiod_setup=f"{_SETUP}:_parallel_carnot_setup",
+            ),
+        },
     )
 )
 register_cycle(
@@ -202,6 +257,20 @@ register_cycle(
                 HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
             ),
         },
+        handlers={
+            "cascade": CycleFamilyHandlers(
+                placement=f"{_TARGETING}.cascade_vapour_compression"
+                ":optimise_cascade_heat_pump_placement",
+                multiperiod_setup=f"{_SETUP}:_cascade_vapour_compression_setup",
+                topology_identifier=HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
+            ),
+            "parallel": CycleFamilyHandlers(
+                placement=f"{_TARGETING}.parallel_vapour_compression"
+                ":optimise_parallel_heat_pump_placement",
+                multiperiod_setup=f"{_SETUP}:_parallel_vapour_compression_setup",
+                topology_identifier=HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
+            ),
+        },
     )
 )
 register_cycle(
@@ -222,6 +291,14 @@ register_cycle(
             "mvr_compressor_model": "HPR_MVR_COMPRESSOR_MODEL",
         },
         screening_methods={"cascade": (HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,)},
+        handlers={
+            "cascade": CycleFamilyHandlers(
+                placement=f"{_TARGETING}.vapour_compression_mvr"
+                ":optimise_vapour_compression_mvr_heat_pump_placement",
+                multiperiod_setup=f"{_SETUP}:_vapour_compression_mvr_setup",
+                topology_identifier=HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,
+            )
+        },
     )
 )
 register_cycle(
@@ -234,6 +311,11 @@ register_cycle(
         options_model=BraytonOptions,
         available=False,
         all_periods=False,
+        handlers={
+            "single": CycleFamilyHandlers(
+                placement=f"{_TARGETING}.brayton:optimise_brayton_heat_pump_placement"
+            )
+        },
     )
 )
 
@@ -242,11 +324,14 @@ __all__ = [
     "DUTIES",
     "BraytonOptions",
     "CarnotOptions",
+    "CycleFamilyHandlers",
     "HprCycleSpec",
     "MvrOptions",
     "VapourCompressionOptions",
     "cycle_spec",
+    "family_handlers",
     "register_cycle",
     "registered_cycles",
+    "resolve_handler",
     "spec_for_cycle",
 ]
