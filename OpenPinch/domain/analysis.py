@@ -6,7 +6,9 @@ import hashlib
 import json
 from types import MappingProxyType
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_REMOVED_MULTIPERIOD_DESIGN = "design.multiperiod_heat_exchanger_network"
 
 
 class AnalysisProvenance(BaseModel):
@@ -21,6 +23,23 @@ class AnalysisProvenance(BaseModel):
     input_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     effective_settings_json: str = "{}"
     prerequisite_ids: tuple[str, ...] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _multiperiod_design_as_all_periods_basis(cls, data):
+        # design.multiperiod_heat_exchanger_network was removed; it was
+        # design.heat_exchanger_network on the all-periods basis.
+        if (
+            isinstance(data, dict)
+            and data.get("method_id") == _REMOVED_MULTIPERIOD_DESIGN
+        ):
+            settings = json.loads(data.get("effective_settings_json", "{}"))
+            settings.setdefault("HENS_DESIGN_BASIS", "all")
+            data = data | {
+                "method_id": "design.heat_exchanger_network",
+                "effective_settings_json": json.dumps(settings),
+            }
+        return data
 
     @field_validator("effective_settings_json")
     @classmethod

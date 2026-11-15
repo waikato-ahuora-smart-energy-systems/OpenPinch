@@ -47,6 +47,8 @@ class ConfigurationOptionStatus:
 
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
 HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
+# What a multiperiod HEN is synthesised from before it is fitted to every period.
+HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
 HPR_COMPRESSOR_MODEL_VALUES = frozenset(
     {"constant", "pareto_front", "wang_cleland", "brendel"}
@@ -382,6 +384,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # None: set by the search width or depth.
     "HENS_SEARCH_WIDTH": _spec(int, 1, "hens", "search_width", numeric_min=0.0, numeric_max=3.0),
     "HENS_SEARCH_DEPTH": _spec(int, 1, "hens", "search_depth", numeric_min=0.0, numeric_max=4.0),
+    "HENS_DESIGN_BASIS": _spec(str, "all", "hens", "design_basis", validator=partial(_string_choice, choices=HENS_DESIGN_BASIS_VALUES)),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),

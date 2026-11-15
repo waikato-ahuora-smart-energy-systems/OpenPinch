@@ -172,7 +172,7 @@ def test_manifest_tracks_required_semantic_dimensions_and_evidence() -> None:
         "all periods",
         "per-period;weighted average",
         "named case;active case;ordered batch",
-        "multiperiod_heat_exchanger_network",
+        "design_result.views",
         "return figure;explicit export",
     ):
         assert required_mode in combined

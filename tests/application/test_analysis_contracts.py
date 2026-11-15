@@ -199,7 +199,7 @@ def test_temporary_configuration_does_not_change_prepared_input_identity():
     assert input_fingerprint(problem) != original
 
 
-def test_multiperiod_design_keeps_its_named_method_identity(monkeypatch):
+def test_an_all_periods_design_keeps_the_design_method_identity(monkeypatch):
     from tests.analysis.heat_exchanger_networks.test_design_workflow import (
         _public_example_problem,
         _use_fake_default_executor,
@@ -207,28 +207,7 @@ def test_multiperiod_design_keeps_its_named_method_identity(monkeypatch):
 
     _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
-    problem.target.all_periods.direct_heat_integration()
-    view = problem.design.multiperiod_heat_exchanger_network()
-    assert (
-        view.result.provenance.method_id == "design.multiperiod_heat_exchanger_network"
-    )
+    view = problem.design.heat_exchanger_network(design_basis="all")
+
+    assert view.result.provenance.method_id == "design.heat_exchanger_network"
     assert problem.results.design.provenance == view.result.provenance
-
-
-def test_multiperiod_design_runs_its_period_targets_when_asked(monkeypatch):
-    from tests.analysis.heat_exchanger_networks.test_design_workflow import (
-        _public_example_problem,
-        _use_fake_default_executor,
-    )
-
-    _use_fake_default_executor(monkeypatch)
-    problem = _public_example_problem()
-    with pytest.raises(RuntimeError, match="prerequisites=True"):
-        problem.design.multiperiod_heat_exchanger_network()
-
-    view = problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
-
-    assert problem.period_results
-    assert (
-        view.result.provenance.method_id == "design.multiperiod_heat_exchanger_network"
-    )

@@ -52,7 +52,6 @@ FORBIDDEN_AMBIGUOUS_TARGET_METHODS = {
 EXPECTED_COMPONENT_METHODS = {"add_process_mvr"}
 EXPECTED_DESIGN_METHODS = {
     "heat_exchanger_network",
-    "multiperiod_heat_exchanger_network",
     "network_evolution",
     "optimise_duties",
     "pinch_design",

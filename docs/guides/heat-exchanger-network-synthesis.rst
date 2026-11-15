@@ -124,9 +124,29 @@ Successful synthesis stores the serializable result on
 provides the selected network, ranked candidates, manifest, diagnostics, and
 task metadata without requiring process engineers to call contributor services.
 
-For multiple operating periods, call
-``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
-all-period targeting.
+Multiple Operating Periods
+--------------------------
+
+On a case with several operating periods, ``heat_exchanger_network()``
+designs one network that serves every period. ``design_basis`` (stored as
+``HENS_DESIGN_BASIS``) sets what it is synthesised from:
+
+- ``"all"`` (the default): every period at once. Synthesis targets every
+  period first when the problem has no period results.
+- ``"period"``: one period alone, the ``period_id`` given, for example the
+  peak or the most frequent period. The network is then fitted to every
+  period: each exchanger gets one area, the largest any period needs, and a
+  period needing less runs with a bypass. A stream with no utility at its end
+  first gets the cheapest one that can serve it there in every period; one no
+  period uses is removed. Passing ``period_id`` implies ``"period"``.
+
+.. code-block:: python
+
+   problem.design.heat_exchanger_network(design_basis="all")
+   problem.design.heat_exchanger_network(period_id="peak")
+
+The result's provenance records the basis (``HENS_DESIGN_BASIS``, and
+``basis_period_id`` for a period basis) and lists every period.
 
 Heuristic Pinch Design
 ----------------------

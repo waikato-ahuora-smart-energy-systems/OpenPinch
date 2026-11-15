@@ -245,25 +245,15 @@ def test_all_periods_command_returns_each_period_output():
     assert response["value"]["base"]["targets"]
 
 
-def test_session_runs_multiperiod_design_after_all_period_targeting(monkeypatch):
-    class Synthesised(Exception):
-        pass
-
-    def synthesise(self, **_kwargs):
-        raise Synthesised
-
-    monkeypatch.setattr(_DesignAccessor, "heat_exchanger_network", synthesise)
+def test_the_removed_multiperiod_design_command_is_unknown():
     session = run_command(
         {
             "command": "open",
             "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
         }
     )["session"]
-    run_command(
-        {"command": "target.all_periods.direct_heat_integration", "session": session}
-    )
 
-    with pytest.raises(Synthesised):
+    with pytest.raises(ValueError, match="Unknown command"):
         run_command(
             {"command": "design.multiperiod_heat_exchanger_network", "session": session}
         )
@@ -1765,7 +1755,7 @@ def _use_two_period_fake_executor(monkeypatch) -> None:
         monkeypatch.setattr(module, "LocalSynthesisExecutor", TwoPeriodExecutor)
 
 
-def test_multiperiod_design_command_returns_one_view_per_period(monkeypatch):
+def test_an_all_periods_design_command_returns_one_view_per_period(monkeypatch):
     from OpenPinch.contracts.schema import contract_json_schemas
 
     _use_two_period_fake_executor(monkeypatch)
@@ -1777,7 +1767,11 @@ def test_multiperiod_design_command_returns_one_view_per_period(monkeypatch):
     )
 
     response = run_command(
-        {"command": "design.multiperiod_heat_exchanger_network", "session": session}
+        {
+            "command": "design.heat_exchanger_network",
+            "session": session,
+            "arguments": {"design_basis": "all"},
+        }
     )
 
     views = response["views"]

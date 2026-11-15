@@ -115,7 +115,6 @@ DOCUMENTED_ALL_PERIOD_HPR_METHODS = frozenset(
 )
 DESIGN_TUTORIALS = {
     "heat_exchanger_network": 15,
-    "multiperiod_heat_exchanger_network": 17,
     "pinch_design": 16,
     "thermal_derivative": 16,
     "network_evolution": 16,

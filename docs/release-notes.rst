@@ -7,6 +7,22 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.multiperiod_heat_exchanger_network()`` is removed, and its
+  command returns ``Unknown command``. ``design.heat_exchanger_network()``
+  now designs multiperiod networks itself: ``design_basis`` (stored as
+  ``HENS_DESIGN_BASIS``) sets what the network is synthesised from.
+  ``"all"``, the default, designs over every period at once, as the
+  multiperiod method did, running all-period targeting first when there is
+  none; ``design_basis="all"`` reproduces the old results. A saved design
+  from the removed method reads back as ``design.heat_exchanger_network``
+  with ``HENS_DESIGN_BASIS`` ``"all"``.
+- ``period_id`` on a multiperiod ``heat_exchanger_network()`` is now a basis
+  period, and its results change. Synthesis runs on that period alone, then
+  the network is fitted to every period: one area per exchanger, the largest
+  any period needs, with a bypass where a period needs less, and a heater or
+  cooler at a stream end where a period needs one. Before, ``period_id`` only
+  labelled the run, which still designed over every period.
+
 - Network evolution runs the ``openpinch-solvers`` Ipopt again when IDAES is
   installed. Looking for Couenne (the default TDM solver) imports IDAES,
   which puts its older Ipopt download first on ``PATH``, so every later
