@@ -7,6 +7,7 @@ from contextvars import copy_context
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
+from ....analysis.heat_pumps.cycles.registry import cycle_spec
 from ....analysis.heat_pumps.performance_maps.generation import (
     generate_hpr_performance_map,
 )
@@ -17,7 +18,7 @@ from ....analysis.heat_pumps.performance_maps.targeting import (
     normalize_hpr_simulation_backend,
 )
 from ....analysis.parallelism import supported_workers
-from ....contracts.hpr import HPRSearchBudget, HPRTopologyIdentifier
+from ....contracts.hpr import HPRSearchBudget
 from ....contracts.hpr_performance_map import (
     HprPerformanceMap,
     HprPerformanceMapRequest,
@@ -106,18 +107,6 @@ def _load_options(
 def _set_if_not_none(options: dict[str, Any], key: str, value: Any) -> None:
     if value is not None:
         options[key] = value
-
-
-def _vapour_compression_methods(is_cascade_cycle: bool):
-    if is_cascade_cycle:
-        return (
-            HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
-            HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
-        )
-    return (
-        HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
-        HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
-    )
 
 
 class _AllPeriodsTargetAccessor:
@@ -845,19 +834,21 @@ class _TargetAccessor:
             return self._fluid_set_runs(
                 "vapour_compression_heat_pump",
                 locals(),
-                methods=_vapour_compression_methods(is_cascade_cycle),
+                methods=cycle_spec("vapour_compression").screening_methods[
+                    "cascade" if is_cascade_cycle else "parallel"
+                ],
                 is_heat_pumping=True,
             )
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
-        extra = {}
-        for key, value in (
-            ("HPR_REFRIGERANTS", refrigerants),
-            ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
-            ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
-            ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
-            ("HPR_COMPRESSOR_MODEL", compressor_model),
-        ):
-            _set_if_not_none(extra, key, value)
+        extra = cycle_spec("vapour_compression").to_configuration(
+            {
+                "refrigerants": refrigerants,
+                "initialize_from_carnot": initialize_from_carnot,
+                "sort_refrigerants": sort_refrigerants,
+                "allow_integrated_expander": allow_integrated_expander,
+                "compressor_model": compressor_model,
+            }
+        )
         return self._hpr(
             surface="vapour_compression_heat_pump",
             cycle=HeatPumpAndRefrigerationCycle.CascadeVapourComp,
@@ -914,19 +905,21 @@ class _TargetAccessor:
             return self._fluid_set_runs(
                 "vapour_compression_refrigeration",
                 locals(),
-                methods=_vapour_compression_methods(is_cascade_cycle),
+                methods=cycle_spec("vapour_compression").screening_methods[
+                    "cascade" if is_cascade_cycle else "parallel"
+                ],
                 is_heat_pumping=False,
             )
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
-        extra = {}
-        for key, value in (
-            ("HPR_REFRIGERANTS", refrigerants),
-            ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
-            ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
-            ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
-            ("HPR_COMPRESSOR_MODEL", compressor_model),
-        ):
-            _set_if_not_none(extra, key, value)
+        extra = cycle_spec("vapour_compression").to_configuration(
+            {
+                "refrigerants": refrigerants,
+                "initialize_from_carnot": initialize_from_carnot,
+                "sort_refrigerants": sort_refrigerants,
+                "allow_integrated_expander": allow_integrated_expander,
+                "compressor_model": compressor_model,
+            }
+        )
         return self._hpr(
             surface="vapour_compression_refrigeration",
             cycle=HeatPumpAndRefrigerationCycle.CascadeVapourComp,
@@ -1055,20 +1048,20 @@ class _TargetAccessor:
             return self._fluid_set_runs(
                 "mvr_heat_pump",
                 locals(),
-                methods=(HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,),
+                methods=cycle_spec("mvr").screening_methods["cascade"],
                 is_heat_pumping=True,
             )
-        extra = {}
-        for key, value in (
-            ("HPR_REFRIGERANTS", refrigerants),
-            ("HPR_MVR_FLUIDS", mvr_fluids),
-            ("HPR_MVR_ETA_COMP", mvr_compressor_efficiency),
-            ("HPR_MVR_COUNT", mvr_stages),
-            ("HPR_MVR_ETA_MOTOR", motor_efficiency),
-            ("HPR_COMPRESSOR_MODEL", compressor_model),
-            ("HPR_MVR_COMPRESSOR_MODEL", mvr_compressor_model),
-        ):
-            _set_if_not_none(extra, key, value)
+        extra = cycle_spec("mvr").to_configuration(
+            {
+                "refrigerants": refrigerants,
+                "mvr_fluids": mvr_fluids,
+                "mvr_compressor_efficiency": mvr_compressor_efficiency,
+                "mvr_stages": mvr_stages,
+                "motor_efficiency": motor_efficiency,
+                "compressor_model": compressor_model,
+                "mvr_compressor_model": mvr_compressor_model,
+            }
+        )
         return self._hpr(
             surface="mvr_heat_pump",
             cycle=HeatPumpAndRefrigerationCycle.VapourCompMVR,
