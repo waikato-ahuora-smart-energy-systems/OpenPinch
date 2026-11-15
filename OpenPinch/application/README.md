@@ -46,7 +46,7 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - A local HPR target is valid only if its owner id, input fingerprint and retained result digest all match the problem [hpr_selection.py:validate_hpr_target].
 - A residual case is frozen to one period, and its utilities start with zero duty (segmented utilities carry duty fractions) [residual_utility.py:create_hpr_residual_case].
 - `with_utilities_from` requires matching period sets and a `PinchProblem` donor, and does not copy donor results [case_derivation.py:with_utilities_from].
-- `single_period_case` reduces every per-period quantity (a `values` list, by `period_ids` when it carries them, else by period position, a one-value list broadcasting) to that period's `value`, and rejects an unknown period and a problem with process components; the derived problem's targets equal that period's all-period targets [case_derivation.py:single_period_case].
+- `single_period_case` reduces every per-period quantity to that period's `value` with `period_source` (`analysis/heat_exchanger_networks/basis`), and rejects an unknown period and a problem with process components; the derived problem's targets equal that period's all-period targets [case_derivation.py:single_period_case].
 
 ## Side Effects
 - `commands._SESSIONS` is module-level state holding live problems, workspaces and returned targets until the `close` command or process exit; each `open` and each returned case adds an entry [commands.py:_SESSIONS].

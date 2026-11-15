@@ -1,8 +1,9 @@
 """How HEN synthesis treats the periods of a multiperiod case.
 
 Synthesis on the all-periods basis builds its solver models over every
-period of the zone. A ``period_id`` is a basis period: synthesis runs on that
-period alone, and the network is then fitted to every period.
+period of the zone. A ``period_id`` is a basis period, and the default median
+basis a synthetic ``median`` period: synthesis runs on that one period, and
+the network is then fitted to every period.
 """
 
 from __future__ import annotations
@@ -82,9 +83,10 @@ _CALLS = {
     ),
 }
 # Synthesis on a basis period sees that period alone; it used to see every
-# period, as period_id only labelled the run.
+# period, as period_id only labelled the run. With no period_id the default
+# median basis synthesises on its synthetic period.
 _SYNTHESIS_PERIODS = {
-    "no period_id": PERIODS,
+    "no period_id": ("median",),
     "period_id base": ("base",),
     "all-periods basis": PERIODS,
 }
@@ -111,14 +113,17 @@ def test_synthesis_builds_its_solver_arrays_over_its_basis_periods(monkeypatch, 
 
 @pytest.mark.synthesis
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
-def test_the_all_periods_basis_designs_what_the_multiperiod_method_did():
-    # The removed multiperiod method was heat_exchanger_network() after
-    # all-period targeting, so both calls design the same network.
+def test_a_stored_all_periods_basis_designs_as_the_argument_does():
+    stored = _two_period_problem()
+    stored.update_options({"HENS_DESIGN_BASIS": "all"})
+
     structures = {
-        call: network_structure_signature(
-            _CALLS[call](_two_period_problem()).selected_network
-        )
-        for call in ("no period_id", "all-periods basis")
+        network_structure_signature(
+            stored.design.heat_exchanger_network(width=0, depth=0).selected_network
+        ),
+        network_structure_signature(
+            _CALLS["all-periods basis"](_two_period_problem()).selected_network
+        ),
     }
 
-    assert len(set(structures.values())) == 1, structures
+    assert len(structures) == 1, structures

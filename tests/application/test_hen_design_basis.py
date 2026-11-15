@@ -177,3 +177,159 @@ def test_a_period_id_designs_on_that_period_and_fits_every_period():
         for state in exchanger.period_states
     }
     assert periods == {"base", "peak"}
+
+
+def _periods_problem(raw_milk_scales, weights, cip_heat_flows=None):
+    """Yee and Grossmann's four streams over several periods.
+
+    Raw Milk's heat flow and CP scale per period; CIP Water's heat flow can be
+    set per period (0 for a period it does not run).
+    """
+    import json
+
+    from OpenPinch.application.problem import PinchProblem
+    from tests.analysis.heat_exchanger_networks.test_hen_period_handling import (
+        FOUR_STREAM_JSON,
+    )
+
+    payload = json.loads(FOUR_STREAM_JSON.read_text(encoding="utf-8"))
+    ids = [f"p{n}" for n in range(len(weights))]
+    for record in payload["streams"]:
+        for key, value in list(record.items()):
+            if isinstance(value, dict) and isinstance(value.get("value"), int | float):
+                base = value["value"]
+                values = [base] * len(ids)
+                if record["name"] == "Raw Milk" and key in (
+                    "heat_flow",
+                    "heat_capacity_flowrate",
+                ):
+                    values = [base * scale for scale in raw_milk_scales]
+                if (
+                    record["name"] == "CIP Water"
+                    and key == "heat_flow"
+                    and cip_heat_flows
+                ):
+                    values = list(cip_heat_flows)
+                record[key] = {"unit": value["unit"], "values": values}
+        if record["name"] == "CIP Water" and cip_heat_flows:
+            record["heat_capacity_flowrate"] = None
+    payload["options"] = {
+        key: value
+        for key, value in payload["options"].items()
+        if not key.startswith("HENS_SOLVER")
+        and key not in ("HENS_DT_CONT_MULTIPLIERS", "HENS_OUTPUT_FOLDER")
+    } | {
+        "PROBLEM_PERIOD_IDS": ids,
+        "PROBLEM_PERIOD_WEIGHTS": list(weights),
+        "HENS_OUTPUT_FORMATS": [],
+        "HENS_MAX_PARALLEL": 1,
+    }
+    return PinchProblem(source=payload, project_name="periods")
+
+
+def _stream(basis, name):
+    return next(stream for stream in basis.streams if stream.name == name)
+
+
+def test_a_median_basis_takes_each_streams_weighted_median():
+    # Raw Milk at 1.0, 1.2 and 1.5 times, weighted 0.2, 0.5 and 0.3: the
+    # weighted median is the middle period's 1.2.
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+
+    basis = problem.design.design_basis()
+
+    assert basis.design_basis == "median"
+    (cluster,) = basis.clusters
+    assert cluster.period_ids == ("p0", "p1", "p2")
+    assert cluster.weight_share == pytest.approx(1.0)
+    assert _stream(basis, "Raw Milk").quantities["heat_flow"] == pytest.approx(3360.0)
+    assert _stream(basis, "HT Flash").quantities["t_supply"] == pytest.approx(590.0)
+
+
+def test_a_one_member_cluster_is_its_period():
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+
+    basis = problem.design.design_basis(basis_clusters=3)
+
+    # The heaviest cluster is the heaviest period, p1, on its own.
+    chosen = basis.clusters[basis.basis_cluster]
+    assert chosen.period_ids == ("p1",) and chosen.medoid == "p1"
+    assert _stream(basis, "Raw Milk").quantities["heat_flow"] == pytest.approx(3360.0)
+    assert _stream(basis, "Raw Milk").quantities["t_target"] == pytest.approx(370.0)
+
+
+def test_a_zero_weight_period_joins_no_cluster():
+    problem = _periods_problem([1.0, 1.2, 9.0], [0.5, 0.5, 0.0])
+
+    basis = problem.design.design_basis(basis_clusters=2)
+
+    assert {p for cluster in basis.clusters for p in cluster.period_ids} == {
+        "p0",
+        "p1",
+    }
+
+
+def test_a_stream_off_in_most_of_the_cluster_is_left_out():
+    # CIP Water runs only in p0, 30 % of the weight: under the 50 % default.
+    problem = _periods_problem(
+        [1.0, 1.0, 1.0], [0.3, 0.4, 0.3], cip_heat_flows=[1200.0, 0.0, 0.0]
+    )
+
+    basis = problem.design.design_basis()
+
+    cip = _stream(basis, "CIP Water")
+    assert not cip.included
+    assert cip.active_share == pytest.approx(0.3)
+
+
+def test_a_multiperiod_design_defaults_to_the_median_basis():
+    problem = _two_period_problem()
+
+    assert problem.design._design_basis(None, None) == "median"
+    assert problem.design._design_basis(None, "base") == "period"
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_median_basis_design_serves_every_period():
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+
+    view = problem.design.heat_exchanger_network(width=0, depth=0)
+
+    provenance = view.result.provenance
+    assert provenance.effective_settings["HENS_DESIGN_BASIS"] == "median"
+    assert provenance.effective_settings["basis_period_ids"] == ["p0", "p1", "p2"]
+    assert provenance.period_ids == ("p0", "p1", "p2")
+    periods = {
+        state.period_id
+        for exchanger in view.selected_network.exchangers
+        for state in exchanger.period_states
+    }
+    assert periods == {"p0", "p1", "p2"}
+
+
+def test_a_cluster_of_one_period_warns():
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+
+    with pytest.warns(RuntimeWarning, match="clusters with one period"):
+        problem.design.design_basis(basis_clusters=3)
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_every_cluster_as_a_candidate_is_never_costlier_than_the_heaviest():
+    def cost(candidates):
+        problem = _periods_problem([1.0, 1.1, 1.6, 1.7], [0.3, 0.3, 0.2, 0.2])
+        problem.update_options(
+            {"HENS_BASIS_CLUSTERS": 2, "HENS_BASIS_CANDIDATES": candidates}
+        )
+        view = problem.design.heat_exchanger_network(width=0, depth=0)
+        return view.selected_network.total_annual_cost
+
+    assert cost("all") <= cost("dominant") * (1 + 1e-9)

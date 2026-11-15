@@ -7,12 +7,32 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.heat_exchanger_network(overdesign_percentage=...)`` (stored as
+  ``HENS_OVERDESIGN_PERCENTAGE``) adds a margin to every heat-recovery area
+  and rates the network over every period at those areas, with bypass. A
+  percentage is applied as given; ``"optimise"`` picks the margin up to
+  ``HENS_OVERDESIGN_MAX`` (50 %) for the least total annual cost. The margin,
+  each period's recovery and utility before and after, the cost with and
+  without it, and the margins tried are in
+  ``selected_network.summary_metrics["overdesign"]``.
+  ``design.optimise_duties()`` gains the ``"rating"`` objective: least
+  utility cost at the network's installed recovery areas.
+- A multiperiod ``design.heat_exchanger_network()`` now synthesises on a
+  median basis by default (``HENS_DESIGN_BASIS`` ``"median"``), so default
+  multiperiod results change: a synthetic single-period case of each
+  stream's period-weighted median over the operating periods, whose network
+  is then fitted to every period. ``basis_clusters`` (``HENS_BASIS_CLUSTERS``)
+  groups the periods by weighted k-medoids first and takes the heaviest
+  group's median; ``HENS_BASIS_CANDIDATES`` ``"all"`` tries every group's.
+  ``design.design_basis()`` previews the clusters and the synthetic streams
+  without synthesis. ``design_basis="all"`` keeps the simultaneous
+  all-period design.
 - ``design.multiperiod_heat_exchanger_network()`` is removed, and its
   command returns ``Unknown command``. ``design.heat_exchanger_network()``
   now designs multiperiod networks itself: ``design_basis`` (stored as
   ``HENS_DESIGN_BASIS``) sets what the network is synthesised from.
-  ``"all"``, the default, designs over every period at once, as the
-  multiperiod method did, running all-period targeting first when there is
+  ``"all"`` designs over every period at once, as the multiperiod method
+  did, running all-period targeting first when there is
   none; ``design_basis="all"`` reproduces the old results. A saved design
   from the removed method reads back as ``design.heat_exchanger_network``
   with ``HENS_DESIGN_BASIS`` ``"all"``.

@@ -345,9 +345,46 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_DESIGN_BASIS": FieldText(
         "HEN design basis", None,
         (
-            "What a multiperiod HEN is synthesised from: all (every operating "
-            "period at once) or period (the period_id passed to the design, "
-            "then fitted to every period with one area per exchanger)."
+            "What a multiperiod HEN is synthesised from, before it is fitted to "
+            "every period with one area per exchanger: median (a synthetic "
+            "case of each stream's period-weighted median), period (the "
+            "period_id passed to the design) or all (every period at once, "
+            "with no fit)."
+        ),
+    ),
+    "HENS_BASIS_CLUSTERS": FieldText(
+        "Median basis clusters", None,
+        (
+            "Clusters of operating periods (weighted k-medoids) for the median "
+            "design basis. 1 takes the median of every operating period; more "
+            "take the median of the heaviest cluster."
+        ),
+    ),
+    "HENS_BASIS_ACTIVE_SHARE": FieldText(
+        "Median basis running share", None,
+        (
+            "A stream is in the median basis case when it runs in at least "
+            "this share of its cluster's period weight."
+        ),
+    ),
+    "HENS_OVERDESIGN_PERCENTAGE": FieldText(
+        "Overdesign margin", "%",
+        (
+            "Margin on every heat-recovery exchanger's area, then rated over every "
+            "period for the least utility cost: a percentage, or optimise to pick "
+            "the margin with the least total annual cost. Unset adds none."
+        ),
+    ),
+    "HENS_OVERDESIGN_MAX": FieldText(
+        "Overdesign margin limit", "%",
+        "The largest margin an optimised overdesign may choose.",
+    ),
+    "HENS_BASIS_CANDIDATES": FieldText(
+        "Median basis candidates", None,
+        (
+            "dominant synthesises from the heaviest cluster's median case; all "
+            "synthesises from every cluster's and keeps the network with the "
+            "lowest total annual cost over all periods."
         ),
     ),
     "HENS_DT_CONT_MULTIPLIERS": FieldText(

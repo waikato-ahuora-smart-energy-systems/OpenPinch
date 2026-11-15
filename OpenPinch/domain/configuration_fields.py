@@ -48,7 +48,9 @@ class ConfigurationOptionStatus:
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
 HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
 # What a multiperiod HEN is synthesised from before it is fitted to every period.
-HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period"})
+HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period", "median"})
+# Which median-basis clusters a design is synthesised from.
+HENS_BASIS_CANDIDATES_VALUES = frozenset({"dominant", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
 HPR_COMPRESSOR_MODEL_VALUES = frozenset(
     {"constant", "pareto_front", "wang_cleland", "brendel"}
@@ -188,6 +190,22 @@ def _share_below_one(name: str, value: Any) -> float:
     numeric_value = _float(name, value)
     if not 0.0 <= numeric_value < 1.0:
         raise ValueError(f"{name} must be at least 0 and less than 1.")
+    return numeric_value
+
+
+def _share_in_unit_interval(name: str, value: Any) -> float:
+    numeric_value = _float(name, value)
+    if not 0.0 < numeric_value <= 1.0:
+        raise ValueError(f"{name} must be above 0 and at most 1.")
+    return numeric_value
+
+
+def _overdesign_margin(name: str, value: Any) -> float | str | None:
+    if value is None or value == "optimise":
+        return value
+    numeric_value = _float(name, value)
+    if not numeric_value >= 0.0:
+        raise ValueError(f"{name} must be at least 0, or 'optimise'.")
     return numeric_value
 
 
@@ -384,7 +402,12 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # None: set by the search width or depth.
     "HENS_SEARCH_WIDTH": _spec(int, 1, "hens", "search_width", numeric_min=0.0, numeric_max=3.0),
     "HENS_SEARCH_DEPTH": _spec(int, 1, "hens", "search_depth", numeric_min=0.0, numeric_max=4.0),
-    "HENS_DESIGN_BASIS": _spec(str, "all", "hens", "design_basis", validator=partial(_string_choice, choices=HENS_DESIGN_BASIS_VALUES)),
+    "HENS_DESIGN_BASIS": _spec(str, "median", "hens", "design_basis", validator=partial(_string_choice, choices=HENS_DESIGN_BASIS_VALUES)),
+    "HENS_BASIS_CLUSTERS": _spec(int, 1, "hens", "basis_clusters", numeric_min=1.0),
+    "HENS_BASIS_ACTIVE_SHARE": _spec(float, 0.5, "hens", "basis_active_share", validator=_share_in_unit_interval),
+    "HENS_BASIS_CANDIDATES": _spec(str, "dominant", "hens", "basis_candidates", validator=partial(_string_choice, choices=HENS_BASIS_CANDIDATES_VALUES)),
+    "HENS_OVERDESIGN_PERCENTAGE": _spec(float | str | None, None, "hens", "overdesign_percentage", validator=_overdesign_margin),
+    "HENS_OVERDESIGN_MAX": _spec(float, 50.0, "hens", "overdesign_max", numeric_min=0.0),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),

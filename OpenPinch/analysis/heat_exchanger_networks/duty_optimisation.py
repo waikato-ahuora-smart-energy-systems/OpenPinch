@@ -70,12 +70,13 @@ from .prepared_problem import SynthesisProblem
 from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
 from .targeting._stage import run_single_method_workflow, run_stage
 
-DutyObjective = Literal["utility", "area", "cost"]
+DutyObjective = Literal["utility", "area", "cost", "rating"]
 
 DUTY_OBJECTIVE_GOALS: dict[str, str] = {
     "utility": "total utility",
     "area": "total area",
     "cost": "total cost",
+    "rating": "rating",
 }
 DEFAULT_FEASIBILITY_APPROACH = 1.0
 """Minimum approach (K) imposed by the ``"cost"`` objective when none is given."""
@@ -142,6 +143,25 @@ def build_duty_optimisation_request(
             "without a utility cap the minimum-area allocation does no heat "
             "recovery."
         )
+    if objective == "rating":
+        if hot_cap is not None or cold_cap is not None:
+            raise ValueError(
+                "the 'rating' objective minimises utility cost at the installed "
+                "areas; utility caps apply to the 'area' objective only."
+            )
+        missing = [
+            _label(exchanger)
+            for exchanger in _structural_exchangers(network)
+            if exchanger.kind is HeatExchangerKind.RECOVERY
+            and not (exchanger.area or 0.0) > 0.0
+        ]
+        if missing:
+            raise ValueError(
+                "the 'rating' objective needs an installed area on every recovery "
+                "exchanger; none on " + ", ".join(missing) + "."
+            )
+        if approach is None:
+            approach = DEFAULT_FEASIBILITY_APPROACH
     if objective == "cost":
         if hot_cap is not None or cold_cap is not None:
             raise ValueError(
@@ -221,6 +241,7 @@ def fixed_network_structure(
     utility_approach: dict[int, float] = {}
     recovery_duties: dict[int, float] = {}
     utility_duties: dict[int, float] = {}
+    recovery_areas: dict[int, float] = {}
 
     for position, exchanger in enumerate(exchangers):
         if position in excluded:
@@ -256,6 +277,8 @@ def fixed_network_structure(
                 recovery_approach[index] = approach
             if duty:
                 recovery_duties[index] = float(duty)
+            if exchanger.area is not None:
+                recovery_areas[index] = float(exchanger.area)
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
             if heater:
@@ -305,6 +328,7 @@ def fixed_network_structure(
             utility_approach=utility_approach,
             initial_recovery_duties=recovery_duties,
             initial_utility_duties=utility_duties,
+            recovery_areas=recovery_areas,
         ),
         positions=tuple(positions),
         slots=tuple(slots),

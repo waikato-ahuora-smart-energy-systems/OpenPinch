@@ -32,7 +32,10 @@ Objectives (all multi-period aware, weighted by period weights):
   has one area shared by all periods; in every period it must provide at
   least the area that period needs (bypass covers any surplus);
 * ``"total cost"``: minimise operating cost plus exchanger capital on the
-  common areas.
+  common areas;
+* ``"rating"``: minimise operating cost with each recovery exchanger's area
+  fixed (``FixedStructureSpec.recovery_areas``). Every period's duty must fit
+  within that area; a period needing less runs with a bypass.
 """
 
 from __future__ import annotations
@@ -51,7 +54,9 @@ from ._base import piecewise as _piecewise
 from .base import BaseHeatExchangerNetworkModel
 from .thermal_profiles import ThermalProfile, smooth_clip
 
-FIXED_STRUCTURE_GOALS = frozenset({"total utility", "total area", "total cost"})
+FIXED_STRUCTURE_GOALS = frozenset(
+    {"total utility", "total area", "total cost", "rating"}
+)
 HEATER = "hot"
 COOLER = "cold"
 _AREA_SMOOTHING = 1e-3
@@ -92,6 +97,8 @@ class FixedStructureSpec:
     utility_approach: Mapping[int, float] = field(default_factory=dict)
     initial_recovery_duties: Mapping[int, float] = field(default_factory=dict)
     initial_utility_duties: Mapping[int, float] = field(default_factory=dict)
+    # Installed area of each recovery exchanger, for the "rating" goal.
+    recovery_areas: Mapping[int, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -752,6 +759,8 @@ def build_fixed_structure_equations(owner) -> None:
         _utility_caps(owner, n)
     if owner.minimisation_goal in {"total area", "total cost"}:
         _common_areas(owner)
+    elif owner.minimisation_goal == "rating":
+        _installed_recovery_areas(owner)
     else:
         owner.area_r = None
         owner.area_u = None
@@ -1200,6 +1209,21 @@ def _common_areas(owner) -> None:
     ]
 
 
+def _installed_recovery_areas(owner) -> None:
+    """Each recovery exchanger's installed area caps its duty in every period."""
+
+    owner.area_r = []
+    for r in range(len(owner.spec.recovery)):
+        area = float(owner.spec.recovery_areas[r])
+        for n in range(owner.N_periods):
+            owner._at_least(
+                area * owner.recovery_U[n][r] * chen_lmtd(*owner.theta_r[n][r]),
+                owner.q_r[n][r],
+            )
+        owner.area_r.append(area)
+    owner.area_u = None
+
+
 def _start_lmtd(thetas) -> float:
     theta_1, theta_2 = (_numeric(theta) for theta in thetas)
     return max(chen_lmtd(max(theta_1, 1e-6), max(theta_2, 1e-6)), 1e-6)
@@ -1216,6 +1240,8 @@ def set_fixed_structure_objective(owner) -> None:
         )
     elif goal == "total area":
         owner.objective_expression = _sum(list(owner.area_r) + list(owner.area_u))
+    elif goal == "rating":
+        owner.objective_expression = operating_cost_expression(owner)
     else:
         owner.objective_expression = operating_cost_expression(
             owner
@@ -1395,7 +1421,11 @@ def post_process_fixed_structure(owner) -> None:
                     slices=slices,
                 )
             )
-        area = _design_area(periods)
+        area = (
+            float(spec.recovery_areas[r])
+            if owner.minimisation_goal == "rating"
+            else _design_area(periods)
+        )
         owner.recovery_results.append(
             ExchangerResult(
                 periods=periods,
