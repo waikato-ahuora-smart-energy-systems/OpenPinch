@@ -115,3 +115,58 @@ def with_utilities_from(receiver, donor, *, project_name=None):
     )
     derived._invalidate_analysis()
     return derived
+
+
+def _period_value(value, index, period_id):
+    """``value`` with every per-period quantity reduced to one period's value."""
+    if isinstance(value, list):
+        return [_period_value(item, index, period_id) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if "values" in value:
+        values = value["values"]
+        ids = value.get("period_ids")
+        position = (
+            [str(item) for item in ids].index(period_id)
+            if ids is not None
+            else (index if len(values) > 1 else 0)
+        )
+        reduced = {
+            key: item
+            for key, item in value.items()
+            if key not in ("values", "period_ids", "weights")
+        }
+        return reduced | {"value": _period_value(values[position], index, period_id)}
+    return {key: _period_value(item, index, period_id) for key, item in value.items()}
+
+
+def single_period_case(problem, period_id, *, project_name=None):
+    """A new single-period problem holding ``period_id``'s data alone.
+
+    Every per-period quantity takes that period's value; the period keeps its
+    id and a weight of one. Synthesis and targeting run on it unchanged.
+    """
+    period_ids = list(problem.period_ids)
+    period_id = str(period_id)
+    if period_id not in period_ids:
+        raise ValueError(
+            f"unknown period {period_id!r}; the problem has periods "
+            + ", ".join(repr(item) for item in period_ids)
+            + "."
+        )
+    if problem._process_components:
+        raise ValueError(
+            "a single-period case cannot be derived from a problem with "
+            "process components."
+        )
+    source = _period_value(
+        problem.to_problem_json(), period_ids.index(period_id), period_id
+    )
+    source["options"] |= {
+        "PROBLEM_PERIOD_IDS": [period_id],
+        "PROBLEM_PERIOD_WEIGHTS": [1.0],
+    }
+    return type(problem)(
+        source,
+        project_name=problem.project_name if project_name is None else project_name,
+    )

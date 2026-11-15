@@ -7,6 +7,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 - `heat_exchanger_network_synthesis_service` and per-method `heat_exchanger_network_*_method_service` functions (`service.py`): dispatch one method and update the problem cache.
 - `prepare_service_context`, `finalise_design_result`, `ensure_target_results`, `normalise_runtime_options`, `optional_text` (`context.py`): shared service-boundary helpers.
 - `heat_exchanger_network_duty_optimisation_service`, `build_duty_optimisation_request`, `DutyOptimisationRequest`, `fixed_network_structure`, `FixedNetworkStructure`, `FixedStructureDutyExecutor`, `build_solution_network`, `verify_solution` (not in `__all__`), `duty_optimisation_task`, `DUTY_OBJECTIVE_GOALS`, `DEFAULT_FEASIBILITY_APPROACH` (`duty_optimisation.py`): optimise exchanger duties on a user-defined network for `"utility"`, `"area"` or `"cost"`.
+- `with_stream_end_utilities` (`period_fit.py`): a network designed on one basis, plus a heater or cooler at each stream end that has none, so a fit over every period can close each period's balance.
 - `quantify_heat_exchanger_network_controllability` (`controllability.py`): 0 to 1 steady-state controllability score for a solved `HeatExchangerNetwork`, from an interaction matrix derived from exchanger duties.
 - `PreparedProblem`, `SynthesisProblem` (`prepared_problem.py`): structural protocols for the problem state analysis code reads.
 - `WorkflowContractError` (`errors.py`): raised when a synthesis workflow breaks its task contract or no task outcome succeeds.
@@ -27,6 +28,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 - An accepted design is ranked, selected and verified; verification failures raise `RuntimeError` [context.py:finalise_design_result].
 - Analysis code accepts the `PreparedProblem` protocol instead of importing the application layer [prepared_problem.py:PreparedProblem].
 - Duty optimisation: `"area"` needs a utility cap, `"cost"` and `"utility"` reject caps, and every process stream needs at least one exchanger, checked at solve time (including after each idle-exchanger removal) so a violation surfaces as a failed task and `WorkflowContractError` from the service [duty_optimisation.py:build_duty_optimisation_request] [duty_optimisation.py:_require_every_stream_served].
+- Stream-end padding gives each stream with no utility at its end the cheapest utility (period-weighted price) that keeps the approach at both ends of an end exchanger in every period the stream runs; a stream no utility reaches gets none, and existing exchangers keep their stages [period_fit.py:with_stream_end_utilities].
 - Exchangers left at zero duty in every period are removed one per pass, the idle one with the smallest `max_duty` first, and the allocation is re-solved until none are idle [duty_optimisation.py:FixedStructureDutyExecutor._solve].
 - The numeric controllability options are validated, component scores lie in 0 to 1, and the composite uses fixed weights renormalised over the components that are not `None` [controllability.py:_validate_options, _COMPOSITE_WEIGHTS].
 

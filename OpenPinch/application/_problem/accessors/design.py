@@ -593,6 +593,26 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
+    def _fit_to_all_periods(self, network: "HeatExchangerNetwork"):
+        """Fit a network designed on one basis to every operating period.
+
+        Each stream without a utility at its end gets the cheapest one that
+        can serve it there; the fixed-structure cost fit then gives every
+        exchanger one area over all periods, with bypass where a period needs
+        less, and removes the exchangers no period uses.
+        """
+        from ....analysis.heat_exchanger_networks.duty_optimisation import (
+            DEFAULT_FEASIBILITY_APPROACH,
+        )
+        from ....analysis.heat_exchanger_networks.period_fit import (
+            with_stream_end_utilities,
+        )
+
+        padded = with_stream_end_utilities(
+            self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
+        )
+        return self.optimise_duties(padded, objective="cost")
+
     def multiperiod_heat_exchanger_network(self, *, prerequisites=False, **kwargs):
         """Synthesize one shared HEN after explicit all-period targeting.
 
