@@ -288,7 +288,9 @@ def test_a_side_search_stays_within_one_node_budget(monkeypatch):
 
     propose_side_topologies(above, limit=5)
 
-    assert calls[0] <= 20 * 5
+    # One budget per search: no proposal completes, so the base search and
+    # each fallback rung search the side, each within its own budget.
+    assert calls[0] <= 20 * 5 * (1 + len(enumeration._FALLBACK_RUNGS))
 
 
 def test_a_relief_stage_proposal_is_not_complete():
@@ -362,8 +364,11 @@ def test_a_fruitless_search_stops_once_its_incomplete_proposals_are_kept(
     proposals = propose_side_topologies(above, limit=10)
 
     assert proposals and not any(proposal.complete for proposal in proposals)
-    # Well under the side's budget of 2000 nodes per proposal requested.
-    assert nodes[0] <= 2 * enumeration._STALL_NODES
+    # Well under the side's budget of 2000 nodes per proposal requested, in
+    # the base search and in each fallback rung, which also stall.
+    assert nodes[0] <= 2 * enumeration._STALL_NODES * (
+        1 + len(enumeration._FALLBACK_RUNGS)
+    )
 
 
 def test_dead_ends_met_first_do_not_hide_the_complete_proposals_behind_them():
@@ -393,3 +398,116 @@ def test_dead_ends_met_first_do_not_hide_the_complete_proposals_behind_them():
     proposals = propose_side_topologies(above, limit=5)
 
     assert [proposal.complete for proposal in proposals] == [True] * 5
+
+
+def _ten_stream_ahmad_above():
+    # Ahmad's ten streams above the pinch at 10 K (K, kW, kW/K). Matching the
+    # must stream nearest the pinch first, no order of partners completes it.
+    return side(
+        "above",
+        [
+            stream("hot", 0, 156.3, 4532.7, 329.15),
+            stream("hot", 1, 50.0, 3200.0, 329.15),
+            stream("hot", 4, 1200.0, 6000.0, 358.15, at_pinch=False),
+            stream("hot", 5, 50.0, 7500.0, 348.15, at_pinch=False),
+        ],
+        [
+            stream("cold", 0, 466.7, 4200.3, 319.15),
+            stream("cold", 1, 600.0, 6000.0, 328.15, at_pinch=False),
+            stream("cold", 2, 180.0, 18000.0, 338.15, at_pinch=False),
+            stream("cold", 3, 81.3, 10081.2, 319.15),
+        ],
+    )
+
+
+def _nine_stream_above():
+    # Linnhoff and Ahmad's nine streams above the pinch at 7.5 K. A must
+    # stream is left with load no partner can take in series.
+    return side(
+        "above",
+        [
+            stream("hot", 0, 100.0, 16700.0, 433.15),
+            stream("hot", 1, 160.0, 9600.0, 433.15),
+            stream("hot", 2, 60.0, 3600.0, 433.15),
+        ],
+        [
+            stream("cold", 0, 100.0, 14750.0, 425.65),
+            stream("cold", 1, 70.0, 805.0, 425.65),
+            stream("cold", 3, 60.0, 1050.0, 425.65),
+            stream("cold", 4, 200.0, 29500.0, 425.65),
+        ],
+        approach=7.5,
+    )
+
+
+def _stages_keep_their_approach(pinch_side, proposal) -> bool:
+    """Every match keeps its approach at both ends of its stage.
+
+    Split branches leave a stage mixed, so each stream spans the whole of
+    its duty in the stage, from its heat before the stage to its heat
+    through it, both counted from its pinch end.
+    """
+
+    streams = {(s.kind, s.index): s for s in pinch_side.hot + pinch_side.cold}
+
+    def layer(match):
+        above = pinch_side.location == "above"
+        return proposal.stages - 1 - match.stage if above else match.stage
+
+    for match in proposal.matches:
+        ends = []
+        for bound in (
+            lambda other: layer(other) < layer(match),
+            lambda other: layer(other) <= layer(match),
+        ):
+            heat = {("hot", match.hot): 0.0, ("cold", match.cold): 0.0}
+            for other in proposal.matches:
+                if bound(other):
+                    for key in (("hot", other.hot), ("cold", other.cold)):
+                        if key in heat:
+                            heat[key] += other.duty
+            ends.append(heat)
+        hot, cold = streams[("hot", match.hot)], streams[("cold", match.cold)]
+        approach = pinch_side.approach[0][match.hot][match.cold] - 1e-6
+        for heat in ends:
+            if (
+                hot.temperature(0, heat[("hot", match.hot)])
+                - cold.temperature(0, heat[("cold", match.cold)])
+                < approach
+            ):
+                return False
+    return True
+
+
+def test_a_side_short_of_complete_proposals_backtracks_over_the_must_stream_order():
+    proposals = propose_side_topologies(_ten_stream_ahmad_above(), limit=10)
+
+    assert proposals[0].complete
+
+
+def test_a_must_stream_no_partner_takes_in_series_splits_a_partner_in_parallel():
+    nine = _nine_stream_above()
+
+    proposals = propose_side_topologies(nine, limit=10)
+
+    complete = [proposal for proposal in proposals if proposal.complete]
+    assert complete
+    assert all(_stages_keep_their_approach(nine, proposal) for proposal in complete)
+
+
+def test_the_fallback_searches_add_nothing_to_a_side_already_at_the_cap(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic import enumeration
+
+    searches = []
+    real_completions = enumeration._completions
+
+    def counting(*args, **kwargs):
+        searches.append(kwargs.get("rung"))
+        yield from real_completions(*args, **kwargs)
+
+    monkeypatch.setattr(enumeration, "_completions", counting)
+
+    proposals = propose_side_topologies(_four_stream_below(), limit=1)
+
+    assert proposals[0].complete
+    assert set(searches) == {enumeration._BASE_RUNG}
