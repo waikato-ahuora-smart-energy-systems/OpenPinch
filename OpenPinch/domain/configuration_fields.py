@@ -389,6 +389,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_PDM_MIN_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_min_unit_networks", numeric_min=0.0),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_extra_unit_networks", numeric_min=0.0),
     "HENS_HEURISTIC_PDM_NETWORKS": _spec(int | None, None, "hens", "heuristic_pdm_networks", numeric_min=0.0),
+    "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS": _spec(int | None, None, "hens", "heuristic_pdm_evolution_seeds", numeric_min=0.0),
     "HENS_PDM_MILP": _spec(bool | None, None, "hens", "pdm_milp"),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),

@@ -1,6 +1,5 @@
 Pre-Release Notes
-=================
-
+==========
 Unreleased
 ----------
 
@@ -41,6 +40,16 @@ Heat exchanger network synthesis
   ``openpinch-solvers`` ships; an older Ipopt first on ``PATH`` rejects them
   and fails its solves. Set any of them in the stage's solver options to
   change it.
+=======
+- Only the cheapest heuristic pinch design networks seed network evolution:
+  ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS`` per dt_cont multiplier, set by the
+  search depth when unset (3 at depths 1 and 2, 20 at depth 3, 50 at
+  depth 4). The rest are still final candidates. Previously every heuristic
+  network seeded evolution. On the 12 OpenHENS benchmark cases at the
+  default width and depth, evolution goes from up to 30 seeds per case to
+  up to 9, about half the run time, with the same best network on every
+  case. Set the option to ``HENS_HEURISTIC_PDM_NETWORKS`` or more to evolve
+  every network as before.
 
 0.9.0 (2026-11-14)
 ------------------
