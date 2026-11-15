@@ -58,6 +58,7 @@ TARGET_TUTORIALS = {
     "exergy": 7,
     "carnot_heat_pump": 8,
     "heat_pump_and_refrigeration": 8,
+    "hpr_cycles": 8,
     "carnot_refrigeration": 8,
     "vapour_compression_heat_pump": 9,
     "vapour_compression_refrigeration": 9,

@@ -7,7 +7,9 @@ from contextvars import copy_context
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
-from ....analysis.heat_pumps.cycles.registry import cycle_spec
+from pydantic import ValidationError
+
+from ....analysis.heat_pumps.cycles.registry import cycle_spec, registered_cycles
 from ....analysis.heat_pumps.performance_maps.generation import (
     generate_hpr_performance_map,
 )
@@ -21,6 +23,8 @@ from ....analysis.parallelism import supported_workers
 from ....contracts.hpr import (
     BraytonCycleOptions,
     CarnotCycleOptions,
+    HprCycleCatalog,
+    HprCycleInfo,
     HprLevels,
     HprLoad,
     HPRSearchBudget,
@@ -289,6 +293,7 @@ install_catalog_forwarders(
     exclude=(
         "brayton_heat_pump",
         "brayton_refrigeration",
+        "hpr_cycles",
         "hpr_performance_map",
         "hpr_refrigerant_screen",
     ),
@@ -830,6 +835,15 @@ class _TargetAccessor:
                 f"{', '.join(spec.topologies)}; got {topology!r}."
             )
         chosen = request.cycle_options or spec.options_model()
+        if not isinstance(chosen, spec.options_model):
+            try:
+                chosen = spec.options_model.model_validate(
+                    chosen if isinstance(chosen, dict) else chosen.model_dump()
+                )
+            except ValidationError as error:
+                raise ValueError(
+                    f"invalid options for the {spec.id} cycle: {error}"
+                ) from error
         backend = getattr(chosen, "simulation_backend", None)
         if backend is not None:
             backend = normalize_hpr_simulation_backend(backend)
@@ -841,7 +855,7 @@ class _TargetAccessor:
         levels = request.levels or HprLevels()
         limits = request.search or HprSearchLimits()
         return self._hpr(
-            surface=legacy,
+            surface=legacy or "heat_pump_and_refrigeration",
             cycle=spec.topologies[topology],
             is_heat_pump=request.duty == "heat_pump",
             is_utility=request.placement == "utility",
@@ -860,6 +874,31 @@ class _TargetAccessor:
             maximum_evaluations=limits.evaluations,
             extra_configuration=spec.to_configuration(chosen),
             simulation_backend=backend,
+        )
+
+    def hpr_cycles(self) -> HprCycleCatalog:
+        """Every registered heat pump and refrigeration cycle.
+
+        Each entry gives the cycle's id and label, the duties it serves, its
+        topologies and default, whether it is available and runs across all
+        periods, its optional dependencies, and the JSON Schema of its
+        options model, from which a client can build the cycle's form.
+        """
+        return HprCycleCatalog(
+            cycles=tuple(
+                HprCycleInfo(
+                    id=spec.id,
+                    label=spec.label,
+                    duties=tuple(sorted(spec.duties)),
+                    topologies=tuple(spec.topologies),
+                    default_topology=spec.default_topology,
+                    available=spec.available,
+                    all_periods=spec.all_periods,
+                    dependencies=spec.dependencies,
+                    options_schema=spec.options_model.model_json_schema(),
+                )
+                for spec in registered_cycles()
+            )
         )
 
     def carnot_heat_pump(

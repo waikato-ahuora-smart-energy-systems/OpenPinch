@@ -157,7 +157,7 @@ install_catalog_forwarders(
     _CaseBatchTargetAccessor,
     surface="target",
     factory=_case_batch_forwarder,
-    exclude=("hpr_performance_map", "hpr_refrigerant_screen"),
+    exclude=("hpr_cycles", "hpr_performance_map", "hpr_refrigerant_screen"),
 )
 install_catalog_forwarders(
     _CaseBatchAllPeriodsTargetAccessor,
@@ -166,6 +166,7 @@ install_catalog_forwarders(
     exclude=(
         "brayton_heat_pump",
         "brayton_refrigeration",
+        "hpr_cycles",
         "hpr_performance_map",
         "hpr_refrigerant_screen",
     ),
