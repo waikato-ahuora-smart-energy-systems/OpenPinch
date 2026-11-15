@@ -57,6 +57,7 @@ TARGET_TUTORIALS = {
     "hpr_refrigerant_screen": 8,
     "exergy": 7,
     "carnot_heat_pump": 8,
+    "heat_pump_and_refrigeration": 8,
     "carnot_refrigeration": 8,
     "vapour_compression_heat_pump": 9,
     "vapour_compression_refrigeration": 9,
@@ -80,6 +81,7 @@ ALL_PERIOD_TUTORIALS = {
     "exergy": 7,
     "energy_transfer": 14,
     "carnot_heat_pump": 10,
+    "heat_pump_and_refrigeration": 10,
     "carnot_refrigeration": 10,
     "hpr_load_kinks": 6,
     "vapour_compression_heat_pump": 10,
@@ -106,6 +108,7 @@ UNDER_DEVELOPMENT_METHODS = frozenset(
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"
 DOCUMENTED_ALL_PERIOD_HPR_METHODS = frozenset(
     {
+        "heat_pump_and_refrigeration",
         "carnot_heat_pump",
         "carnot_refrigeration",
         "vapour_compression_heat_pump",

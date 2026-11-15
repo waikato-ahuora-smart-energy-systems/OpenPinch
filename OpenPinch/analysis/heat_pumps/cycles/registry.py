@@ -15,54 +15,18 @@ from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ValidationError
 
-from ....contracts.hpr import HPRTopologyIdentifier
+from ....contracts.hpr import (
+    BraytonCycleOptions,
+    CarnotCycleOptions,
+    HPRTopologyIdentifier,
+    MvrCycleOptions,
+    VapourCompressionCycleOptions,
+)
 from ....domain.enums import HeatPumpAndRefrigerationCycle
 
 DUTIES = frozenset({"heat_pump", "refrigeration"})
-
-
-class _CycleOptions(BaseModel):
-    """A cycle's own options. Values pass unchanged to the ``HPR_*``
-    configuration, whose validators check them; only unknown names are
-    rejected here."""
-
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-
-class CarnotOptions(_CycleOptions):
-    """Carnot cycles have no options of their own."""
-
-
-class BraytonOptions(_CycleOptions):
-    """Brayton cycles have no options of their own."""
-
-
-class VapourCompressionOptions(_CycleOptions):
-    """Refrigerants and simulation choices of vapour compression cycles.
-
-    ``compressor_model`` may be a compressor efficiency function in a call;
-    such a function is not stored with the case.
-    """
-
-    refrigerants: Any = None
-    initialize_from_carnot: Any = None
-    sort_refrigerants: Any = None
-    allow_integrated_expander: Any = None
-    compressor_model: Any = None
-
-
-class MvrOptions(_CycleOptions):
-    """Refrigerants, MVR fluids and stages, and efficiencies of an MVR cascade."""
-
-    refrigerants: Any = None
-    mvr_fluids: Any = None
-    mvr_compressor_efficiency: Any = None
-    mvr_compressor_model: Any = None
-    compressor_model: Any = None
-    mvr_stages: Any = None
-    motor_efficiency: Any = None
 
 
 @dataclass(frozen=True)
@@ -201,7 +165,11 @@ def family_handlers(hpr_type: str) -> CycleFamilyHandlers:
 _TARGETING = "OpenPinch.analysis.heat_pumps.targeting"
 _SETUP = "OpenPinch.analysis.heat_pumps._multiperiod.setup"
 
-_VAPOUR_COMPRESSION_KEYS = {
+_EFFICIENCY_KEYS = {
+    "compressor_efficiency": "HPR_ETA_COMP",
+    "expander_efficiency": "HPR_ETA_EXP",
+}
+_VAPOUR_COMPRESSION_KEYS = _EFFICIENCY_KEYS | {
     "refrigerants": "HPR_REFRIGERANTS",
     "initialize_from_carnot": "HPR_INITIALISE_SIMULATED_CYCLE",
     "sort_refrigerants": "HPR_REFRIGERANT_SORT_ENABLED",
@@ -219,7 +187,8 @@ register_cycle(
         },
         default_topology="cascade",
         duties=DUTIES,
-        options_model=CarnotOptions,
+        options_model=CarnotCycleOptions,
+        configuration_keys=_EFFICIENCY_KEYS,
         handlers={
             "cascade": CycleFamilyHandlers(
                 placement=f"{_TARGETING}.cascade_carnot"
@@ -244,7 +213,7 @@ register_cycle(
         },
         default_topology="cascade",
         duties=DUTIES,
-        options_model=VapourCompressionOptions,
+        options_model=VapourCompressionCycleOptions,
         configuration_keys=_VAPOUR_COMPRESSION_KEYS,
         dependencies=("tespy (explicit backend only)",),
         screening_methods={
@@ -280,7 +249,7 @@ register_cycle(
         topologies={"cascade": HeatPumpAndRefrigerationCycle.VapourCompMVR},
         default_topology="cascade",
         duties=frozenset({"heat_pump"}),
-        options_model=MvrOptions,
+        options_model=MvrCycleOptions,
         configuration_keys={
             "refrigerants": "HPR_REFRIGERANTS",
             "mvr_fluids": "HPR_MVR_FLUIDS",
@@ -308,7 +277,8 @@ register_cycle(
         topologies={"single": HeatPumpAndRefrigerationCycle.Brayton},
         default_topology="single",
         duties=DUTIES,
-        options_model=BraytonOptions,
+        options_model=BraytonCycleOptions,
+        configuration_keys=_EFFICIENCY_KEYS,
         available=False,
         all_periods=False,
         handlers={
@@ -322,12 +292,8 @@ register_cycle(
 
 __all__ = [
     "DUTIES",
-    "BraytonOptions",
-    "CarnotOptions",
     "CycleFamilyHandlers",
     "HprCycleSpec",
-    "MvrOptions",
-    "VapourCompressionOptions",
     "cycle_spec",
     "family_handlers",
     "register_cycle",

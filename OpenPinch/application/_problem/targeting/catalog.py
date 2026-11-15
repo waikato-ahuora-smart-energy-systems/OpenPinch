@@ -78,6 +78,7 @@ METHOD_CATALOG = MappingProxyType(
                 else (),
             )
             for name in (
+                "heat_pump_and_refrigeration",
                 "carnot_heat_pump",
                 "carnot_refrigeration",
                 "vapour_compression_heat_pump",
