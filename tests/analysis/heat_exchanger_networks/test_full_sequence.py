@@ -1184,7 +1184,7 @@ def test_period_zone_and_multiperiod_designs_resolve_the_same_depth(
     with pytest.raises(DepthResolved) as for_period:
         problem.design.heat_exchanger_network(period_id="base")
     with pytest.raises(DepthResolved) as for_all_periods:
-        problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
+        problem.design.heat_exchanger_network(design_basis="all")
 
     assert for_period.value.args == (expected_depth,)
     assert for_all_periods.value.args == (expected_depth,)

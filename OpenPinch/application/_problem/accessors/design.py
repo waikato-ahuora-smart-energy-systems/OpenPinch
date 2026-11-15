@@ -325,6 +325,7 @@ class _DesignAccessor:
         depth: int | None = None,
         options: Mapping[str, Any] | None = None,
         period_id: str | None = None,
+        design_basis: str | None = None,
         dt_cont_multipliers=None,
         derivative_thresholds=None,
         stages=None,
@@ -335,6 +336,16 @@ class _DesignAccessor:
         solve_tolerance=None,
     ) -> HeatExchangerNetworkDesignView:
         """Run HEN synthesis at a search width and depth.
+
+        On a multiperiod case the network serves every operating period;
+        ``design_basis`` (``HENS_DESIGN_BASIS``) is what it is synthesised
+        from. ``"all"`` designs over every period at once, after all-period
+        targeting when there is none. ``"period"`` synthesises on
+        ``period_id`` alone, then fits the network to every period: each
+        exchanger gets one area, with bypass where a period needs less, and
+        a heater or cooler is added at a stream end where a period needs
+        one. Passing ``period_id`` implies ``"period"``. On a single-period
+        case the basis changes nothing.
 
         ``width`` (``HENS_SEARCH_WIDTH``, 0 to 3, default 1) picks the dt_cont
         multipliers: 1.0; 0.75, 1.0 and 1.5; then five and seven values from
@@ -358,6 +369,24 @@ class _DesignAccessor:
             heat_exchanger_network_open_hens_method_service,
         )
 
+        basis = self._design_basis(design_basis, period_id)
+        if basis == "period":
+            return self._design_on_basis_period(
+                period_id,
+                width=width,
+                depth=depth,
+                options=options,
+                dt_cont_multipliers=dt_cont_multipliers,
+                derivative_thresholds=derivative_thresholds,
+                stages=stages,
+                pack_stages=pack_stages,
+                solver=solver,
+                max_parallel=max_parallel,
+                best_solutions=best_solutions,
+                solve_tolerance=solve_tolerance,
+            )
+        if basis == "all" and not self._problem.period_results:
+            self._problem.target.all_periods.all_heat_integration()
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
@@ -379,6 +408,54 @@ class _DesignAccessor:
             configuration=configuration,
             workspace_variant=None,
         )
+
+    def _design_basis(self, design_basis: str | None, period_id: str | None):
+        """The basis a multiperiod design is synthesised from; None for one period."""
+        from ....domain.configuration_fields import HENS_DESIGN_BASIS_VALUES
+
+        if design_basis is not None and design_basis not in HENS_DESIGN_BASIS_VALUES:
+            raise ValueError(
+                "design_basis must be one of "
+                + ", ".join(repr(value) for value in sorted(HENS_DESIGN_BASIS_VALUES))
+                + f"; got {design_basis!r}."
+            )
+        if design_basis == "all" and period_id is not None:
+            raise ValueError(
+                "design_basis='all' designs over every period; drop period_id, "
+                "or pass design_basis='period' to design on that period."
+            )
+        if len(self._problem.period_ids) <= 1:
+            return None
+        basis = design_basis or (
+            "period"
+            if period_id is not None
+            else self._problem._require_prepared_root_zone().config.hens.design_basis
+        )
+        if basis == "period" and period_id is None:
+            raise ValueError("design_basis='period' needs a period_id to design on.")
+        return basis
+
+    def _design_on_basis_period(self, period_id: str, **arguments):
+        """Synthesise on ``period_id`` alone, then fit every period."""
+        from ...case_derivation import single_period_case
+        from ..targeting.provenance import canonical_json
+
+        basis = single_period_case(self._problem, period_id)
+        network = basis.design.heat_exchanger_network(**arguments).selected_network
+        view = self._fit_to_all_periods(network)
+        provenance = view.result.provenance
+        settings = dict(provenance.effective_settings)
+        settings |= {"HENS_DESIGN_BASIS": "period", "basis_period_id": str(period_id)}
+        provenance = provenance.model_copy(
+            update={
+                "method_id": "design.heat_exchanger_network",
+                "period_ids": tuple(self._problem.period_ids),
+                "effective_settings_json": canonical_json(settings),
+            }
+        )
+        view.result.provenance = provenance
+        self._problem._results.design.provenance = provenance
+        return view
 
     def pinch_design(self, *, options=None, period_id=None, **kwargs):
         """Run the pinch design method only.
@@ -612,30 +689,6 @@ class _DesignAccessor:
             self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
         )
         return self.optimise_duties(padded, objective="cost")
-
-    def multiperiod_heat_exchanger_network(self, *, prerequisites=False, **kwargs):
-        """Synthesize one shared HEN after explicit all-period targeting.
-
-        With ``prerequisites=True``, a problem with no all-period targets
-        runs ``target.all_periods.all_heat_integration()`` first.
-        """
-        if not self._problem.period_results and prerequisites:
-            self._problem.target.all_periods.all_heat_integration()
-        if not self._problem.period_results:
-            raise RuntimeError(
-                "Run problem.target.all_periods.<method>() before multiperiod HEN "
-                "synthesis, or pass prerequisites=True to run "
-                "all_heat_integration first."
-            )
-        if "period_id" in kwargs:
-            raise TypeError("multiperiod synthesis does not accept period_id.")
-        view = self.heat_exchanger_network(**kwargs)
-        provenance = view.result.provenance.model_copy(
-            update={"method_id": "design.multiperiod_heat_exchanger_network"}
-        )
-        view.result.provenance = provenance
-        self._problem._results.design.provenance = provenance
-        return view
 
 
 class _DesignAccessorDescriptor:

@@ -129,15 +129,12 @@ METHOD_CATALOG = MappingProxyType(
         **{
             f"design.{name}": _spec(
                 prerequisites=("direct_heat_integration",),
-                periods="shared"
-                if name == "multiperiod_heat_exchanger_network"
-                else "specialized",
+                periods="shared" if name == "heat_exchanger_network" else "specialized",
                 dependencies=("synthesis", "external solver"),
                 adapter="hen",
             )
             for name in (
                 "heat_exchanger_network",
-                "multiperiod_heat_exchanger_network",
                 "network_evolution",
                 "optimise_duties",
                 "pinch_design",

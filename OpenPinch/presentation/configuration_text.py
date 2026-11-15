@@ -342,6 +342,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "override it when set."
         ),
     ),
+    "HENS_DESIGN_BASIS": FieldText(
+        "HEN design basis", None,
+        (
+            "What a multiperiod HEN is synthesised from: all (every operating "
+            "period at once) or period (the period_id passed to the design, "
+            "then fitted to every period with one area per exchanger)."
+        ),
+    ),
     "HENS_DT_CONT_MULTIPLIERS": FieldText(
         "HEN dt_cont multipliers", None,
         (

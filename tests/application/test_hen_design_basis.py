@@ -98,3 +98,82 @@ def test_a_basis_period_design_fitted_to_all_periods_closes_every_balance():
             )
     # One area per exchanger, for both periods.
     assert all(exchanger.area is not None for exchanger in fitted.exchangers)
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        ({"design_basis": "all", "period_id": "base"}, "period_id"),
+        ({"design_basis": "period"}, "needs a period_id"),
+        ({"design_basis": "busiest"}, "design_basis"),
+    ],
+)
+def test_a_contradictory_or_unknown_design_basis_is_rejected(arguments, message):
+    with pytest.raises(ValueError, match=message):
+        _two_period_problem().design.heat_exchanger_network(**arguments)
+
+
+def test_the_all_periods_basis_targets_every_period_first(monkeypatch):
+    # The fake executor has no multiperiod networks, so stop at the dispatch.
+    from OpenPinch.analysis.heat_exchanger_networks import service
+
+    class Dispatched(Exception):
+        pass
+
+    def stop(problem, settings, **kwargs):
+        raise Dispatched
+
+    monkeypatch.setattr(service, "execute_open_hens_method", stop)
+    problem = _two_period_problem()
+
+    with pytest.raises(Dispatched):
+        problem.design.heat_exchanger_network(design_basis="all")
+
+    assert set(problem.period_results) == {"base", "peak"}
+
+
+def test_the_multiperiod_method_is_gone():
+    assert not hasattr(
+        _two_period_problem().design, "multiperiod_heat_exchanger_network"
+    )
+
+
+def test_a_saved_multiperiod_design_reads_as_the_all_periods_basis():
+    from OpenPinch.domain.analysis import AnalysisProvenance
+
+    provenance = AnalysisProvenance(
+        owner_id="owner",
+        method_id="design.multiperiod_heat_exchanger_network",
+        zone_address="Site",
+        period_ids=("base", "peak"),
+        input_fingerprint="0" * 64,
+        effective_settings_json='{"HENS_SEARCH_DEPTH": 1}',
+    )
+
+    assert provenance.method_id == "design.heat_exchanger_network"
+    assert provenance.effective_settings["HENS_DESIGN_BASIS"] == "all"
+    assert provenance.effective_settings["HENS_SEARCH_DEPTH"] == 1
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_period_id_designs_on_that_period_and_fits_every_period():
+    problem = _two_period_problem()
+
+    view = problem.design.heat_exchanger_network(width=0, depth=0, period_id="peak")
+
+    provenance = view.result.provenance
+    assert provenance.method_id == "design.heat_exchanger_network"
+    assert provenance.period_ids == ("base", "peak")
+    assert provenance.effective_settings["HENS_DESIGN_BASIS"] == "period"
+    assert provenance.effective_settings["basis_period_id"] == "peak"
+    assert problem.results.design.provenance == provenance
+    periods = {
+        state.period_id
+        for exchanger in view.selected_network.exchangers
+        for state in exchanger.period_states
+    }
+    assert periods == {"base", "peak"}

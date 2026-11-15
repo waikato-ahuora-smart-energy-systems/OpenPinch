@@ -1,9 +1,8 @@
-"""How HEN synthesis treats the periods of a multiperiod case today.
+"""How HEN synthesis treats the periods of a multiperiod case.
 
-Characterisation tests: they pin current behaviour before the design entry
-points are merged. Every call builds its solver models over every period of
-the zone; ``period_id`` only picks the cached targets reused and labels the
-run, so it does not restrict the design to that period.
+Synthesis on the all-periods basis builds its solver models over every
+period of the zone. A ``period_id`` is a basis period: synthesis runs on that
+period alone, and the network is then fitted to every period.
 """
 
 from __future__ import annotations
@@ -78,16 +77,21 @@ _CALLS = {
     "period_id base": lambda problem: problem.design.heat_exchanger_network(
         width=0, depth=0, period_id="base"
     ),
-    "multiperiod method": lambda problem: (
-        problem.design.multiperiod_heat_exchanger_network(
-            width=0, depth=0, prerequisites=True
-        )
+    "all-periods basis": lambda problem: problem.design.heat_exchanger_network(
+        width=0, depth=0, design_basis="all"
     ),
+}
+# Synthesis on a basis period sees that period alone; it used to see every
+# period, as period_id only labelled the run.
+_SYNTHESIS_PERIODS = {
+    "no period_id": PERIODS,
+    "period_id base": ("base",),
+    "all-periods basis": PERIODS,
 }
 
 
 @pytest.mark.parametrize("call", list(_CALLS))
-def test_every_design_call_builds_its_solver_arrays_over_all_periods(monkeypatch, call):
+def test_synthesis_builds_its_solver_arrays_over_its_basis_periods(monkeypatch, call):
     seen = []
     real = executor.problem_to_solver_arrays
 
@@ -102,17 +106,19 @@ def test_every_design_call_builds_its_solver_arrays_over_all_periods(monkeypatch
     with pytest.raises(WorkflowContractError):
         _CALLS[call](_two_period_problem())
 
-    assert seen and set(seen) == {PERIODS}
+    assert seen and set(seen) == {_SYNTHESIS_PERIODS[call]}
 
 
 @pytest.mark.synthesis
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")
-def test_a_period_id_and_the_multiperiod_method_design_the_same_network():
-    # With every call designing over all periods, the period label changes
-    # nothing about the network the heuristic pinch design method finds.
+def test_the_all_periods_basis_designs_what_the_multiperiod_method_did():
+    # The removed multiperiod method was heat_exchanger_network() after
+    # all-period targeting, so both calls design the same network.
     structures = {
-        call: network_structure_signature(run(_two_period_problem()).selected_network)
-        for call, run in _CALLS.items()
+        call: network_structure_signature(
+            _CALLS[call](_two_period_problem()).selected_network
+        )
+        for call in ("no period_id", "all-periods basis")
     }
 
     assert len(set(structures.values())) == 1, structures
