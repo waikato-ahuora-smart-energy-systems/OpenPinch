@@ -76,9 +76,16 @@ DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {
 }
 # Ipopt pushes starting values off their bounds by 1e-2 relative to the bound
 # (about 3.5 K at 350 K), which undoes warm starts from solved networks.
+# Stopping at an error of 1e-4 held for 5 iterations converges evolution
+# solves that stalled near the optimum, with the same networks; the
+# wall-time cap stops a solve that hangs. acceptable_iter and max_wall_time
+# need Ipopt 3.14 or later (openpinch-solvers ships it).
 DEFAULT_IPOPT_PYOMO_OPTIONS: dict[str, Any] = {
     "bound_push": 1e-6,
     "bound_frac": 1e-6,
+    "acceptable_tol": 1e-4,
+    "acceptable_iter": 5,
+    "max_wall_time": 120.0,
 }
 # Defaults under the given options: SCIP prints nothing, and MindtPy runs
 # outer approximation with HiGHS masters and Ipopt subproblems.
@@ -182,8 +189,11 @@ def stage_solver(solver_name: str, *, default: str) -> str:
     return solver_name
 
 
-def require_solver_backend(solver_name: str) -> None:
-    """Validate optional Python packages and executables for one solver name."""
+def require_solver_backend(solver_name: str) -> str | None:
+    """Validate optional Python packages and executables for one solver name.
+
+    Returns the solver's executable, or None for a solver with none.
+    """
 
     if solver_name in PYOMO_SOLVERS:
         if solver_name in PYOMO_SOLVER_MODULES:
@@ -191,8 +201,9 @@ def require_solver_backend(solver_name: str) -> None:
                 PYOMO_SOLVER_MODULES[solver_name],
                 purpose=f"{solver_name} heat exchanger network synthesis solves",
             )
+        executable = None
         if solver_name in PYOMO_SOLVER_BINARIES:
-            require_solver_binary(
+            executable = require_solver_binary(
                 PYOMO_SOLVER_BINARIES[solver_name],
                 purpose=f"{solver_name} heat exchanger network synthesis solves",
             )
@@ -201,7 +212,7 @@ def require_solver_backend(solver_name: str) -> None:
             package="pyomo",
             purpose=f"{solver_name} solver factory access",
         )
-        return
+        return executable
 
     raise MissingSynthesisSolverError(
         "Unsupported heat exchanger network synthesis solver "
@@ -230,7 +241,10 @@ def configure_pyomo_solver(
             f"{solver_name!r} cannot solve a native Pyomo model. Supported "
             f"solvers are: {', '.join(sorted(PYOMO_SOLVERS))}."
         )
-    require_solver_backend(solver_name)
+    executable = require_solver_backend(solver_name)
+    if executable is not None and solver_name in SOLUTION_FILE_SOLVERS:
+        # Solved with this executable rather than whichever is first on PATH.
+        model._openpinch_solver_executable = executable
     effective_options = _merge_solver_options(
         DEFAULT_SOLVER_OPTIONS.get(solver_name, {}), solver_options
     )
@@ -312,7 +326,14 @@ def solve_pyomo_model(
     failure_reason = None
     try:
         with _solver_working_directory(model, "pyomo"):
-            solver = pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
+            executable = getattr(model, "_openpinch_solver_executable", None)
+            solver = (
+                pyomo.SolverFactory(
+                    PYOMO_SOLVER_FACTORY_NAMES[solver_name], executable=executable
+                )
+                if executable is not None
+                else pyomo.SolverFactory(PYOMO_SOLVER_FACTORY_NAMES[solver_name])
+            )
             options = getattr(model, "_openpinch_solver_options", None) or {}
             if solver_name == "mindtpy":
                 # MindtPy takes its configuration as solve arguments.

@@ -168,8 +168,10 @@ in series split a partner away from the pinch, matching it in parallel with
 that partner's last match where the stage keeps its approach. A side the first
 search fills is not searched again.
 
-In the main synthesis workflow every heuristic network seeds network
-evolution directly (from search depth 1). Heuristic networks never go to the
+In the main synthesis workflow the cheapest heuristic networks seed network
+evolution directly (from search depth 1): ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS``
+per dt_cont multiplier, 3 at depths 1 and 2, set by the depth (see below).
+The rest stay final candidates as they are. Heuristic networks never go to the
 thermal derivative method.
 
 From search depth 2, or with ``HENS_PDM_MILP`` set, the MILP pinch design
@@ -217,25 +219,31 @@ The depth picks the stages run at each multiplier and their effort:
    * - Depth
      - Stages
      - Heuristic networks
+     - Heuristic networks evolved
      - Evolution breadth
    * - 0
      - heuristic pinch design only
      - 10
      - none
+     - none
    * - 1 (default)
      - heuristic, then evolution
      - 10
+     - 3
      - 1
    * - 2
      - heuristic and MILP; MILP through the thermal derivative method
      - 10
+     - 3
      - 1
    * - 3
      - as 2; every MILP network also straight to evolution
      - 20
+     - 20
      - 2
    * - 4
      - as 3
+     - 50
      - 50
      - 3
 
@@ -245,8 +253,9 @@ default) to add them at any depth that runs the MILP.
 
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
-and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
-``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the depth. A call's
+and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS``,
+``HENS_PDM_MILP``, ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the
+depth. A call's
 ``width`` and ``depth`` win over the call's ``options``, which win over the
 stored options for that call only. A governed option stored on the problem
 also wins over a stored level: a stored ``HENS_PDM_MILP: false`` keeps the

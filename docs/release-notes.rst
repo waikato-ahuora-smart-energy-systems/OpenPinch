@@ -7,6 +7,49 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Network evolution runs the ``openpinch-solvers`` Ipopt again when IDAES is
+  installed. Looking for Couenne (the default TDM solver) imports IDAES,
+  which puts its older Ipopt download first on ``PATH``, so every later
+  evolution solve ran that Ipopt instead. The IDAES directory is now a
+  fallback after ``openpinch-solvers`` however it reached ``PATH``, and Ipopt
+  and Couenne run the executable found when their solve is configured.
+  OpenPinch's own IDAES lookup no longer leaves IDAES first on ``PATH``, so
+  worker processes, which inherit it, also run the ``openpinch-solvers``
+  Ipopt. Ipopt runs as the bundled executable rather than through the
+  ``ipopt`` launcher ``openpinch-solvers`` installs, which started Python
+  for every solve (about 17 ms each).
+- Multiperiod networks converge where Ipopt's restoration phase failed. The
+  area cost's offset at zero area rises from 1e-8 m2 to 1e-4 m2, which keeps
+  its slope at an idle unit's zero area moderate: every root solve of the
+  dairy chilling sample ended "Restoration Failed" at a feasible point, and
+  now all ten converge, with the same final network.
+- The default (single-path) network evolution solves each topology once per
+  search. It cycled through the same add and remove moves and re-solved
+  them, including one infeasible removal at every depth; it now reuses the
+  first solve. On the twelve literature cases and the dairy sample this cuts
+  evolution solves by about a third, with the same final networks.
+- Ipopt (``ipopt-pyomo``) now defaults to ``acceptable_tol 1e-4``,
+  ``acceptable_iter 5`` and ``max_wall_time 120`` alongside its bound
+  pushes, so a solve that stalls near the optimum stops there, and a solve
+  that hangs stops after two minutes. Nine-stream's evolution solves that
+  stalled short of convergence now converge, with the same networks.
+  Together with the changes above, network evolution on the twelve
+  literature cases and the dairy sample takes about 30 % less wall time and
+  40 % less Ipopt time, every root solve converges (221 of 221, from 211),
+  and every final network and its cost are unchanged.
+  ``acceptable_iter`` and ``max_wall_time`` need Ipopt 3.14 or later, which
+  ``openpinch-solvers`` ships; an older Ipopt first on ``PATH`` rejects them
+  and fails its solves. Set any of them in the stage's solver options to
+  change it.
+- Only the cheapest heuristic pinch design networks seed network evolution:
+  ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS`` per dt_cont multiplier, set by the
+  search depth when unset (3 at depths 1 and 2, 20 at depth 3, 50 at
+  depth 4). The rest are still final candidates. Previously every heuristic
+  network seeded evolution. On the 12 OpenHENS benchmark cases at the
+  default width and depth, evolution goes from up to 30 seeds per case to
+  up to 9, about half the run time, with the same best network on every
+  case. Set the option to ``HENS_HEURISTIC_PDM_NETWORKS`` or more to evolve
+  every network as before.
 - The heuristic pinch design method searches a pinch side again when it
   finds fewer complete proposals than ``HENS_HEURISTIC_PDM_NETWORKS``: first
   trying the next nearest must streams to the pinch as well as the nearest,

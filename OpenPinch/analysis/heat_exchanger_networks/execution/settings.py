@@ -87,6 +87,8 @@ class SynthesisWorkflowSettings:
     evm_n_rm_branches: int | None = None
     # Cap on heuristic pinch design networks per multiplier; 0 runs none.
     heuristic_pdm_networks: int = 10
+    # Heuristic networks per multiplier that seed evolution, cheapest first.
+    heuristic_pdm_evolution_seeds: int = 3
     pdm_milp: bool = False
     pdm_solver: str
     tdm_solver: str
@@ -252,6 +254,7 @@ def workflow_settings_from_problem(
         evm_n_ad_branches=search.evm_n_ad_branches,
         evm_n_rm_branches=search.evm_n_rm_branches,
         heuristic_pdm_networks=search.heuristic_networks,
+        heuristic_pdm_evolution_seeds=search.heuristic_evolution_seeds,
         pdm_milp=search.milp,
         pdm_solver=solvers["pdm"],
         tdm_solver=solvers["tdm"],

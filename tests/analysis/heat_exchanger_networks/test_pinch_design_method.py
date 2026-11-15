@@ -2367,7 +2367,7 @@ class _FakeSolver:
 
 def _patch_pyomo_solve(monkeypatch, solve) -> None:
     pyomo = SimpleNamespace(
-        SolverFactory=lambda _name: _FakeSolver(solve),
+        SolverFactory=lambda _name, **_kwargs: _FakeSolver(solve),
         value=lambda expression, exception=True: expression,
     )
     monkeypatch.setattr(

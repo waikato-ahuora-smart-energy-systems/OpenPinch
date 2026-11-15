@@ -253,6 +253,65 @@ def test_evolution_takes_heuristic_parents_at_every_tier():
     assert task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
 
 
+def _heuristic_outcomes(settings, problem, costs_by_multiplier):
+    """Copies of one heuristic outcome with the given costs per multiplier."""
+    (outcome,) = FakeSynthesisExecutor().execute(
+        build_heuristic_pinch_design_method_tasks(
+            replace(settings, dt_cont_multipliers=(1.0,))
+        ),
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=1,
+    )
+    return tuple(
+        outcome.model_copy(
+            update={
+                "task": outcome.task.model_copy(
+                    update={
+                        "task_id": f"heuristic-{multiplier}-{index}",
+                        "dt_cont_multiplier": multiplier,
+                    }
+                ),
+                "objective_value": cost,
+            }
+        )
+        for multiplier, costs in costs_by_multiplier.items()
+        for index, cost in enumerate(costs)
+    )
+
+
+def test_only_the_cheapest_heuristic_networks_per_multiplier_seed_evolution():
+    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+    settings = replace(
+        workflow_settings_from_problem(problem), heuristic_pdm_evolution_seeds=2
+    )
+    outcomes = _heuristic_outcomes(
+        settings, problem, {1.0: (30.0, 10.0, 40.0, 20.0), 1.5: (50.0,)}
+    )
+
+    tasks = build_network_evolution_method_tasks_from_pinch_design_method(
+        outcomes, settings=settings
+    )
+
+    assert [task.parent_task_id for task in tasks] == [
+        "heuristic-1.0-1",
+        "heuristic-1.0-3",
+        "heuristic-1.5-0",
+    ]
+
+
+def test_heuristic_evolution_seeds_come_from_the_depth_unless_set():
+    def seeds(options):
+        return workflow_settings_from_problem(
+            _small_problem_with_options(options)
+        ).heuristic_pdm_evolution_seeds
+
+    assert seeds({}) == 3
+    assert seeds({"HENS_SEARCH_DEPTH": 3}) == 20
+    assert seeds({"HENS_SEARCH_DEPTH": 4}) == 50
+    assert seeds({"HENS_SEARCH_DEPTH": 4, "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS": 5}) == 5
+
+
 def test_heuristic_tasks_build_pinch_design_problems_with_the_cap():
     problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
     problem.target.all_heat_integration()

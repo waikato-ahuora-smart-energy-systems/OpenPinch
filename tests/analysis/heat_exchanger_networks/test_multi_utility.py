@@ -319,6 +319,50 @@ def test_multiperiod_area_costs_have_a_finite_slope_at_zero_area():
         assert pyo.value(slope) < float("inf")
 
 
+@pytest.mark.synthesis
+def test_multiperiod_area_costs_are_not_steep_at_zero_area():
+    # With a 1e-8 m2 offset the slope at zero area was about 1,600 times the
+    # slope at 1 m2, and every dairy root solve reached a feasible point and
+    # then ended in "Restoration Failed". At 1e-4 m2 all ten converge with
+    # the same networks (EVM Ipopt tuning benchmark, 2026-11-15).
+    pyo = pytest.importorskip("pyomo.environ")
+    from pyomo.core.expr.calculus.derivatives import Modes, differentiate
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
+        StageWiseModel,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    problem = PinchProblem("dairy_chilling_multiperiod.json")
+    problem.target.all_heat_integration()
+    model = StageWiseModel(
+        name="dairy relaxed",
+        framework="Stagewise",
+        solver="ipopt-pyomo",
+        solver_arrays=problem_to_solver_arrays(problem, 5.0),
+        stages=2,
+        dTmin=5.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+    )
+
+    total = model.recovery_area_cost_total
+    area = next(area for area in _flatten(model.area_r_shared) if not area.fixed)
+    slopes = []
+    for value in (0.0, 1.0):
+        area.set_value(value)
+        slope = differentiate(total, wrt=area, mode=Modes.reverse_numeric)
+        slopes.append(pyo.value(slope))
+
+    assert slopes[0] / slopes[1] < 100.0
+
+
 def _flatten(grid):
     for item in grid:
         if isinstance(item, list):

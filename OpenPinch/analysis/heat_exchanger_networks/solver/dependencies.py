@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import sys
+import sysconfig
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -76,14 +78,25 @@ def require_declared_synthesis_dependencies() -> dict[str, ModuleType]:
 
 def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> str:
     """Return a solver executable path or raise an actionable error."""
-    path = which(binary_name)
+    path = which(binary_name, path=_path_without_imported_idaes())
+    if path is not None and Path(path).parent == _scripts_directory():
+        # openpinch-solvers' launcher, which starts Python on every solve.
+        package_path = _solver_binary_in(
+            _openpinch_solvers_bin_directory(), binary_name
+        )
+        if package_path is not None:
+            return str(package_path)
     if path is not None:
         return path
-    for bin_directory in (_openpinch_solvers_bin_directory(), _idaes_bin_directory()):
-        package_path = _solver_binary_in(bin_directory, binary_name)
-        if package_path is not None:
-            _prepend_path(package_path.parent)
-            return str(package_path)
+    package_path = _solver_binary_in(_openpinch_solvers_bin_directory(), binary_name)
+    if package_path is not None:
+        _prepend_path(package_path.parent)
+        return str(package_path)
+    package_path = _solver_binary_in(_idaes_bin_directory(), binary_name)
+    if package_path is not None:
+        # Last on PATH, so IDAES's older Ipopt never shadows another one.
+        _append_path(package_path.parent)
+        return str(package_path)
 
     purpose_text = f" for {purpose}" if purpose else ""
     raise MissingSynthesisSolverError(
@@ -92,6 +105,27 @@ def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> st
         "available on PATH, and see the OpenPinch synthesis dependency policy "
         "documentation for solver-test requirements."
     )
+
+
+def _scripts_directory() -> Path:
+    """This environment's scripts directory, where pip puts package launchers."""
+
+    return Path(sysconfig.get_path("scripts"))
+
+
+def _path_without_imported_idaes() -> str:
+    """``PATH`` without the IDAES download that importing ``idaes`` puts first.
+
+    That directory stays a fallback after ``openpinch_solvers``; otherwise
+    looking for Couenne would switch every later Ipopt solve to IDAES's
+    older Ipopt.
+    """
+
+    entries = os.environ.get("PATH", "").split(os.pathsep)
+    idaes_bin = getattr(sys.modules.get("idaes"), "bin_directory", None)
+    if idaes_bin is None:
+        return os.pathsep.join(entries)
+    return os.pathsep.join(entry for entry in entries if entry != str(idaes_bin))
 
 
 def _solver_binary_in(bin_directory: Path | None, binary_name: str) -> Path | None:
@@ -111,9 +145,20 @@ def _openpinch_solvers_bin_directory() -> Path | None:
 
 
 def _idaes_bin_directory() -> Path | None:
-    """IDAES's downloaded solver executables (Ipopt, Couenne), if installed."""
+    """IDAES's downloaded solver executables (Ipopt, Couenne), if installed.
 
-    return _package_bin_directory("idaes")
+    Importing ``idaes`` puts that directory first on ``PATH``; ``PATH`` is
+    restored, so worker processes, which inherit it, do not run IDAES's Ipopt.
+    """
+
+    path = os.environ.get("PATH")
+    try:
+        return _package_bin_directory("idaes")
+    finally:
+        if path is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = path
 
 
 def _package_bin_directory(module_name: str) -> Path | None:
@@ -125,6 +170,18 @@ def _package_bin_directory(module_name: str) -> Path | None:
     if raw_path is None:
         return None
     return Path(raw_path)
+
+
+def _append_path(directory: Path) -> None:
+    """Put ``directory`` last on ``PATH``, moving it there if it is earlier."""
+
+    directory_text = str(directory)
+    path_entries = [
+        entry
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry != directory_text
+    ]
+    os.environ["PATH"] = os.pathsep.join([*path_entries, directory_text])
 
 
 def _prepend_path(directory: Path) -> None:
