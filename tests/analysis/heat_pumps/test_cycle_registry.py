@@ -98,3 +98,60 @@ def test_a_cycle_registers_once_and_owns_its_model_families():
         register_cycle(carnot)
     with pytest.raises(ValueError, match="reuses another cycle's model family"):
         register_cycle(replace(carnot, id="carnot_copy"))
+
+
+def test_every_model_family_names_its_analysis_handlers():
+    from OpenPinch.analysis.heat_pumps._multiperiod import setup
+    from OpenPinch.analysis.heat_pumps.cycles.registry import (
+        family_handlers,
+        resolve_handler,
+    )
+    from OpenPinch.analysis.heat_pumps.targeting import (
+        brayton,
+        cascade_carnot,
+        cascade_vapour_compression,
+        parallel_carnot,
+        parallel_vapour_compression,
+        vapour_compression_mvr,
+    )
+
+    expected = {
+        Cycle.CascadeCarnot: (
+            cascade_carnot.optimise_cascade_carnot_heat_pump_placement,
+            setup._cascade_carnot_setup,
+            None,
+        ),
+        Cycle.ParallelCarnot: (
+            parallel_carnot.optimise_parallel_carnot_heat_pump_placement,
+            setup._parallel_carnot_setup,
+            None,
+        ),
+        Cycle.CascadeVapourComp: (
+            cascade_vapour_compression.optimise_cascade_heat_pump_placement,
+            setup._cascade_vapour_compression_setup,
+            HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
+        ),
+        Cycle.ParallelVapourComp: (
+            parallel_vapour_compression.optimise_parallel_heat_pump_placement,
+            setup._parallel_vapour_compression_setup,
+            HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
+        ),
+        Cycle.VapourCompMVR: (
+            vapour_compression_mvr.optimise_vapour_compression_mvr_heat_pump_placement,
+            setup._vapour_compression_mvr_setup,
+            HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,
+        ),
+        Cycle.Brayton: (brayton.optimise_brayton_heat_pump_placement, None, None),
+    }
+    for family, (placement, multiperiod, topology) in expected.items():
+        handlers = family_handlers(family.value)
+        assert resolve_handler(handlers.placement) is placement
+        assert resolve_handler(handlers.multiperiod_setup) is multiperiod
+        assert handlers.topology_identifier is topology
+
+
+def test_an_unregistered_model_family_has_no_handlers():
+    from OpenPinch.analysis.heat_pumps.cycles.registry import family_handlers
+
+    with pytest.raises(ValueError, match="no registered cycle"):
+        family_handlers("Stirling cycle")

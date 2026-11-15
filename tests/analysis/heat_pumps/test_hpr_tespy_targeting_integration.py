@@ -24,6 +24,11 @@ from tests.analysis.heat_pumps.hpr_targeting_fakes import FakeHprTargetEvaluator
 from tests.analysis.heat_pumps.test_hpr_targeting_preflight import _target_args
 
 
+def _patch_placement(monkeypatch, handler):
+    """Make the registry's placement lookup return ``handler`` for any cycle."""
+    monkeypatch.setattr(hp_service, "_placement_handler", lambda _hpr_type: handler)
+
+
 def _candidate(args) -> np.ndarray:
     _starts, bounds = cascade._get_cascade_hp_opt_setup(None, args)
     point = np.array([(lower + upper) / 2.0 for lower, upper in bounds])
@@ -353,9 +358,8 @@ def test_service_preflights_once_and_passes_prepared_value_to_optimizer(
         "preflight_tespy_hpr_targeting",
         lambda received: calls.append(received) or prepared,
     )
-    monkeypatch.setitem(
-        hp_service._HP_PLACEMENT_HANDLERS,
-        args.hpr_type,
+    _patch_placement(
+        monkeypatch,
         lambda received, *, prepared_tespy: (
             calls.append((received, prepared_tespy)) or result
         ),

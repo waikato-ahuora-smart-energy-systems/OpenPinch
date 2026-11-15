@@ -30,6 +30,11 @@ from OpenPinch.domain.zone import Zone
 from .helpers import _base_args, _patch_output_model_validate, _pt_with_hnet
 
 
+def _patch_placement(monkeypatch, handler):
+    """Make the registry's placement lookup return ``handler`` for any cycle."""
+    monkeypatch.setattr(hp, "_placement_handler", lambda _hpr_type: handler)
+
+
 def _make_base_utility_collections(
     *,
     hot_flow: float = 40.0,
@@ -395,9 +400,8 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
             or _base_args(period_idx=period_idx)
         ),
     )
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS,
-        HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
+    _patch_placement(
+        monkeypatch,
         lambda args: SimpleNamespace(
             to_output_fields=lambda: {"period_idx": args.period_idx}
         ),
@@ -1124,9 +1128,8 @@ def test_get_hpr_targets_validates_supported_non_brayton_backend_results(
         "construct_HPRTargetInputs",
         lambda **kwargs: SimpleNamespace(hpr_type=hpr_type),
     )
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS,
-        hpr_type,
+    _patch_placement(
+        monkeypatch,
         lambda args: HPRBackendResult(
             obj=0.1,
             utility_tot=1.0,
@@ -1259,5 +1262,9 @@ def test_calc_hpr_cascade_propagates_helper_type_error_once(
 
 
 def test_hpr_handler_registry_includes_brayton():
-    handler = hp._HP_PLACEMENT_HANDLERS[HeatPumpAndRefrigerationCycle.Brayton.value]
-    assert handler is hp.optimise_brayton_heat_pump_placement
+    from OpenPinch.analysis.heat_pumps.targeting.brayton import (
+        optimise_brayton_heat_pump_placement,
+    )
+
+    handler = hp._placement_handler(HeatPumpAndRefrigerationCycle.Brayton.value)
+    assert handler is optimise_brayton_heat_pump_placement
