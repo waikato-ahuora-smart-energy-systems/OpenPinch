@@ -456,8 +456,10 @@ def test_notebook_08_hpr_calls_are_explicitly_bounded() -> None:
     assert source.count("maximum_restarts=1") == 2
     assert source.count("maximum_iterations=20") == 2
     assert source.count("maximum_evaluations=50") == 2
-    assert source.count("condensers=1") == 2
-    assert source.count("evaporators=1") == 2
+    # The gateway step repeats the heat pump's levels and bounds as models.
+    assert source.count("condensers=1") == 3
+    assert source.count("evaporators=1") == 3
+    assert "HprSearchLimits(restarts=1, iterations=20, evaluations=50)" in source
     assert "assert heat_pump.hpr_success" in source
     assert "assert refrigeration.hpr_success" in source
 
@@ -501,11 +503,16 @@ def test_notebook_10_uses_five_isolated_scalar_shared_designs() -> None:
     assert source.count("= new_refrigeration_problem()") == 2
     assert '"dairy_chilling_multiperiod.json"' in source
     assert source.count('period_id="base"') == 6
-    assert source.count("maximum_restarts=1") == 6
-    assert source.count("maximum_iterations=20") == 5
-    assert source.count("maximum_evaluations=50") == 5
+    # The Carnot refrigeration screen runs through the gateway, its limits
+    # as one HprSearchLimits.
+    assert source.count("maximum_restarts=1") == 5
+    assert source.count("maximum_iterations=20") == 4
+    assert source.count("maximum_evaluations=50") == 4
+    assert (
+        source.count("HprSearchLimits(restarts=1, iterations=20, evaluations=50)") == 1
+    )
     assert source.count(".target.carnot_heat_pump(") == 1
-    assert source.count(".target.carnot_refrigeration(") == 1
+    assert source.count(".target.heat_pump_and_refrigeration(") == 1
     assert source.count(".target.vapour_compression_heat_pump(") == 2
     assert source.count(".target.vapour_compression_refrigeration(") == 1
     assert source.count(".target.mvr_heat_pump(") == 1

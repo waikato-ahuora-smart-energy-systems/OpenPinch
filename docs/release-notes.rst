@@ -4,6 +4,21 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``target.heat_pump_and_refrigeration(cycle, ...)`` targets any registered
+  cycle (``"carnot"``, ``"vapour_compression"``, ``"mvr"``; ``"brayton"`` is
+  registered but unavailable) through one call: ``duty``, ``topology`` and
+  ``placement`` as arguments, and the load, levels, the cycle's own options
+  and the search limits as typed models from ``OpenPinch.contracts.hpr``
+  (``HprLoad``, ``HprLevels``, the cycle's options model,
+  ``HprSearchLimits``) or mappings of their fields. ``request=`` takes all of
+  it as one ``HprTargetRequest``, which a client can validate as JSON. It is
+  also on ``target.all_periods``. The seven named methods
+  (``carnot_heat_pump`` and the rest) now run through it with unchanged
+  results.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
