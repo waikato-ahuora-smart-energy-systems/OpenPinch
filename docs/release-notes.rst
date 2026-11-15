@@ -15,7 +15,9 @@ Heat exchanger network synthesis
   and Couenne run the executable found when their solve is configured.
   OpenPinch's own IDAES lookup no longer leaves IDAES first on ``PATH``, so
   worker processes, which inherit it, also run the ``openpinch-solvers``
-  Ipopt.
+  Ipopt. Ipopt runs as the bundled executable rather than through the
+  ``ipopt`` launcher ``openpinch-solvers`` installs, which started Python
+  for every solve (about 17 ms each).
 - Multiperiod networks converge where Ipopt's restoration phase failed. The
   area cost's offset at zero area rises from 1e-8 m2 to 1e-4 m2, which keeps
   its slope at an idle unit's zero area moderate: every root solve of the

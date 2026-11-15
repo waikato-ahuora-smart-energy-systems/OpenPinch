@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import sysconfig
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -78,6 +79,13 @@ def require_declared_synthesis_dependencies() -> dict[str, ModuleType]:
 def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> str:
     """Return a solver executable path or raise an actionable error."""
     path = which(binary_name, path=_path_without_imported_idaes())
+    if path is not None and Path(path).parent == _scripts_directory():
+        # openpinch-solvers' launcher, which starts Python on every solve.
+        package_path = _solver_binary_in(
+            _openpinch_solvers_bin_directory(), binary_name
+        )
+        if package_path is not None:
+            return str(package_path)
     if path is not None:
         return path
     package_path = _solver_binary_in(_openpinch_solvers_bin_directory(), binary_name)
@@ -97,6 +105,12 @@ def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> st
         "available on PATH, and see the OpenPinch synthesis dependency policy "
         "documentation for solver-test requirements."
     )
+
+
+def _scripts_directory() -> Path:
+    """This environment's scripts directory, where pip puts package launchers."""
+
+    return Path(sysconfig.get_path("scripts"))
 
 
 def _path_without_imported_idaes() -> str:

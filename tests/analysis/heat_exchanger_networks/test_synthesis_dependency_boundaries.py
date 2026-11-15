@@ -170,6 +170,31 @@ def test_ipopt_on_path_from_an_idaes_import_does_not_shadow_openpinch_solvers(
     assert path == str(package_bin / "ipopt")
 
 
+def test_the_openpinch_solvers_launcher_on_path_runs_its_executable(
+    tmp_path,
+    monkeypatch,
+):
+    # Installing openpinch-solvers puts a Python launcher for its Ipopt in the
+    # environment's scripts directory; it starts an interpreter for every
+    # solve, about 17 ms, a fifth of the benchmark's Ipopt time.
+    scripts = tmp_path / "scripts"
+    package_bin = tmp_path / "openpinch_solvers"
+    for directory in (scripts, package_bin):
+        directory.mkdir()
+        solver = directory / "ipopt"
+        solver.write_text("#!/bin/sh\n", encoding="utf-8")
+        solver.chmod(0o755)
+    monkeypatch.setattr(_dependencies, "_scripts_directory", lambda: scripts)
+    monkeypatch.setattr(
+        _dependencies, "_openpinch_solvers_bin_directory", lambda: package_bin
+    )
+    monkeypatch.setenv("PATH", os.pathsep.join([str(scripts), "/usr/bin"]))
+
+    path = _dependencies.require_solver_binary("ipopt")
+
+    assert path == str(package_bin / "ipopt")
+
+
 def test_openpinch_solvers_bin_directory_reads_the_installed_package(monkeypatch):
     fake = type("Module", (), {"bin_directory": "/opt/openpinch_solvers/bin"})
     monkeypatch.setattr(
