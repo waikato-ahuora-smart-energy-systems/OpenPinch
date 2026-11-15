@@ -80,11 +80,15 @@ def require_solver_binary(binary_name: str, *, purpose: str | None = None) -> st
     path = which(binary_name, path=_path_without_imported_idaes())
     if path is not None:
         return path
-    for bin_directory in (_openpinch_solvers_bin_directory(), _idaes_bin_directory()):
-        package_path = _solver_binary_in(bin_directory, binary_name)
-        if package_path is not None:
-            _prepend_path(package_path.parent)
-            return str(package_path)
+    package_path = _solver_binary_in(_openpinch_solvers_bin_directory(), binary_name)
+    if package_path is not None:
+        _prepend_path(package_path.parent)
+        return str(package_path)
+    package_path = _solver_binary_in(_idaes_bin_directory(), binary_name)
+    if package_path is not None:
+        # Last on PATH, so IDAES's older Ipopt never shadows another one.
+        _append_path(package_path.parent)
+        return str(package_path)
 
     purpose_text = f" for {purpose}" if purpose else ""
     raise MissingSynthesisSolverError(
@@ -127,9 +131,20 @@ def _openpinch_solvers_bin_directory() -> Path | None:
 
 
 def _idaes_bin_directory() -> Path | None:
-    """IDAES's downloaded solver executables (Ipopt, Couenne), if installed."""
+    """IDAES's downloaded solver executables (Ipopt, Couenne), if installed.
 
-    return _package_bin_directory("idaes")
+    Importing ``idaes`` puts that directory first on ``PATH``; ``PATH`` is
+    restored, so worker processes, which inherit it, do not run IDAES's Ipopt.
+    """
+
+    path = os.environ.get("PATH")
+    try:
+        return _package_bin_directory("idaes")
+    finally:
+        if path is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = path
 
 
 def _package_bin_directory(module_name: str) -> Path | None:
@@ -141,6 +156,13 @@ def _package_bin_directory(module_name: str) -> Path | None:
     if raw_path is None:
         return None
     return Path(raw_path)
+
+
+def _append_path(directory: Path) -> None:
+    directory_text = str(directory)
+    path_entries = os.environ.get("PATH", "").split(os.pathsep)
+    if directory_text not in path_entries:
+        os.environ["PATH"] = os.pathsep.join([*path_entries, directory_text])
 
 
 def _prepend_path(directory: Path) -> None:

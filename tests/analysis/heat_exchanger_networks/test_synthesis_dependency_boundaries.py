@@ -99,7 +99,23 @@ def test_solver_binary_falls_back_to_idaes_bin_directory(
     )
 
     assert path == str(solver)
-    assert os.environ["PATH"].split(os.pathsep)[0] == str(tmp_path)
+    # Appended, not prepended: first on PATH, IDAES's older Ipopt shadowed
+    # openpinch-solvers' in worker processes, which inherit PATH.
+    assert os.environ["PATH"].split(os.pathsep) == ["/usr/bin", str(tmp_path)]
+
+
+def test_looking_up_idaes_leaves_path_unchanged(monkeypatch):
+    # Importing idaes puts its solver directory first on PATH, where worker
+    # processes, which inherit PATH but not the import, would run its Ipopt.
+    def import_idaes(name):
+        os.environ["PATH"] = os.pathsep.join(["/idaes/bin", os.environ["PATH"]])
+        return type("Module", (), {"bin_directory": "/idaes/bin"})
+
+    monkeypatch.setattr(_dependencies, "import_module", import_idaes)
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    assert _dependencies._idaes_bin_directory() == Path("/idaes/bin")
+    assert os.environ["PATH"] == "/usr/bin"
 
 
 def test_solver_binary_comes_from_openpinch_solvers_before_idaes(
