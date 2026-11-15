@@ -192,6 +192,7 @@ class HensConfig:
     pdm_min_unit_networks: int
     pdm_extra_unit_networks: int
     heuristic_pdm_networks: int | None
+    heuristic_pdm_evolution_seeds: int | None
     pdm_milp: bool | None
     tdm_parent_limit: int | None
     stage_packing: str

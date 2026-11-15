@@ -37,6 +37,8 @@ class DepthLevel:
     evolution_breadth: int
     thermal_derivative: bool = False
     milp_seeds_evolution: bool = False
+    # Heuristic networks per multiplier that seed evolution, cheapest first.
+    heuristic_evolution_seeds: int = 3
 
 
 DEPTH_LEVELS: dict[int, DepthLevel] = {
@@ -44,10 +46,22 @@ DEPTH_LEVELS: dict[int, DepthLevel] = {
     1: DepthLevel(True, 10, False, 1),
     2: DepthLevel(True, 10, True, 1, thermal_derivative=True),
     3: DepthLevel(
-        True, 20, True, 2, thermal_derivative=True, milp_seeds_evolution=True
+        True,
+        20,
+        True,
+        2,
+        thermal_derivative=True,
+        milp_seeds_evolution=True,
+        heuristic_evolution_seeds=20,
     ),
     4: DepthLevel(
-        True, 50, True, 3, thermal_derivative=True, milp_seeds_evolution=True
+        True,
+        50,
+        True,
+        3,
+        thermal_derivative=True,
+        milp_seeds_evolution=True,
+        heuristic_evolution_seeds=50,
     ),
 }
 
@@ -61,6 +75,7 @@ class ResolvedSearch:
     level: DepthLevel
     dt_cont_multipliers: tuple[float, ...]
     heuristic_networks: int
+    heuristic_evolution_seeds: int
     milp: bool
     evm_n_ad_branches: int
     evm_n_rm_branches: int
@@ -96,6 +111,9 @@ def resolve_search(hens: Any) -> ResolvedSearch:
         ),
         heuristic_networks=int(
             pick(hens.heuristic_pdm_networks, level.heuristic_networks)
+        ),
+        heuristic_evolution_seeds=int(
+            pick(hens.heuristic_pdm_evolution_seeds, level.heuristic_evolution_seeds)
         ),
         milp=bool(pick(hens.pdm_milp, level.milp)),
         evm_n_ad_branches=int(pick(hens.evm_n_ad_branches, level.evolution_breadth)),
