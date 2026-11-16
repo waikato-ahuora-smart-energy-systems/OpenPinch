@@ -167,3 +167,25 @@ def test_the_search_reaches_the_published_retrofit_target():
 
     best = min(design.hot_utility for design in result.frontier)
     assert best == pytest.approx(RETROFITTED_HOT_UTILITY, rel=0.005)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_the_structure_strategy_reaches_the_target_in_three_changes():
+    # Ranking structures by their unlimited-area ceiling and sizing area
+    # within each solve, three structural changes reach the published hot
+    # utility; area additions do not count as steps.
+    result = _problem().design.retrofit(
+        EXISTING,
+        strategy="structure",
+        max_modifications=3,
+        min_approach_temperature=10.0,
+        area_addition_cost=4_000.0,
+        split_cost=10_000.0,
+    )
+
+    best = result.frontier[3]
+    structural = [m for m in best.modifications if m.kind != "area_addition"]
+    assert len(structural) == 3
+    assert best.hot_utility == pytest.approx(RETROFITTED_HOT_UTILITY, rel=0.005)

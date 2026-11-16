@@ -555,6 +555,19 @@ New utility exchangers
    cooler on H3 lets a new H1-C2 match in a new third stage save about
    $836k/y instead of $222k/y alone.
 
+Structure-first strategy
+   With ``strategy="structure"`` each step makes one structural change (a
+   new match, a relocation, or a paired new utility exchanger), following
+   the network pinch approach of Smith's group: ``ceiling_candidates``
+   (default 12) screened changes are ranked by the utility cost their
+   structure reaches with unlimited area, and the ``new_match_candidates``
+   best are solved with every existing exchanger free to grow. An exchanger
+   keeps added area of at least 1 % of its installed area (1 m2 or more),
+   reported and priced as an area addition, so the frontier counts
+   structural changes. Each structure is sized afresh. It takes about twice
+   the solves of the default "stepwise" search and found better designs on
+   both validation cases below.
+
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
 exchanger, moving an existing one would mainly save the new unit's cost,
@@ -595,7 +608,29 @@ Akpomiemie and Smith (2018), simplified crude preheat train
    one, where the paper moves one exchanger, adds one and enlarges several:
    the search counts each enlarged exchanger as a step, and the paper's
    $4,000 fixed cost per unit makes new exchangers cheap. With the default
-   four candidates it stops at 20.5 % after six steps.
+   four candidates it stops at 20.5 % after six steps. With
+   ``strategy="structure"`` three structural changes (three new matches, plus
+   added area on four exchangers) reach the published hot utility in 141
+   solves, at $521k of capital.
+
+Stepwise and structure-first searches compared (report costs; Smith's
+Table 5 costs at a 10 K approach):
+
+.. list-table::
+   :header-rows: 1
+
+   * - Case
+     - Stepwise, 4 steps
+     - Structure, 3 structural changes
+   * - Ciric and Floudas, report costs
+     - $1.83M/y net, 67 solves
+     - $1.98M/y net, 133 solves
+   * - Ciric and Floudas, report rules
+     - $1.15M/y net, 66 solves
+     - $1.29M/y net, 136 solves
+   * - Akpomiemie and Smith
+     - 11,777 kW hot utility, 76 solves
+     - 10,960 kW (the published target), 141 solves
 
 Serialized Network Input
 ------------------------
