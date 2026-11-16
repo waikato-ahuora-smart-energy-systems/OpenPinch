@@ -1360,12 +1360,20 @@ class _UnreadValue:
         raise AssertionError("an inactive match's approach was read")
 
 
-def _built_two_stage_model() -> StageWiseModel:
-    """The four-stream case built, not solved: two hot and two cold streams."""
+def _built_two_stage_model(monkeypatch) -> StageWiseModel:
+    """The four-stream case built, not solved: two hot and two cold streams.
+
+    Nothing is solved, so no solver executable is needed.
+    """
+    pytest.importorskip("pyomo.environ")
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
     from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
         problem_to_solver_arrays,
     )
     from OpenPinch.application.problem import PinchProblem
+
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
 
     problem = PinchProblem("Four-stream-Yee-and-Grossmann-1990-1.json")
     problem.target.all_heat_integration()
@@ -1387,11 +1395,11 @@ def _built_two_stage_model() -> StageWiseModel:
     return model
 
 
-def test_post_process_skips_the_approaches_of_inactive_matches():
+def test_post_process_skips_the_approaches_of_inactive_matches(monkeypatch):
     # An inactive match has no log-mean whatever its approaches, and on the
     # pulp mill all but about 67 of 8,800 slots are inactive: reading both
     # approaches of every slot was most of post-processing's 17 million reads.
-    model = _built_two_stage_model()
+    model = _built_two_stage_model(monkeypatch)
     model.Q_r_by_period[0][0][0][1].set_value(0.0)
     model.theta_1_by_period[0][0][0][1] = _UnreadValue()
     model.theta_2_by_period[0][0][0][1] = _UnreadValue()
@@ -1415,11 +1423,11 @@ class _CountedValue:
         return self._number
 
 
-def test_post_process_reads_each_stream_temperature_once():
+def test_post_process_reads_each_stream_temperature_once(monkeypatch):
     # The dQ/dA loop read T_h[i][k] and T_c[j][k + 1] twice for every
     # (hot, cold, stage) slot, and the solved alpha step reads them again;
     # a temperature depends on its stream and stage only.
-    model = _built_two_stage_model()
+    model = _built_two_stage_model(monkeypatch)
     counted = []
     for grid in (model.T_h_by_period[0], model.T_c_by_period[0]):
         for row in grid:
