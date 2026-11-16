@@ -102,6 +102,12 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Classic four-stream heat-exchanger-network synthesis benchmark.",
         topics=("synthesis", "benchmark"),
     ),
+    "Five-stream-Ciric-and-Floudas-1989.json": SampleCaseMetadata(
+        name="Five-stream-Ciric-and-Floudas-1989.json",
+        title="Five Stream Ciric and Floudas",
+        description="Five-stream heat-exchanger-network retrofit benchmark.",
+        topics=("retrofit", "benchmark"),
+    ),
 }
 
 

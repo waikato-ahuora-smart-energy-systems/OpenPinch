@@ -434,10 +434,14 @@ modifications that recover more heat. Give the network as for
 be mappings with ``area`` and an optional ``id`` (a plant tag), or a
 ``HeatExchangerNetwork`` whose exchangers carry ``area``. The example is
 Example 1 of Hallberg and Scribner (2009), adapted from Ciric and Floudas
-(1989); its case file is ``tests/fixtures/retrofit``.
+(1989), packaged as ``Five-stream-Ciric-and-Floudas-1989.json``; notebook 16
+runs it.
 
 .. code-block:: python
 
+   from OpenPinch import PinchProblem
+
+   problem = PinchProblem("Five-stream-Ciric-and-Floudas-1989.json")
    existing = {
        "recovery": [
            {"hot": "H3", "cold": "C2", "stage": 1, "area": 609.7, "id": "E1"},

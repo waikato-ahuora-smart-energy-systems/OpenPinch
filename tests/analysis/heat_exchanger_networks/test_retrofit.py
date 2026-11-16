@@ -25,7 +25,8 @@ from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from tests.support.paths import REPOSITORY_ROOT
 
 CASE_JSON = (
-    REPOSITORY_ROOT / "tests/fixtures/retrofit/Five-stream-Ciric-and-Floudas-1989.json"
+    REPOSITORY_ROOT
+    / "OpenPinch/tutorials/sample_cases/Five-stream-Ciric-and-Floudas-1989.json"
 )
 
 # Existing exchangers (Figure 1 and Table 2 of the report): E1 H3-C2 and
