@@ -1350,3 +1350,93 @@ def test_chen_mean_is_unchanged_for_an_exchanger_in_use():
     exact = (20.0 * 10.0 * 30.0 / 2 + 1e-3) ** (1 / 3)
 
     assert _chen_mean(20.0, 10.0) == pytest.approx(exact, rel=1e-9)
+
+
+class _UnreadValue:
+    """A solved value that post-processing must not need."""
+
+    @property
+    def value(self):
+        raise AssertionError("an inactive match's approach was read")
+
+
+def _built_two_stage_model(monkeypatch) -> StageWiseModel:
+    """The four-stream case built, not solved: two hot and two cold streams.
+
+    Nothing is solved, so no solver executable is needed.
+    """
+    pytest.importorskip("pyomo.environ")
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+    from OpenPinch.application.problem import PinchProblem
+
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
+
+    problem = PinchProblem("Four-stream-Yee-and-Grossmann-1990-1.json")
+    problem.target.all_heat_integration()
+    model = StageWiseModel(
+        name="post-process reads",
+        framework="TDM",
+        solver="couenne",
+        solver_arrays=problem_to_solver_arrays(problem, 10.0),
+        stages=2,
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+    )
+    model.solver_run = SimpleNamespace(objective_value=1.0)
+    return model
+
+
+def test_post_process_skips_the_approaches_of_inactive_matches(monkeypatch):
+    # An inactive match has no log-mean whatever its approaches, and on the
+    # pulp mill all but about 67 of 8,800 slots are inactive: reading both
+    # approaches of every slot was most of post-processing's 17 million reads.
+    model = _built_two_stage_model(monkeypatch)
+    model.Q_r_by_period[0][0][0][1].set_value(0.0)
+    model.theta_1_by_period[0][0][0][1] = _UnreadValue()
+    model.theta_2_by_period[0][0][0][1] = _UnreadValue()
+
+    model._get_multiperiod_post_process()
+
+    assert model.LMTD_r_by_period[0][0][0][1] == 0.0
+    assert model.LMTD_r_by_period[0][0][0][0] > 0.0
+
+
+class _CountedValue:
+    """A solved value that counts its reads."""
+
+    def __init__(self, number: float) -> None:
+        self._number = number
+        self.reads = 0
+
+    @property
+    def value(self) -> float:
+        self.reads += 1
+        return self._number
+
+
+def test_post_process_reads_each_stream_temperature_once(monkeypatch):
+    # The dQ/dA loop read T_h[i][k] and T_c[j][k + 1] twice for every
+    # (hot, cold, stage) slot, and the solved alpha step reads them again;
+    # a temperature depends on its stream and stage only.
+    model = _built_two_stage_model(monkeypatch)
+    counted = []
+    for grid in (model.T_h_by_period[0], model.T_c_by_period[0]):
+        for row in grid:
+            for k, variable in enumerate(row):
+                row[k] = _CountedValue(variable.value)
+                counted.append(row[k])
+
+    model._get_multiperiod_post_process()
+
+    # Once for dQ/dA, once for the alpha solve and at most twice for heater
+    # and cooler areas; it was twice per partner in every stage.
+    assert max(value.reads for value in counted) <= 4

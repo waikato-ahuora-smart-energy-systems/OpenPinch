@@ -86,6 +86,13 @@ Heat exchanger network synthesis
   and each task read it many times for its settings and solver arrays. On
   the pulp mill sample case a design reads it 3 times instead of 139, which
   saves about 6.5 s, with the same network.
+- Stage-wise post-processing is faster. Reading a solved Pyomo variable no
+  longer tries to index it first; post-processing reads an inactive match's
+  approaches not at all and each stream temperature once; and the alpha
+  flow-on step builds its fractions and sparse system as NumPy arrays, with
+  the same values to the last place. On the pulp mill sample case
+  post-processing takes about 11 s of CPU time instead of 32 s, and the
+  design about 154 s instead of 181 s, with the same network.
 - Building a stage-wise model is faster: parameter blocks are fixed as a
   whole when allocated, the Pyomo module is looked up once per model, and the
   big-M values and duty bounds that multiply binaries are Python floats, so
