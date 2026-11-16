@@ -101,11 +101,17 @@ class FixedStructureSpec:
     # Installed area of each exchanger, for the "rating" goal.
     recovery_areas: Mapping[int, float] = field(default_factory=dict)
     utility_areas: Mapping[int, float] = field(default_factory=dict)
-    # Exact over Chen LMTD at the design point, per exchanger and period
-    # (default 1): rating caps duty by area * factor * U * Chen-LMTD, so the
-    # installed area, sized with the exact LMTD, carries its design duty.
-    recovery_lmtd_factors: Mapping[int, Sequence[float]] = field(default_factory=dict)
-    utility_lmtd_factors: Mapping[int, Sequence[float]] = field(default_factory=dict)
+    # The design point of each exchanger, by solver period, for the "rating"
+    # goal: (duty, theta_1, theta_2, required area or None). Rating caps duty
+    # by area * factor * U * Chen-LMTD, the factor making the installed area
+    # carry its design duty: required area / Chen area at that point, or
+    # exact over Chen LMTD when no required area is given.
+    recovery_design_points: Mapping[int, Mapping[int, tuple]] = field(
+        default_factory=dict
+    )
+    utility_design_points: Mapping[int, Mapping[int, tuple]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass
@@ -1219,13 +1225,24 @@ def _common_areas(owner) -> None:
 def _installed_areas(owner) -> None:
     """Each exchanger's installed area caps its duty in every period."""
 
-    def installed(areas, factors, duties, coefficients, thetas, count):
+    def factor(point, coefficient: float) -> float:
+        if point is None:
+            return 1.0
+        duty, theta_1, theta_2, required = point
+        if duty <= 0.0 or min(theta_1, theta_2) <= 0.0:
+            return 1.0
+        chen = chen_lmtd(theta_1, theta_2)
+        if required:
+            return duty / (float(coefficient) * chen) / float(required)
+        return exact_lmtd(theta_1, theta_2) / chen
+
+    def installed(areas, points, duties, coefficients, thetas, count):
         fixed = []
         for e in range(count):
             area = float(areas[e])
-            factor = factors.get(e, ())
+            design = points.get(e, {})
             for n in range(owner.N_periods):
-                capacity = area * (float(factor[n]) if n < len(factor) else 1.0)
+                capacity = area * factor(design.get(n), coefficients[n][e])
                 owner._at_least(
                     capacity * coefficients[n][e] * chen_lmtd(*thetas[n][e]),
                     duties[n][e],
@@ -1235,7 +1252,7 @@ def _installed_areas(owner) -> None:
 
     owner.area_r = installed(
         owner.spec.recovery_areas,
-        owner.spec.recovery_lmtd_factors,
+        owner.spec.recovery_design_points,
         owner.q_r,
         owner.recovery_U,
         owner.theta_r,
@@ -1243,7 +1260,7 @@ def _installed_areas(owner) -> None:
     )
     owner.area_u = installed(
         owner.spec.utility_areas,
-        owner.spec.utility_lmtd_factors,
+        owner.spec.utility_design_points,
         owner.q_u,
         owner.utility_U,
         owner.theta_u,

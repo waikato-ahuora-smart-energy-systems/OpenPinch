@@ -65,8 +65,6 @@ from .models.fixed_structure import (
     FixedStructureSpec,
     RecoveryMatch,
     UtilityMatch,
-    chen_lmtd,
-    exact_lmtd,
 )
 from .prepared_problem import SynthesisProblem
 from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
@@ -244,8 +242,10 @@ def fixed_network_structure(
     utility_duties: dict[int, float] = {}
     recovery_areas: dict[int, float] = {}
     utility_areas: dict[int, float] = {}
-    recovery_factors: dict[int, tuple[float, ...]] = {}
-    utility_factors: dict[int, tuple[float, ...]] = {}
+    recovery_points: dict[int, dict[int, tuple]] = {}
+    utility_points: dict[int, dict[int, tuple]] = {}
+    # Solver period index by period id; without one, the network's own.
+    periods = axis_maps.get("periods")
 
     for position, exchanger in enumerate(exchangers):
         if position in excluded:
@@ -283,7 +283,7 @@ def fixed_network_structure(
                 recovery_duties[index] = float(duty)
             if exchanger.area is not None:
                 recovery_areas[index] = float(exchanger.area)
-                recovery_factors[index] = _lmtd_factor(exchanger)
+                recovery_points[index] = _design_points(exchanger, periods)
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
             if heater:
@@ -323,7 +323,7 @@ def fixed_network_structure(
                 utility_duties[index] = float(duty)
             if exchanger.area is not None:
                 utility_areas[index] = float(exchanger.area)
-                utility_factors[index] = _lmtd_factor(exchanger)
+                utility_points[index] = _design_points(exchanger, periods)
         positions.append(position)
 
     _require_every_stream_served(hot_axis, cold_axis, recovery, utilities)
@@ -338,8 +338,8 @@ def fixed_network_structure(
             initial_utility_duties=utility_duties,
             recovery_areas=recovery_areas,
             utility_areas=utility_areas,
-            recovery_lmtd_factors=recovery_factors,
-            utility_lmtd_factors=utility_factors,
+            recovery_design_points=recovery_points,
+            utility_design_points=utility_points,
         ),
         positions=tuple(positions),
         slots=tuple(slots),
@@ -699,20 +699,42 @@ def heat_exchanger_network_duty_optimisation_service(
     return finalise_design_result(problem, target_output, workflow_result)
 
 
-def _lmtd_factor(exchanger: HeatExchanger) -> tuple[float, ...]:
-    """Exact over Chen LMTD at each period's design approaches, by period index.
+def _design_points(exchanger: HeatExchanger, periods) -> dict[int, tuple]:
+    """Each active period's design point, by solver period index.
 
-    The installed area was sized with the exact LMTD, the rating model uses
-    Chen's; capacity scaled by this ratio carries the period's design duty. A
-    period with no approaches (the exchanger idle) takes 1.
+    ``(duty, theta_1, theta_2, required area or None)``: the end approaches
+    are the recorded ones, else follow from the inlet and outlet temperatures
+    (counter-current); the required area is the period's segment slice area
+    when the exchanger has slices. Periods the solver arrays lack are left
+    out, as are periods with no approaches.
     """
-    factors: dict[int, float] = {}
+    slice_areas = exchanger.segment_area_by_period
+    points: dict[int, tuple] = {}
     for state in exchanger.period_states:
-        thetas = state.approach_temperatures[:2]
-        if state.active and len(thetas) == 2 and min(thetas) > 0.0:
-            factors[state.period_idx] = exact_lmtd(*thetas) / chen_lmtd(*thetas)
-    count = 1 + max((state.period_idx for state in exchanger.period_states), default=0)
-    return tuple(factors.get(n, 1.0) for n in range(count))
+        index = (
+            state.period_idx if periods is None else periods.get(str(state.period_id))
+        )
+        if index is None or not state.active:
+            continue
+        thetas = tuple(state.approach_temperatures[:2])
+        temperatures = (
+            state.source_inlet_temperature,
+            state.source_outlet_temperature,
+            state.sink_inlet_temperature,
+            state.sink_outlet_temperature,
+        )
+        if len(thetas) < 2 and None not in temperatures:
+            source_in, source_out, sink_in, sink_out = temperatures
+            thetas = (source_in - sink_out, source_out - sink_in)
+        if len(thetas) < 2:
+            continue
+        points[int(index)] = (
+            float(state.duty),
+            float(thetas[0]),
+            float(thetas[1]),
+            slice_areas.get(str(state.period_id)),
+        )
+    return points
 
 
 def _structural_exchangers(network: HeatExchangerNetwork) -> tuple[HeatExchanger, ...]:
