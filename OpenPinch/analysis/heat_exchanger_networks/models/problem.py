@@ -114,6 +114,7 @@ class InternalHeatExchangerNetworkProblem:
         evolution_max_parallel: int = 1,
         evolution_no_improvement_patience: int | None = None,
         evolution_beam_width: int = 4,
+        evolution_solved_topologies: dict | None = None,
         model_factories: Mapping[str, Any] | None = None,
     ) -> Any:
         """Load, solve, and return the private solved model for this task."""
@@ -146,6 +147,7 @@ class InternalHeatExchangerNetworkProblem:
                     max_parallel=evolution_max_parallel,
                     no_improvement_patience=evolution_no_improvement_patience,
                     beam_width=evolution_beam_width,
+                    solved_topologies=evolution_solved_topologies,
                 )
                 if evolved is not None:
                     self.case = evolved

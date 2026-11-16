@@ -1019,9 +1019,14 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
     evolution_flags = []
 
     def fake_get_solution(
-        self, *, print_output=True, evolution=None, model_factories=None
+        self,
+        *,
+        print_output=True,
+        evolution=None,
+        model_factories=None,
+        **evolution_options,
     ):
-        del print_output, model_factories
+        del print_output, model_factories, evolution_options
         evolution_flags.append((self.synthesis_task_id, evolution))
         if self.parent is not None:
             parent_links.append((self.synthesis_task_id, self.parent.synthesis_task_id))
