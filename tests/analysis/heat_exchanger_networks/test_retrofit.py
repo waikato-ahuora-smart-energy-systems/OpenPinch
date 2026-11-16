@@ -9,6 +9,7 @@ has seven exchangers; its hot utility is 17,759 kW and cold utility 15,510 kW.
 
 from __future__ import annotations
 
+import functools
 import json
 
 import pytest
@@ -220,4 +221,250 @@ def test_retrofit_goal_lets_an_enlargeable_unit_grow_at_a_cost():
     assert _hot_utility(structure, model) < _hot_utility(base_structure, base)
     assert model.retrofit_capital_value == pytest.approx(
         float(model.A_coeff[0]) * e1.added_area, rel=1e-6
+    )
+
+
+# Report costs (pages 13-14): a new exchanger $34,600 plus $857/m2, added area
+# $8,650 per unit (existing shell) plus $857/m2, a split $10,000. The fixture
+# sets the area law ($857/m2, exponent 1), the new-unit cost and a 5-year life
+# with no discount, so the capital recovery factor is 0.2 per year.
+REPORT_COSTS = {
+    "new_unit_cost": 34_600.0,
+    "area_addition_cost": 8_650.0,
+    "split_cost": 10_000.0,
+}
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_search_finds_one_best_design_per_modification_count():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    problem = _case_problem()
+    result = run_retrofit_search(
+        problem,
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=2,
+            beam_width=2,
+            new_match_candidates=3,
+            area_tolerance=0.02,
+            **REPORT_COSTS,
+        ),
+    )
+
+    base = result.frontier[0]
+    assert base.modifications == ()
+    assert base.hot_utility == pytest.approx(REPORTED_HOT_UTILITY, rel=0.02)
+    assert base.annual_savings == 0.0
+    assert [d.modification_count for d in result.frontier] == [0, 1, 2]
+    for design in result.frontier[1:]:
+        assert design.hot_utility < base.hot_utility
+        assert design.annual_savings > 0.0
+        fixed = sum(m.fixed_cost for m in design.modifications)
+        area = sum(m.area_cost for m in design.modifications)
+        assert design.capital_cost == pytest.approx(fixed + area)
+        assert design.annualised_capital_cost == pytest.approx(
+            0.2 * design.capital_cost
+        )
+        assert design.net_annual_benefit == pytest.approx(
+            design.annual_savings - design.annualised_capital_cost
+        )
+        assert design.payback_years == pytest.approx(
+            design.capital_cost / design.annual_savings
+        )
+    assert result.selected.net_annual_benefit > 0.0
+
+
+def test_retrofit_search_needs_the_installed_area_of_every_existing_unit():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    network = _existing_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": None}) if e.exchanger_id == "E4" else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="installed area.*E4"):
+        run_retrofit_search(_case_problem(), network, RetrofitSettings())
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_search_rejects_an_existing_network_short_of_area():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # H3 has no cooler: with half its area E2 cannot bring H3 to its target.
+    network = _existing_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": 0.5 * e.area})
+                if e.exchanger_id == "E2"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="existing network.*installed areas"):
+        run_retrofit_search(_case_problem(), network, RetrofitSettings())
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_every_frontier_modification_does_something():
+    # The deep, narrow search runs out of useful moves before its last depth.
+    for design in _deep_search().frontier[1:]:
+        duties = {
+            e.exchanger_id: max(s.duty for s in e.period_states)
+            for e in design.network.exchangers
+        }
+        for modification in design.modifications:
+            assert modification.added_area >= 1e-3
+            assert duties[modification.exchanger_id] > 0.0
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_the_frontier_marks_designs_no_better_than_fewer_modifications():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # Costly added area: one modification loses money against the existing
+    # network, and a fourth adds less than it costs.
+    result = run_retrofit_search(
+        _case_problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=4,
+            beam_width=2,
+            new_match_candidates=4,
+            **(REPORT_COSTS | {"area_addition_cost": 2e6}),
+        ),
+    )
+
+    expected = [
+        any(
+            earlier.net_annual_benefit >= design.net_annual_benefit
+            for earlier in result.frontier[:n]
+        )
+        for n, design in enumerate(result.frontier)
+    ]
+    assert any(expected)
+    assert [d.dominated for d in result.frontier] == expected
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_the_result_counts_the_designs_the_search_solved():
+    result = _deep_search()
+
+    # The base, plus at least one child per frontier depth.
+    assert result.evaluated_designs >= len(result.frontier)
+
+
+@functools.cache
+def _deep_search():
+    """A deep, narrow search: six modifications, a beam of one."""
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    return run_retrofit_search(
+        _case_problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=6, beam_width=1, new_match_candidates=2, **REPORT_COSTS
+        ),
+    )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_new_matches_use_the_existing_network_stream_names():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # Added area priced out, so the frontier is made of new matches.
+    result = run_retrofit_search(
+        _case_problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=2,
+            beam_width=2,
+            new_match_candidates=4,
+            **(REPORT_COSTS | {"area_addition_cost": 1e9}),
+        ),
+    )
+    new_matches = [
+        m
+        for design in result.frontier
+        for m in design.modifications
+        if m.kind == "new_match"
+    ]
+
+    assert new_matches
+    for match in new_matches:
+        assert match.hot_stream in {"H1", "H2", "H3"}
+        assert match.cold_stream in {"C1", "C2"}
+        assert match.exchanger_id.startswith(
+            f"new:{match.hot_stream}->{match.cold_stream}"
+        )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_search_prices_each_modification_with_the_report_costs():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    result = run_retrofit_search(
+        _case_problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=1, beam_width=8, new_match_candidates=3, **REPORT_COSTS
+        ),
+    )
+
+    (design,) = result.frontier[1:]
+    (modification,) = design.modifications
+    assert modification.added_area > 0.0
+    assert modification.area_cost == pytest.approx(857.0 * modification.added_area)
+    if modification.kind == "new_match":
+        assert modification.fixed_cost == pytest.approx(
+            34_600.0 + 10_000.0 * len(modification.new_splits)
+        )
+    else:
+        assert modification.fixed_cost == pytest.approx(8_650.0)
+    assert design.capital_cost == pytest.approx(
+        modification.fixed_cost + modification.area_cost
     )

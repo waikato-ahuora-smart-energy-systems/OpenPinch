@@ -21,6 +21,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
   - [models](./models/README.md): concrete HEN equation models.
   - [reporting](./reporting/README.md): feasibility checks, ranking and exports.
   - [results](./results/README.md): result assembly, seeds and selection.
+  - [retrofit](./retrofit/README.md): retrofit of an existing network, one modification at a time.
   - [solver](./solver/README.md): solver arrays, piecewise profiles, backends and dependency guards.
   - [targeting](./targeting/README.md): method orchestration and topology helpers.
 
