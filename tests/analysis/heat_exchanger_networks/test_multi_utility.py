@@ -371,11 +371,16 @@ def _flatten(grid):
             yield item
 
 
-def test_stagewise_big_m_values_are_python_floats():
+def test_stagewise_big_m_values_are_python_floats(monkeypatch):
     # A NumPy scalar in front of a Pyomo term, as in M * (1 - z) or
-    # Q_max * z, goes
-    # through NumPy's ufunc dispatch first: 2.8 million times, several
-    # seconds, in a pulp mill design's isothermal approach equations.
+    # Q_max * z, goes through NumPy's ufunc dispatch first: 3.5 million
+    # times, several seconds, in a pulp mill design's build. The model is
+    # built, not solved, so no solver executable is needed.
+    pytest.importorskip("pyomo.environ")
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
     arrays = problem_to_solver_arrays(
         _two_cold_utility_problem(40.0, glycol_first=True), D_TMIN
     )
