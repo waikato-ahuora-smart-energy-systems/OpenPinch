@@ -1140,6 +1140,48 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
     assert max_active_count == 2
 
 
+def test_local_executor_copies_the_master_zone_once_per_stage(monkeypatch) -> None:
+    # PinchProblem.master_zone deep-copies the whole zone tree on each read.
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    tasks = build_pinch_design_method_tasks(settings)[:2]
+    assert len(tasks) == 2
+    reads = []
+    copy_zone = PinchProblem.master_zone.fget
+    monkeypatch.setattr(
+        PinchProblem,
+        "master_zone",
+        property(lambda self: reads.append(None) or copy_zone(self)),
+    )
+
+    def solve(worker_args):
+        from OpenPinch.contracts.synthesis.task import (
+            HeatExchangerNetworkSynthesisTaskOutcome,
+        )
+
+        task = worker_args[0]
+        outcome = HeatExchangerNetworkSynthesisTaskOutcome(task=task, status="failed")
+        return task, outcome, None
+
+    monkeypatch.setattr(executor_module, "_solve_built_task", solve)
+
+    LocalSynthesisExecutor().execute(
+        tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert len(reads) == 1
+
+
+def test_shared_zone_problem_keeps_the_validated_input_records() -> None:
+    # Solver arrays keep the input order and supplied flow rates from these.
+    problem = _four_stream_problem()
+    expected = problem_to_solver_arrays(problem, 10.0).axis_maps
+    shared = executor_module._ZoneCopiedOnce(problem)
+
+    assert shared._validated_data is problem._validated_data
+    assert problem_to_solver_arrays(shared, 10.0).axis_maps == expected
+
+
 def test_local_executor_passes_user_solver_options_to_internal_problem() -> None:
     problem = _four_stream_problem(
         options={
