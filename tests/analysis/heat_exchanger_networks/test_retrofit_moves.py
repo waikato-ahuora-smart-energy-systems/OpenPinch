@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
     NewMatch,
+    NewUtility,
     apply_new_match,
+    apply_new_utility,
+    apply_relocation,
     match_potential,
     new_splits,
+    new_utility_candidates,
     screen_new_matches,
 )
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -49,6 +53,65 @@ def test_a_match_joining_a_stage_splits_streams_already_matched_there():
     assert new_splits(network, NewMatch("H2", "C1", 1, new_stage=False)) == ("C1",)
     assert new_splits(network, NewMatch("H2", "C2", 1, new_stage=False)) == ()
     assert new_splits(network, NewMatch("H1", "C1", 2, new_stage=True)) == ()
+
+
+def test_a_relocated_exchanger_keeps_its_id_and_installed_area():
+    network = _network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": 50.0})
+                if e.exchanger_id == "recovery:H1->C1:S1"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    moved = apply_relocation(
+        network, "recovery:H1->C1:S1", NewMatch("H2", "C2", 2, new_stage=False)
+    )
+
+    exchanger = next(
+        e for e in moved.exchangers if e.exchanger_id == "recovery:H1->C1:S1"
+    )
+    assert (exchanger.source_stream, exchanger.sink_stream, exchanger.stage) == (
+        "H2",
+        "C2",
+        2,
+    )
+    assert exchanger.area == 50.0
+    assert len(moved.exchangers) == len(network.exchangers)
+    # The network keeps its two stages (from_structure leaves stage_count unset).
+    assert moved.stage_count == 2
+
+
+def test_a_new_utility_goes_on_a_stream_end_without_one():
+    network = _network()
+
+    # C1 has a heater after stage 2 but none at its end; H1 has an end cooler.
+    candidates = new_utility_candidates(
+        network,
+        hot_streams=("H1", "H2"),
+        cold_streams=("C1", "C2"),
+        hot_utilities=("HU",),
+        cold_utilities=("CU",),
+    )
+    assert candidates == (
+        NewUtility("C1", "HU", heater=True),
+        NewUtility("C2", "HU", heater=True),
+        NewUtility("H2", "CU", heater=False),
+    )
+
+    added = apply_new_utility(network, NewUtility("H2", "CU", heater=False), "N1")
+    (cooler,) = (e for e in added.exchangers if e.exchanger_id == "N1")
+    assert (cooler.source_stream, cooler.sink_stream, cooler.stage) == (
+        "H2",
+        "CU",
+        None,
+    )
+    assert cooler.area is None
+    assert len(added.exchangers) == len(network.exchangers) + 1
 
 
 # Stream supply, target (C) and heat capacity flowrate (kW/K).
@@ -118,7 +181,7 @@ def test_match_potential_uses_the_stream_temperatures_at_the_position():
     assert potential("H2", "C1", 1, True) == 0.0
 
 
-def test_screen_ranks_new_matches_by_potential_then_fewest_splits():
+def test_screen_ranks_new_matches_by_utility_relief_then_potential():
     network = _solved_network()
 
     ranked = screen_new_matches(network, ENDS, approach=10.0, limit=2)
@@ -129,12 +192,17 @@ def test_screen_ranks_new_matches_by_potential_then_fewest_splits():
     #   H1-C2 at stage 1 (new or joining): min(10, 4) * (200 - 50 - 10) = 560
     #   H1-C1 below stage 1 (new stage 3, or joining stage 2):
     #       min(10, 8) * (140 - 40 - 10) = 720
-    #   H1-C1 in a new stage 2 (C1 at 77.5 C): 8 * (140 - 77.5 - 10) = 420
-    # So the two 720 kW moves lead, the new stage first because joining
-    # stage 2 splits C1.
+    # Ranked by potential alone the two 720 kW H1-C1 moves led. A new match
+    # first cuts utility only as far as its hot stream has cooling and its
+    # cold stream heating: H1 is cooled 400 kW, C1 heated 220 kW and C2
+    # 280 kW, so H1-C1 relieves min(720, 400, 220) = 220 kW and H1-C2 at
+    # stage 1 min(560, 400, 280) = 280 kW. The H1-C2 moves lead (a new stage
+    # first, since joining stage 1 splits H1); every H2 move relieves nothing,
+    # H2 having no cooler. This replaces ranking by potential alone, which
+    # tried matches that could not cut utility first.
     assert ranked == (
-        NewMatch("H1", "C1", 3, new_stage=True),
-        NewMatch("H1", "C1", 2, new_stage=False),
+        NewMatch("H1", "C2", 1, new_stage=True),
+        NewMatch("H1", "C2", 1, new_stage=False),
     )
     everything = screen_new_matches(network, ENDS, approach=10.0, limit=100)
     # An existing match is never proposed again in its own stage.

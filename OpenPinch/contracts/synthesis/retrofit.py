@@ -13,15 +13,21 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     """One modification of an existing network.
 
     ``kind`` is ``"new_match"`` (a new recovery exchanger, ``exchanger_id``,
-    between ``hot_stream`` and ``cold_stream`` at ``stage``) or
-    ``"area_addition"`` (area added to existing exchanger ``exchanger_id``).
-    ``added_area`` is in m2; ``fixed_cost`` and ``area_cost`` are installed
-    costs in $; ``new_splits`` names the streams a new match splits.
+    between ``hot_stream`` and ``cold_stream`` at ``stage``),
+    ``"area_addition"`` (area added to existing exchanger ``exchanger_id``)
+    or ``"relocation"`` (existing recovery exchanger ``exchanger_id``, with
+    its installed area, moved to ``hot_stream`` and ``cold_stream`` at
+    ``stage``). ``added_area`` is in m2; ``fixed_cost`` and ``area_cost`` are
+    installed costs in $; ``new_splits`` names the streams a new or moved
+    match splits. A new or moved match may come with the new end-of-stream
+    heater or cooler that lets it work, ``utility_exchanger_id`` with
+    ``utility_area`` (m2); its unit and area costs are in ``fixed_cost`` and
+    ``area_cost``.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["new_match", "area_addition"]
+    kind: Literal["new_match", "area_addition", "relocation"]
     exchanger_id: str
     added_area: float = 0.0
     fixed_cost: float = 0.0
@@ -31,6 +37,8 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     stage: int | None = None
     new_stage: bool = False
     new_splits: tuple[str, ...] = ()
+    utility_exchanger_id: str | None = None
+    utility_area: float = 0.0
 
 
 class HeatExchangerNetworkRetrofitDesign(BaseModel):

@@ -921,10 +921,14 @@ class _DesignAccessor:
         beam_width: int = 3,
         new_match_candidates: int = 4,
         area_tolerance: float = 0.02,
+        max_added_area_fraction: float | None = None,
         min_approach_temperature: float | None = None,
         new_unit_cost: float | None = None,
         area_addition_cost: float = 0.0,
         split_cost: float = 0.0,
+        relocation_cost: float | None = None,
+        relocation_candidates: int = 8,
+        new_utility_units: bool = False,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -957,6 +961,18 @@ class _DesignAccessor:
         ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
         added area on an existing exchanger adds ``area_addition_cost``, all
         in $ and annualised with the capital recovery factor.
+        ``max_added_area_fraction`` caps the added area on an existing
+        exchanger at that fraction of its installed area (None: no cap).
+        With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
+        split) a step may also move an existing recovery exchanger, with its
+        installed area, to a screened match that shares one of its streams
+        (None, the default: no relocations); ``relocation_candidates`` are
+        tried from each design, ranked by the match's heat potential less the
+        unit's present duty. With ``new_utility_units`` each new match and
+        relocation is also tried together with a new end heater or cooler on
+        a stream that has none, which can free the units a move needs; the
+        pair is one modification, costing one more ``new_unit_cost`` and the
+        utility exchanger's area.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
@@ -1000,6 +1016,7 @@ class _DesignAccessor:
                     beam_width=beam_width,
                     new_match_candidates=new_match_candidates,
                     area_tolerance=area_tolerance,
+                    max_added_area_fraction=max_added_area_fraction,
                     approach=(
                         DEFAULT_FEASIBILITY_APPROACH
                         if min_approach_temperature is None
@@ -1008,6 +1025,11 @@ class _DesignAccessor:
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),
                     split_cost=float(split_cost),
+                    relocation_cost=(
+                        None if relocation_cost is None else float(relocation_cost)
+                    ),
+                    relocation_candidates=relocation_candidates,
+                    new_utility_units=new_utility_units,
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

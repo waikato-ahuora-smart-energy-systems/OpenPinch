@@ -118,6 +118,9 @@ class FixedStructureSpec:
     # Existing units the "retrofit" goal may enlarge, by solver index.
     enlargeable_recovery: frozenset[int] = frozenset()
     enlargeable_utilities: frozenset[int] = frozenset()
+    # Caps an enlargeable unit's added area at this fraction of its installed
+    # area; None leaves it uncapped.
+    max_added_area_fraction: float | None = None
 
 
 @dataclass
@@ -1301,6 +1304,7 @@ def _retrofit_areas(owner) -> None:
     """
 
     widen = 1.0 + float(owner.spec.area_tolerance)
+    fraction = owner.spec.max_added_area_fraction
 
     def unit(side, tag, index, areas, points, enlargeable):
         terms = _unit_terms(owner, side, index)
@@ -1308,10 +1312,9 @@ def _retrofit_areas(owner) -> None:
             area = _common_area(owner, f"{tag}{index}", *terms)
             return area, area
         installed = float(areas[index])
+        cap = None if fraction is None else float(fraction) * installed
         added = (
-            owner._var(f"d{tag}{index}", 0.0, 0.0, None)
-            if index in enlargeable
-            else 0.0
+            owner._var(f"d{tag}{index}", 0.0, 0.0, cap) if index in enlargeable else 0.0
         )
         _cap_installed(owner, installed * widen + added, points.get(index, {}), *terms)
         return installed, added
