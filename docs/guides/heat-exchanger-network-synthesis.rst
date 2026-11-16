@@ -283,12 +283,12 @@ The depth picks the stages run at each multiplier and their effort:
      - heuristic, then evolution
      - 50
      - 3
-     - 1
+     - 2
    * - 2
      - heuristic and MILP; MILP through the thermal derivative method
      - 50
      - 3
-     - 1
+     - 2
    * - 3
      - as 2; every MILP network also straight to evolution
      - 50

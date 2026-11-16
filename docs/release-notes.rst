@@ -32,6 +32,20 @@ Heat exchanger network synthesis
   four cases. The pulp mill case takes 188 s instead of 45 s, finds 11
   minimum-unit networks instead of 2, and its best network is within 0.01 %.
   Set ``HENS_HEURISTIC_PDM_NETWORKS`` to 10 for the earlier, faster search.
+- Network evolution explores two add and two remove branches per step by
+  default (``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now
+  default to 2 at search depths 1 and 2, was 1), and the evolution tasks of
+  a serial stage share the topologies they have solved, so a topology one
+  task solved is reused by the next rather than solved again. Tasks solved
+  in worker processes (``HENS_MAX_PARALLEL`` above 1) do not share. On the
+  12 OpenHENS cases at the default width and depth, the best network costs
+  less on five cases (Five-stream Bogataj 4.0 %, Thirteen-stream Kim 1.6 %,
+  Four-stream Escobar 1.6 %, Five-stream Kim 1.2 %, Ten-stream Ahmad
+  0.04 %), each with one to four fewer units, and no case is worse; the run
+  takes about as long (+2 %). On the pulp mill, chocolate factory and crude
+  preheat sample cases the best networks are within 0.01 % and the runs take
+  about 40 % longer. Set both options to 1 for the earlier single-path
+  search.
 - Post-processing a solved stage-wise model is faster. The alpha flow-on
   system computes each stream's flow-on terms once per stage rather than once
   per partner, and drops zero terms when it builds them. Flow fractions read

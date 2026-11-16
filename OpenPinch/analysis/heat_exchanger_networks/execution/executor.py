@@ -147,13 +147,18 @@ class LocalSynthesisExecutor:
 
         worker_count = max(1, min(max_parallel, len(built)))
         branch_parallel = max(1, max_parallel) if worker_count == 1 else 1
+        # Serial tasks share the evolution topologies they solve. Tasks in
+        # worker processes do not: what they shared would depend on which
+        # tasks a worker happened to run.
+        solved_topologies: dict | None = {} if worker_count == 1 else None
         solve_inputs = (
             (
                 task,
                 internal_problem,
                 self.print_output,
                 task_model_factories,
-                _evolution_options(problem, task, max_parallel=branch_parallel),
+                _evolution_options(problem, task, max_parallel=branch_parallel)
+                | {"solved_topologies": solved_topologies},
             )
             for task, internal_problem, task_model_factories in built
         )
@@ -446,12 +451,16 @@ def _solve_built_task(
             worker_args
         )
     is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
+    evolution_options = dict(evolution_options)
+    solved_topologies = evolution_options.pop("solved_topologies", None)
     try:
         solve_kwargs: dict[str, Any] = {
             "print_output": print_output,
             "evolution": is_evolution,
             "model_factories": model_factories,
         }
+        if is_evolution and solved_topologies is not None:
+            solve_kwargs["evolution_solved_topologies"] = solved_topologies
         if is_evolution and evolution_options != {
             "n_ad_branches": 1,
             "n_rm_branches": 1,

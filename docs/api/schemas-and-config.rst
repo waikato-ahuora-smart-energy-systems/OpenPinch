@@ -216,7 +216,7 @@ default those steps choose approaches by cost down to 0.1 K; see
 
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` set the network evolution
 breadth of every evolution task when they are set. When they are not, the search
-depth sets it: 1 up to depth 2, 2 at depth 3 and 3 at depth 4.
+depth sets it: 2 up to depth 3 and 3 at depth 4.
 ``manifest.evm_n_ad_branches`` and ``manifest.evm_n_rm_branches`` report the
 breadth used.
 
