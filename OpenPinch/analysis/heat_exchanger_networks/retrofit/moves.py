@@ -10,6 +10,9 @@ from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger import HeatExchanger
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 
+HEATER = HeatExchangerKind.HOT_UTILITY
+COOLER = HeatExchangerKind.COLD_UTILITY
+
 
 @dataclass(frozen=True)
 class NewMatch:
@@ -23,6 +26,73 @@ class NewMatch:
     cold: str
     stage: int
     new_stage: bool
+
+
+@dataclass(frozen=True)
+class NewUtility:
+    """A new utility exchanger at the end of process stream ``stream``: a
+    heater served by hot utility ``utility`` (``heater``) or a cooler served
+    by cold utility ``utility``."""
+
+    stream: str
+    utility: str
+    heater: bool
+
+
+def new_utility_candidates(
+    network: HeatExchangerNetwork,
+    *,
+    hot_streams,
+    cold_streams,
+    hot_utilities,
+    cold_utilities,
+) -> tuple[NewUtility, ...]:
+    """New end-of-stream utility exchangers ``network`` could take.
+
+    Each cold stream without an end heater may take one from each hot
+    utility, then each hot stream without an end cooler one from each cold
+    utility; a heater or cooler placed after a stage does not count.
+    """
+
+    ends = {
+        (e.kind, e.sink_stream if e.kind is HEATER else e.source_stream)
+        for e in network.exchangers
+        if e.kind is not HeatExchangerKind.RECOVERY and e.stage is None
+    }
+    heaters = [
+        NewUtility(stream, utility, heater=True)
+        for stream in sorted(cold_streams)
+        if (HEATER, stream) not in ends
+        for utility in hot_utilities
+    ]
+    coolers = [
+        NewUtility(stream, utility, heater=False)
+        for stream in sorted(hot_streams)
+        if (COOLER, stream) not in ends
+        for utility in cold_utilities
+    ]
+    return tuple(heaters + coolers)
+
+
+def apply_new_utility(
+    network: HeatExchangerNetwork, move: NewUtility, exchanger_id: str
+) -> HeatExchangerNetwork:
+    """``network`` with the utility exchanger ``move`` added at its stream's
+    end as ``exchanger_id``, with no installed area."""
+
+    entry = [(move.stream, move.utility)]
+    (new,) = HeatExchangerNetwork.from_structure(
+        recovery=[],
+        heaters=entry if move.heater else (),
+        coolers=() if move.heater else entry,
+    ).exchangers
+    return network.model_copy(
+        update={
+            "exchangers": network.exchangers
+            + (new.model_copy(update={"exchanger_id": exchanger_id}),),
+            "stage_count": stage_count(network),
+        }
+    )
 
 
 def stage_count(network: HeatExchangerNetwork) -> int:

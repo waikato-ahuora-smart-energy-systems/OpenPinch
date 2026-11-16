@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
     NewMatch,
+    NewUtility,
+    apply_new_utility,
+    new_utility_candidates,
     apply_new_match,
     apply_relocation,
     match_potential,
@@ -52,7 +55,6 @@ def test_a_match_joining_a_stage_splits_streams_already_matched_there():
     assert new_splits(network, NewMatch("H1", "C1", 2, new_stage=True)) == ()
 
 
-
 def test_a_relocated_exchanger_keeps_its_id_and_installed_area():
     network = _network()
     network = network.model_copy(
@@ -82,6 +84,35 @@ def test_a_relocated_exchanger_keeps_its_id_and_installed_area():
     assert len(moved.exchangers) == len(network.exchangers)
     # The network keeps its two stages (from_structure leaves stage_count unset).
     assert moved.stage_count == 2
+
+
+
+def test_a_new_utility_goes_on_a_stream_end_without_one():
+    network = _network()
+
+    # C1 has a heater after stage 2 but none at its end; H1 has an end cooler.
+    candidates = new_utility_candidates(
+        network,
+        hot_streams=("H1", "H2"),
+        cold_streams=("C1", "C2"),
+        hot_utilities=("HU",),
+        cold_utilities=("CU",),
+    )
+    assert candidates == (
+        NewUtility("C1", "HU", heater=True),
+        NewUtility("C2", "HU", heater=True),
+        NewUtility("H2", "CU", heater=False),
+    )
+
+    added = apply_new_utility(network, NewUtility("H2", "CU", heater=False), "N1")
+    (cooler,) = (e for e in added.exchangers if e.exchanger_id == "N1")
+    assert (cooler.source_stream, cooler.sink_stream, cooler.stage) == (
+        "H2",
+        "CU",
+        None,
+    )
+    assert cooler.area is None
+    assert len(added.exchangers) == len(network.exchangers) + 1
 
 # Stream supply, target (C) and heat capacity flowrate (kW/K).
 ENDS = {
