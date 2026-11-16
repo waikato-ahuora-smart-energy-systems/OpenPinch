@@ -555,9 +555,12 @@ New utility exchangers
    cooler on H3 lets a new H1-C2 match in a new third stage save about
    $836k/y instead of $222k/y alone.
 
-Not yet covered: moving or repiping utility exchangers, and utility
-exchangers placed between stages. Area reduction is not a move: an exchanger
-may always run below its area, and existing area is sunk.
+Not covered: moving or repiping an existing heater or cooler, and new
+utility exchangers placed between stages. Next to a paired new utility
+exchanger, moving an existing one would mainly save the new unit's cost,
+while its steam or cooling-water service usually makes it costlier to move
+than a recovery exchanger. Area reduction is not a move: an exchanger may
+always run below its area, and existing area is sunk.
 
 The search is a greedy beam, so more candidates or ``new_utility_units`` do
 not always end better. On the Ciric and Floudas case with the report's costs

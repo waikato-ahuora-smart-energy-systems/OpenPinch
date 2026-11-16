@@ -33,12 +33,13 @@ Heat exchanger network synthesis
   are also tried with a new end heater or cooler that frees the units they
   need, priced together as one modification. New matches are screened by
   the utility they could cut at first order (heat potential capped by the
-  hot stream's cooling and the cold stream's heating), which on the Ciric
-  and Floudas case doubles the four-step net benefit of the default search.
-  Network mappings for ``optimise_duties`` and
+  hot stream's cooling and the cold stream's heating). Every design is
+  checked as optimised duties are (approaches, heat balances, areas) and
+  dropped if it fails. Network mappings for ``optimise_duties`` and
   ``retrofit`` now take entries as mappings with ``area`` and ``id``. Tested
-  on the Ciric and Floudas (1989) retrofit case; see "Retrofit of an Existing
-  Network" in the HEN synthesis guide.
+  on the Ciric and Floudas (1989) retrofit case, packaged as
+  ``Five-stream-Ciric-and-Floudas-1989.json`` and demonstrated in notebook
+  16; see "Retrofit of an Existing Network" in the HEN synthesis guide.
 - The heuristic pinch design method realises networks faster: side
   proposals that solve to a side network already found are not paired,
   since each pairing would repeat a network; they stand in only for a
