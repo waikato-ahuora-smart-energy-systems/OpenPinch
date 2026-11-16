@@ -29,7 +29,9 @@ Heat exchanger network synthesis
   an existing exchanger (for example 0.2 for at most 20 % more), and with
   ``relocation_cost`` a step may move an existing recovery exchanger, with
   its installed area, to another match or position (relocation and
-  repiping). Network mappings for ``optimise_duties`` and
+  repiping). With ``new_utility_units=True`` new matches and relocations
+  are also tried with a new end heater or cooler that frees the units they
+  need, priced together as one modification. Network mappings for ``optimise_duties`` and
   ``retrofit`` now take entries as mappings with ``area`` and ``id``. Tested
   on the Ciric and Floudas (1989) retrofit case; see "Retrofit of an Existing
   Network" in the HEN synthesis guide.

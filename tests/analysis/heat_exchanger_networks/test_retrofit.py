@@ -706,3 +706,36 @@ def test_design_retrofit_relocates_an_existing_exchanger_when_cheapest():
     assert moved.source_stream.endswith(modification.hot_stream)
     assert moved.sink_stream.endswith(modification.cold_stream)
     assert result.frontier[1].annual_savings > 0.0
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_pairs_a_move_with_the_new_utility_it_needs():
+    def first_step(new_utility_units):
+        result = _case_problem().design.retrofit(
+            EXISTING_STRUCTURE,
+            max_modifications=1,
+            new_match_candidates=24,
+            new_utility_units=new_utility_units,
+            **REPORT_COSTS,
+        )
+        return result.frontier[1]
+
+    alone, paired = first_step(False), first_step(True)
+
+    # A new cooler on H3 frees its recovery units: H1-C2 in a new third stage
+    # then saves about $836k/y against $222k/y without the cooler.
+    (modification,) = paired.modifications
+    assert modification.kind == "new_match"
+    assert modification.utility_exchanger_id is not None
+    assert modification.utility_area > 0.0
+    # Two new units (the match and the utility exchanger) and any splits.
+    assert modification.fixed_cost == pytest.approx(
+        2 * REPORT_COSTS["new_unit_cost"]
+        + REPORT_COSTS["split_cost"] * len(modification.new_splits)
+    )
+    assert modification.area_cost == pytest.approx(
+        857.0 * (modification.added_area + modification.utility_area)
+    )
+    assert paired.net_annual_benefit > alone.net_annual_benefit

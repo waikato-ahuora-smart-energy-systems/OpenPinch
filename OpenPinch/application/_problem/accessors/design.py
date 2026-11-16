@@ -928,6 +928,7 @@ class _DesignAccessor:
         split_cost: float = 0.0,
         relocation_cost: float | None = None,
         relocation_candidates: int = 8,
+        new_utility_units: bool = False,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -967,7 +968,11 @@ class _DesignAccessor:
         installed area, to a screened match that shares one of its streams
         (None, the default: no relocations); ``relocation_candidates`` are
         tried from each design, ranked by the match's heat potential less the
-        unit's present duty.
+        unit's present duty. With ``new_utility_units`` each new match and
+        relocation is also tried together with a new end heater or cooler on
+        a stream that has none, which can free the units a move needs; the
+        pair is one modification, costing one more ``new_unit_cost`` and the
+        utility exchanger's area.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
@@ -1024,6 +1029,7 @@ class _DesignAccessor:
                         None if relocation_cost is None else float(relocation_cost)
                     ),
                     relocation_candidates=relocation_candidates,
+                    new_utility_units=new_utility_units,
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

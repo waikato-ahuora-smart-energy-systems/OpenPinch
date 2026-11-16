@@ -33,10 +33,13 @@ from ..execution.settings import configured_stage_solver, stage_solver_options
 from .frontier import mark_dominated
 from .moves import (
     NewMatch,
+    NewUtility,
     apply_new_match,
+    apply_new_utility,
     apply_relocation,
     match_potential,
     new_splits,
+    new_utility_candidates,
     screen_new_matches,
 )
 
@@ -62,7 +65,9 @@ class RetrofitSettings:
     added area). ``relocation_cost`` ($ per existing recovery exchanger moved
     to another match or position, plus ``split_cost`` per new split) enables
     relocation moves (``relocation_candidates`` tried from each design);
-    ``None`` leaves them out.
+    ``None`` leaves them out. ``new_utility_units`` also tries each new match
+    and relocation with each new end heater or cooler the network lacks, in
+    the same step, priced as one more new unit.
     """
 
     max_modifications: int = 3
@@ -76,6 +81,7 @@ class RetrofitSettings:
     split_cost: float = 0.0
     relocation_cost: float | None = None
     relocation_candidates: int = 8
+    new_utility_units: bool = False
 
 
 @dataclass(frozen=True)
@@ -84,6 +90,7 @@ class _Move:
     exchanger_id: str
     match: NewMatch | None = None
     splits: tuple[str, ...] = ()
+    utility_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -148,9 +155,7 @@ def run_retrofit_search(
     for _depth in range(max(0, int(settings.max_modifications))):
         children = []
         for parent in beam:
-            for state in _children(
-                parent, evaluator.ends, settings, evaluator.existing
-            ):
+            for state in _children(parent, settings, evaluator):
                 signature = _signature(state, evaluator.existing)
                 if signature in seen:
                     continue
@@ -168,11 +173,13 @@ def run_retrofit_search(
     )
 
 
-def _children(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
+def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
     """Each one-modification step from ``parent``: added area on each
     existing unit at its cap, the screened new matches, then (with a
     ``relocation_cost``) each existing recovery unit not yet moved that
-    shares a stream with a screened match, moved there."""
+    shares a stream with a screened match, moved there. With
+    ``new_utility_units`` each new match and relocation is also tried with
+    each new end utility exchanger the network lacks."""
 
     state = parent.state
     for exchanger_id in parent.binding:
@@ -181,36 +188,48 @@ def _children(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
             enlarged=state.enlarged | {exchanger_id},
             moves=state.moves + (_Move("area_addition", exchanger_id),),
         )
+    for network, move in _structural_steps(parent, settings, evaluator):
+        yield replace(state, network=network, moves=state.moves + (move,))
+        if not settings.new_utility_units:
+            continue
+        for utility in new_utility_candidates(network, **evaluator.utility_axes):
+            utility_id = _new_utility_id(network, utility)
+            yield replace(
+                state,
+                network=apply_new_utility(network, utility, utility_id),
+                moves=state.moves + (replace(move, utility_id=utility_id),),
+            )
+
+
+def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
+    """The screened new matches and, with a ``relocation_cost``, the
+    relocations from ``parent``, each as ``(network, move)``."""
+
+    network = parent.state.network
     matches = screen_new_matches(
         parent.solved,
-        ends,
+        evaluator.ends,
         approach=settings.approach,
         limit=settings.new_match_candidates,
     )
     for match in matches:
-        exchanger_id = _new_id(state.network, match)
-        move = _Move("new_match", exchanger_id, match, new_splits(state.network, match))
-        yield replace(
-            state,
-            network=apply_new_match(state.network, match, exchanger_id),
-            moves=state.moves + (move,),
-        )
+        exchanger_id = _new_id(network, match)
+        move = _Move("new_match", exchanger_id, match, new_splits(network, match))
+        yield apply_new_match(network, match, exchanger_id), move
     if settings.relocation_cost is None:
         return
-    for unit, match in _relocations(parent, ends, settings, existing):
-        remaining = state.network.model_copy(
+    for unit, match in _relocations(
+        parent, evaluator.ends, settings, evaluator.existing
+    ):
+        remaining = network.model_copy(
             update={
                 "exchangers": tuple(
-                    e for e in state.network.exchangers if e.exchanger_id != unit
+                    e for e in network.exchangers if e.exchanger_id != unit
                 )
             }
         )
         move = _Move("relocation", unit, match, new_splits(remaining, match))
-        yield replace(
-            state,
-            network=apply_relocation(state.network, unit, match),
-            moves=state.moves + (move,),
-        )
+        yield apply_relocation(network, unit, match), move
 
 
 def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
@@ -248,6 +267,24 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     return [(unit, match) for _score, unit, match in scored[:limit]]
 
 
+def _new_utility_id(network: HeatExchangerNetwork, utility: NewUtility) -> str:
+    """``new:<utility>-><stream>`` for a heater, ``new:<stream>-><utility>``
+    for a cooler, with ``:2``, ``:3`` and so on when taken."""
+
+    taken = {e.exchanger_id for e in network.exchangers}
+    pair = (
+        (utility.utility, utility.stream)
+        if utility.heater
+        else (utility.stream, utility.utility)
+    )
+    stem = f"new:{pair[0]}->{pair[1]}"
+    exchanger_id, n = stem, 1
+    while exchanger_id in taken:
+        n += 1
+        exchanger_id = f"{stem}:{n}"
+    return exchanger_id
+
+
 def _new_id(network: HeatExchangerNetwork, match: NewMatch) -> str:
     taken = {e.exchanger_id for e in network.exchangers}
     stem = f"new:{match.hot}->{match.cold}"
@@ -260,7 +297,8 @@ def _new_id(network: HeatExchangerNetwork, match: NewMatch) -> str:
 
 def _signature(state: _State, existing):
     """Recovery matches by stage, with the existing unit installed at each
-    (new units are alike), and the enlarged units: one per structure."""
+    (new units are alike), the utility exchangers, and the enlarged units:
+    one per structure."""
 
     recovery = frozenset(
         (
@@ -272,7 +310,12 @@ def _signature(state: _State, existing):
         for e in state.network.exchangers
         if e.kind is HeatExchangerKind.RECOVERY
     )
-    return recovery, state.enlarged
+    utilities = frozenset(
+        (e.source_stream, e.sink_stream, e.stage)
+        for e in state.network.exchangers
+        if e.kind is not HeatExchangerKind.RECOVERY
+    )
+    return recovery, utilities, state.enlarged
 
 
 class _Evaluator:
@@ -294,6 +337,13 @@ class _Evaluator:
         self.names = _existing_names(self.arrays.axis_maps, existing)
         self.ends = {
             self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
+        }
+        axes = self.arrays.axis_maps
+        self.utility_axes = {
+            "hot_streams": tuple(n for n, e in self.ends.items() if e[0] > e[1]),
+            "cold_streams": tuple(n for n, e in self.ends.items() if e[0] <= e[1]),
+            "hot_utilities": tuple(self.names[n] for n in axes["hot_utilities"]),
+            "cold_utilities": tuple(self.names[n] for n in axes["cold_utilities"]),
         }
         self.base_utility_cost: float | None = None
         self.evaluations = 0
@@ -371,7 +421,10 @@ class _Evaluator:
             stages = {e.exchanger_id: e.stage for e in state.network.exchangers}
             modifications = tuple(
                 self._modification(
-                    move, results[move.exchanger_id], stages[move.exchanger_id]
+                    move,
+                    results[move.exchanger_id],
+                    stages[move.exchanger_id],
+                    results.get(move.utility_id),
                 )
                 for move in state.moves
             )
@@ -395,13 +448,17 @@ class _Evaluator:
         finally:
             model.cleanup()
 
-    def _modification(self, move: _Move, result, stage: int | None):
+    def _modification(
+        self, move: _Move, result, stage: int | None, utility=None
+    ) -> HeatExchangerNetworkRetrofitModification | None:
         """``move`` priced from its unit's added area; ``None`` when it does
         nothing (no added area, or a unit with no duty). A relocation adds no
         area. A new or moved match reports ``stage``, its stage in the
-        design's network."""
+        design's network. ``utility`` is the result of the new utility
+        exchanger paired with the move, priced as one more new unit; it too
+        must carry duty."""
 
-        if not result.active:
+        if not result.active or (utility is not None and not utility.active):
             return None
         settings = self.settings
         splits = settings.split_cost * len(move.splits)
@@ -416,19 +473,29 @@ class _Evaluator:
                 if move.kind == "new_match"
                 else settings.area_addition_cost
             )
+        utility_area = 0.0 if utility is None else float(utility.added_area)
+        if utility is not None:
+            fixed += settings.new_unit_cost
         match = move.match
         return HeatExchangerNetworkRetrofitModification(
             kind=move.kind,
             exchanger_id=move.exchanger_id,
             added_area=added,
             fixed_cost=float(fixed),
-            area_cost=self.area_coeff * added**self.area_exp if added else 0.0,
+            area_cost=self._area_cost(added) + self._area_cost(utility_area),
             hot_stream=match.hot if match else None,
             cold_stream=match.cold if match else None,
             stage=stage if match else None,
             new_stage=bool(match and match.new_stage),
             new_splits=move.splits,
+            utility_exchanger_id=move.utility_id,
+            utility_area=utility_area,
         )
+
+    def _area_cost(self, area: float) -> float:
+        """Installed cost ($) of ``area`` m2 of new area."""
+
+        return self.area_coeff * area**self.area_exp if area > 0.0 else 0.0
 
 
 def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]:

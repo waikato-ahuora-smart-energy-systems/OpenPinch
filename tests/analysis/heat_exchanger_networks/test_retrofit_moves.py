@@ -5,12 +5,12 @@ from __future__ import annotations
 from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
     NewMatch,
     NewUtility,
-    apply_new_utility,
-    new_utility_candidates,
     apply_new_match,
+    apply_new_utility,
     apply_relocation,
     match_potential,
     new_splits,
+    new_utility_candidates,
     screen_new_matches,
 )
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -86,7 +86,6 @@ def test_a_relocated_exchanger_keeps_its_id_and_installed_area():
     assert moved.stage_count == 2
 
 
-
 def test_a_new_utility_goes_on_a_stream_end_without_one():
     network = _network()
 
@@ -113,6 +112,7 @@ def test_a_new_utility_goes_on_a_stream_end_without_one():
     )
     assert cooler.area is None
     assert len(added.exchangers) == len(network.exchangers) + 1
+
 
 # Stream supply, target (C) and heat capacity flowrate (kW/K).
 ENDS = {

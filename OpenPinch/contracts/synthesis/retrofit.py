@@ -19,7 +19,10 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     its installed area, moved to ``hot_stream`` and ``cold_stream`` at
     ``stage``). ``added_area`` is in m2; ``fixed_cost`` and ``area_cost`` are
     installed costs in $; ``new_splits`` names the streams a new or moved
-    match splits.
+    match splits. A new or moved match may come with the new end-of-stream
+    heater or cooler that lets it work, ``utility_exchanger_id`` with
+    ``utility_area`` (m2); its unit and area costs are in ``fixed_cost`` and
+    ``area_cost``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -34,6 +37,8 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     stage: int | None = None
     new_stage: bool = False
     new_splits: tuple[str, ...] = ()
+    utility_exchanger_id: str | None = None
+    utility_area: float = 0.0
 
 
 class HeatExchangerNetworkRetrofitDesign(BaseModel):

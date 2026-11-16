@@ -532,10 +532,28 @@ Relocation
    on the Ciric and Floudas case with 30 candidates it takes 319 solves
    instead of 48, and leaves the frontier unchanged, since most moves strand
    a stream whose utility exchanger is already at its area.
+New utility exchangers
+   A new heater or cooler never lowers utility cost by itself, but it can
+   free the recovery units a move needs: a cooler on a hot stream that has
+   none lets that stream's recovery exchangers give up duty. With
+   ``new_utility_units=True`` each new match and relocation is also tried
+   together with each new end heater (on a cold stream without one) or
+   cooler (on a hot stream without one). The pair is one modification: one
+   more ``new_unit_cost`` plus the utility exchanger's area, reported as
+   ``utility_exchanger_id`` and ``utility_area``. A pair whose utility
+   exchanger carries no duty is dropped. On the Ciric and Floudas case a
+   cooler on H3 lets a new H1-C2 match in a new third stage save about
+   $836k/y instead of $222k/y alone.
 
-Not yet covered: new utility exchangers and moving utility exchangers. Area
-reduction is not a move: an exchanger may always run below its area, and
-existing area is sunk.
+Not yet covered: moving or repiping utility exchangers, and utility
+exchangers placed between stages. Area reduction is not a move: an exchanger
+may always run below its area, and existing area is sunk.
+
+The new-match screen ranks matches by the heat they could recover where they
+sit, which can miss the best ones: on the Ciric and Floudas case, trying all
+24 positions (``new_match_candidates=24``) finds a four-step design worth
+about $1.76M/y against $848k/y with the default four, in 258 solves rather
+than 48.
 
 Serialized Network Input
 ------------------------
