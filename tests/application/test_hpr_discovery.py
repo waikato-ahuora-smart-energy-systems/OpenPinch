@@ -272,3 +272,53 @@ def test_a_request_naming_another_period_than_the_call_is_rejected():
         problem.target.heat_pump_and_refrigeration(
             request=HprTargetRequest(period_id="peak"), period_id="base"
         )
+
+
+def test_a_new_cycles_recorded_run_replays_as_that_cycle(demo_cycle):
+    # carnot is not registered here, so a replay falling back to the default
+    # cycle would fail.
+    from OpenPinch.application._problem.periods import (
+        aggregation as period_aggregation,
+    )
+
+    problem = PinchProblem("basic_pinch.json")
+    problem.target.heat_pump_and_refrigeration(demo_cycle, **CHEAP)
+    spec = problem._last_target_run_spec
+
+    replayed = period_aggregation.target_output_for_recorded_period(problem, spec, "0")
+
+    assert any(target.hpr_success for target in replayed.targets)
+
+
+def test_a_recorded_named_run_replays_its_own_topology(monkeypatch):
+    # Replaying a recorded run used to fail on the HPR_TYPE it recorded, and
+    # the named method's defaults would have replayed a parallel run as a
+    # cascade.
+    from OpenPinch.application._problem.periods import (
+        aggregation as period_aggregation,
+    )
+
+    problem = PinchProblem("basic_pinch.json")
+    problem.target.carnot_heat_pump(
+        is_cascade_cycle=False,
+        load_fraction=0.25,
+        condensers=1,
+        evaporators=1,
+        maximum_restarts=1,
+    )
+    spec = problem._last_target_run_spec
+    seen = []
+    real = _TargetAccessor._execute
+
+    def capture(self, **kwargs):
+        # The recorded options come back as options; the method's own
+        # configuration wins over them.
+        seen.append(dict(kwargs["options"] or {}) | dict(kwargs["configuration"]))
+        return real(self, **kwargs)
+
+    monkeypatch.setattr(_TargetAccessor, "_execute", capture)
+
+    period_aggregation.target_output_for_recorded_period(problem, spec, "0")
+
+    assert seen[-1]["HPR_TYPE"] == "Parallel Carnot cycles"
+    assert seen[-1]["HPR_LOAD_FRACTION"] == 0.25

@@ -38,6 +38,10 @@ from ....contracts.hpr_performance_map import (
     HprPerformanceMapRequest,
 )
 from ....contracts.output import TargetOutput
+from ....domain.configuration_fields import (
+    CONFIG_FIELD_SPECS,
+    USER_CONFIG_FIELD_SPECS,
+)
 from ....domain.enums import (
     HeatPumpAndRefrigerationCycle,
     TargetType,
@@ -122,6 +126,10 @@ def _set_if_not_none(options: dict[str, Any], key: str, value: Any) -> None:
     if value is not None:
         options[key] = value
 
+
+# A recorded gateway run keeps the request's cycle, duty, topology and
+# placement under this key of its recorded options, for replay.
+_GATEWAY_REPLAY_KEY = "hpr_gateway"
 
 # The named method each registered cycle and duty had before the gateway: a
 # gateway run records it as its surface, so recorded runs replay through it.
@@ -372,6 +380,7 @@ class _TargetAccessor:
         period_id: str | None,
         direct_service=None,
         indirect_service=None,
+        record_options: Mapping[str, Any] | None = None,
     ) -> BaseTargetModel:
         from ...residual_utility import residual_basis, residual_utility_service
 
@@ -403,9 +412,16 @@ class _TargetAccessor:
                 direct_service_func=direct_service,
                 indirect_service_func=indirect_service,
             )
+        # Options the method selects itself (HPR_TYPE, ORC_MODEL) cannot be
+        # passed back to it, so a replay leaves them to the method.
+        recorded = {
+            key: value
+            for key, value in {**config_overrides, **runtime}.items()
+            if not (key in CONFIG_FIELD_SPECS and key not in USER_CONFIG_FIELD_SPECS)
+        }
         self._problem._record_target_run(
             surface,
-            options={**config_overrides, **runtime},
+            options=recorded | dict(record_options or {}),
             zone_name=zone.name if hasattr(zone, "name") else zone,
             include_subzones=include_subzones,
         )
@@ -649,6 +665,7 @@ class _TargetAccessor:
         maximum_evaluations: int | None = None,
         extra_configuration: Mapping[str, Any] | None = None,
         simulation_backend: str | None = None,
+        record_options: Mapping[str, Any] | None = None,
     ) -> BaseTargetModel:
         require_available(f"target.{surface}")
         normalized_backend = (
@@ -720,6 +737,7 @@ class _TargetAccessor:
             period_id=period_id,
             direct_service=None if is_utility else direct_service,
             indirect_service=indirect_service if is_utility else None,
+            record_options=record_options,
         )
 
     def _fluid_set_runs(
@@ -747,18 +765,29 @@ class _TargetAccessor:
         )
         method = getattr(self, surface)
 
+        def run(fluids, condensers, evaporators, mvr_stages):
+            if mvr_stages is not None:
+                arguments["mvr_stages"] = mvr_stages
+            return method(
+                **arguments,
+                refrigerants=fluids,
+                condensers=condensers,
+                evaporators=evaporators,
+            )
+
+        return self._run_fluid_sets(plan, run)
+
+    def _run_fluid_sets(self, plan, run):
+        """Run each planned fluid set with ``run(fluids, condensers,
+        evaporators, mvr_stages)``, keeping the last successful run's state."""
+
         def solve(item):
-            if item.mvr_stages is not None:
-                arguments["mvr_stages"] = item.mvr_stages
             # A run that raises commits nothing; one that reports failure has
             # committed, so the problem goes back to the last successful run.
             before = snapshot_problem(self._problem)
             period_states = dict(self._problem._period_states)
-            target = method(
-                **arguments,
-                refrigerants=list(item.fluids),
-                condensers=item.condensers,
-                evaporators=item.evaporators,
+            target = run(
+                list(item.fluids), item.condensers, item.evaporators, item.mvr_stages
             )
             if not target.hpr_success:
                 commit_problem(self._problem, before)
@@ -798,6 +827,12 @@ class _TargetAccessor:
         as one ``HprTargetRequest`` instead. Screened refrigerants run once
         per proposed fluid set, as the named methods do.
         """
+        if options is not None and _GATEWAY_REPLAY_KEY in options:
+            # A recorded run replayed: its cycle, duty, topology and placement.
+            options = dict(options)
+            recorded = options.pop(_GATEWAY_REPLAY_KEY)
+            cycle, duty = recorded["cycle"], recorded["duty"]
+            topology, placement = recorded["topology"], recorded["placement"]
         if request is None:
             request = HprTargetRequest.model_validate(
                 {
@@ -845,8 +880,10 @@ class _TargetAccessor:
         chosen = request.cycle_options or spec.options_model()
         if not isinstance(chosen, spec.options_model):
             try:
+                # The request already checked the options name this cycle.
+                fields = chosen if isinstance(chosen, dict) else chosen.model_dump()
                 chosen = spec.options_model.model_validate(
-                    chosen if isinstance(chosen, dict) else chosen.model_dump()
+                    {key: value for key, value in fields.items() if key != "cycle"}
                 )
             except ValidationError as error:
                 raise ValueError(
@@ -856,9 +893,11 @@ class _TargetAccessor:
         if backend is not None:
             backend = normalize_hpr_simulation_backend(backend)
         if is_screened(getattr(chosen, "refrigerants", None)):
-            return getattr(self, legacy)(
-                **_legacy_hpr_arguments(request, topology, chosen, zone)
-            )
+            if legacy is not None:
+                return getattr(self, legacy)(
+                    **_legacy_hpr_arguments(request, topology, chosen, zone)
+                )
+            return self._gateway_fluid_set_runs(spec, request, topology, chosen, zone)
         load = request.load
         levels = request.levels or HprLevels()
         limits = request.search or HprSearchLimits()
@@ -882,7 +921,63 @@ class _TargetAccessor:
             maximum_evaluations=limits.evaluations,
             extra_configuration=spec.to_configuration(chosen),
             simulation_backend=backend,
+            # A recorded run replays through its surface, the gateway reading
+            # its cycle, duty, topology and placement back from here.
+            record_options={
+                _GATEWAY_REPLAY_KEY: {
+                    "cycle": spec.id,
+                    "duty": request.duty,
+                    "topology": topology,
+                    "placement": request.placement,
+                }
+            },
         )
+
+    def _gateway_fluid_set_runs(self, spec, request, topology, cycle_options, zone):
+        """Run a cycle with no named method once per screened fluid set."""
+        methods = spec.screening_methods.get(topology)
+        if not methods:
+            raise ValueError(
+                f"the {spec.id} cycle has no fluid-set screening for the "
+                f"{topology} topology; pass a list of refrigerants."
+            )
+        if getattr(cycle_options, "mvr_fluids", None) is not None:
+            raise ValueError(
+                "mvr_fluids names the vapour compression fluids, which the "
+                "screened fluid sets choose; drop mvr_fluids."
+            )
+        levels = request.levels or HprLevels()
+        plan = plan_fluid_set_runs(
+            cycle_options.refrigerants,
+            methods=methods,
+            is_heat_pumping=request.duty == "heat_pump",
+            condensers=levels.condensers,
+            evaporators=levels.evaporators,
+            mvr_stages=getattr(cycle_options, "mvr_stages", None),
+        )
+
+        def run(fluids, condensers, evaporators, mvr_stages):
+            update = {"refrigerants": fluids}
+            if mvr_stages is not None:
+                update["mvr_stages"] = mvr_stages
+            return self.heat_pump_and_refrigeration(
+                spec.id,
+                duty=request.duty,
+                topology=topology,
+                placement=request.placement,
+                load=request.load,
+                levels=levels.model_copy(
+                    update={"condensers": condensers, "evaporators": evaporators}
+                ),
+                cycle_options=cycle_options.model_copy(update=update),
+                search=request.search,
+                zone=zone,
+                include_subzones=request.include_subzones,
+                period_id=request.period_id,
+                options=request.options,
+            )
+
+        return self._run_fluid_sets(plan, run)
 
     def hpr_cycles(self) -> HprCycleCatalog:
         """Every registered heat pump and refrigeration cycle.

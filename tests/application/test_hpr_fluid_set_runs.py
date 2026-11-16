@@ -402,3 +402,46 @@ def test_mvr_fluids_cannot_replace_the_screened_fluid_sets(calls):
         )
 
     assert calls == []
+
+
+@pytest.fixture
+def screened_cycle(monkeypatch):
+    """vapour_compression registered as a new cycle with no named method."""
+    from dataclasses import replace
+    from typing import Literal
+
+    from OpenPinch.analysis.heat_pumps.cycles import registry
+    from OpenPinch.contracts.hpr import VapourCompressionCycleOptions
+
+    class DemoOptions(VapourCompressionCycleOptions):
+        cycle: Literal["vc_demo"] = "vc_demo"
+
+    spec = registry.cycle_spec("vapour_compression")
+    cycles = {
+        name: other
+        for name, other in registry._REGISTRY.items()
+        if name != "vapour_compression"
+    }
+    monkeypatch.setattr(registry, "_REGISTRY", cycles)
+    registry.register_cycle(replace(spec, id="vc_demo", options_model=DemoOptions))
+    return "vc_demo"
+
+
+def test_a_new_cycle_runs_a_screen_through_the_gateway(calls, screened_cycle):
+    runs = PinchProblem().target.heat_pump_and_refrigeration(
+        screened_cycle, cycle_options={"refrigerants": _screen()}
+    )
+
+    assert isinstance(runs, HprFluidSetRunsResult)
+    assert [_refrigerants(call) for call in calls] == [
+        ["Ammonia"],
+        ["n-Butane"],
+        ["n-Butane", "Ammonia"],
+        ["n-Butane", "Isobutane"],
+    ]
+    assert [(call["condensers"], call["evaporators"]) for call in calls] == [
+        (1, 1),
+        (1, 1),
+        (2, 1),
+        (2, 1),
+    ]

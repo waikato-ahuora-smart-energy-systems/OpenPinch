@@ -807,14 +807,18 @@ class HprLevels(_RequestModel):
 
 
 class HprSearchLimits(_RequestModel):
-    """Optimisation limits: multistart restarts, iterations and evaluations."""
+    """Optimisation limits: multistart restarts (0 for the first start only),
+    iterations and evaluations."""
 
-    restarts: int | None = Field(default=None, strict=True, ge=1)
+    # 0 runs the first start only, as HPR_MAX_MULTISTART does.
+    restarts: int | None = Field(default=None, strict=True, ge=0)
     iterations: int | None = Field(default=None, strict=True, ge=1)
     evaluations: int | None = Field(default=None, strict=True, ge=1)
 
 
 _Efficiency = Field(default=None, gt=0.0, le=1.0)
+# 0 means no expander recovery, as HPR_ETA_EXP allows.
+_ExpanderEfficiency = Field(default=None, ge=0.0, le=1.0)
 
 
 class CarnotCycleOptions(_RequestModel):
@@ -822,7 +826,7 @@ class CarnotCycleOptions(_RequestModel):
 
     cycle: Literal["carnot"] = "carnot"
     compressor_efficiency: float | None = _Efficiency
-    expander_efficiency: float | None = _Efficiency
+    expander_efficiency: float | None = _ExpanderEfficiency
 
 
 class VapourCompressionCycleOptions(_RequestModel):
@@ -835,7 +839,7 @@ class VapourCompressionCycleOptions(_RequestModel):
 
     cycle: Literal["vapour_compression"] = "vapour_compression"
     compressor_efficiency: float | None = _Efficiency
-    expander_efficiency: float | None = _Efficiency
+    expander_efficiency: float | None = _ExpanderEfficiency
     refrigerants: Any = None
     initialize_from_carnot: bool | None = None
     sort_refrigerants: bool | None = None
@@ -862,7 +866,7 @@ class BraytonCycleOptions(_RequestModel):
 
     cycle: Literal["brayton"] = "brayton"
     compressor_efficiency: float | None = _Efficiency
-    expander_efficiency: float | None = _Efficiency
+    expander_efficiency: float | None = _ExpanderEfficiency
 
 
 HprCycleOptions = Annotated[
@@ -900,6 +904,16 @@ class HprTargetRequest(_RequestModel):
     @model_validator(mode="before")
     @classmethod
     def _options_name_the_cycle(cls, data):
+        options = data.get("cycle_options") if isinstance(data, dict) else None
+        if isinstance(options, BaseModel) and type(options) not in (
+            CarnotCycleOptions,
+            VapourCompressionCycleOptions,
+            MvrCycleOptions,
+            BraytonCycleOptions,
+        ):
+            # A registered cycle's own options model: the gateway validates
+            # its fields with that model.
+            data = data | {"cycle_options": options.model_dump()}
         if isinstance(data, dict) and isinstance(data.get("cycle_options"), dict):
             options = dict(data["cycle_options"])
             options.setdefault("cycle", data.get("cycle", "carnot"))
