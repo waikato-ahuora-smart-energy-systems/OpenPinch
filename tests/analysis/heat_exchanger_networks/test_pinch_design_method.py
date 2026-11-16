@@ -1172,6 +1172,16 @@ def test_local_executor_copies_the_master_zone_once_per_stage(monkeypatch) -> No
     assert len(reads) == 1
 
 
+def test_shared_zone_problem_keeps_the_validated_input_records() -> None:
+    # Solver arrays keep the input order and supplied flow rates from these.
+    problem = _four_stream_problem()
+    expected = problem_to_solver_arrays(problem, 10.0).axis_maps
+    shared = executor_module._ZoneCopiedOnce(problem)
+
+    assert shared._validated_data is problem._validated_data
+    assert problem_to_solver_arrays(shared, 10.0).axis_maps == expected
+
+
 def test_local_executor_passes_user_solver_options_to_internal_problem() -> None:
     problem = _four_stream_problem(
         options={

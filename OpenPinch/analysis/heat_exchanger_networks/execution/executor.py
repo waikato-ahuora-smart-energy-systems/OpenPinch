@@ -554,10 +554,17 @@ class _ZoneCopiedOnce:
     read, and building one stage's tasks reads it many times for settings
     and solver arrays, none of which change it. Readers share this copy;
     the pinch design decomposition makes its own before changing a zone.
+    Every other attribute, such as the validated input records the solver
+    arrays order streams by, is the problem's own.
     """
 
     def __init__(self, problem) -> None:
         self._problem = problem
+
+    def __getattr__(self, name: str):
+        if name == "_problem":
+            raise AttributeError(name)
+        return getattr(self._problem, name)
 
     @cached_property
     def master_zone(self):
