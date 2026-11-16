@@ -318,6 +318,28 @@ def test_retrofit_search_needs_the_installed_area_of_every_existing_unit():
         run_retrofit_search(_case_problem(), network, RetrofitSettings())
 
 
+def test_retrofit_search_needs_unique_exchanger_ids():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    network = _existing_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"exchanger_id": "E1"})
+                if e.exchanger_id == "E4"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="unique.*E1"):
+        run_retrofit_search(_case_problem(), network, RetrofitSettings())
+
+
 @pytest.mark.parametrize("fraction", [-0.1, float("nan"), float("inf")])
 def test_retrofit_search_rejects_a_cap_that_is_not_finite_and_non_negative(
     fraction,

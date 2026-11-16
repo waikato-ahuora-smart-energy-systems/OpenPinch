@@ -114,6 +114,13 @@ def run_retrofit_search(
             "retrofit needs the installed area of every existing exchanger; "
             "none on " + ", ".join(missing) + "."
         )
+    ids = [str(e.exchanger_id) for e in _structural_exchangers(existing)]
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    if duplicates:
+        raise ValueError(
+            "retrofit needs a unique id on every existing exchanger; "
+            "repeated: " + ", ".join(duplicates) + "."
+        )
     ensure_target_results(problem, {}, None)
     evaluator = _Evaluator(problem, existing, settings)
     base = evaluator.evaluate(_State(existing, frozenset(), ()))
