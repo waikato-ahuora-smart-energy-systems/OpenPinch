@@ -215,9 +215,21 @@ def _index(values: Any, *indexes: int | None) -> Any:
     return current
 
 
+_NO_VALUE = object()
+
+
 def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
+    if value.__class__ is float:
+        return value
+    # A solved Pyomo variable or parameter holds its number in ``value``;
+    # reading it before asking what the object is saves two lookups and two
+    # calls on every read. Indexed components and expressions have no
+    # ``value`` and take the paths below.
+    number = getattr(value, "value", _NO_VALUE)
+    if number is not _NO_VALUE:
+        return _optional_float(number)
     if _is_scalar_pyomo_value(value):
         # Pyomo disables float() with an error message that names the
         # component, which is slow to build; read the value directly.
