@@ -104,6 +104,7 @@ UNDER_DEVELOPMENT_METHODS = frozenset(
         "organic_rankine_cycle",
         "grand_composite_curve_with_orc",
         "net_load_profiles_with_orc",
+        "retrofit",
     }
 )
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"

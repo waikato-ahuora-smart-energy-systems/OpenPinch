@@ -12,6 +12,7 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+    from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitResult
     from ....contracts.synthesis.view import (
         HeatExchangerNetworkGridLayout,
         HeatExchangerNetworkView,
@@ -46,6 +47,57 @@ class UtilityChoiceError(ValueError):
 def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
     if value is not None:
         values[key] = value
+
+
+_RECOVERY_ENTRY_KEYS = frozenset({"hot", "cold", "stage", "area", "id"})
+_UTILITY_ENTRY_KEYS = frozenset({"stream", "utility", "stage", "area", "id"})
+
+
+def _entry_extra(entry: Mapping[str, Any], allowed, kind: str) -> dict[str, Any]:
+    unknown = sorted(str(key) for key in entry if key not in allowed)
+    if unknown:
+        raise ValueError(
+            f"a {kind} entry accepts {', '.join(sorted(allowed))}; got "
+            + ", ".join(unknown)
+            + "."
+        )
+    extra: dict[str, Any] = {}
+    if entry.get("area") is not None:
+        extra["area"] = float(entry["area"])
+    if entry.get("id") is not None:
+        extra["exchanger_id"] = str(entry["id"])
+    return extra
+
+
+def _recovery_entry(entry) -> tuple[Any, dict[str, Any]]:
+    """A recovery entry as a ``(hot, cold, stage)`` placement and extras."""
+
+    if not isinstance(entry, Mapping):
+        return entry, {}
+    extra = _entry_extra(entry, _RECOVERY_ENTRY_KEYS, "recovery")
+    return (entry["hot"], entry["cold"], entry["stage"]), extra
+
+
+def _utility_entry(entry, default: str | None, side: str) -> tuple[Any, dict]:
+    """A heater or cooler entry as a placement and extras."""
+
+    if not isinstance(entry, Mapping):
+        return entry, {}
+    extra = _entry_extra(entry, _UTILITY_ENTRY_KEYS, side[:-1])
+    utility = entry.get("utility") or default
+    if entry.get("stage") is None:
+        return (entry["stream"], utility), extra
+    return (entry["stream"], utility, entry["stage"]), extra
+
+
+def _names_no_utility(entries) -> bool:
+    """Whether a heater or cooler entry leaves its utility to the default."""
+
+    return any(
+        isinstance(entry, str)
+        or (isinstance(entry, Mapping) and entry.get("utility") is None)
+        for entry in entries
+    )
 
 
 class HeatExchangerNetworkDesignView:
@@ -827,22 +879,141 @@ class _DesignAccessor:
             )
         if "recovery" not in structure:
             raise ValueError("network structure needs a 'recovery' list.")
-        heaters = tuple(structure.get("heaters", ()))
-        coolers = tuple(structure.get("coolers", ()))
         hot_utility = structure.get("hot_utility")
         cold_utility = structure.get("cold_utility")
-        if hot_utility is None and any(isinstance(e, str) for e in heaters):
+        if hot_utility is None and _names_no_utility(structure.get("heaters", ())):
             hot_utility = self._only_utility("Hot")
-        if cold_utility is None and any(isinstance(e, str) for e in coolers):
+        if cold_utility is None and _names_no_utility(structure.get("coolers", ())):
             cold_utility = self._only_utility("Cold")
-        return HeatExchangerNetwork.from_structure(
-            recovery=tuple(structure["recovery"]),
-            heaters=heaters,
-            coolers=coolers,
+        recovery = [_recovery_entry(entry) for entry in structure["recovery"]]
+        heaters = [
+            _utility_entry(entry, hot_utility, "heaters")
+            for entry in structure.get("heaters", ())
+        ]
+        coolers = [
+            _utility_entry(entry, cold_utility, "coolers")
+            for entry in structure.get("coolers", ())
+        ]
+        network = HeatExchangerNetwork.from_structure(
+            recovery=tuple(placement for placement, _ in recovery),
+            heaters=tuple(placement for placement, _ in heaters),
+            coolers=tuple(placement for placement, _ in coolers),
             hot_utility=hot_utility,
             cold_utility=cold_utility,
             stage_count=structure.get("stage_count"),
         )
+        # from_structure keeps the order: recovery, heaters, then coolers.
+        extras = [extra for _, extra in recovery + heaters + coolers]
+        return network.model_copy(
+            update={
+                "exchangers": tuple(
+                    exchanger.model_copy(update=extra) if extra else exchanger
+                    for exchanger, extra in zip(network.exchangers, extras, strict=True)
+                )
+            }
+        )
+
+    def retrofit(
+        self,
+        existing: "HeatExchangerNetwork | Mapping[str, Any]",
+        *,
+        max_modifications: int = 3,
+        beam_width: int = 3,
+        new_match_candidates: int = 4,
+        area_tolerance: float = 0.02,
+        min_approach_temperature: float | None = None,
+        new_unit_cost: float | None = None,
+        area_addition_cost: float = 0.0,
+        split_cost: float = 0.0,
+        options: Mapping[str, Any] | None = None,
+        solver=None,
+        solve_tolerance=None,
+    ) -> "HeatExchangerNetworkRetrofitResult":
+        """Find cost-effective modifications of an existing network.
+
+        ``existing`` is the network as built: a ``HeatExchangerNetwork`` or a
+        mapping as for ``optimise_duties``, in which entries may be mappings
+        carrying the installed ``area`` (m2) and an ``id``::
+
+            {
+                "recovery": [
+                    {"hot": "H1", "cold": "C1", "stage": 1, "area": 120.0,
+                     "id": "E1"},
+                ],
+                "heaters": [{"stream": "C1", "area": 30.0}],
+                "coolers": [{"stream": "H1", "utility": "CW", "area": 60.0}],
+            }
+
+        Every exchanger needs its installed area. The existing network is
+        rated at its areas (widened by ``area_tolerance``), then modified one
+        step at a time, up to ``max_modifications``: more area on an existing
+        exchanger whose duty its area limits, or a new match (screened by the
+        heat it could recover where it sits). Each step keeps the
+        ``beam_width`` designs with the best net annual benefit and tries
+        ``new_match_candidates`` new matches from each.
+
+        Added area costs ``COSTING_HX_AREA_COEFF * area **
+        COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
+        ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
+        added area on an existing exchanger adds ``area_addition_cost``, all
+        in $ and annualised with the capital recovery factor.
+
+        Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
+        the best design for each number of modifications (0 is the existing
+        network) with its savings, capital, payback and modifications, and
+        ``selected`` the one with the best net annual benefit. The problem's
+        cached design is not changed. Requires the optional synthesis
+        dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
+        """
+
+        from ....analysis.heat_exchanger_networks.duty_optimisation import (
+            DEFAULT_FEASIBILITY_APPROACH,
+        )
+        from ....analysis.heat_exchanger_networks.retrofit.search import (
+            RetrofitSettings,
+            run_retrofit_search,
+        )
+        from ..targeting.execution import walk_zone_tree
+        from ..targeting.state import commit_problem, snapshot_problem
+
+        if isinstance(existing, Mapping):
+            existing = self._network_from_structure(existing)
+        _runtime, configuration = self._arguments(
+            options=options, period_id=None, solve_tolerance=solve_tolerance
+        )
+        if solver is not None:
+            configuration["HENS_SOLVER_EVM"] = solver
+        isolated = snapshot_problem(self._problem)
+        root = isolated._build_execution_master_zone()
+        stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
+        with temporary_zone_configuration(root, configuration):
+            unit_cost = (
+                isolated.master_zone.config.costing.hx_unit_cost
+                if new_unit_cost is None
+                else new_unit_cost
+            )
+            result = run_retrofit_search(
+                isolated,
+                existing,
+                RetrofitSettings(
+                    max_modifications=max_modifications,
+                    beam_width=beam_width,
+                    new_match_candidates=new_match_candidates,
+                    area_tolerance=area_tolerance,
+                    approach=(
+                        DEFAULT_FEASIBILITY_APPROACH
+                        if min_approach_temperature is None
+                        else min_approach_temperature
+                    ),
+                    new_unit_cost=float(unit_cost),
+                    area_addition_cost=float(area_addition_cost),
+                    split_cost=float(split_cost),
+                ),
+            )
+        for zone in walk_zone_tree(isolated._master_zone):
+            zone.config = stored_configs[zone.address]
+        commit_problem(self._problem, isolated)
+        return result
 
     def _only_utility(self, kind: str) -> str:
         data = self._problem._validated_data

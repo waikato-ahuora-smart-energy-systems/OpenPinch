@@ -425,6 +425,102 @@ solver is ``HENS_SOLVER_EVM`` unless ``solver`` is passed. The network grid
 draws each utility exchanger where it sits: at the stream end or on the
 stage boundary it follows, with exchangers in series side by side.
 
+Retrofit of an Existing Network
+-------------------------------
+
+``design.retrofit`` starts from an existing network and finds cost-effective
+modifications that recover more heat. Give the network as for
+``optimise_duties``, with every exchanger's installed area in m2: entries may
+be mappings with ``area`` and an optional ``id`` (a plant tag), or a
+``HeatExchangerNetwork`` whose exchangers carry ``area``. The example is
+Example 1 of Hallberg and Scribner (2009), adapted from Ciric and Floudas
+(1989); its case file is ``tests/fixtures/retrofit``.
+
+.. code-block:: python
+
+   existing = {
+       "recovery": [
+           {"hot": "H3", "cold": "C2", "stage": 1, "area": 609.7, "id": "E1"},
+           {"hot": "H3", "cold": "C1", "stage": 2, "area": 579.2, "id": "E2"},
+           {"hot": "H1", "cold": "C1", "stage": 1, "area": 1008.5, "id": "E3"},
+           {"hot": "H2", "cold": "C2", "stage": 2, "area": 117.96, "id": "E4"},
+       ],
+       "heaters": [{"stream": "C2", "area": 246.75, "id": "E7"}],
+       "coolers": [
+           {"stream": "H1", "area": 787.5, "id": "E5"},
+           {"stream": "H2", "area": 104.6, "id": "E6"},
+       ],
+   }
+
+   result = problem.design.retrofit(
+       existing,
+       max_modifications=3,
+       area_addition_cost=8_650.0,
+       split_cost=10_000.0,
+   )
+   for design in result.frontier:
+       print(
+           design.modification_count,
+           round(design.annual_savings),
+           round(design.capital_cost),
+           design.payback_years,
+       )
+   best = result.selected
+
+The method follows network evolution, one modification at a time:
+
+1. The existing network is rated: every exchanger is held to its installed
+   area and the duties minimise utility cost. This is the base case; its
+   utility cost is the reference for savings.
+2. Each step tries, from every design kept so far, added area on each
+   existing exchanger whose duty is limited by its area, and the most
+   promising new matches. New matches are screened by the heat they could
+   recover where they would sit, joining a stage (which may split a stream)
+   or in a new stage between two existing ones.
+3. Each candidate is solved on the fixed-structure model: existing exchangers
+   keep their installed area unless they are given more, new exchangers are
+   sized, and the objective is utility cost plus the annualised cost of the
+   added area. Candidates are ranked by net annual benefit, savings less the
+   annualised capital, and the best ``beam_width`` go on to the next step.
+
+``result.frontier`` holds the best design found for each number of
+modifications, from the existing network (0) up to ``max_modifications``, so
+the trade-off between the size of the retrofit and its benefit is visible.
+A design no better than one with fewer modifications is marked
+``dominated``. ``result.selected`` is the design with the best net annual
+benefit.
+
+Each design lists its ``modifications`` (``"new_match"`` or
+``"area_addition"``, the exchanger, the added area, fixed and area cost, and
+any new splits), the rated network, hot and cold utility (kW), utility cost,
+annual savings, capital cost ($), annualised capital and net annual benefit
+($/y), and the simple payback in years.
+
+Costs
+   Added area, on an existing or a new exchanger, costs
+   ``COSTING_HX_AREA_COEFF * area ** COSTING_HX_AREA_EXP``; existing area is
+   sunk. A new exchanger adds ``new_unit_cost`` (default
+   ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits; more
+   area on an existing exchanger adds ``area_addition_cost``. Capital is
+   annualised with the capital recovery factor of ``COSTING_DISCOUNT_RATE``
+   and ``COSTING_SERVICE_LIFE``.
+Area tolerance
+   Plant areas are rounded and the solver uses Chen's LMTD approximation, so
+   an existing network may fall just short of its own duties at its exact
+   areas. ``area_tolerance`` (default 0.02) widens every installed area by
+   that fraction. An existing network that still cannot meet its targets
+   raises ``ValueError``.
+Search size
+   ``beam_width`` (default 3) designs are kept per step and
+   ``new_match_candidates`` (default 4) new matches are tried from each, so a
+   step solves up to ``beam_width * (existing exchangers +
+   new_match_candidates)`` small NLPs. ``min_approach_temperature`` (default
+   1 K) applies to every exchanger.
+
+Not yet covered: moving an existing exchanger to another match (relocation),
+repiping an existing match to another position, area reduction, and new
+utility exchangers.
+
 Serialized Network Input
 ------------------------
 
