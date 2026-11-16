@@ -43,6 +43,25 @@ def test_param_is_a_fixed_value_that_can_be_changed():
     assert pyo.value(selector) == pytest.approx(0.0)
 
 
+def test_params_come_from_preallocated_blocks_and_unused_entries_stay_out(
+    tmp_path,
+):
+    # Adding to a VarList one parameter at a time cost several seconds per
+    # large design; parameters are handed out from blocks allocated ahead.
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0, ub=5.0)
+    parameters = [model.Param(value=float(index)) for index in range(3)]
+    model.Equation(x >= parameters[2])
+    model.Minimize(x)
+
+    block = parameters[0].parent_component()
+    assert all(parameter.parent_component() is block for parameter in parameters)
+    assert len(block) > len(parameters)
+    assert [pyo.value(parameter) for parameter in parameters] == [0.0, 1.0, 2.0]
+    assert all(parameter.fixed for parameter in parameters)
+    model.model.write(str(tmp_path / "model.nl"))
+
+
 def test_equations_become_constraints_of_the_model():
     model = PyomoModel()
     x = model.Var(value=0.0, lb=0.0, ub=5.0)
