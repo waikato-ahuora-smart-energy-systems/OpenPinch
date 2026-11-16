@@ -218,6 +218,10 @@ def _index(values: Any, *indexes: int | None) -> Any:
 def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
+    if _is_scalar_pyomo_value(value):
+        # Pyomo disables float() with an error message that names the
+        # component, which is slow to build; read the value directly.
+        return _optional_float(value.value)
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -230,6 +234,17 @@ def _optional_float(value: Any) -> float | None:
     if value_attr is not None:
         return _optional_float(value_attr)
     return None
+
+
+def _is_scalar_pyomo_value(value: Any) -> bool:
+    is_numeric_type = getattr(value, "is_numeric_type", None)
+    is_indexed = getattr(value, "is_indexed", None)
+    return (
+        callable(is_numeric_type)
+        and callable(is_indexed)
+        and is_numeric_type()
+        and not is_indexed()
+    )
 
 
 def _optional_int(value: Any) -> int | None:

@@ -8,7 +8,7 @@ from ....domain.enums import HeatExchangerKind, StreamID
 from ....domain.heat_exchanger import HeatExchanger
 from ..solver.arrays import PreparedSolverArrays
 from .metadata import _allowed, _index, _optional_float, _optional_int, _third_dimension
-from .period_state import _recovery_period_state
+from .period_state import _recovery_period_activity, _recovery_period_state
 from .segment_area import _recovery_segment_contributions
 
 
@@ -36,6 +36,20 @@ def _recovery_exchangers(
     for i, hot_stream in enumerate(hot_streams):
         for j, cold_stream in enumerate(cold_streams):
             for k in range(stages):
+                if not include_inactive and not any(
+                    _recovery_period_activity(
+                        solved_model,
+                        period_idx=period_idx,
+                        hot_index=i,
+                        cold_index=j,
+                        stage_index=k,
+                        q_values=q_values,
+                        q_values_by_period=q_values_by_period,
+                        tolerance=tolerance,
+                    )[1]
+                    for period_idx in range(len(period_ids))
+                ):
+                    continue
                 states = tuple(
                     _recovery_period_state(
                         solved_model,
@@ -50,8 +64,6 @@ def _recovery_exchangers(
                     )
                     for period_idx, period_id in enumerate(period_ids)
                 )
-                if not any(state.active for state in states) and not include_inactive:
-                    continue
                 stage = k + 1
                 segment_contributions = _recovery_segment_contributions(
                     solved_model,

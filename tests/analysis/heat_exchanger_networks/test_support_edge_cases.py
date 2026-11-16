@@ -938,3 +938,40 @@ def test_seed_network_json_keeps_the_dt_cont_multiplier_it_was_solved_at():
     seed = HeatExchangerNetwork.model_validate(network.model_dump(mode="json"))
 
     assert dt_cont_multiplier_from_network(seed, _settings()) == 1.4
+
+
+class _ScalarPyomoValue:
+    """A scalar Pyomo numeric value whose ``float()`` is disabled, as in Pyomo."""
+
+    value = 2.5
+
+    def is_numeric_type(self) -> bool:
+        return True
+
+    def is_indexed(self) -> bool:
+        return False
+
+    def __float__(self) -> float:
+        raise AssertionError("extraction should read .value, not call float()")
+
+
+def test_extraction_reads_a_scalar_pyomo_value_without_float_conversion():
+    # Pyomo's disabled float() builds a long error message naming the
+    # component; trying it first cost about half the pulp mill's design time.
+    assert extraction_metadata._optional_float(_ScalarPyomoValue()) == 2.5
+
+
+def test_extraction_reads_pyomo_variables_parameters_and_unset_values():
+    pyo = pytest.importorskip("pyomo.environ")
+    model = pyo.ConcreteModel()
+    model.I = pyo.RangeSet(0, 1)
+    model.x = pyo.Var(model.I, initialize={0: 3.0, 1: 4.0})
+    model.s = pyo.Var(initialize=5.0)
+    model.p = pyo.Param(model.I, initialize=1.5, mutable=True)
+    model.unset = pyo.Var()
+
+    assert extraction_metadata._optional_float(model.x[1]) == 4.0
+    assert extraction_metadata._optional_float(model.x) == 3.0
+    assert extraction_metadata._optional_float(model.s) == 5.0
+    assert extraction_metadata._optional_float(model.p[0]) == 1.5
+    assert extraction_metadata._optional_float(model.unset) is None
