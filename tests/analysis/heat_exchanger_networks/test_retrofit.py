@@ -438,8 +438,9 @@ def test_the_frontier_marks_designs_no_better_than_fewer_modifications():
         run_retrofit_search,
     )
 
-    # Costly added area: one modification loses money against the existing
-    # network, and a fourth adds less than it costs.
+    # Costly added area and new units: every modification loses money
+    # against the existing network. (Costly added area alone no longer does:
+    # the screen, ranked by utility relief, finds new matches that pay.)
     result = run_retrofit_search(
         _case_problem(),
         _existing_network(),
@@ -447,7 +448,7 @@ def test_the_frontier_marks_designs_no_better_than_fewer_modifications():
             max_modifications=4,
             beam_width=2,
             new_match_candidates=4,
-            **(REPORT_COSTS | {"area_addition_cost": 2e6}),
+            **(REPORT_COSTS | {"area_addition_cost": 2e6, "new_unit_cost": 2e6}),
         ),
     )
 
@@ -650,12 +651,13 @@ def test_batch_design_retrofit_runs_on_every_selected_case():
 @pytest.mark.solver
 @_needs_live_solver
 def test_design_retrofit_caps_added_area_like_the_report():
-    # The report allows at most 20% more area on an existing exchanger.
+    # The report allows at most 20% more area on an existing exchanger. New
+    # units are priced out so the frontier is made of area additions.
     result = _case_problem().design.retrofit(
         EXISTING_STRUCTURE,
         max_modifications=2,
         max_added_area_fraction=0.2,
-        **REPORT_COSTS,
+        **(REPORT_COSTS | {"new_unit_cost": 1e9}),
     )
 
     additions = [

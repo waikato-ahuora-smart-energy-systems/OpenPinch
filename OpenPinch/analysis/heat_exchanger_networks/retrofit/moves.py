@@ -118,8 +118,8 @@ def screen_new_matches(
     Every hot and cold stream pair is tried joining each stage and in a new
     stage at each position; a pair already matched in a stage is not
     proposed there again. Moves with positive ``match_potential`` are ranked
-    by potential, then fewest new splits, then stage, joining before a new
-    stage, and stream names.
+    by ``utility_relief``, then potential, then fewest new splits, then
+    stage, joining before a new stage, and stream names.
     """
 
     hot = sorted(name for name, (supply, target, _) in ends.items() if supply > target)
@@ -145,6 +145,7 @@ def screen_new_matches(
     ranked = sorted(
         ((potential, move) for potential, move in scored if potential > 0.0),
         key=lambda item: (
+            -utility_relief(network, item[1], item[0]),
             -item[0],
             len(new_splits(network, item[1])),
             item[1].stage,
@@ -177,6 +178,28 @@ def match_potential(
     cold = _cold_temperature(network, ends, move.cold, cold_boundary)
     capacity = min(ends[move.hot][2], ends[move.cold][2])
     return capacity * max(0.0, hot - cold - approach)
+
+
+def utility_relief(
+    network: HeatExchangerNetwork, move: NewMatch, potential: float
+) -> float:
+    """Utility a new match of ``potential`` could cut at first order.
+
+    Heat it moves cuts utility only as far as its hot stream is cooled and
+    its cold stream heated: the least of ``potential``, the hot stream's
+    cooler duty and the cold stream's heater duty, read from the first
+    period of solved ``network``.
+    """
+
+    def duty(kind: HeatExchangerKind, stream: str) -> float:
+        return sum(
+            e.period_states[0].duty
+            for e in network.exchangers
+            if e.kind is kind
+            and (e.source_stream if kind is COOLER else e.sink_stream) == stream
+        )
+
+    return min(potential, duty(COOLER, move.hot), duty(HEATER, move.cold))
 
 
 def _hot_temperature(network, ends, stream: str, stage: int) -> float:

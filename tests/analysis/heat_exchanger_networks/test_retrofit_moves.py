@@ -181,7 +181,7 @@ def test_match_potential_uses_the_stream_temperatures_at_the_position():
     assert potential("H2", "C1", 1, True) == 0.0
 
 
-def test_screen_ranks_new_matches_by_potential_then_fewest_splits():
+def test_screen_ranks_new_matches_by_utility_relief_then_potential():
     network = _solved_network()
 
     ranked = screen_new_matches(network, ENDS, approach=10.0, limit=2)
@@ -192,12 +192,17 @@ def test_screen_ranks_new_matches_by_potential_then_fewest_splits():
     #   H1-C2 at stage 1 (new or joining): min(10, 4) * (200 - 50 - 10) = 560
     #   H1-C1 below stage 1 (new stage 3, or joining stage 2):
     #       min(10, 8) * (140 - 40 - 10) = 720
-    #   H1-C1 in a new stage 2 (C1 at 77.5 C): 8 * (140 - 77.5 - 10) = 420
-    # So the two 720 kW moves lead, the new stage first because joining
-    # stage 2 splits C1.
+    # Ranked by potential alone the two 720 kW H1-C1 moves led. A new match
+    # first cuts utility only as far as its hot stream has cooling and its
+    # cold stream heating: H1 is cooled 400 kW, C1 heated 220 kW and C2
+    # 280 kW, so H1-C1 relieves min(720, 400, 220) = 220 kW and H1-C2 at
+    # stage 1 min(560, 400, 280) = 280 kW. The H1-C2 moves lead (a new stage
+    # first, since joining stage 1 splits H1); every H2 move relieves nothing,
+    # H2 having no cooler. This replaces ranking by potential alone, which
+    # tried matches that could not cut utility first.
     assert ranked == (
-        NewMatch("H1", "C1", 3, new_stage=True),
-        NewMatch("H1", "C1", 2, new_stage=False),
+        NewMatch("H1", "C2", 1, new_stage=True),
+        NewMatch("H1", "C2", 1, new_stage=False),
     )
     everything = screen_new_matches(network, ENDS, approach=10.0, limit=100)
     # An existing match is never proposed again in its own stage.

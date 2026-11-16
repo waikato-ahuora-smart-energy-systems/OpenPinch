@@ -474,9 +474,12 @@ The method follows network evolution, one modification at a time:
    utility cost is the reference for savings.
 2. Each step tries, from every design kept so far, added area on each
    existing exchanger whose duty is limited by its area, and the most
-   promising new matches. New matches are screened by the heat they could
-   recover where they would sit, joining a stage (which may split a stream)
-   or in a new stage between two existing ones. With ``relocation_cost``
+   promising new matches, joining a stage (which may split a stream) or in a
+   new stage between two existing ones. New matches are ranked by the
+   utility they could cut at first order: the heat they could recover where
+   they would sit, but no more than their hot stream's cooling or their cold
+   stream's heating. Ties, including matches that cut nothing directly, go
+   to the larger heat potential. With ``relocation_cost``
    set, a step may also move an existing recovery exchanger, with its
    installed area, to a screened match that shares one of its streams; its
    own pair at another position is a repiping.
@@ -549,11 +552,12 @@ Not yet covered: moving or repiping utility exchangers, and utility
 exchangers placed between stages. Area reduction is not a move: an exchanger
 may always run below its area, and existing area is sunk.
 
-The new-match screen ranks matches by the heat they could recover where they
-sit, which can miss the best ones: on the Ciric and Floudas case, trying all
-24 positions (``new_match_candidates=24``) finds a four-step design worth
-about $1.76M/y against $848k/y with the default four, in 258 solves rather
-than 48.
+The search is a greedy beam, so more candidates or ``new_utility_units`` do
+not always end better. On the Ciric and Floudas case with the report's costs
+and four modifications, the defaults reach about $1.83M/y (67 solves);
+eight new-match candidates end at $1.17M/y after a better first step; and
+trying all 24 positions with new utility exchangers reaches $1.97M/y (496
+solves). Compare a few settings on a real case.
 
 Serialized Network Input
 ------------------------
