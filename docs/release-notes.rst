@@ -150,6 +150,12 @@ Heat exchanger network synthesis
   in, and distinct target-meeting topologies rise from 87 to 93 in the same
   time; with 50 networks per multiplier, from 206 to 250 for about 20 %
   more time. The best network is unchanged or better on every case.
+- Extracting a network from a solved model is faster: it reads Pyomo values
+  directly rather than through ``float()``, which Pyomo disables with an
+  error message that is slow to build, and skips matches that carry no duty
+  in any period before reading their temperatures. On the pulp mill sample
+  case extraction drops from 213 s to 14 s (profiled), and a heat exchanger
+  network design from 137 s to 79 s, with the same network.
 
 0.9.0 (2026-11-14)
 ------------------

@@ -84,10 +84,9 @@ def _approach_temperatures(
     return tuple(value for value in values if value is not None)
 
 
-def _recovery_period_state(
+def _recovery_period_activity(
     solved_model: Any,
     *,
-    period_id: str,
     period_idx: int,
     hot_index: int,
     cold_index: int,
@@ -95,7 +94,8 @@ def _recovery_period_state(
     q_values: Any,
     q_values_by_period: Any,
     tolerance: float,
-) -> HeatExchangerPeriodState:
+) -> tuple[float, bool]:
+    """Return a recovery match's duty in one period and whether it is active."""
     duty_source = (
         _index(
             q_values_by_period,
@@ -112,6 +112,31 @@ def _recovery_period_state(
         duty,
         _index(getattr(solved_model, "z", None), hot_index, cold_index, stage_index),
         tolerance,
+    )
+    return duty, active
+
+
+def _recovery_period_state(
+    solved_model: Any,
+    *,
+    period_id: str,
+    period_idx: int,
+    hot_index: int,
+    cold_index: int,
+    stage_index: int,
+    q_values: Any,
+    q_values_by_period: Any,
+    tolerance: float,
+) -> HeatExchangerPeriodState:
+    duty, active = _recovery_period_activity(
+        solved_model,
+        period_idx=period_idx,
+        hot_index=hot_index,
+        cold_index=cold_index,
+        stage_index=stage_index,
+        q_values=q_values,
+        q_values_by_period=q_values_by_period,
+        tolerance=tolerance,
     )
     hot_boundaries = getattr(solved_model, "T_h_by_period", None)
     cold_boundaries = getattr(solved_model, "T_c_by_period", None)
