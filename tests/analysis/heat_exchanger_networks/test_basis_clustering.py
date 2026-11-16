@@ -88,3 +88,12 @@ def test_a_heavy_enough_period_becomes_its_clusters_medoid():
 def test_more_clusters_than_periods_is_rejected():
     with pytest.raises(ValueError, match="between 1 and 6"):
         weighted_k_medoids(FEATURES, WEIGHTS, 7)
+
+
+def test_identical_periods_as_medoids_each_keep_their_own_cluster():
+    features = np.array([[0.0, 0.0], [0.0, 0.0], [5.0, 5.0]])
+
+    result = weighted_k_medoids(features, np.ones(3), 3)
+
+    assert sorted(result.medoids) == [0, 1, 2]
+    assert sorted(result.labels) == [0, 1, 2]

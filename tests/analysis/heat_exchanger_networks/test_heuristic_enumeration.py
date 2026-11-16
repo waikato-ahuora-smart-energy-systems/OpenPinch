@@ -511,3 +511,48 @@ def test_the_fallback_searches_add_nothing_to_a_side_already_at_the_cap(monkeypa
 
     assert proposals[0].complete
     assert set(searches) == {enumeration._BASE_RUNG}
+
+
+def test_the_largest_feasible_duty_is_found_past_an_infeasible_stretch():
+    # A cold stream heating fast (CP 0.5), then slowly (CP 10), then fast again
+    # (CP 0.1), against a hot stream of CP 1, 10 K approach. The end gap dips
+    # below the approach from 2 kW to 18.9 kW, recovers, and closes again at
+    # 25 + 5.5 / 9 kW. Bisection from the 30 kW limit stops at 2 kW.
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic.enumeration import (
+        _feasible_duty,
+        _State,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.heuristic.side_streams import (
+        SideStream,
+    )
+
+    above = side(
+        "above",
+        [stream("hot", 0, 1.0, 30.0, 100.0)],
+        [stream("cold", 0, 1.0, 30.0, 88.0)],
+    )
+    segmented = SideStream(
+        kind="cold",
+        index=0,
+        loads=(30.0,),
+        pinch_cps=(0.5,),
+        at_pinch=(True,),
+        heats=((0.0, 10.0, 25.0, 30.0),),
+        temperatures=((88.0, 108.0, 109.5, 159.5),),
+        weights=(1.0,),
+    )
+    above = replace(above, cold=(segmented,))
+    hot, cold = above.hot[0], above.cold[0]
+    state = _State(
+        remaining={("hot", 0): 30.0, ("cold", 0): 30.0},
+        used={("hot", 0): 0.0, ("cold", 0): 0.0},
+        layer={},
+        pairs=frozenset(),
+        matches=(),
+    )
+
+    assert _feasible_duty(above, state, hot, cold) == pytest.approx(
+        25.0 + 5.5 / 9.0, rel=1e-6
+    )

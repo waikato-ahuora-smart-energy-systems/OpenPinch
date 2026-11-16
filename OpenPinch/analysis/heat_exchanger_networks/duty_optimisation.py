@@ -152,12 +152,11 @@ def build_duty_optimisation_request(
         missing = [
             _label(exchanger)
             for exchanger in _structural_exchangers(network)
-            if exchanger.kind is HeatExchangerKind.RECOVERY
-            and not (exchanger.area or 0.0) > 0.0
+            if not (exchanger.area or 0.0) > 0.0
         ]
         if missing:
             raise ValueError(
-                "the 'rating' objective needs an installed area on every recovery "
+                "the 'rating' objective needs an installed area on every "
                 "exchanger; none on " + ", ".join(missing) + "."
             )
         if approach is None:
@@ -242,6 +241,11 @@ def fixed_network_structure(
     recovery_duties: dict[int, float] = {}
     utility_duties: dict[int, float] = {}
     recovery_areas: dict[int, float] = {}
+    utility_areas: dict[int, float] = {}
+    recovery_points: dict[int, dict[int, tuple]] = {}
+    utility_points: dict[int, dict[int, tuple]] = {}
+    # Solver period index by period id; without one, the network's own.
+    periods = axis_maps.get("periods")
 
     for position, exchanger in enumerate(exchangers):
         if position in excluded:
@@ -279,6 +283,7 @@ def fixed_network_structure(
                 recovery_duties[index] = float(duty)
             if exchanger.area is not None:
                 recovery_areas[index] = float(exchanger.area)
+                recovery_points[index] = _design_points(exchanger, periods)
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
             if heater:
@@ -316,6 +321,9 @@ def fixed_network_structure(
                 utility_approach[index] = approach
             if duty:
                 utility_duties[index] = float(duty)
+            if exchanger.area is not None:
+                utility_areas[index] = float(exchanger.area)
+                utility_points[index] = _design_points(exchanger, periods)
         positions.append(position)
 
     _require_every_stream_served(hot_axis, cold_axis, recovery, utilities)
@@ -329,6 +337,9 @@ def fixed_network_structure(
             initial_recovery_duties=recovery_duties,
             initial_utility_duties=utility_duties,
             recovery_areas=recovery_areas,
+            utility_areas=utility_areas,
+            recovery_design_points=recovery_points,
+            utility_design_points=utility_points,
         ),
         positions=tuple(positions),
         slots=tuple(slots),
@@ -410,7 +421,10 @@ def build_solution_network(
                 sink_stream_role=roles[1],
                 stage=stage,
                 period_states=states,
-                area=None if slices else result.area,
+                # An installed (rated) area may exceed the slices' area.
+                area=result.area
+                if request.objective == "rating" or not slices
+                else None,
                 capital_cost=result.capital_cost,
                 segment_area_contributions=slices,
             )
@@ -683,6 +697,44 @@ def heat_exchanger_network_duty_optimisation_service(
 
     workflow_result = run_single_method_workflow(settings, _METHOD, run_method_stage)
     return finalise_design_result(problem, target_output, workflow_result)
+
+
+def _design_points(exchanger: HeatExchanger, periods) -> dict[int, tuple]:
+    """Each active period's design point, by solver period index.
+
+    ``(duty, theta_1, theta_2, required area or None)``: the end approaches
+    are the recorded ones, else follow from the inlet and outlet temperatures
+    (counter-current); the required area is the period's segment slice area
+    when the exchanger has slices. Periods the solver arrays lack are left
+    out, as are periods with no approaches.
+    """
+    slice_areas = exchanger.segment_area_by_period
+    points: dict[int, tuple] = {}
+    for state in exchanger.period_states:
+        index = (
+            state.period_idx if periods is None else periods.get(str(state.period_id))
+        )
+        if index is None or not state.active:
+            continue
+        thetas = tuple(state.approach_temperatures[:2])
+        temperatures = (
+            state.source_inlet_temperature,
+            state.source_outlet_temperature,
+            state.sink_inlet_temperature,
+            state.sink_outlet_temperature,
+        )
+        if len(thetas) < 2 and None not in temperatures:
+            source_in, source_out, sink_in, sink_out = temperatures
+            thetas = (source_in - sink_out, source_out - sink_in)
+        if len(thetas) < 2:
+            continue
+        points[int(index)] = (
+            float(state.duty),
+            float(thetas[0]),
+            float(thetas[1]),
+            slice_areas.get(str(state.period_id)),
+        )
+    return points
 
 
 def _structural_exchangers(network: HeatExchangerNetwork) -> tuple[HeatExchanger, ...]:

@@ -11,7 +11,7 @@ Builds the synthetic single-period case a multiperiod HEN is synthesised from on
 - Subdirectories: none.
 
 ## Invariants
-- A medoid minimises the sum of weight times Euclidean distance over its members. Build adds, `k` times, the row lowering that cost most; swap then takes the best cost-lowering replacement of a medoid each pass, until none lowers it by more than 1e-12 of the cost. Ties go to the lowest row, and rows join the nearest medoid, a tie to the earlier medoid; `k` lies in 1..rows [clustering.py:weighted_k_medoids].
+- A medoid minimises the sum of weight times Euclidean distance over its members. Build adds, `k` times, the row lowering that cost most; swap then takes the best cost-lowering replacement of a medoid each pass, until none lowers it by more than 1e-12 of the cost. Ties go to the lowest row, and rows join the nearest medoid, a tie to the earlier medoid, while a medoid's own row always joins its own cluster, so identical periods as medoids leave no cluster empty; `k` lies in 1..rows [clustering.py:weighted_k_medoids].
 - Scaling every weight by one constant, or duplicating a period instead of doubling its weight, gives the same clusters; the period order changes nothing beyond tie-breaks [clustering.py:weighted_k_medoids].
 - Operating periods have weight above zero and some process stream running (active, heat flow above zero); only they are clustered, and `basis_clusters` lies in 1..their number [synthetic_case.py:median_basis].
 - Features per stream are supply and target temperature, heat flow and the running flag, each divided by its period-weighted standard deviation over the operating periods (a column with no spread is left as it is) [synthetic_case.py:_scaled_features].

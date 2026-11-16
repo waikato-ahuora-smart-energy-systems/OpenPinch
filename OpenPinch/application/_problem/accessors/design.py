@@ -378,8 +378,10 @@ class _DesignAccessor:
         to ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times twice
         the scaled ``THERMAL_DT_CONT`` if that is larger.
         """
-        margin = self._overdesign_margin(overdesign_percentage)
+        hens = self._effective_hens(options)
+        margin = self._overdesign_margin(overdesign_percentage, hens)
         view = self._synthesise(
+            hens=hens,
             width=width,
             depth=depth,
             options=options,
@@ -397,11 +399,31 @@ class _DesignAccessor:
         )
         if margin is None:
             return view
-        return self._apply_overdesign(view.selected_network, margin, basis=view)
+        return self._apply_overdesign(
+            view.selected_network,
+            margin,
+            basis=view,
+            hens=hens,
+            options=options,
+            solver=solver,
+            solve_tolerance=solve_tolerance,
+        )
+
+    def _effective_hens(self, options):
+        """The HENS configuration a call runs with: its options over the stored."""
+        from copy import copy
+
+        if options is not None and not isinstance(options, Mapping):
+            raise TypeError("design options must be supplied as a mapping.")
+        _runtime, configuration = split_runtime_and_configuration_options(options)
+        root = self._problem._require_prepared_root_zone()
+        with temporary_zone_configuration(root, configuration):
+            return copy(root.config.hens)
 
     def _synthesise(
         self,
         *,
+        hens,
         width,
         depth,
         options,
@@ -421,7 +443,7 @@ class _DesignAccessor:
             heat_exchanger_network_open_hens_method_service,
         )
 
-        basis = self._design_basis(design_basis, period_id)
+        basis = self._design_basis(design_basis, period_id, hens)
         arguments = dict(
             width=width,
             depth=depth,
@@ -438,7 +460,7 @@ class _DesignAccessor:
         if basis == "period":
             return self._design_on_basis_period(period_id, **arguments)
         if basis == "median":
-            return self._design_on_median_basis(basis_clusters, **arguments)
+            return self._design_on_median_basis(basis_clusters, hens, **arguments)
         if basis == "all" and not self._problem.period_results:
             self._problem.target.all_periods.all_heat_integration()
         runtime, configuration = self._arguments(
@@ -463,16 +485,30 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
-    def _overdesign_margin(self, overdesign_percentage):
+    def _overdesign_margin(self, overdesign_percentage, hens):
         from ....analysis.heat_exchanger_networks.overdesign import validate_margin
 
         if overdesign_percentage is None:
-            hens = self._problem._require_prepared_root_zone().config.hens
             overdesign_percentage = hens.overdesign_percentage
         return validate_margin(overdesign_percentage)
 
-    def _apply_overdesign(self, network, margin, *, basis=None):
-        """Rate ``network`` with its recovery areas enlarged by ``margin``."""
+    def _apply_overdesign(
+        self,
+        network,
+        margin,
+        *,
+        basis=None,
+        hens=None,
+        options=None,
+        solver=None,
+        solve_tolerance=None,
+    ):
+        """Rate ``network`` with its recovery areas enlarged by ``margin``.
+
+        The rating solves run with the call's ``options``, ``solver`` and
+        ``solve_tolerance``; ``hens`` (default: the stored configuration)
+        gives the margin limit.
+        """
         from ....analysis.heat_exchanger_networks.overdesign import (
             apply_overdesign,
             validate_margin,
@@ -480,12 +516,19 @@ class _DesignAccessor:
         from ..targeting.provenance import canonical_json
 
         margin = validate_margin(margin)
-        hens = self._problem._require_prepared_root_zone().config.hens
+        if hens is None:
+            hens = self._effective_hens(options)
         view, metrics = apply_overdesign(
             network,
             margin,
             maximum=float(hens.overdesign_max),
-            rate=lambda installed: self.optimise_duties(installed, objective="rating"),
+            rate=lambda installed: self.optimise_duties(
+                installed,
+                objective="rating",
+                options=options,
+                solver=solver,
+                solve_tolerance=solve_tolerance,
+            ),
         )
         view.selected_network.summary_metrics["overdesign"] = metrics
         settings = dict((basis or view).result.provenance.effective_settings) | {
@@ -501,8 +544,11 @@ class _DesignAccessor:
         self._problem._results.design = view.result
         return view
 
-    def _design_basis(self, design_basis: str | None, period_id: str | None):
-        """The basis a multiperiod design is synthesised from; None for one period."""
+    def _design_basis(self, design_basis: str | None, period_id: str | None, hens=None):
+        """The basis a multiperiod design is synthesised from; None for one period.
+
+        ``hens`` is the call's configuration (default: the stored one).
+        """
         from ....domain.configuration_fields import HENS_DESIGN_BASIS_VALUES
 
         if design_basis is not None and design_basis not in HENS_DESIGN_BASIS_VALUES:
@@ -518,10 +564,10 @@ class _DesignAccessor:
             )
         if len(self._problem.period_ids) <= 1:
             return None
+        if hens is None:
+            hens = self._problem._require_prepared_root_zone().config.hens
         basis = design_basis or (
-            "period"
-            if period_id is not None
-            else self._problem._require_prepared_root_zone().config.hens.design_basis
+            "period" if period_id is not None else hens.design_basis
         )
         if basis == "period" and period_id is None:
             raise ValueError("design_basis='period' needs a period_id to design on.")
@@ -573,14 +619,15 @@ class _DesignAccessor:
             ),
         )
 
-    def _median_basis(self, basis_clusters):
+    def _median_basis(self, basis_clusters, hens=None):
         import warnings
 
         from ....analysis.heat_exchanger_networks.basis.synthetic_case import (
             median_basis,
         )
 
-        hens = self._problem._require_prepared_root_zone().config.hens
+        if hens is None:
+            hens = self._problem._require_prepared_root_zone().config.hens
         clusters = int(
             hens.basis_clusters if basis_clusters is None else basis_clusters
         )
@@ -606,10 +653,9 @@ class _DesignAccessor:
             )
         return basis, clusters
 
-    def _design_on_median_basis(self, basis_clusters, **arguments):
+    def _design_on_median_basis(self, basis_clusters, hens, **arguments):
         """Synthesise on median cases, fit every period, keep the cheapest."""
-        basis, clusters = self._median_basis(basis_clusters)
-        hens = self._problem._require_prepared_root_zone().config.hens
+        basis, clusters = self._median_basis(basis_clusters, hens)
         candidates = (
             range(len(basis.clusters))
             if hens.basis_candidates == "all"
@@ -648,13 +694,33 @@ class _DesignAccessor:
         )
 
     def _design_on_derived_basis(self, case, basis_settings, **arguments):
-        """Synthesise on a derived single-period ``case``, then fit every period."""
+        """Synthesise on a derived single-period ``case``, then fit every period.
+
+        The fit runs with the call's options, solver and tolerance; the
+        provenance keeps the settings the basis synthesis ran with.
+        """
         from ..targeting.provenance import canonical_json
 
-        network = case.design.heat_exchanger_network(**arguments).selected_network
-        view = self._fit_to_all_periods(network)
+        # The margin is applied once, to the fitted network, never to the
+        # basis design.
+        basis_options = dict(arguments["options"] or {}) | {
+            "HENS_OVERDESIGN_PERCENTAGE": None
+        }
+        basis_view = case.design.heat_exchanger_network(
+            **(arguments | {"options": basis_options})
+        )
+        view = self._fit_to_all_periods(
+            basis_view.selected_network,
+            options=arguments["options"],
+            solver=arguments["solver"],
+            solve_tolerance=arguments["solve_tolerance"],
+        )
         provenance = view.result.provenance
-        settings = dict(provenance.effective_settings) | basis_settings
+        settings = (
+            dict(provenance.effective_settings)
+            | dict(basis_view.result.provenance.effective_settings)
+            | basis_settings
+        )
         provenance = provenance.model_copy(
             update={
                 "method_id": "design.heat_exchanger_network",
@@ -883,13 +949,21 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
-    def _fit_to_all_periods(self, network: "HeatExchangerNetwork"):
+    def _fit_to_all_periods(
+        self,
+        network: "HeatExchangerNetwork",
+        *,
+        options=None,
+        solver=None,
+        solve_tolerance=None,
+    ):
         """Fit a network designed on one basis to every operating period.
 
-        Each stream without a utility at its end gets the cheapest one that
-        can serve it there; the fixed-structure cost fit then gives every
-        exchanger one area over all periods, with bypass where a period needs
-        less, and removes the exchangers no period uses.
+        Each stream without a utility at its end every period can use gets
+        the cheapest one that can serve it there; the fixed-structure cost
+        fit, with the call's ``options``, ``solver`` and ``solve_tolerance``,
+        then gives every exchanger one area over all periods, with bypass
+        where a period needs less, and removes the exchangers no period uses.
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             DEFAULT_FEASIBILITY_APPROACH,
@@ -901,7 +975,13 @@ class _DesignAccessor:
         padded = with_stream_end_utilities(
             self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
         )
-        return self.optimise_duties(padded, objective="cost")
+        return self.optimise_duties(
+            padded,
+            objective="cost",
+            options=options,
+            solver=solver,
+            solve_tolerance=solve_tolerance,
+        )
 
 
 class _DesignAccessorDescriptor:

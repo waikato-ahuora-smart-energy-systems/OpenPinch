@@ -817,6 +817,14 @@ class _TargetAccessor:
         else:
             request = HprTargetRequest.model_validate(request)
             zone = request.zone
+            # all_periods passes each period as period_id beside the request.
+            if period_id is not None:
+                if request.period_id not in (None, period_id):
+                    raise ValueError(
+                        f"the request targets period {request.period_id!r}, but the "
+                        f"call targets period {period_id!r}."
+                    )
+                request = request.model_copy(update={"period_id": period_id})
         spec = cycle_spec(request.cycle)
         legacy = _LEGACY_HPR_SURFACES.get((spec.id, request.duty))
         if not spec.available:
