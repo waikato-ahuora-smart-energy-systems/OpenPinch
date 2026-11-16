@@ -31,10 +31,10 @@ Reusable bounded scalar minimisation that returns several ranked local minima ra
 - Results keep task order and do not depend on where a task ran: each task is independent, and workers get tasks pickled when the batch began, before this process changes any state they share. A task the pool lost, or that its shutdown cancelled before it started, reruns in this process [execution.py:_map_with_late_pool].
 
 ## Side Effects
-- Spawns `ProcessPoolExecutor` workers; falls back to serial execution on Emscripten, an unpicklable task, a pool that cannot start or breaks, or a `__main__` script with no main guard [execution.py:_pool_worker_count] [execution.py:_map_in_process_pool] [execution.py:_map_with_late_pool].
+- Spawns `ProcessPoolExecutor` workers; falls back to serial execution on Emscripten, an unpicklable task, a pool that cannot start or breaks, a `__main__` script with no main guard, or a `__main__` whose `__file__` names no file, such as `<stdin>` [execution.py:_pool_worker_count] [execution.py:_map_in_process_pool] [execution.py:_map_with_late_pool].
 - Under spawn and forkserver, starts a timer thread per batch, which outlives the batch if a pool it started is not up yet; that thread starts, feeds and stops the pool, while objectives still run on the calling thread [execution.py:_map_with_late_pool].
 - A batch can return while its pool's workers are still importing; they then exit by themselves, so interpreter exit can wait for them for up to the import time [execution.py:_map_with_late_pool].
-- Reads and parses the main script file to look for a main guard when the start method is not fork [execution.py:_main_module_reruns_in_workers].
+- Checks that the main script file exists, then reads and parses it to look for a main guard, when the start method is not fork [execution.py:_main_module_blocks_workers].
 - Logs warnings and debug messages through `logging` [execution.py:_map_in_process_pool] [candidates.py:_polish_single_candidate].
 - Calls `scipy.optimize.minimize` for polishing [candidates.py:_polish_single_candidate].
 - `merge_task_reports` mutates the caller's objective [execution.py:_run_objective_tasks].

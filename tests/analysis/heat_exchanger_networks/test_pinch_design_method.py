@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -275,7 +275,8 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
         f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
     )
     monkeypatch.setattr(
-        f"{executor_module}._main_module_reruns_in_workers", lambda: True
+        f"{executor_module}._main_module_blocks_workers",
+        lambda: "the main script has no main guard",
     )
     # A platform with worker processes, so Pyodide reaches the pool too.
     monkeypatch.setattr(sys, "platform", "linux")
@@ -286,6 +287,31 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
     assert [outcome.status for outcome in outcomes] == ["success", "success"]
     assert pool_starts == []
     assert "main guard" in caplog.text
+
+
+def test_local_executor_runs_serially_when_workers_cannot_import_main(
+    monkeypatch, caplog
+) -> None:
+    def forbidden_process_pool_executor(**kwargs):
+        raise AssertionError("must not start worker processes")
+
+    executor_module = "OpenPinch.analysis.heat_exchanger_networks.execution.executor"
+    monkeypatch.setattr(
+        f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
+    )
+    # A script piped in with ``python - <<EOF``: spawned workers would try to
+    # run the main module from the path "<stdin>" and fail.
+    main = ModuleType("__main__")
+    main.__file__ = "<stdin>"
+    monkeypatch.setitem(sys.modules, "__main__", main)
+    monkeypatch.setattr("multiprocessing.get_start_method", lambda: "spawn")
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    with caplog.at_level("WARNING"):
+        outcomes = _two_prebuilt_successful_tasks(monkeypatch, _process_pool)
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+    assert "<stdin>" in caplog.text
 
 
 def test_user_couenne_options_are_written_to_model_run_directory(

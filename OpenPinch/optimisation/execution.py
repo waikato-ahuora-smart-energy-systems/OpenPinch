@@ -88,23 +88,40 @@ def _is_main_guard(node: ast.stmt) -> bool:
     )
 
 
-def _main_module_reruns_in_workers() -> bool:
-    """Return whether spawned workers would rerun an unguarded main script.
+def _main_module_blocks_workers() -> str | None:
+    """Return why spawned workers cannot run the main module, or ``None``.
 
-    Under the spawn and forkserver start methods each worker imports the
-    main module again; a script with no main guard then repeats its whole
-    run in every worker.
+    Under the spawn and forkserver start methods each worker runs the main
+    module again from its ``__file__``. A script with no main guard then
+    repeats its whole run in every worker, and a main module read from
+    stdin or a string (``__file__`` of ``"<stdin>"``) cannot be rerun at
+    all. A main module with no ``__file__`` (Jupyter, ``python -c``) is not
+    rerun.
     """
     if multiprocessing.get_start_method() == "fork":
-        return False
+        return None
     path = getattr(sys.modules.get("__main__"), "__file__", None)
-    if not path or not str(path).endswith(".py"):
-        return False
+    if not path:
+        return None
+    if not Path(path).is_file():
+        return (
+            f"worker processes cannot rerun the main module from {path!r}. "
+            "Run the code from a script file or a notebook to use worker "
+            "processes."
+        )
+    if not str(path).endswith(".py"):
+        return None
     try:
         tree = ast.parse(Path(path).read_text(encoding="utf-8"))
     except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
-        return False
-    return not any(_is_main_guard(node) for node in tree.body)
+        return None
+    if any(_is_main_guard(node) for node in tree.body):
+        return None
+    return (
+        "the main script has no main guard, so every worker process would "
+        "rerun it. Put the script's entry code under "
+        '`if __name__ == "__main__":` to use worker processes.'
+    )
 
 
 def _pool_worker_count(requested: int, task_count: int) -> int:
@@ -113,13 +130,8 @@ def _pool_worker_count(requested: int, task_count: int) -> int:
         # Pyodide has no process pools.
         return 1
     workers = min(int(requested), task_count, os.cpu_count() or 1)
-    if workers > 1 and _main_module_reruns_in_workers():
-        logger.warning(
-            "Running optimisation tasks serially: the main script has no "
-            "main guard, so every worker process would rerun it. Put the "
-            'script\'s entry code under `if __name__ == "__main__":` to '
-            "use worker processes."
-        )
+    if workers > 1 and (reason := _main_module_blocks_workers()):
+        logger.warning("Running optimisation tasks serially: %s", reason)
         return 1
     return workers
 
