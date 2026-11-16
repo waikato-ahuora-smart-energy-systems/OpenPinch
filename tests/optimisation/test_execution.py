@@ -10,6 +10,8 @@ import sys
 import threading
 import time
 import types
+import zipfile
+import zipimport
 from concurrent.futures import (
     CancelledError,
     Future,
@@ -349,6 +351,38 @@ def test_main_module_imported_by_name_uses_worker_processes(
         monkeypatch,
         __file__=str(archive / "__main__.py"),
         __spec__=importlib.machinery.ModuleSpec("__main__", None),
+    )
+    assert execution._pool_worker_count(2, 2) == 2
+
+
+def _main_module_in_zip(monkeypatch, tmp_path, source):
+    # ``python -m mod`` with ``mod`` inside a zip on sys.path: workers import
+    # ``mod`` by name as ``__mp_main__``, rerunning its top-level code.
+    archive = tmp_path / "modules.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("mod.py", source)
+    spec = zipimport.zipimporter(str(archive)).find_spec("mod")
+    _main_module(monkeypatch, __file__=spec.origin, __spec__=spec)
+
+
+def test_unguarded_named_main_module_in_a_zip_runs_serially(
+    native_platform, monkeypatch, tmp_path, caplog
+):
+    _main_module_in_zip(monkeypatch, tmp_path, "import OpenPinch\nrun_placement()\n")
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        assert execution._pool_worker_count(2, 2) == 1
+
+    assert 'if __name__ == "__main__":' in caplog.text
+
+
+def test_guarded_named_main_module_in_a_zip_uses_worker_processes(
+    native_platform, monkeypatch, tmp_path
+):
+    _main_module_in_zip(
+        monkeypatch,
+        tmp_path,
+        'import OpenPinch\n\nif __name__ == "__main__":\n    run_placement()\n',
     )
     assert execution._pool_worker_count(2, 2) == 2
 
