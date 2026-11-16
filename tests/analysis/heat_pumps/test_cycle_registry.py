@@ -155,3 +155,51 @@ def test_an_unregistered_model_family_has_no_handlers():
 
     with pytest.raises(ValueError, match="no registered cycle"):
         family_handlers("Stirling cycle")
+
+
+@pytest.fixture
+def fresh_registry(monkeypatch):
+    """A registry and HPR_TYPE set the test can extend and leave as they were."""
+    from OpenPinch.analysis.heat_pumps.cycles import registry
+    from OpenPinch.domain import configuration_fields
+
+    monkeypatch.setattr(registry, "_REGISTRY", dict(registry._REGISTRY))
+    monkeypatch.setattr(
+        configuration_fields,
+        "_REGISTERED_HPR_TYPES",
+        set(configuration_fields._REGISTERED_HPR_TYPES),
+    )
+    return registry
+
+
+def test_a_cycle_can_name_a_model_family_of_its_own(fresh_registry):
+    # A new cycle names its model family by a string, with no enum member:
+    # registering it makes that HPR_TYPE valid.
+    from dataclasses import replace
+
+    from OpenPinch.domain.configuration_fields import (
+        validate_internal_configuration_options as validate,
+    )
+
+    carnot = fresh_registry.cycle_spec("carnot")
+    with pytest.raises(ValueError, match="HPR_TYPE"):
+        validate({"HPR_TYPE": "Stirling cycle"})
+
+    fresh_registry.register_cycle(
+        replace(
+            carnot,
+            id="stirling",
+            topologies={"single": "Stirling cycle"},
+            default_topology="single",
+            handlers={"single": carnot.handlers["cascade"]},
+        )
+    )
+
+    assert validate({"HPR_TYPE": "Stirling cycle"}) == {"HPR_TYPE": "Stirling cycle"}
+    assert fresh_registry.spec_for_cycle("Stirling cycle") == (
+        fresh_registry.cycle_spec("stirling"),
+        "single",
+    )
+    assert (
+        fresh_registry.family_handlers("Stirling cycle") is carnot.handlers["cascade"]
+    )

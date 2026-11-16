@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Any, Mapping
 
 from pydantic import ValidationError
 
-from ....analysis.heat_pumps.cycles.registry import cycle_spec, registered_cycles
+from ....analysis.heat_pumps.cycles.registry import (
+    cycle_spec,
+    family_value,
+    registered_cycles,
+)
 from ....analysis.heat_pumps.performance_maps.generation import (
     generate_hpr_performance_map,
 )
@@ -647,7 +651,7 @@ class _TargetAccessor:
         self,
         *,
         surface: str,
-        cycle: HeatPumpAndRefrigerationCycle,
+        cycle: HeatPumpAndRefrigerationCycle | str,
         is_heat_pump: bool,
         is_utility: bool,
         zone: str | Zone | None = None,
@@ -673,7 +677,7 @@ class _TargetAccessor:
             if simulation_backend is None
             else normalize_hpr_simulation_backend(simulation_backend)
         )
-        configuration = {"HPR_TYPE": cycle.value}
+        configuration = {"HPR_TYPE": family_value(cycle)}
         configuration.update(
             _load_options(
                 load_fraction=load_fraction,
