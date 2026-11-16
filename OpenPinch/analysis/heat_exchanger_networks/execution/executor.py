@@ -31,7 +31,7 @@ _PINCH_DESIGN_METHODS = (
     HeatExchangerNetworkDesignMethod.HeuristicPinchDesign,
 )
 # Heuristic networks per multiplier when a task does not set its own cap.
-_HEURISTIC_NETWORKS = 10
+_HEURISTIC_NETWORKS = 50
 
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:

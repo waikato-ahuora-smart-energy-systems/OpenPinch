@@ -106,13 +106,13 @@ def test_tasks_run_one_per_multiplier_with_the_network_cap():
     assert all(task.settings["heuristic_networks"] == 4 for task in tasks)
 
 
-def test_the_heuristic_gives_ten_networks_and_depth_two_adds_the_milp():
+def test_the_heuristic_gives_fifty_networks_and_depth_two_adds_the_milp():
     settings = workflow_settings_from_problem(_small_problem_with_options({}))
     shallow = workflow_settings_from_problem(
         _small_problem_with_options({"HENS_SEARCH_DEPTH": 1})
     )
 
-    assert settings.heuristic_pdm_networks == 10
+    assert settings.heuristic_pdm_networks == 50
     assert settings.pdm_milp is True
     assert shallow.pdm_milp is False
     assert shallow.runs_milp_pinch_design is False
@@ -392,7 +392,7 @@ def test_the_network_cap_comes_from_the_configuration():
         workflow_settings_from_problem(
             _small_problem_with_options({})
         ).heuristic_pdm_networks
-        == 10
+        == 50
     )
 
 

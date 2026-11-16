@@ -14,6 +14,14 @@ Heat exchanger network synthesis
   less time at 10 networks per multiplier, with the same best networks and
   at least as many distinct ones. ``heuristic_report`` counts the dropped
   sides as ``repeated_sides``.
+- ``HENS_HEURISTIC_PDM_NETWORKS`` defaults to 50 heuristic networks per
+  dt_cont multiplier at search depths 0 to 3 (was 10 at depths 0 to 2 and 20
+  at depth 3); depth 4 already used 50. With the faster realisation, the 12
+  OpenHENS cases at depth 0 take about 50 s instead of 22 s at 10, give
+  about 2.7 times as many distinct networks, and improve the best network on
+  four cases. The pulp mill case takes 188 s instead of 45 s, finds 11
+  minimum-unit networks instead of 2, and its best network is within 0.01 %.
+  Set ``HENS_HEURISTIC_PDM_NETWORKS`` to 10 for the earlier, faster search.
 
 0.9.1 (2026-11-16)
 ------------------
