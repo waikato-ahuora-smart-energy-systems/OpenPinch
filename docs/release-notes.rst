@@ -23,7 +23,7 @@ Heat exchanger network synthesis
   form, for another thread to poll with ``version``, ``snapshot()`` and
   ``changed_since(version)``. Worker processes send their networks to the
   calling process. See "Networks as They Are Found" in the HEN synthesis
-  guide.
+  guide; tutorial 16 follows its deeper search this way.
 - A synthesis result now ranks every verified network of the run, including
   each improvement an evolution search finds while it runs, not only the
   network each task ends with. A network enters only with a converged solve,

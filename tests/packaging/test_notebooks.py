@@ -34,6 +34,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
 )
 ALLOWED_SPECIALIST_IMPORTS = frozenset(
     {
+        "OpenPinch.analysis.heat_exchanger_networks.results.record",
         "OpenPinch.contracts.hpr",
         "OpenPinch.contracts.hpr_performance_map",
         "OpenPinch.presentation.reporting.hpr",
@@ -521,6 +522,22 @@ def test_notebook_10_uses_five_isolated_scalar_shared_designs() -> None:
     assert "hpr_failure_summary(error)" in source
     assert "except HPRTargetingError as error" in source
     assert "except Exception" not in source
+
+
+def test_notebook_16_follows_the_live_network_record() -> None:
+    notebook = _load_notebook(
+        ROOT / "OpenPinch" / "tutorials" / "notebooks" / "16_advanced_hen_methods.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert "record = HeatExchangerNetworkRecord()" in source
+    assert "record=record" in source
+    assert "record.changed_since(seen)" in source
+    assert "assert deeper.result.ranked_networks == record.outcomes()" in source
+    assert 'assert record.status == "complete"' in source
+    # The deeper search runs once, now on a background thread.
+    assert source.count("heat_exchanger_network,") == 1
+    assert "heat_exchanger_network(" not in source
 
 
 def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
