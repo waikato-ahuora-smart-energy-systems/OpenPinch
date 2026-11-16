@@ -30,7 +30,8 @@ def weighted_k_medoids(features, weights, k: int) -> Clustering:
     Distances are Euclidean. Build adds, ``k`` times, the row that lowers the
     weighted cost most; swap then replaces a medoid by a non-medoid while
     that lowers the cost, taking the best swap each pass. Rows join their
-    nearest medoid, a tie going to the earlier medoid.
+    nearest medoid, a tie going to the earlier medoid; a medoid's own row joins
+    its own cluster.
     """
 
     features = np.asarray(features, dtype=float)
@@ -65,7 +66,14 @@ def weighted_k_medoids(features, weights, k: int) -> Clustering:
             break
         current, medoids = best
 
-    labels = tuple(int(np.argmin(distances[row, medoids])) for row in range(rows))
+    # A medoid's own row stays in its cluster, so identical periods chosen as
+    # medoids each keep a non-empty cluster.
+    labels = tuple(
+        medoids.index(row)
+        if row in medoids
+        else int(np.argmin(distances[row, medoids]))
+        for row in range(rows)
+    )
     return Clustering(medoids=tuple(medoids), labels=labels)
 
 

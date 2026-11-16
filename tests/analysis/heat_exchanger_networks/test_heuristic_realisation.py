@@ -100,14 +100,18 @@ def test_four_stream_proposal_realises_the_textbook_network_at_target():
     solved = problem.get_solution(print_output=False)
 
     assert solved is not None and solved.mSuccess == 1
-    (network,) = _networks(problem)
+    # The textbook network comes first. The split fallback also finds a
+    # four-unit design, its parallel match's duty bounded exactly where
+    # bisection stopped short.
+    network, *others = _networks(problem)
+    assert len(others) == 1
     assert verify_network_feasibility(network) == ()
     # The four-stream hot utility target at 14 K, with two recovery matches
     # below the pinch and one above.
     assert _hot_utility(network) == pytest.approx(510.0, rel=1e-4)
     recovery = [e for e in network.exchangers if e.kind is HeatExchangerKind.RECOVERY]
     assert len(recovery) == 3
-    assert problem.heuristic_report["networks"] == 1
+    assert problem.heuristic_report["networks"] == 2
 
 
 @pytest.mark.skipif("not _highs_available()", reason="needs highspy")

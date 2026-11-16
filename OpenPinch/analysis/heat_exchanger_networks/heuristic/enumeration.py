@@ -28,7 +28,6 @@ from .side_streams import PinchSide, SideStream
 LOAD_FRACTION_TOLERANCE = 1e-3
 # DFS nodes allowed per proposal requested, across a side's search.
 _NODES_PER_PROPOSAL = 2000
-_BISECTION_STEPS = 40
 # Pinch-match sets collected per one kept, before ordering by CP similarity.
 _COLLECTED_PER_PROPOSAL = 4
 # Search nodes spent without a complete proposal, once the incomplete ones
@@ -500,6 +499,17 @@ def _stage_feasible(side, streams, matches, start_heat, end_heat) -> bool:
     leave a stage at one temperature), scaled by each period's load.
     """
 
+    return all(
+        margin >= 0.0
+        for margin in _stage_margins(side, streams, matches, start_heat, end_heat)
+    )
+
+
+def _stage_margins(side, streams, matches, start_heat, end_heat) -> list[float]:
+    """Each match's temperature difference less its approach, at both stage ends,
+    in every period both its streams run, in a fixed order."""
+
+    margins = []
     for hot_index, cold_index, _layer, _duty in matches:
         hot, cold = streams[("hot", hot_index)], streams[("cold", cold_index)]
         hot_key, cold_key = ("hot", hot_index), ("cold", cold_index)
@@ -510,13 +520,59 @@ def _stage_feasible(side, streams, matches, start_heat, end_heat) -> bool:
             hot_scale = hot.loads[n] / hot.load
             cold_scale = cold.loads[n] / cold.load
             for heat in (start_heat, end_heat):
-                if (
+                margins.append(
                     hot.temperature(n, heat.get(hot_key, 0.0) * hot_scale)
                     - cold.temperature(n, heat.get(cold_key, 0.0) * cold_scale)
-                    < approach
-                ):
-                    return False
-    return True
+                    - approach
+                )
+    return margins
+
+
+def _largest_feasible(margins, breakpoints, limit: float) -> float:
+    """The largest duty in [0, ``limit``] at which every margin is non-negative.
+
+    ``margins(q)`` lists the constraint margins at duty ``q``; each is linear
+    in ``q`` between consecutive ``breakpoints`` (where a stream's profile
+    changes slope). Pieces are searched from the top, so a feasible stretch
+    above an infeasible one is still found, and within a piece the margins'
+    zero crossings bound the feasible duties exactly. A segmented stream can
+    make the margins dip below zero and recover, which bisection would miss.
+    """
+
+    # Feasibility at zero duty is not required: a new match joining a mixed
+    # stage may need some duty before its ends keep their approach.
+    if limit <= 0.0:
+        return 0.0
+    points = sorted({0.0, float(limit), *(q for q in breakpoints if 0.0 < q < limit)})
+    for low, high in reversed(list(zip(points, points[1:]))):
+        start, end = low, high
+        for below, above in zip(margins(low), margins(high)):
+            if below >= 0.0 and above >= 0.0:
+                continue
+            if below < 0.0 and above < 0.0:
+                start, end = high, low
+                break
+            crossing = low + (high - low) * below / (below - above)
+            if below < 0.0:
+                start = max(start, crossing)
+            else:
+                end = min(end, crossing)
+        if start <= end:
+            return end
+    return 0.0
+
+
+def _profile_breakpoints(side, stream: SideStream, heat_before: float):
+    """Duties at which a match starting ``heat_before`` along ``stream`` (from
+    its pinch end) reaches one of the stream's profile breakpoints, in any
+    period it runs."""
+
+    return [
+        heat * stream.load / stream.loads[n] - heat_before
+        for n in range(side.periods)
+        if stream.active(n)
+        for heat in stream.heats[n]
+    ]
 
 
 def _extend(
@@ -637,7 +693,7 @@ def _parallel_duty(side, state, streams, match, limit: float) -> float:
 
     hot_index, cold_index, layer = match
 
-    def feasible(duty: float) -> bool:
+    def margins(duty: float) -> list[float]:
         matches = state.matches + ((hot_index, cold_index, layer, duty),)
         start: dict = {}
         end: dict = {}
@@ -648,20 +704,20 @@ def _parallel_duty(side, state, streams, match, limit: float) -> float:
                 if other_layer <= layer:
                     end[key] = end.get(key, 0.0) + other_duty
         in_stage = [m for m in matches if m[2] == layer]
-        return _stage_feasible(side, streams, in_stage, start, end)
+        return _stage_margins(side, streams, in_stage, start, end)
 
-    if feasible(limit):
-        return limit
-    if not feasible(0.0):
-        return 0.0
-    low, high = 0.0, limit
-    for _step in range(_BISECTION_STEPS):
-        middle = (low + high) / 2.0
-        if feasible(middle):
-            low = middle
-        else:
-            high = middle
-    return low
+    def heat_through(key) -> float:
+        return sum(
+            duty
+            for hot, cold, other_layer, duty in state.matches
+            if other_layer <= layer and key in (("hot", hot), ("cold", cold))
+        )
+
+    hot_key, cold_key = ("hot", hot_index), ("cold", cold_index)
+    breakpoints = _profile_breakpoints(
+        side, streams[hot_key], heat_through(hot_key)
+    ) + _profile_breakpoints(side, streams[cold_key], heat_through(cold_key))
+    return _largest_feasible(margins, breakpoints, limit)
 
 
 def _candidates(side, state, streams, must, *, repeat: bool):
@@ -749,37 +805,29 @@ def _feasible_duty(side, state, must, partner) -> float:
         state.remaining[(partner.kind, partner.index)],
     )
 
-    def feasible(duty: float) -> bool:
+    hot_used = state.used[("hot", hot.index)]
+    cold_used = state.used[("cold", cold.index)]
+
+    def margins(duty: float) -> list[float]:
+        found = []
         for n in range(side.periods):
             if not (hot.active(n) and cold.active(n)):
                 continue
             approach = side.approach[n][hot.index][cold.index] - 1e-6
             for q in (0.0, duty):
-                hot_heat = (
-                    (state.used[("hot", hot.index)] + q) * hot.loads[n] / hot.load
+                hot_heat = (hot_used + q) * hot.loads[n] / hot.load
+                cold_heat = (cold_used + q) * cold.loads[n] / cold.load
+                found.append(
+                    hot.temperature(n, hot_heat)
+                    - cold.temperature(n, cold_heat)
+                    - approach
                 )
-                cold_heat = (
-                    (state.used[("cold", cold.index)] + q) * cold.loads[n] / cold.load
-                )
-                if (
-                    hot.temperature(n, hot_heat) - cold.temperature(n, cold_heat)
-                    < approach
-                ):
-                    return False
-        return True
+        return found
 
-    if limit <= 0.0 or not feasible(0.0):
-        return 0.0
-    if feasible(limit):
-        return limit
-    low, high = 0.0, limit
-    for _step in range(_BISECTION_STEPS):
-        middle = (low + high) / 2.0
-        if feasible(middle):
-            low = middle
-        else:
-            high = middle
-    return low
+    breakpoints = _profile_breakpoints(side, hot, hot_used) + _profile_breakpoints(
+        side, cold, cold_used
+    )
+    return _largest_feasible(margins, breakpoints, limit)
 
 
 def _proposal(side, state, streams, must_kind, *, complete: bool) -> SideProposal:

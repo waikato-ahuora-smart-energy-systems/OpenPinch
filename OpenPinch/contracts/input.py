@@ -481,17 +481,17 @@ class HeatExchangerSchema(BaseModel):
         design_area = max(totals.values()) if totals else None
         if design_area is None:
             return self
-        if self.area is not None and not math.isclose(
-            self.area,
-            design_area,
-            rel_tol=1e-4,
-            abs_tol=1e-3,
+        # An area above the slices' is an installed area (an overdesign),
+        # kept as given; one below them cannot serve every period.
+        if self.area is None or math.isclose(
+            self.area, design_area, rel_tol=1e-4, abs_tol=1e-3
         ):
+            object.__setattr__(self, "area", design_area)
+        elif self.area < design_area:
             raise ValueError(
-                "area must match the maximum period-total segment area "
+                "area must be at least the maximum period-total segment area "
                 f"{design_area:.12g}"
             )
-        object.__setattr__(self, "area", design_area)
         return self
 
 

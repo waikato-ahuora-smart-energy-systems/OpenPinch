@@ -84,20 +84,24 @@ def validate_segment_design_area(
     area: float | None,
     contributions: Iterable[HeatExchangerAreaSlice],
 ) -> float | None:
-    """Return the authoritative design area or reject an inconsistent value."""
+    """Return the design area, or reject an area some period's slices exceed.
+
+    An area above the slices' is an installed area (an overdesign): a period
+    needing less runs with a bypass, so it is kept as given.
+    """
     design_area = segment_design_area(contributions)
     if design_area is None:
         return area
-    if area is not None and not math.isclose(
-        area,
-        design_area,
-        rel_tol=_AREA_REL_TOL,
-        abs_tol=_AREA_ABS_TOL,
+    if area is None or math.isclose(
+        area, design_area, rel_tol=_AREA_REL_TOL, abs_tol=_AREA_ABS_TOL
     ):
+        return design_area
+    if area < design_area:
         raise ValueError(
-            f"area must match the maximum period-total segment area {design_area:.12g}"
+            "area must be at least the maximum period-total segment area "
+            f"{design_area:.12g}"
         )
-    return design_area
+    return area
 
 
 def _sum_by_period(

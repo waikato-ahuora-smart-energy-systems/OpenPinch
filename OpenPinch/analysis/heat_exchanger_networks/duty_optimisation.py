@@ -65,6 +65,8 @@ from .models.fixed_structure import (
     FixedStructureSpec,
     RecoveryMatch,
     UtilityMatch,
+    chen_lmtd,
+    exact_lmtd,
 )
 from .prepared_problem import SynthesisProblem
 from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
@@ -152,12 +154,11 @@ def build_duty_optimisation_request(
         missing = [
             _label(exchanger)
             for exchanger in _structural_exchangers(network)
-            if exchanger.kind is HeatExchangerKind.RECOVERY
-            and not (exchanger.area or 0.0) > 0.0
+            if not (exchanger.area or 0.0) > 0.0
         ]
         if missing:
             raise ValueError(
-                "the 'rating' objective needs an installed area on every recovery "
+                "the 'rating' objective needs an installed area on every "
                 "exchanger; none on " + ", ".join(missing) + "."
             )
         if approach is None:
@@ -242,6 +243,9 @@ def fixed_network_structure(
     recovery_duties: dict[int, float] = {}
     utility_duties: dict[int, float] = {}
     recovery_areas: dict[int, float] = {}
+    utility_areas: dict[int, float] = {}
+    recovery_factors: dict[int, tuple[float, ...]] = {}
+    utility_factors: dict[int, tuple[float, ...]] = {}
 
     for position, exchanger in enumerate(exchangers):
         if position in excluded:
@@ -279,6 +283,7 @@ def fixed_network_structure(
                 recovery_duties[index] = float(duty)
             if exchanger.area is not None:
                 recovery_areas[index] = float(exchanger.area)
+                recovery_factors[index] = _lmtd_factor(exchanger)
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
             if heater:
@@ -316,6 +321,9 @@ def fixed_network_structure(
                 utility_approach[index] = approach
             if duty:
                 utility_duties[index] = float(duty)
+            if exchanger.area is not None:
+                utility_areas[index] = float(exchanger.area)
+                utility_factors[index] = _lmtd_factor(exchanger)
         positions.append(position)
 
     _require_every_stream_served(hot_axis, cold_axis, recovery, utilities)
@@ -329,6 +337,9 @@ def fixed_network_structure(
             initial_recovery_duties=recovery_duties,
             initial_utility_duties=utility_duties,
             recovery_areas=recovery_areas,
+            utility_areas=utility_areas,
+            recovery_lmtd_factors=recovery_factors,
+            utility_lmtd_factors=utility_factors,
         ),
         positions=tuple(positions),
         slots=tuple(slots),
@@ -410,7 +421,10 @@ def build_solution_network(
                 sink_stream_role=roles[1],
                 stage=stage,
                 period_states=states,
-                area=None if slices else result.area,
+                # An installed (rated) area may exceed the slices' area.
+                area=result.area
+                if request.objective == "rating" or not slices
+                else None,
                 capital_cost=result.capital_cost,
                 segment_area_contributions=slices,
             )
@@ -683,6 +697,22 @@ def heat_exchanger_network_duty_optimisation_service(
 
     workflow_result = run_single_method_workflow(settings, _METHOD, run_method_stage)
     return finalise_design_result(problem, target_output, workflow_result)
+
+
+def _lmtd_factor(exchanger: HeatExchanger) -> tuple[float, ...]:
+    """Exact over Chen LMTD at each period's design approaches, by period index.
+
+    The installed area was sized with the exact LMTD, the rating model uses
+    Chen's; capacity scaled by this ratio carries the period's design duty. A
+    period with no approaches (the exchanger idle) takes 1.
+    """
+    factors: dict[int, float] = {}
+    for state in exchanger.period_states:
+        thetas = state.approach_temperatures[:2]
+        if state.active and len(thetas) == 2 and min(thetas) > 0.0:
+            factors[state.period_idx] = exact_lmtd(*thetas) / chen_lmtd(*thetas)
+    count = 1 + max((state.period_idx for state in exchanger.period_states), default=0)
+    return tuple(factors.get(n, 1.0) for n in range(count))
 
 
 def _structural_exchangers(network: HeatExchangerNetwork) -> tuple[HeatExchanger, ...]:

@@ -69,3 +69,26 @@ def test_a_stream_end_already_served_gets_no_second_utility():
 
     assert _placements(padded).count(("hot_utility", "Hot Utility.HPS", MILK)) == 1
     assert _placements(padded).count(("cold_utility", RAW, "Cold Utility.CW")) == 1
+
+
+def test_an_end_utility_one_period_cannot_use_is_replaced():
+    # CIP Water heats to 500 K in base but 530 K in peak: the 520 K steam the
+    # basis design used cannot finish it at peak, so HPS takes its place.
+    source = _with_low_pressure_steam().to_problem_json()
+    cip = next(s for s in source["streams"] if s["name"] == "CIP Water")
+    cip["t_target"] = {"values": [500.0, 530.0], "unit": "K"}
+    cip["heat_capacity_flowrate"] = None
+    cip["heat_flow"] = {"values": [1500.0, 1800.0], "unit": "kW"}
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[(FLASH, CIP, 1)],
+        heaters=[(CIP, "Hot Utility.LPS")],
+        stage_count=1,
+    )
+
+    padded = with_stream_end_utilities(
+        PinchProblem(source, project_name="two-period"), network, approach=1.0
+    )
+
+    heaters = [p for p in _placements(padded) if p[0] == "hot_utility"]
+    assert ("hot_utility", "Hot Utility.LPS", CIP) not in heaters
+    assert ("hot_utility", "Hot Utility.HPS", CIP) in heaters

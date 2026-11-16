@@ -56,13 +56,27 @@ def fitted():
     return problem, view.selected_network
 
 
-def test_rating_needs_an_area_on_every_recovery_exchanger():
+def test_rating_needs_an_area_on_every_exchanger():
     network = HeatExchangerNetwork.from_structure(
         recovery=[("H1", "C1", 1)], heaters=[("C1", "HU")], coolers=[("H1", "CU")]
     )
+    # Heaters and coolers keep their installed areas too.
+    recovery_only = network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger.model_copy(update={"area": 10.0})
+                if exchanger.kind == HeatExchangerKind.RECOVERY
+                else exchanger
+                for exchanger in network.exchangers
+            )
+        }
+    )
 
-    with pytest.raises(ValueError, match="'rating' objective needs an installed area"):
-        build_duty_optimisation_request(network, objective="rating")
+    for unrated in (network, recovery_only):
+        with pytest.raises(
+            ValueError, match="'rating' objective needs an installed area"
+        ):
+            build_duty_optimisation_request(unrated, objective="rating")
 
 
 @pytest.mark.parametrize("margin", [-5.0, "maximise"])
@@ -103,6 +117,14 @@ def test_a_fixed_margin_scales_every_recovery_area_and_raises_no_utility(fitted)
     base_areas = _recovery_areas(network)
     for exchanger_id, area in _recovery_areas(margined).items():
         assert area == pytest.approx(1.2 * base_areas[exchanger_id], rel=1e-9)
+    for exchanger in margined.exchangers:
+        if exchanger.kind != HeatExchangerKind.RECOVERY:
+            base = next(
+                e
+                for e in network.exchangers
+                if e.exchanger_id == exchanger.exchanger_id
+            )
+            assert exchanger.area == pytest.approx(base.area, rel=1e-9)
     base_utility = _utility_by_period(network)
     for period, utility in _utility_by_period(margined).items():
         assert utility <= base_utility[period] + 1e-3 * max(base_utility[period], 1.0)

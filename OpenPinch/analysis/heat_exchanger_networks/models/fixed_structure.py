@@ -33,9 +33,10 @@ Objectives (all multi-period aware, weighted by period weights):
   least the area that period needs (bypass covers any surplus);
 * ``"total cost"``: minimise operating cost plus exchanger capital on the
   common areas;
-* ``"rating"``: minimise operating cost with each recovery exchanger's area
-  fixed (``FixedStructureSpec.recovery_areas``). Every period's duty must fit
-  within that area; a period needing less runs with a bypass.
+* ``"rating"``: minimise operating cost with every exchanger's area fixed
+  (``FixedStructureSpec.recovery_areas`` and ``utility_areas``). Every
+  period's duty must fit within that area; a period needing less runs with a
+  bypass.
 """
 
 from __future__ import annotations
@@ -97,8 +98,14 @@ class FixedStructureSpec:
     utility_approach: Mapping[int, float] = field(default_factory=dict)
     initial_recovery_duties: Mapping[int, float] = field(default_factory=dict)
     initial_utility_duties: Mapping[int, float] = field(default_factory=dict)
-    # Installed area of each recovery exchanger, for the "rating" goal.
+    # Installed area of each exchanger, for the "rating" goal.
     recovery_areas: Mapping[int, float] = field(default_factory=dict)
+    utility_areas: Mapping[int, float] = field(default_factory=dict)
+    # Exact over Chen LMTD at the design point, per exchanger and period
+    # (default 1): rating caps duty by area * factor * U * Chen-LMTD, so the
+    # installed area, sized with the exact LMTD, carries its design duty.
+    recovery_lmtd_factors: Mapping[int, Sequence[float]] = field(default_factory=dict)
+    utility_lmtd_factors: Mapping[int, Sequence[float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -760,7 +767,7 @@ def build_fixed_structure_equations(owner) -> None:
     if owner.minimisation_goal in {"total area", "total cost"}:
         _common_areas(owner)
     elif owner.minimisation_goal == "rating":
-        _installed_recovery_areas(owner)
+        _installed_areas(owner)
     else:
         owner.area_r = None
         owner.area_u = None
@@ -1209,19 +1216,39 @@ def _common_areas(owner) -> None:
     ]
 
 
-def _installed_recovery_areas(owner) -> None:
-    """Each recovery exchanger's installed area caps its duty in every period."""
+def _installed_areas(owner) -> None:
+    """Each exchanger's installed area caps its duty in every period."""
 
-    owner.area_r = []
-    for r in range(len(owner.spec.recovery)):
-        area = float(owner.spec.recovery_areas[r])
-        for n in range(owner.N_periods):
-            owner._at_least(
-                area * owner.recovery_U[n][r] * chen_lmtd(*owner.theta_r[n][r]),
-                owner.q_r[n][r],
-            )
-        owner.area_r.append(area)
-    owner.area_u = None
+    def installed(areas, factors, duties, coefficients, thetas, count):
+        fixed = []
+        for e in range(count):
+            area = float(areas[e])
+            factor = factors.get(e, ())
+            for n in range(owner.N_periods):
+                capacity = area * (float(factor[n]) if n < len(factor) else 1.0)
+                owner._at_least(
+                    capacity * coefficients[n][e] * chen_lmtd(*thetas[n][e]),
+                    duties[n][e],
+                )
+            fixed.append(area)
+        return fixed
+
+    owner.area_r = installed(
+        owner.spec.recovery_areas,
+        owner.spec.recovery_lmtd_factors,
+        owner.q_r,
+        owner.recovery_U,
+        owner.theta_r,
+        len(owner.spec.recovery),
+    )
+    owner.area_u = installed(
+        owner.spec.utility_areas,
+        owner.spec.utility_lmtd_factors,
+        owner.q_u,
+        owner.utility_U,
+        owner.theta_u,
+        len(owner.spec.utilities),
+    )
 
 
 def _start_lmtd(thetas) -> float:
@@ -1513,7 +1540,11 @@ def post_process_fixed_structure(owner) -> None:
                     slices=slices,
                 )
             )
-        area = _design_area(periods)
+        area = (
+            float(spec.utility_areas[e])
+            if owner.minimisation_goal == "rating"
+            else _design_area(periods)
+        )
         unit, coeff, exponent = (
             (owner.hu_unit_cost[0], owner.hu_coeff[0], owner.hu_exp[0])
             if match.side == HEATER

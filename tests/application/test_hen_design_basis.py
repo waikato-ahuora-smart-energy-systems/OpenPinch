@@ -333,3 +333,95 @@ def test_every_cluster_as_a_candidate_is_never_costlier_than_the_heaviest():
         return view.selected_network.total_annual_cost
 
     assert cost("all") <= cost("dominant") * (1 + 1e-9)
+
+
+def test_a_period_basis_in_the_call_options_needs_a_period_id():
+    with pytest.raises(ValueError, match="needs a period_id"):
+        _two_period_problem().design.heat_exchanger_network(
+            options={"HENS_DESIGN_BASIS": "period"}
+        )
+
+
+def test_an_all_periods_basis_in_the_call_options_is_followed(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks import service
+
+    class Dispatched(Exception):
+        pass
+
+    def stop(problem, settings, **kwargs):
+        raise Dispatched
+
+    monkeypatch.setattr(service, "execute_open_hens_method", stop)
+    problem = _two_period_problem()
+
+    with pytest.raises(Dispatched):
+        problem.design.heat_exchanger_network(options={"HENS_DESIGN_BASIS": "all"})
+
+    assert set(problem.period_results) == {"base", "peak"}
+
+
+def test_median_basis_settings_in_the_call_options_are_followed(monkeypatch):
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+
+    recorded = {}
+
+    class Designed(Exception):
+        pass
+
+    def record(self, case, basis_settings, **arguments):
+        recorded.update(basis_settings)
+        raise Designed
+
+    monkeypatch.setattr(_DesignAccessor, "_design_on_derived_basis", record)
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+
+    with pytest.warns(RuntimeWarning), pytest.raises(Designed):
+        problem.design.heat_exchanger_network(options={"HENS_BASIS_CLUSTERS": 2})
+
+    assert recorded["HENS_BASIS_CLUSTERS"] == 2
+
+
+def test_the_all_period_fit_runs_with_the_calls_settings(monkeypatch):
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    seen = {}
+
+    def capture(self, network, **kwargs):
+        seen.update(kwargs)
+
+    monkeypatch.setattr(_DesignAccessor, "optimise_duties", capture)
+    raw, cip = "Process A.Raw Milk", "Process A.CIP Water"
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[(raw, cip, 1)], stage_count=1
+    )
+
+    _two_period_problem().design._fit_to_all_periods(
+        network,
+        options={"COSTING_HX_UNIT_COST": 9000.0},
+        solver="ipopt-pyomo",
+        solve_tolerance=1e-4,
+    )
+
+    assert seen == {
+        "objective": "cost",
+        "options": {"COSTING_HX_UNIT_COST": 9000.0},
+        "solver": "ipopt-pyomo",
+        "solve_tolerance": 1e-4,
+    }
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_basis_designs_provenance_keeps_its_synthesis_settings():
+    view = _two_period_problem().design.heat_exchanger_network(
+        width=0, depth=0, period_id="peak"
+    )
+
+    settings = view.result.provenance.effective_settings
+    assert settings["HENS_SEARCH_WIDTH"] == 0
+    assert settings["HENS_SEARCH_DEPTH"] == 0
+    assert settings["HENS_DESIGN_BASIS"] == "period"

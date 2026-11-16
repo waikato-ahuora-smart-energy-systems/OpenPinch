@@ -22,6 +22,16 @@ Heat pumps and refrigeration
   availability, optional dependencies and the JSON Schema of each cycle's
   options, for building a cycle picker and option form. It is also a
   command.
+- The cycles are registered once each in
+  ``OpenPinch.analysis.heat_pumps.cycles.registry``: ``register_cycle``,
+  ``cycle_spec``, ``registered_cycles``, ``spec_for_cycle`` and
+  ``family_handlers``, with ``HprCycleSpec`` holding a cycle's topologies,
+  duties, options model and the ``HPR_*`` keys they set, dependencies,
+  screening layouts and analysis handlers. A new cycle is its model, its
+  options model and one ``register_cycle`` call.
+- ``target.all_periods.heat_pump_and_refrigeration(request=...)`` targets
+  each period in turn; a request naming another period than the call is
+  rejected.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -35,7 +45,31 @@ Heat exchanger network synthesis
   without it, and the margins tried are in
   ``selected_network.summary_metrics["overdesign"]``.
   ``design.optimise_duties()`` gains the ``"rating"`` objective: least
-  utility cost at the network's installed recovery areas.
+  utility cost at the network's installed areas, recovery, heaters and
+  coolers alike, each of which needs an area. Heaters and coolers keep
+  their installed areas under a margin, so a rated period cannot use more
+  utility than they carry. An exchanger's ``area`` may now exceed what its
+  segment slices need (an installed, overdesigned area); one below them is
+  still rejected.
+- Call ``options`` set ``HENS_DESIGN_BASIS``, ``HENS_BASIS_CLUSTERS``,
+  ``HENS_BASIS_ACTIVE_SHARE``, ``HENS_BASIS_CANDIDATES``,
+  ``HENS_OVERDESIGN_PERCENTAGE`` and ``HENS_OVERDESIGN_MAX`` for that call,
+  as the stored options do; they were ignored. The all-period fit and the
+  rating solves run with the call's options, solver and tolerance, and a
+  median or period design's provenance keeps the settings its basis
+  synthesis ran with. A margin applies to the fitted network only, never
+  also to the basis design.
+- ``application.case_derivation.single_period_case(problem, period_id)``
+  derives a new problem holding one period's data alone.
+- The all-period fit replaces a basis design's end heater or cooler that
+  cannot serve its stream in every period with the cheapest one that can.
+- Median basis clusters of identical periods each keep their own period, so
+  no cluster is left empty.
+- The heuristic pinch design method finds the largest feasible duty of a
+  match exactly, piece by piece along the streams' profiles. With segmented
+  streams, bisection could stop at the end of the first feasible stretch;
+  splits away from the pinch now also find duties that need some load
+  before their stage keeps its approach, which can add complete proposals.
 - A multiperiod ``design.heat_exchanger_network()`` now synthesises on a
   median basis by default (``HENS_DESIGN_BASIS`` ``"median"``), so default
   multiperiod results change: a synthetic single-period case of each

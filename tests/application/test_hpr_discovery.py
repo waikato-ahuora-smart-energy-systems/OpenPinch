@@ -63,15 +63,22 @@ def test_the_cycle_catalogue_is_a_command():
     ]
 
 
+def _hpr_work(outputs) -> dict[str, float]:
+    """Each period's heat pump work, from the target that carries it."""
+    work = {
+        period: next(
+            target.hpr_work.value for target in output.targets if target.hpr_success
+        )
+        for period, output in outputs.items()
+    }
+    assert work and all(value > 0.0 for value in work.values())
+    return work
+
+
 def test_the_gateway_over_all_periods_matches_the_named_method():
     def work(run):
         problem = PinchProblem("crude_preheat_train_multiperiod.json")
-        return {
-            period: output.targets[0].hpr_details.w_net
-            if hasattr(output.targets[0], "hpr_details")
-            else None
-            for period, output in run(problem.target.all_periods).items()
-        }
+        return _hpr_work(run(problem.target.all_periods))
 
     named = work(
         lambda periods: periods.carnot_heat_pump(
@@ -239,3 +246,29 @@ def _diagnostics() -> HPRFailureSummary:
         warm_start_evaluated=False,
         warm_start_viable=False,
     )
+
+
+def test_all_periods_runs_a_request_once_per_period():
+    from OpenPinch.contracts.hpr import HprTargetRequest
+
+    work = _hpr_work
+    named = PinchProblem("crude_preheat_train_multiperiod.json").target.all_periods
+    request = HprTargetRequest(cycle="carnot", **CHEAP)
+    gateway = PinchProblem("crude_preheat_train_multiperiod.json").target.all_periods
+
+    assert work(gateway.heat_pump_and_refrigeration(request=request)) == work(
+        named.carnot_heat_pump(
+            load_fraction=0.25, condensers=1, evaporators=1, maximum_restarts=1
+        )
+    )
+
+
+def test_a_request_naming_another_period_than_the_call_is_rejected():
+    from OpenPinch.contracts.hpr import HprTargetRequest
+
+    problem = PinchProblem("crude_preheat_train_multiperiod.json")
+
+    with pytest.raises(ValueError, match="period"):
+        problem.target.heat_pump_and_refrigeration(
+            request=HprTargetRequest(period_id="peak"), period_id="base"
+        )
