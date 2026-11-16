@@ -246,7 +246,9 @@ def test_designs_that_fail_to_solve_or_verify_stay_off_the_frontier(fake_solver)
     result = run_retrofit_search(
         _problem(),
         _existing_network(),
-        RetrofitSettings(max_modifications=2, new_match_candidates=4, **COSTS),
+        RetrofitSettings(
+            strategy="stepwise", max_modifications=2, new_match_candidates=4, **COSTS
+        ),
     )
 
     kinds = {m.kind for d in result.frontier for m in d.modifications}
@@ -402,3 +404,16 @@ def test_design_retrofit_takes_the_search_strategy(fake_solver):
     ]
     with pytest.raises(ValueError, match="strategy"):
         problem.design.retrofit(_existing_network(), strategy="greedy")
+
+
+def test_design_retrofit_steps_by_structure_by_default(fake_solver):
+    result = _problem().design.retrofit(
+        _existing_network(), max_modifications=2, new_match_candidates=2
+    )
+
+    for depth, design in enumerate(result.frontier):
+        structural = [m for m in design.modifications if m.kind != "area_addition"]
+        assert len(structural) == depth
+    assert any(
+        m.kind == "area_addition" for d in result.frontier for m in d.modifications
+    )

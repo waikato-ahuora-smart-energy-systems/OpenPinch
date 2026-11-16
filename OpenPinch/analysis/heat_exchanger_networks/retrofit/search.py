@@ -76,13 +76,13 @@ class RetrofitSettings:
     and relocation with each new end heater or cooler the network lacks, in
     the same step, priced as one more new unit.
 
-    ``strategy`` "stepwise" makes one modification per step, an area
-    addition being one. "structure" makes one structural change per step
+    ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened
     changes are ranked by the utility cost their structure reaches with
     unlimited area, the ``new_match_candidates`` best are solved with every
     existing exchanger free to grow, and a unit keeps added area of at least
-    1 % of its installed area (1 m2 or more).
+    1 % of its installed area (1 m2 or more). "stepwise" makes one
+    modification per step, an area addition being one.
     """
 
     max_modifications: int = 3
@@ -97,7 +97,7 @@ class RetrofitSettings:
     relocation_cost: float | None = None
     relocation_candidates: int = 8
     new_utility_units: bool = False
-    strategy: str = "stepwise"
+    strategy: str = "structure"
     ceiling_candidates: int = 12
 
 

@@ -268,6 +268,7 @@ def test_retrofit_search_finds_one_best_design_per_modification_count():
         problem,
         _existing_network(),
         RetrofitSettings(
+            strategy="stepwise",
             max_modifications=2,
             beam_width=2,
             new_match_candidates=3,
@@ -446,6 +447,7 @@ def test_the_frontier_marks_designs_no_better_than_fewer_modifications():
         _case_problem(),
         _existing_network(),
         RetrofitSettings(
+            strategy="stepwise",
             max_modifications=4,
             beam_width=2,
             new_match_candidates=4,
@@ -562,7 +564,11 @@ def test_retrofit_search_prices_each_modification_with_the_report_costs():
         _case_problem(),
         _existing_network(),
         RetrofitSettings(
-            max_modifications=1, beam_width=8, new_match_candidates=3, **REPORT_COSTS
+            strategy="stepwise",
+            max_modifications=1,
+            beam_width=8,
+            new_match_candidates=3,
+            **REPORT_COSTS,
         ),
     )
 
@@ -603,6 +609,7 @@ EXISTING_STRUCTURE = {
 def test_design_retrofit_takes_the_existing_network_as_a_mapping():
     result = _case_problem().design.retrofit(
         EXISTING_STRUCTURE,
+        strategy="stepwise",
         max_modifications=1,
         beam_width=4,
         new_match_candidates=2,
@@ -680,6 +687,7 @@ def test_design_retrofit_relocates_an_existing_exchanger_when_cheapest():
     # New units and added area priced out: a relocation is the best step.
     result = _case_problem().design.retrofit(
         EXISTING_STRUCTURE,
+        strategy="stepwise",
         max_modifications=1,
         new_unit_cost=1e9,
         area_addition_cost=1e9,
@@ -718,6 +726,7 @@ def test_design_retrofit_pairs_a_move_with_the_new_utility_it_needs():
     def first_step(new_utility_units):
         result = _case_problem().design.retrofit(
             EXISTING_STRUCTURE,
+            strategy="stepwise",
             max_modifications=1,
             new_match_candidates=24,
             new_utility_units=new_utility_units,
@@ -762,7 +771,9 @@ def test_retrofit_search_drops_designs_that_fail_solution_verification(monkeypat
     result = search.run_retrofit_search(
         _case_problem(),
         _existing_network(),
-        search.RetrofitSettings(max_modifications=2, **REPORT_COSTS),
+        search.RetrofitSettings(
+            strategy="stepwise", max_modifications=2, **REPORT_COSTS
+        ),
     )
 
     assert len(result.frontier) > 1

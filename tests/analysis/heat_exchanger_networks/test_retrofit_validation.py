@@ -158,6 +158,7 @@ def test_the_search_reaches_the_published_retrofit_target():
     # addition as a modification, needs seven steps.
     result = _problem().design.retrofit(
         EXISTING,
+        strategy="stepwise",
         max_modifications=7,
         new_match_candidates=24,
         min_approach_temperature=10.0,

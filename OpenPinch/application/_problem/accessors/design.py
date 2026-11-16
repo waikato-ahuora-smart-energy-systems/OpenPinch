@@ -929,7 +929,7 @@ class _DesignAccessor:
         relocation_cost: float | None = None,
         relocation_candidates: int = 8,
         new_utility_units: bool = False,
-        strategy: str = "stepwise",
+        strategy: str = "structure",
         ceiling_candidates: int = 12,
         options: Mapping[str, Any] | None = None,
         solver=None,
@@ -951,12 +951,12 @@ class _DesignAccessor:
             }
 
         Every exchanger needs its installed area. The existing network is
-        rated at its areas (widened by ``area_tolerance``), then modified one
-        step at a time, up to ``max_modifications``: more area on an existing
-        exchanger whose duty its area limits, or a new match (screened by the
-        heat it could recover where it sits). Each step keeps the
-        ``beam_width`` designs with the best net annual benefit and tries
-        ``new_match_candidates`` new matches from each.
+        rated at its areas (widened by ``area_tolerance``), then changed one
+        structural step at a time, up to ``max_modifications``: a new match
+        (screened by the utility it could cut where it sits) or, optionally,
+        a relocated exchanger, with the added area each structure needs
+        sized in the same solve. Each step keeps the ``beam_width`` designs
+        with the best net annual benefit.
 
         Added area costs ``COSTING_HX_AREA_COEFF * area **
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
@@ -976,14 +976,14 @@ class _DesignAccessor:
         pair is one modification, costing one more ``new_unit_cost`` and the
         utility exchanger's area.
 
-        ``strategy`` "stepwise" (the default) makes one modification per
-        step, an area addition being one. "structure" makes one structural
-        change per step: ``ceiling_candidates`` screened changes are ranked
+        ``strategy`` "structure" (the default) makes one structural change
+        per step: ``ceiling_candidates`` screened changes are ranked
         by the utility cost their structure reaches with unlimited area (its
         network pinch), the ``new_match_candidates`` best are solved with
         every existing exchanger free to grow, and an exchanger keeps added
-        area of at least 1 % of its installed area, as an area addition. The
-        frontier then counts structural changes.
+        area of at least 1 % of its installed area, as an area addition, so
+        the frontier counts structural changes. "stepwise" instead makes one
+        modification per step, an area addition being one.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
