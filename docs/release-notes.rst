@@ -32,6 +32,17 @@ Heat pumps and refrigeration
 - ``target.all_periods.heat_pump_and_refrigeration(request=...)`` targets
   each period in turn; a request naming another period than the call is
   rejected.
+- The named heat pump and refrigeration methods accept
+  ``expander_efficiency=0`` (no expander recovery) and
+  ``maximum_restarts=0`` (the first start only) again; the gateway's models
+  had rejected both.
+- A newly registered cycle with screened refrigerants runs once per
+  proposed fluid set through the gateway, as the named methods do.
+- A multiperiod summary after a heat pump or refrigeration target replays
+  it for each period. The replay failed on the cycle type it had recorded;
+  a recorded run now leaves out the options its method selects and keeps
+  the gateway's cycle, duty, topology and placement, so a parallel or
+  indirect run replays as one.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

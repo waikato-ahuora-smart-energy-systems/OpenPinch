@@ -314,3 +314,21 @@ def test_a_carnot_target_is_the_same_through_the_gateway():
         assert getattr(gateway.hpr_details, field) == pytest.approx(
             getattr(named.hpr_details, field), rel=1e-12
         ), field
+
+
+@pytest.mark.parametrize(
+    ("arguments", "key", "value"),
+    [
+        ({"expander_efficiency": 0.0}, "HPR_ETA_EXP", 0.0),
+        ({"maximum_restarts": 0}, "HPR_MAX_MULTISTART", 0),
+    ],
+)
+def test_the_named_methods_still_accept_their_zero_values(
+    monkeypatch, arguments, key, value
+):
+    # No expander recovery, and no restarts beyond the first run, are valid.
+    call = _captured(
+        monkeypatch, lambda problem: problem.target.carnot_heat_pump(**arguments)
+    )
+
+    assert call["configuration"][key] == value
