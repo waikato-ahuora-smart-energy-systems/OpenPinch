@@ -254,6 +254,40 @@ def test_designs_that_fail_to_solve_or_verify_stay_off_the_frontier(fake_solver)
     assert result.evaluated_designs > len(result.frontier)
 
 
+def test_a_relocation_never_leaves_a_stream_without_an_exchanger(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # Without its cooler E6, H2 is served by E4 alone: moving E4 to a match
+    # without H2 would leave H2 with no exchanger, which is no network.
+    network = _existing_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(e for e in network.exchangers if e.exchanger_id != "E6")
+        }
+    )
+
+    result = run_retrofit_search(
+        _problem(),
+        network,
+        RetrofitSettings(
+            max_modifications=1,
+            beam_width=50,
+            new_match_candidates=0,
+            relocation_cost=5_000.0,
+            relocation_candidates=100,
+            **COSTS,
+        ),
+    )
+
+    assert result.evaluated_designs > 1
+    for design in result.frontier:
+        e4 = next(e for e in design.network.exchangers if e.exchanger_id == "E4")
+        assert e4.source_stream.endswith("H2")
+
+
 def test_design_retrofit_runs_the_search_from_a_mapping(fake_solver):
     existing = {
         "recovery": [

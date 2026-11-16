@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import sys
+from collections import Counter
 from dataclasses import dataclass, replace
 
 from ....contracts.synthesis.retrofit import (
@@ -239,7 +240,8 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     Each existing recovery unit not yet moved may go to any screened match
     that shares one of its streams (its own pair elsewhere is a repiping).
     A move scores the match's potential less the unit's present duty, the
-    heat it gives up; positive scores are kept, best first.
+    heat it gives up; positive scores are kept, best first. A unit that is
+    the only exchanger on one of its streams stays on that stream.
     """
 
     solved = parent.solved
@@ -251,6 +253,11 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
         and e.exchanger_id in existing
         and e.exchanger_id not in moved
     }
+    served = Counter(
+        stream
+        for e in parent.state.network.exchangers
+        for stream in (e.source_stream, e.sink_stream)
+    )
     # Every screened match, not just the best few.
     pool = screen_new_matches(
         solved, ends, approach=settings.approach, limit=sys.maxsize
@@ -259,7 +266,10 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     for match in pool:
         potential = match_potential(solved, ends, match, approach=settings.approach)
         for unit, (hot, cold, duty) in duties.items():
-            if match.hot == hot or match.cold == cold:
+            stranded = (match.hot != hot and served[hot] == 1) or (
+                match.cold != cold and served[cold] == 1
+            )
+            if (match.hot == hot or match.cold == cold) and not stranded:
                 score = potential - duty
                 if score > 0.0:
                     scored.append((score, unit, match))
