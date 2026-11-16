@@ -510,15 +510,17 @@ def _update_with_best_model(owner, best_model) -> None:
 
     owner.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
     owner.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
+    # These are Pyomo expressions on the candidate's model; deep-copying one
+    # copies that whole model. verify() only reads their solved values.
     if hasattr(best_model, "hu_cost_solver_by_period"):
-        owner.hu_cost_solver_by_period = copy.deepcopy(
+        owner.hu_cost_solver_by_period = _solved_values(
             best_model.hu_cost_solver_by_period
         )
-        owner.cu_cost_solver_by_period = copy.deepcopy(
+        owner.cu_cost_solver_by_period = _solved_values(
             best_model.cu_cost_solver_by_period
         )
     if hasattr(best_model, "recovery_area_cost_filtered"):
-        owner.recovery_area_cost_filtered = copy.deepcopy(
+        owner.recovery_area_cost_filtered = _solved_values(
             best_model.recovery_area_cost_filtered
         )
     if hasattr(best_model, "recovery_area_cost_total"):
@@ -542,6 +544,14 @@ def _update_with_best_model(owner, best_model) -> None:
     if hasattr(best_model, "solver_run"):
         owner.solver_run = best_model.solver_run
     owner.get_post_process()
+
+
+def _solved_values(values):
+    """Return ``values`` with each entry, at any list depth, read as a float."""
+
+    if isinstance(values, list):
+        return [_solved_values(value) for value in values]
+    return _value(values)
 
 
 def get_n_minus_one_evolution(
