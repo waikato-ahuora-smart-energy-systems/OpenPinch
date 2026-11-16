@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -36,6 +38,31 @@ class _EvolutionBranchState:
     best_tac: float
     stale_depths: int = 0
     signature: tuple[tuple[int, int, int], ...] = ()
+
+
+_IMPROVEMENT_CALLBACK: ContextVar[Callable[[Any], None] | None] = ContextVar(
+    "openpinch_hen_evolution_improvement", default=None
+)
+
+
+@contextmanager
+def reporting_improvements(callback: Callable[[Any], None]) -> Iterator[None]:
+    """Pass each candidate that improves on its search's best to ``callback``.
+
+    Searches run in the enclosed block call it as they go, with the solved,
+    verified candidate model, in the order the search accepts them.
+    """
+    token = _IMPROVEMENT_CALLBACK.set(callback)
+    try:
+        yield
+    finally:
+        _IMPROVEMENT_CALLBACK.reset(token)
+
+
+def _report_improvement(candidate) -> None:
+    callback = _IMPROVEMENT_CALLBACK.get()
+    if callback is not None:
+        callback(candidate)
 
 
 def _stagewise_model_class():
@@ -150,6 +177,7 @@ def get_net_benefit_evolution(
             next_frontier.append(branch_period)
             if best_model is None or candidate.TAC < best_model.TAC:
                 best_model = candidate
+                _report_improvement(candidate)
         # Keep the best branches by TAC, ties broken on topology signature, so
         # the frontier never grows past the beam width.
         next_frontier.sort(
@@ -218,6 +246,7 @@ def _get_source_net_benefit_evolution(
             break
         if best_model is None or model.TAC < best_model.TAC:
             best_model = model
+            _report_improvement(model)
             logger.debug(
                 "New best model: %s found with TAC: %.6f",
                 model.name,

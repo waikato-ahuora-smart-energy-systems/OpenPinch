@@ -42,13 +42,21 @@ def build_synthesis_result(
     tasks: Sequence[HeatExchangerNetworkSynthesisTask],
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Convert accepted task outcomes into the canonical design data."""
+    """Convert accepted task outcomes into the canonical design data.
+
+    The ranked networks are the run record's entries and the accepted network
+    is its first; ``outcomes`` explain a run that admitted none.
+    """
+    from .record import run_record
+
     outcomes = demote_infeasible_outcomes(outcomes)
-    accepted = _accepted_outcome(outcomes)
-    if accepted.network is None:
+    ranked = run_record(outcomes).outcomes()
+    if not ranked:
+        _accepted_outcome(outcomes)
         raise WorkflowContractError(
-            "Accepted heat exchanger network outcome must include a network."
+            "heat exchanger network synthesis admitted no network."
         )
+    accepted = ranked[0]
 
     network = accepted.network.model_copy(
         update={
@@ -108,7 +116,7 @@ def build_synthesis_result(
         method=accepted.task.method,
         stage_count=network.stage_count,
         objective_values=objective_values,
-        ranked_networks=tuple(outcomes),
+        ranked_networks=ranked,
         manifest=manifest,
     )
 

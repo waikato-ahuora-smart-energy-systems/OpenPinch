@@ -32,6 +32,69 @@ The design view also exposes ``selected_network``, total recovery, hot and cold
 utility duty, and ``utility(name)``. Serialize the complete result with
 ``design.result.model_dump(mode="json")``.
 
+The ranked networks are every network the run verified and costed, one per
+topology (the cheapest), in ascending total annual cost: the networks each
+task ends with, and every network an evolution search finds that improves on
+its best so far.
+
+Networks as They Are Found
+--------------------------
+
+Pass a ``HeatExchangerNetworkRecord`` as ``record=`` to see the networks while
+synthesis runs. Each network enters the record as soon as it is verified and
+costed in its final form: on a multiperiod median or period basis it is first
+fitted to every period, and with an overdesign margin it is rated at the
+margin. The record is thread-safe; another thread polls it:
+
+.. code-block:: python
+
+   import threading
+   import time
+
+   from OpenPinch.analysis.heat_exchanger_networks.results.record import (
+       HeatExchangerNetworkRecord,
+   )
+
+   record = HeatExchangerNetworkRecord()
+
+   def watch():
+       version = 0
+       while True:
+           change = record.changed_since(version)
+           if change is not None:
+               version = change["version"]
+               for entry in change["entries"]:
+                   print(entry["key"], entry["method"], entry["total_annual_cost"])
+               if change["status"] != "running":
+                   return
+           time.sleep(0.5)
+
+   watcher = threading.Thread(target=watch)
+   watcher.start()
+   design = problem.design.heat_exchanger_network(record=record)
+   watcher.join()
+
+``record.version`` rises with every change. ``record.snapshot()`` returns the
+whole record as new JSON-ready data: ``version``, ``status`` (``"pending"``,
+``"running"``, ``"complete"`` or ``"failed"``), ``selected`` (the selected
+entry's key once complete) and ``entries``, cheapest first, each with its
+``key``, ``rank``, ``method``, ``task_id``, ``dt_cont_multiplier``,
+``total_annual_cost``, ``unit_count``, ``version`` and ``network`` (the
+network's JSON). ``record.changed_since(version)`` returns ``None`` when
+nothing has changed, else the same header, only the entries added or replaced
+since ``version``, and ``order``, every key in rank order. Entries are never
+removed: a topology found again at a lower cost replaces its entry under the
+same key, so a reader merges entries by key. Equal costs are ordered by task
+id and then topology, so the contents and order do not depend on the order in
+which worker processes finish.
+
+On completion the result ranks exactly the record's networks and selects its
+first. A record collects one call. With ``HENS_MAX_PARALLEL`` above 1, worker
+processes send their networks to the calling process, which holds the record;
+fitting and rating run there. Fitting and rating every improvement adds
+solves, so a fitted or overdesigned design takes longer than one that fits
+and rates the selected network alone did.
+
 Exchanger Approach Temperatures
 -------------------------------
 
