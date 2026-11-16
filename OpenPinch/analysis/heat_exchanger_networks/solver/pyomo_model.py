@@ -14,6 +14,13 @@ from typing import Any
 
 from .dependencies import require_synthesis_dependency
 
+# Parameters are handed out from dense blocks of fixed variables: allocating
+# a block at once is about three times faster than one VarList entry at a
+# time. Blocks double in size so small models stay small; unused entries
+# appear in no constraint, so solvers never see them.
+_FIRST_PARAMETER_BLOCK = 64
+_LARGEST_PARAMETER_BLOCK = 8192
+
 
 def _pyomo() -> Any:
     return require_synthesis_dependency(
@@ -28,7 +35,8 @@ class PyomoModel:
 
     Parameters are fixed variables, so a solve substitutes their values and a
     parameter can be changed between solves. Names are accepted for
-    signature compatibility and not used: components live in flat lists.
+    signature compatibility and not used: variables live in one list and
+    parameters in preallocated blocks.
     ``_path`` is a run directory, created only to hold a solver option file.
     """
 
@@ -37,7 +45,8 @@ class PyomoModel:
         pyo = _pyomo()
         self.model = pyo.ConcreteModel()
         self.model.variables = pyo.VarList()
-        self.model.parameters = pyo.VarList()
+        self._parameter_blocks: list[Any] = []
+        self._parameters_left = 0
         self.model.constraints = pyo.ConstraintList()
         self.objective = None
         # Set to start a MIP solve from the variables' current values.
@@ -60,9 +69,27 @@ class PyomoModel:
         return variable
 
     def Param(self, value: float = 0.0, name: str | None = None) -> Any:
-        parameter = self.model.parameters.add()
+        if self._parameters_left == 0:
+            self._add_parameter_block()
+        block = self._parameter_blocks[-1]
+        parameter = block[len(block) - self._parameters_left]
+        self._parameters_left -= 1
         parameter.fix(value)
         return parameter
+
+    def _add_parameter_block(self) -> None:
+        pyo = _pyomo()
+        size = min(
+            _LARGEST_PARAMETER_BLOCK,
+            max(
+                _FIRST_PARAMETER_BLOCK,
+                sum(len(block) for block in self._parameter_blocks),
+            ),
+        )
+        block = pyo.Var(range(size), dense=True)
+        self.model.add_component(f"parameters_{len(self._parameter_blocks)}", block)
+        self._parameter_blocks.append(block)
+        self._parameters_left = size
 
     def Equation(self, expression: Any) -> Any:
         return self.model.constraints.add(expression)

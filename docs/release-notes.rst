@@ -161,6 +161,10 @@ Heat exchanger network synthesis
   in, and distinct target-meeting topologies rise from 87 to 93 in the same
   time; with 50 networks per multiplier, from 206 to 250 for about 20 %
   more time. The best network is unchanged or better on every case.
+- Building a heat exchanger network model is faster: its parameters, mostly
+  placeholders for disallowed matches, come from blocks of fixed variables
+  allocated ahead rather than one at a time. On the pulp mill sample case a
+  design takes about 7.5 s less (136 s to 129 s), with the same network.
 
 0.9.0 (2026-11-14)
 ------------------
