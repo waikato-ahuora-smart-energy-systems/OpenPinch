@@ -93,6 +93,13 @@ Heat exchanger network synthesis
   the same values to the last place. On the pulp mill sample case
   post-processing takes about 11 s of CPU time instead of 32 s, and the
   design about 154 s instead of 181 s, with the same network.
+- Building a stage-wise model is faster: parameter blocks are fixed as a
+  whole when allocated, the Pyomo module is looked up once per model, and the
+  big-M values and duty bounds that multiply binaries are Python floats, so
+  Pyomo builds those terms without NumPy's ufunc dispatch. On the pulp mill
+  sample case the 276 stage-wise builds of a design take about 37 s of CPU
+  time instead of 58 s, and the design about 157 s instead of 175 s, with the
+  same network.
 
 0.9.1 (2026-11-16)
 ------------------

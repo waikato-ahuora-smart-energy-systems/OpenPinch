@@ -73,7 +73,7 @@ def set_preprocessing(owner) -> None:
     owner.U_hu = owner.U_hu_period[0].copy()
     owner.U_cu = owner.U_cu_period[0].copy()
 
-    owner.Q_max_period = np.array(
+    duty_bounds = np.array(
         [
             [
                 [
@@ -98,8 +98,10 @@ def set_preprocessing(owner) -> None:
         ],
         dtype=float,
     )
-    owner.Q_max = np.max(owner.Q_max_period, axis=0)
-    owner.M_ij_period = np.array(
+    owner.Q_max = np.max(duty_bounds, axis=0)
+    # Python floats, as M_ij_period below: the bound multiplies z in Q <= Q_max * z.
+    owner.Q_max_period = duty_bounds.tolist()
+    big_m = np.array(
         [
             [
                 [
@@ -118,7 +120,10 @@ def set_preprocessing(owner) -> None:
         ],
         dtype=float,
     )
-    owner.M_ij = np.max(owner.M_ij_period, axis=0)
+    owner.M_ij = np.max(big_m, axis=0)
+    # Python floats, not NumPy scalars: M * (1 - z) with a NumPy M goes
+    # through NumPy's ufunc dispatch before Pyomo builds the term.
+    owner.M_ij_period = big_m.tolist()
 
     owner.z_feasible = [
         [
