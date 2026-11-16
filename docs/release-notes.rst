@@ -100,6 +100,10 @@ Heat exchanger network synthesis
   sample case the 276 stage-wise builds of a design take about 37 s of CPU
   time instead of 58 s, and the design about 157 s instead of 175 s, with the
   same network.
+- Extracting a network from a solved model is faster: a solved Pyomo
+  variable's value is read before asking what the object is, and a recovery
+  match's binary is read once rather than once per period. Extracted
+  networks are unchanged.
 
 0.9.1 (2026-11-16)
 ------------------
