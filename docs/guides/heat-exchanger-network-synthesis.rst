@@ -504,6 +504,9 @@ Costs
    area on an existing exchanger adds ``area_addition_cost``. Capital is
    annualised with the capital recovery factor of ``COSTING_DISCOUNT_RATE``
    and ``COSTING_SERVICE_LIFE``.
+   ``max_added_area_fraction`` (default ``None``, no cap) limits the area
+   added to an existing exchanger to that fraction of its installed area,
+   for example 0.2 where a shell can take at most 20 % more tubes.
 Area tolerance
    Plant areas are rounded and the solver uses Chen's LMTD approximation, so
    an existing network may fall just short of its own duties at its exact

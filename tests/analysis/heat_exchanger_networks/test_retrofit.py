@@ -224,6 +224,24 @@ def test_retrofit_goal_lets_an_enlargeable_unit_grow_at_a_cost():
     )
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_goal_caps_added_area_at_a_fraction_of_the_installed_area():
+    structure, model = _retrofit_model(
+        _case_problem(),
+        _existing_network(),
+        area_tolerance=0.02,
+        enlargeable_recovery=frozenset({0}),
+        max_added_area_fraction=0.01,
+    )
+
+    assert model.mSuccess == 1
+    e1 = structure.results(model)[0]
+    # Uncapped, E1 grows by about 19 m2 (3%); a 1% cap binds.
+    assert e1.added_area == pytest.approx(0.01 * EXISTING_AREAS["E1"], rel=1e-4)
+
+
 # Report costs (pages 13-14): a new exchanger $34,600 plus $857/m2, added area
 # $8,650 per unit (existing shell) plus $857/m2, a split $10,000. The fixture
 # sets the area law ($857/m2, exponent 1), the new-unit cost and a 5-year life
@@ -556,3 +574,27 @@ def test_batch_design_retrofit_runs_on_every_selected_case():
         assert result.frontier[0].hot_utility == pytest.approx(
             REPORTED_HOT_UTILITY, rel=0.02
         )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_caps_added_area_like_the_report():
+    # The report allows at most 20% more area on an existing exchanger.
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=2,
+        max_added_area_fraction=0.2,
+        **REPORT_COSTS,
+    )
+
+    additions = [
+        modification
+        for design in result.frontier
+        for modification in design.modifications
+        if modification.kind == "area_addition"
+    ]
+    assert additions
+    for modification in additions:
+        installed = EXISTING_AREAS[modification.exchanger_id]
+        assert modification.added_area <= 0.2 * installed * (1 + 1e-6)

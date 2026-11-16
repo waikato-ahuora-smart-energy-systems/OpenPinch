@@ -25,7 +25,8 @@ Heat exchanger network synthesis
   added area and fixed costs for new units, added area and splits). The
   result's ``frontier`` gives the best design for each number of
   modifications with savings, capital, payback and net annual benefit, and
-  marks dominated ones. Network mappings for ``optimise_duties`` and
+  marks dominated ones. ``max_added_area_fraction`` caps the area added to
+  an existing exchanger (for example 0.2 for at most 20 % more). Network mappings for ``optimise_duties`` and
   ``retrofit`` now take entries as mappings with ``area`` and ``id``. Tested
   on the Ciric and Floudas (1989) retrofit case; see "Retrofit of an Existing
   Network" in the HEN synthesis guide.

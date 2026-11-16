@@ -45,6 +45,8 @@ class RetrofitSettings:
     per depth and ``new_match_candidates`` the screened new matches tried from
     each. ``area_tolerance`` widens every installed area (a fraction) and
     ``approach`` is the minimum approach (K) on every exchanger.
+    ``max_added_area_fraction`` caps the area added to an existing exchanger
+    as a fraction of its installed area (None: no cap).
     ``new_unit_cost`` ($ per new exchanger), ``area_addition_cost`` ($ per
     existing exchanger given more area) and ``split_cost`` ($ per stream a new
     match splits) add to the area cost (the ``COSTING_HX_AREA_*`` law on the
@@ -55,6 +57,7 @@ class RetrofitSettings:
     beam_width: int = 3
     new_match_candidates: int = 4
     area_tolerance: float = 0.02
+    max_added_area_fraction: float | None = None
     approach: float = DEFAULT_FEASIBILITY_APPROACH
     new_unit_cost: float = 0.0
     area_addition_cost: float = 0.0
@@ -237,6 +240,7 @@ class _Evaluator:
             spec=replace(
                 structure.spec,
                 area_tolerance=float(settings.area_tolerance),
+                max_added_area_fraction=settings.max_added_area_fraction,
                 enlargeable_recovery=enlargeable["recovery"],
                 enlargeable_utilities=enlargeable["utility"],
             ),

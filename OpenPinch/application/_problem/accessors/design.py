@@ -921,6 +921,7 @@ class _DesignAccessor:
         beam_width: int = 3,
         new_match_candidates: int = 4,
         area_tolerance: float = 0.02,
+        max_added_area_fraction: float | None = None,
         min_approach_temperature: float | None = None,
         new_unit_cost: float | None = None,
         area_addition_cost: float = 0.0,
@@ -957,6 +958,8 @@ class _DesignAccessor:
         ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
         added area on an existing exchanger adds ``area_addition_cost``, all
         in $ and annualised with the capital recovery factor.
+        ``max_added_area_fraction`` caps the added area on an existing
+        exchanger at that fraction of its installed area (None: no cap).
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
@@ -1000,6 +1003,7 @@ class _DesignAccessor:
                     beam_width=beam_width,
                     new_match_candidates=new_match_candidates,
                     area_tolerance=area_tolerance,
+                    max_added_area_fraction=max_added_area_fraction,
                     approach=(
                         DEFAULT_FEASIBILITY_APPROACH
                         if min_approach_temperature is None
