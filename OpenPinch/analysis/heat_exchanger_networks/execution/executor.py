@@ -95,7 +95,8 @@ class LocalSynthesisExecutor:
 
         max_parallel = supported_workers(int(max_parallel))
         worker_count = max(1, min(max_parallel, len(tasks)))
-        if worker_count > 1 and _can_build_tasks_in_workers(tasks, parent_outcomes):
+        pool = self._start_pool(worker_count)
+        if pool is not None and _can_build_tasks_in_workers(tasks, parent_outcomes):
             solve_inputs = (
                 (
                     task,
@@ -108,7 +109,7 @@ class LocalSynthesisExecutor:
             )
             solved_results = self._reported(
                 tasks,
-                self._map(_build_and_solve_root_task, solve_inputs, worker_count),
+                self._run(pool, _build_and_solve_root_task, solve_inputs),
                 0,
             )
             return self._collect_outcomes(tasks, solved_results, {})
@@ -146,11 +147,16 @@ class LocalSynthesisExecutor:
                     failed[task.task_id] = _failed_task_outcome(task, str(exc))
 
         worker_count = max(1, min(max_parallel, len(built)))
+        if pool is not None and worker_count == 1:
+            # At most one task built: close the unused pool and solve here.
+            with pool:
+                pass
+            pool = None
         branch_parallel = max(1, max_parallel) if worker_count == 1 else 1
-        # Serial tasks share the evolution topologies they solve. Tasks in
-        # worker processes do not: what they shared would depend on which
-        # tasks a worker happened to run.
-        solved_topologies: dict | None = {} if worker_count == 1 else None
+        # Serial tasks, including those of a pool that could not start, share
+        # the evolution topologies they solve. Tasks in worker processes do
+        # not: what they shared would depend on which tasks a worker ran.
+        solved_topologies: dict | None = {} if pool is None else None
         solve_inputs = (
             (
                 task,
@@ -165,24 +171,30 @@ class LocalSynthesisExecutor:
         # Tasks that failed to build count as done.
         done = len(tasks) - len(built)
         solved_results = self._reported(
-            tasks, self._map(_solve_built_task, solve_inputs, worker_count), done
+            tasks, self._run(pool, _solve_built_task, solve_inputs), done
         )
 
         return self._collect_outcomes(tasks, solved_results, failed)
 
-    def _map(self, func, inputs, worker_count: int):
-        """Yield ``func`` over ``inputs``, in a worker pool when one can start."""
-        if worker_count > 1:
-            try:
-                pool = self.worker_pool_factory(worker_count)
-            except NotImplementedError as exc:
-                logger.debug("Solving HEN tasks serially: %s", exc)
-            else:
-                with pool:
-                    yield from pool.map(func, inputs)
-                return
-        for worker_args in inputs:
-            yield func(worker_args)
+    def _start_pool(self, worker_count: int):
+        """A pool of ``worker_count`` workers, or ``None`` to run serially."""
+        if worker_count <= 1:
+            return None
+        try:
+            return self.worker_pool_factory(worker_count)
+        except NotImplementedError as exc:
+            logger.debug("Solving HEN tasks serially: %s", exc)
+            return None
+
+    @staticmethod
+    def _run(pool, func, inputs):
+        """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``."""
+        if pool is None:
+            for worker_args in inputs:
+                yield func(worker_args)
+            return
+        with pool:
+            yield from pool.map(func, inputs)
 
     def _reported(
         self,

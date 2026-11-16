@@ -277,6 +277,23 @@ def test_tasks_share_one_store_where_worker_processes_cannot_start(monkeypatch):
     assert isinstance(received[0], dict) and received[1] is received[0]
 
 
+def test_tasks_share_one_store_when_the_pool_falls_back_to_serial(monkeypatch):
+    def no_pool(workers):
+        raise NotImplementedError("no main guard")
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    received = _stub_stage(monkeypatch)
+
+    LocalSynthesisExecutor(worker_pool_factory=no_pool).execute(
+        [_evolution_task(index) for index in range(2)],
+        problem=None,
+        parent_outcomes={},
+        max_parallel=2,
+    )
+
+    assert isinstance(received[0], dict) and received[1] is received[0]
+
+
 def test_a_built_evolution_task_hands_the_store_to_its_solve():
     store: dict = {}
 
