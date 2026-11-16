@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import warnings
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -86,6 +87,24 @@ def _solve_flow_on_system(model) -> np.ndarray | None:
         columns.append(column)
         coefficients.append(coefficient)
 
+    # A gamma row's flow-on terms depend on its stream and stage only, so
+    # they are computed once and shared by every partner's row. Zero terms
+    # are dropped here rather than once per partner.
+    hot_flow_on = {
+        (i, k): _nonzero_terms(
+            (j0, -model.beta_h[i][j0][k] * model.P_h[i][j0][k]) for j0 in range(model.J)
+        )
+        for i in range(model.I)
+        for k in range(1, model.S)
+    }
+    cold_flow_on = {
+        (j, k): _nonzero_terms(
+            (i0, -model.beta_c[i0][j][k] * model.P_c[i0][j][k]) for i0 in range(model.I)
+        )
+        for j in range(model.J)
+        for k in range(model.S - 1)
+    }
+
     for k, j, i in _recovery_indices(model):
         row = alpha(i, j, k)
         add(row, row, 1.0)
@@ -96,23 +115,15 @@ def _solve_flow_on_system(model) -> np.ndarray | None:
         row = gamma_h(i, j, k)
         add(row, row, 1.0)
         if k + 1 < model.S:
-            for j0 in range(model.J):
-                add(
-                    row,
-                    alpha(i, j0, k + 1),
-                    -model.beta_h[i][j0][k + 1] * model.P_h[i][j0][k + 1],
-                )
+            for j0, coefficient in hot_flow_on[i, k + 1]:
+                add(row, alpha(i, j0, k + 1), coefficient)
             add(row, gamma_h(i, j, k + 1), -(1 - model.z_j[i][k + 1]))
 
         row = gamma_c(i, j, k)
         add(row, row, 1.0)
         if k > 0:
-            for i0 in range(model.I):
-                add(
-                    row,
-                    alpha(i0, j, k - 1),
-                    -model.beta_c[i0][j][k - 1] * model.P_c[i0][j][k - 1],
-                )
+            for i0, coefficient in cold_flow_on[j, k - 1]:
+                add(row, alpha(i0, j, k - 1), coefficient)
             add(row, gamma_c(i, j, k - 1), -(1 - model.z_i[j][k - 1]))
 
     matrix = sp.csc_matrix(
@@ -129,6 +140,10 @@ def _solve_flow_on_system(model) -> np.ndarray | None:
     if np.max(np.abs(solution)) > _ALPHA_BOUND + _SOLVE_TOLERANCE:
         return None
     return solution[:count].reshape(model.I, model.J, model.S)
+
+
+def _nonzero_terms(terms) -> list[tuple[int, float]]:
+    return [(index, coefficient) for index, coefficient in terms if coefficient != 0.0]
 
 
 def alpha_value(model, i: int, j: int, k: int) -> float:
@@ -154,10 +169,6 @@ def _recovery_indices(model):
         for j in range(model.J):
             for i in range(model.I):
                 yield k, j, i
-
-
-def _solved_value(value: Any) -> Any:
-    return _execution._value(value)
 
 
 def _unchanged(value: Any) -> Any:
@@ -186,23 +197,6 @@ def _temperature_drop_functions(
             return value(model.T_c[j][k]) - value(model.T_c[j][k + 1])
 
     return hot_drop, cold_rise
-
-
-def _set_flow_fraction_grids(
-    model,
-    value: Callable[[Any], Any],
-    flow_fraction: Callable[[Any, int, int, int], Any],
-) -> None:
-    """Set ``P_h`` and ``P_c`` from the hot drop and cold rise numerators."""
-
-    hot_drop, cold_rise = _temperature_drop_functions(model, value)
-    shape = _recovery_grid_shape(model)
-    model.P_h = build_index_grid(
-        lambda i, j, k: flow_fraction(lambda: hot_drop(i, j, k), i, j, k), shape
-    )
-    model.P_c = build_index_grid(
-        lambda i, j, k: flow_fraction(lambda: cold_rise(i, j, k), i, j, k), shape
-    )
 
 
 def _heat_load_total_grids(
@@ -242,38 +236,74 @@ def _set_match_indicator_grids(
     )
 
 
+def _solved_grids(model) -> SimpleNamespace:
+    """Read each solved value the flow fractions use once, as plain floats."""
+
+    def solved(grid, shape):
+        return build_index_grid(
+            lambda *index: _execution._value(_at(grid, index)), shape
+        )
+
+    boundaries = model.S + 1
+    grids = SimpleNamespace(
+        I=model.I,
+        J=model.J,
+        S=model.S,
+        non_isothermal_model=model.non_isothermal_model,
+        T_h=solved(model.T_h, (model.I, boundaries)),
+        T_c=solved(model.T_c, (model.J, boundaries)),
+        Q_r=solved(model.Q_r, _recovery_grid_shape(model)),
+        z=solved(model.z, _recovery_grid_shape(model)),
+    )
+    if model.non_isothermal_model:
+        grids.T_h_out_x = solved(model.T_h_out_x, _recovery_grid_shape(model))
+        grids.T_c_out_y = solved(model.T_c_out_y, (model.J, model.I, model.S))
+    return grids
+
+
+def _at(grid, index):
+    for position in index:
+        grid = grid[position]
+    return grid
+
+
 def _set_postoptimisation_flow_fractions(model) -> None:
     """Set numeric flow fractions from a solved model's ``[value]`` arrays."""
 
+    solved = _solved_grids(model)
+
     def flow_fraction(numerator: Callable[[], float], i: int, j: int, k: int):
-        if _execution._value(model.T_h[i][k]) > _execution._value(model.T_c[j][k + 1]):
-            return numerator() / (
-                _execution._value(model.T_h[i][k])
-                - _execution._value(model.T_c[j][k + 1])
-            )
+        if solved.T_h[i][k] > solved.T_c[j][k + 1]:
+            return numerator() / (solved.T_h[i][k] - solved.T_c[j][k + 1])
         return 0.0
 
-    _set_flow_fraction_grids(model, _solved_value, flow_fraction)
+    hot_drop, cold_rise = _temperature_drop_functions(solved, _unchanged)
+    shape = _recovery_grid_shape(model)
+    model.P_h = build_index_grid(
+        lambda i, j, k: flow_fraction(lambda: hot_drop(i, j, k), i, j, k), shape
+    )
+    model.P_c = build_index_grid(
+        lambda i, j, k: flow_fraction(lambda: cold_rise(i, j, k), i, j, k), shape
+    )
 
     model.Sum_Qr_is, model.Sum_Qr_js = _heat_load_total_grids(
-        model, _solved_value, lambda total: [total]
+        solved, _unchanged, lambda total: [total]
     )
     model.beta_h = build_index_grid(
         lambda i, j, k: (
-            _execution._value(model.Q_r[i][j][k])
-            / _execution._value(model.Sum_Qr_is[i][k])
-            if _execution._value(model.Sum_Qr_is[i][k]) > 0
+            solved.Q_r[i][j][k] / model.Sum_Qr_is[i][k][0]
+            if model.Sum_Qr_is[i][k][0] > 0
             else 0.0
         ),
-        _recovery_grid_shape(model),
+        shape,
     )
     model.beta_c = build_index_grid(
         lambda i, j, k: (
-            _execution._value(model.Q_r[i][j][k])
-            / _execution._value(model.Sum_Qr_js[j][k])
-            if _execution._value(model.Sum_Qr_js[j][k]) > 0
+            solved.Q_r[i][j][k] / model.Sum_Qr_js[j][k][0]
+            if model.Sum_Qr_js[j][k][0] > 0
             else 0.0
         ),
-        _recovery_grid_shape(model),
+        shape,
     )
-    _set_match_indicator_grids(model, _solved_value, _unchanged)
+    _set_match_indicator_grids(solved, _unchanged, _unchanged)
+    model.z_i, model.z_j = solved.z_i, solved.z_j
