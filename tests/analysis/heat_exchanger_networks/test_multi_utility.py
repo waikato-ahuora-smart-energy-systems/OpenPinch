@@ -369,3 +369,36 @@ def _flatten(grid):
             yield from _flatten(item)
         else:
             yield item
+
+
+def test_stagewise_big_m_values_are_python_floats(monkeypatch):
+    # A NumPy scalar in front of a Pyomo term, as in M * (1 - z) or
+    # Q_max * z, goes through NumPy's ufunc dispatch first: 3.5 million
+    # times, several seconds, in a pulp mill design's build. The model is
+    # built, not solved, so no solver executable is needed.
+    pytest.importorskip("pyomo.environ")
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+
+    monkeypatch.setattr(backend, "require_solver_backend", lambda _name: None)
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
+    arrays = problem_to_solver_arrays(
+        _two_cold_utility_problem(40.0, glycol_first=True), D_TMIN
+    )
+    model = StageWiseModel(
+        name="big-m",
+        framework="TDM",
+        solver="couenne",
+        solver_arrays=arrays,
+        stages=1,
+        dTmin=D_TMIN,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+    )
+
+    big_m = [*_flatten(model.M_ij_period), *_flatten(model.Q_max_period)]
+    assert big_m
+    assert all(type(value) is float for value in big_m)
