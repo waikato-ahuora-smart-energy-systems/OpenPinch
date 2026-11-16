@@ -548,19 +548,19 @@ Relocation
    ``relocation_cost`` (default ``None``: no relocations) is the fixed cost
    of moving an existing recovery exchanger, plus ``split_cost`` per stream
    the move splits; the moved exchanger keeps its installed area at no area
-   cost. ``relocation_candidates`` (default 8) moves are tried from each
-   design, ordered by the heat the new position could recover less the duty
-   the exchanger gives up. The stepwise search tries only moves that gain
-   more than they give up; the default search passes them all to the
-   ceiling ranking, where relocations and new matches each get
-   ``new_match_candidates`` full solves. On Akpomiemie and Smith's case,
-   with ``relocation_candidates=100`` it finds the paper's resequencing of
-   exchanger 7 as the best single change; at the default eight that move
-   ranks too low to be tried. Relocation can enlarge the search several-fold:
-   on the Ciric and Floudas case with 30 candidates it takes 319 solves
-   instead of 48 with the stepwise search, and leaves the frontier
-   unchanged, since most moves strand a stream whose utility exchanger is
-   already at its area.
+   cost. The default search ranks every possible move by its ceiling, where
+   relocations and new matches each get ``new_match_candidates`` full
+   solves. A simple score, the heat the new position could recover less the
+   duty the exchanger gives up, barely tracks the ceiling: on Akpomiemie and
+   Smith's case the paper's resequencing of exchanger 7 has the best ceiling
+   of 395 moves but scores 127th. Ranking them all, the search finds that
+   move and builds on it ($740,000/y net at two changes, against $712,000/y
+   when only the 100 best-scored moves were ranked), at a cost: 2,621 solves
+   and about 100 s instead of 889 and 28 s. The stepwise search tries the
+   ``relocation_candidates`` (default 8) best-scored moves, and only those
+   that gain more than they give up. On the Ciric and Floudas case
+   relocation leaves the frontier unchanged, since most moves strand a
+   stream whose utility exchanger is already at its area.
 New utility exchangers
    A new heater or cooler never lowers utility cost by itself, but it can
    free the recovery units a move needs: a cooler on a hot stream that has

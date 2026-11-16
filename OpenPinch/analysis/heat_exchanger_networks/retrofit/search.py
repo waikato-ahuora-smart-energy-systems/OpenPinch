@@ -71,7 +71,8 @@ class RetrofitSettings:
     match splits) add to the area cost (the ``COSTING_HX_AREA_*`` law on the
     added area). ``relocation_cost`` ($ per existing recovery exchanger moved
     to another match or position, plus ``split_cost`` per new split) enables
-    relocation moves (``relocation_candidates`` tried from each design);
+    relocation moves (all ranked by ceiling in the structure search, the
+    ``relocation_candidates`` best scored in the stepwise one);
     ``None`` leaves them out. ``new_utility_units`` also tries each new match
     and relocation with each new end heater or cooler the network lacks, in
     the same step, priced as one more new unit.
@@ -268,15 +269,16 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
 
 
 def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
-    """The ``relocation_candidates`` most promising relocations from ``parent``.
+    """The relocations from ``parent``, most promising first.
 
     Each existing recovery unit not yet moved may go to any screened match
     that shares one of its streams (its own pair elsewhere is a repiping).
     A move scores the match's potential less the unit's present duty, the
-    heat it gives up, best first. The stepwise search keeps positive scores
-    only; the structure search keeps them all, as the ceiling ranking judges
-    a move by what its whole structure can reach. A unit that is the only
-    exchanger on one of its streams stays on that stream.
+    heat it gives up, best first. The stepwise search keeps the
+    ``relocation_candidates`` best positive scores; the structure search
+    keeps every move, as the ceiling ranking judges a move by what its whole
+    structure can reach and the score barely tracks that. A unit that is the
+    only exchanger on one of its streams stays on that stream.
     """
 
     solved = parent.solved
@@ -309,6 +311,8 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
                 if score > 0.0 or settings.strategy == "structure":
                     scored.append((score, unit, match))
     scored.sort(key=lambda item: -item[0])
+    if settings.strategy == "structure":
+        return [(unit, match) for _score, unit, match in scored]
     limit = max(0, int(settings.relocation_candidates))
     return [(unit, match) for _score, unit, match in scored[:limit]]
 

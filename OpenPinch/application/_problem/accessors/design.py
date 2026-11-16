@@ -968,9 +968,10 @@ class _DesignAccessor:
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
         split) a step may also move an existing recovery exchanger, with its
         installed area, to a screened match that shares one of its streams
-        (None, the default: no relocations); ``relocation_candidates`` are
-        tried from each design, ranked by the match's heat potential less the
-        unit's present duty. With ``new_utility_units`` each new match and
+        (None, the default: no relocations). The default search ranks every
+        such move by its ceiling; the stepwise search tries the
+        ``relocation_candidates`` with the most heat potential at the match
+        less the unit's present duty. With ``new_utility_units`` each new match and
         relocation is also tried together with a new end heater or cooler on
         a stream that has none, which can free the units a move needs; the
         pair is one modification, costing one more ``new_unit_cost`` and the

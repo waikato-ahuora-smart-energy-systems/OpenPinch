@@ -444,12 +444,11 @@ def test_the_ceiling_ranks_relocations_that_give_up_more_than_they_gain(
             max_modifications=1,
             new_match_candidates=1,
             relocation_cost=5_000.0,
-            relocation_candidates=3,
             **COSTS,
         ),
     )
 
-    assert ranked.count("relocation") == 3
+    assert ranked.count("relocation") > 0
 
 
 def test_relocations_and_new_matches_each_get_their_best_solved(
@@ -482,3 +481,38 @@ def test_relocations_and_new_matches_each_get_their_best_solved(
 
     assert solved.count("new_match") == 2
     assert solved.count("relocation") == 2
+
+
+def test_the_structure_search_ranks_every_relocation_by_its_ceiling(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # The pre-score barely tracks the ceiling (the Smith case's best move
+    # scores 127th of 395), so the structure search caps nothing before
+    # the ceiling ranking: relocation_candidates bounds the stepwise search.
+    ranked = []
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        ranked.append(state.moves[-1].kind)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+
+    def relocations_ranked(candidates: int) -> int:
+        ranked.clear()
+        search.run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=1,
+                new_match_candidates=1,
+                relocation_cost=5_000.0,
+                relocation_candidates=candidates,
+                **COSTS,
+            ),
+        )
+        return ranked.count("relocation")
+
+    assert relocations_ranked(1) == relocations_ranked(1_000) > 1
