@@ -535,3 +535,24 @@ def test_design_retrofit_takes_the_existing_network_as_a_mapping():
     else:
         assert modification.exchanger_id in EXISTING_AREAS
         assert modification.fixed_cost == pytest.approx(8_650.0)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_batch_design_retrofit_runs_on_every_selected_case():
+    from OpenPinch import PinchWorkspace
+
+    workspace = PinchWorkspace(source=json.loads(CASE_JSON.read_text("utf-8")))
+    workspace.scenario("scenario", activate=False)
+
+    batch = workspace.cases().design.retrofit(
+        existing=EXISTING_STRUCTURE, max_modifications=1, beam_width=2
+    )
+
+    assert dict(batch.errors) == {}
+    assert len(batch.results) == 2
+    for result in batch.results.values():
+        assert result.frontier[0].hot_utility == pytest.approx(
+            REPORTED_HOT_UTILITY, rel=0.02
+        )
