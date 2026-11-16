@@ -69,6 +69,8 @@ METHOD_CATALOG = MappingProxyType(
             periods="nonmutating", adapter="inverse_dt_min"
         ),
         "target.hpr_load_kinks": _spec(periods="nonmutating", adapter="load_kinks"),
+        # Describes the registered cycles; reads no problem data.
+        "target.hpr_cycles": _spec(periods="nonmutating", adapter="cycle_catalog"),
         **{
             f"target.{name}": _spec(
                 scopes=AGGREGATE_SCOPES + (ZoneType.UO.value,),
@@ -78,6 +80,7 @@ METHOD_CATALOG = MappingProxyType(
                 else (),
             )
             for name in (
+                "heat_pump_and_refrigeration",
                 "carnot_heat_pump",
                 "carnot_refrigeration",
                 "vapour_compression_heat_pump",
@@ -126,18 +129,17 @@ METHOD_CATALOG = MappingProxyType(
             periods="nonmutating",
             adapter="refrigerant_screen",
         ),
+        # Reads the problem's inputs only: no targets, solver or synthesis.
+        "design.design_basis": _spec(periods="shared", adapter="hen"),
         **{
             f"design.{name}": _spec(
                 prerequisites=("direct_heat_integration",),
-                periods="shared"
-                if name == "multiperiod_heat_exchanger_network"
-                else "specialized",
+                periods="shared" if name == "heat_exchanger_network" else "specialized",
                 dependencies=("synthesis", "external solver"),
                 adapter="hen",
             )
             for name in (
                 "heat_exchanger_network",
-                "multiperiod_heat_exchanger_network",
                 "network_evolution",
                 "optimise_duties",
                 "pinch_design",

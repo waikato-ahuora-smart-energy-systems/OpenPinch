@@ -172,8 +172,16 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
     *,
     settings: SynthesisWorkflowSettings | None = None,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Generate ESM tasks directly from PDM or heuristic pinch design outcomes."""
+    """Generate ESM tasks directly from PDM or heuristic pinch design outcomes.
+
+    With ``settings``, only the ``heuristic_pdm_evolution_seeds`` cheapest
+    heuristic networks per dt_cont multiplier seed evolution.
+    """
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
+    if settings is not None:
+        pdm_outcomes = _cheapest_heuristic_seeds(
+            pdm_outcomes, settings.heuristic_pdm_evolution_seeds
+        )
     for outcome in pdm_outcomes:
         heuristic = _successful_method(
             outcome, HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
@@ -207,6 +215,34 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
             )
         )
     return tuple(tasks)
+
+
+def _cheapest_heuristic_seeds(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+    limit: int,
+) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
+    """Drop all but the ``limit`` cheapest heuristic networks per multiplier."""
+    groups: dict[tuple, list[HeatExchangerNetworkSynthesisTaskOutcome]] = {}
+    for outcome in outcomes:
+        if _successful_method(
+            outcome, HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
+        ):
+            task = outcome.task
+            key = (
+                task.problem_id,
+                task.workspace_variant,
+                task.period_id,
+                task.dt_cont_multiplier,
+            )
+            groups.setdefault(key, []).append(outcome)
+    dropped = {
+        id(outcome)
+        for group in groups.values()
+        for outcome in sorted(group, key=lambda outcome: outcome.objective_value)[
+            limit:
+        ]
+    }
+    return tuple(outcome for outcome in outcomes if id(outcome) not in dropped)
 
 
 def _standard_evolution_task(

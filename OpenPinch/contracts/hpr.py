@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, List, Literal, Optional, Self
+from typing import Annotated, Any, List, Literal, Optional, Self
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -765,8 +765,216 @@ def _detach_hpr_output_value(value: Any) -> Any:
     return value
 
 
+# -- Gateway request: target.heat_pump_and_refrigeration ---------------------
+
+
+class _RequestModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+
+class HprLoad(_RequestModel):
+    """The heat pump or refrigeration load: exactly one form.
+
+    ``fraction`` of the target load, a ``duty`` in kW, or ``period_loads`` in kW
+    by period id.
+    """
+
+    fraction: float | None = None
+    duty: float | None = None
+    period_loads: dict[str, float] | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> Self:
+        given = [
+            name
+            for name in ("fraction", "duty", "period_loads")
+            if getattr(self, name) is not None
+        ]
+        if len(given) != 1:
+            raise ValueError(
+                "a load takes exactly one of fraction, duty or period_loads; "
+                f"got {', '.join(given) or 'none'}."
+            )
+        return self
+
+
+class HprLevels(_RequestModel):
+    """Condenser and evaporator levels, and the cycle's minimum approach."""
+
+    condensers: int | None = Field(default=None, ge=1)
+    evaporators: int | None = Field(default=None, ge=1)
+    minimum_approach_temperature: float | None = Field(default=None, ge=0.0)
+
+
+class HprSearchLimits(_RequestModel):
+    """Optimisation limits: multistart restarts (0 for the first start only),
+    iterations and evaluations."""
+
+    # 0 runs the first start only, as HPR_MAX_MULTISTART does.
+    restarts: int | None = Field(default=None, strict=True, ge=0)
+    iterations: int | None = Field(default=None, strict=True, ge=1)
+    evaluations: int | None = Field(default=None, strict=True, ge=1)
+
+
+_Efficiency = Field(default=None, gt=0.0, le=1.0)
+# 0 means no expander recovery, as HPR_ETA_EXP allows.
+_ExpanderEfficiency = Field(default=None, ge=0.0, le=1.0)
+
+
+class CarnotCycleOptions(_RequestModel):
+    """Carnot cycle options: second-law efficiencies."""
+
+    cycle: Literal["carnot"] = "carnot"
+    compressor_efficiency: float | None = _Efficiency
+    expander_efficiency: float | None = _ExpanderEfficiency
+
+
+class VapourCompressionCycleOptions(_RequestModel):
+    """Vapour compression options.
+
+    ``refrigerants`` is a list of fluids or a refrigerant screen result
+    (one run per proposed fluid set). ``compressor_model`` may be a compressor
+    efficiency function in a call; such a function is not stored.
+    """
+
+    cycle: Literal["vapour_compression"] = "vapour_compression"
+    compressor_efficiency: float | None = _Efficiency
+    expander_efficiency: float | None = _ExpanderEfficiency
+    refrigerants: Any = None
+    initialize_from_carnot: bool | None = None
+    sort_refrigerants: bool | None = None
+    allow_integrated_expander: bool | None = None
+    compressor_model: Any = None
+    simulation_backend: str = "coolprop"
+
+
+class MvrCycleOptions(_RequestModel):
+    """Vapour compression with an MVR cascade: fluids, stages, efficiencies."""
+
+    cycle: Literal["mvr"] = "mvr"
+    refrigerants: Any = None
+    mvr_fluids: Any = None
+    mvr_compressor_efficiency: float | None = _Efficiency
+    mvr_compressor_model: Any = None
+    compressor_model: Any = None
+    mvr_stages: int | None = Field(default=None, ge=1)
+    motor_efficiency: float | None = _Efficiency
+
+
+class BraytonCycleOptions(_RequestModel):
+    """Brayton cycle options: compressor and expander efficiencies."""
+
+    cycle: Literal["brayton"] = "brayton"
+    compressor_efficiency: float | None = _Efficiency
+    expander_efficiency: float | None = _ExpanderEfficiency
+
+
+HprCycleOptions = Annotated[
+    CarnotCycleOptions
+    | VapourCompressionCycleOptions
+    | MvrCycleOptions
+    | BraytonCycleOptions,
+    Field(discriminator="cycle"),
+]
+
+
+class HprTargetRequest(_RequestModel):
+    """One heat pump or refrigeration target, for any registered cycle.
+
+    ``placement`` is ``process`` (direct, against the process) or ``utility``
+    (indirect); ``topology`` defaults to the cycle's own. ``cycle_options``
+    are the cycle's own options, its ``cycle`` matching ``cycle``.
+    """
+
+    cycle: str = "carnot"
+    duty: Literal["heat_pump", "refrigeration"] = "heat_pump"
+    topology: str | None = None
+    placement: Literal["process", "utility"] = "process"
+    load: HprLoad | None = None
+    levels: HprLevels | None = None
+    # A mapping for a cycle registered beyond the four above; the gateway
+    # validates it with that cycle's own options model.
+    cycle_options: HprCycleOptions | dict[str, Any] | None = None
+    search: HprSearchLimits | None = None
+    zone: str | None = None
+    include_subzones: bool = False
+    period_id: str | None = None
+    options: dict[str, Any] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _options_name_the_cycle(cls, data):
+        options = data.get("cycle_options") if isinstance(data, dict) else None
+        if isinstance(options, BaseModel) and type(options) not in (
+            CarnotCycleOptions,
+            VapourCompressionCycleOptions,
+            MvrCycleOptions,
+            BraytonCycleOptions,
+        ):
+            # A registered cycle's own options model: the gateway validates
+            # its fields with that model.
+            data = data | {"cycle_options": options.model_dump()}
+        if isinstance(data, dict) and isinstance(data.get("cycle_options"), dict):
+            options = dict(data["cycle_options"])
+            options.setdefault("cycle", data.get("cycle", "carnot"))
+            data = data | {"cycle_options": options}
+        return data
+
+    @model_validator(mode="after")
+    def _options_match_the_cycle(self) -> Self:
+        options = self.cycle_options
+        named = (
+            options.get("cycle")
+            if isinstance(options, dict)
+            else (None if options is None else options.cycle)
+        )
+        if named is not None and named != self.cycle:
+            raise ValueError(
+                f"cycle_options are for the {named} cycle, not {self.cycle}."
+            )
+        return self
+
+
+class HprCycleInfo(BaseModel):
+    """One registered heat pump and refrigeration cycle, for a client's form.
+
+    ``options_schema`` is the JSON Schema of the cycle's options model.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    label: str
+    duties: tuple[str, ...]
+    topologies: tuple[str, ...]
+    default_topology: str
+    available: bool
+    all_periods: bool
+    dependencies: tuple[str, ...]
+    options_schema: dict[str, Any]
+
+
+class HprCycleCatalog(BaseModel):
+    """Every registered cycle, in registration order."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cycles: tuple[HprCycleInfo, ...]
+
+
 __all__ = [
     "ZERO_USEFUL_DUTY_REASON",
+    "BraytonCycleOptions",
+    "CarnotCycleOptions",
+    "HprCycleCatalog",
+    "HprCycleInfo",
+    "HprCycleOptions",
+    "HprLevels",
+    "HprLoad",
+    "HprSearchLimits",
+    "HprTargetRequest",
+    "MvrCycleOptions",
+    "VapourCompressionCycleOptions",
     "HPRActiveStage",
     "HPRAlternativeDesign",
     "HPREffectiveTopology",

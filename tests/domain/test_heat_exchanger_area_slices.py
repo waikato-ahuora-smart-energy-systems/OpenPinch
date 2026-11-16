@@ -61,12 +61,24 @@ def test_segment_area_totals_and_design_area_are_parent_properties():
     assert exchanger.area == 7.0
 
 
-def test_segment_area_rejects_inconsistent_parent_area():
+def test_segment_area_rejects_a_parent_area_below_what_a_period_needs():
     with pytest.raises(ValueError, match="maximum period-total segment area"):
         _exchanger(
             slices=(_slice(period="normal", duty=10.0, area=5.0),),
-            area=6.0,
+            area=4.0,
         )
+
+
+def test_an_installed_area_above_what_the_periods_need_is_kept():
+    # An overdesigned exchanger: a period needing less area runs with a
+    # bypass. It used to be rejected, as the area had to equal the slices'.
+    exchanger = _exchanger(
+        slices=(_slice(period="normal", duty=10.0, area=5.0),),
+        area=6.0,
+    )
+
+    assert exchanger.area == 6.0
+    assert exchanger.segment_design_area == 5.0
 
 
 def test_constant_cp_exchanger_area_behavior_is_unchanged():

@@ -1,0 +1,119 @@
+"""Fitting a network designed on one basis to every operating period.
+
+A network synthesised on one period (or a synthetic one) may leave another
+period's stream with load no exchanger can take. Before the fixed-structure
+fit over all periods, each stream without a utility at its end gets one, the
+cheapest that can serve it there in every period; the fit's zero-duty pruning
+removes those no period uses.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+from ...domain.enums import HeatExchangerKind
+from ...domain.heat_exchanger_network import HeatExchangerNetwork
+from .solver.arrays import problem_to_solver_arrays
+
+# The arrays are read for temperatures and prices only, which no approach
+# temperature changes.
+_ARRAYS_APPROACH = 1.0
+
+
+def with_stream_end_utilities(
+    problem, network: HeatExchangerNetwork, *, approach: float
+) -> HeatExchangerNetwork:
+    """``network`` with a heater or cooler at each stream end every period can use.
+
+    An end utility of ``network`` that cannot keep ``approach`` at both ends
+    in every period its stream runs is dropped. Each stream then without one
+    gets the cheapest that can: a hot utility for a cold stream, a cold
+    utility for a hot stream, priced by the period-weighted utility price. A
+    stream no utility can serve that way gets none.
+    """
+
+    arrays = problem_to_solver_arrays(problem, _ARRAYS_APPROACH)
+    values, axes = arrays.arrays, arrays.axis_maps
+    weights = np.asarray(values["period_weights"], dtype=float)
+
+    def reaches(side: str, stream_index: int, utility_index: int) -> bool:
+        """Whether a utility at the stream's end keeps ``approach`` in every
+        period the stream runs: a heater (``side="hot"``) on a cold stream, or
+        a cooler on a hot stream."""
+        if side == "hot":
+            stream_in, stream_out = values["T_c_in_period"], values["T_c_out_period"]
+            util_in, util_out = values["T_hu_in_period"], values["T_hu_out_period"]
+            running = values["f_c_period"][:, stream_index] > 0.0
+            sign = 1.0
+        else:
+            stream_in, stream_out = values["T_h_in_period"], values["T_h_out_period"]
+            util_in, util_out = values["T_cu_in_period"], values["T_cu_out_period"]
+            running = values["f_h_period"][:, stream_index] > 0.0
+            sign = -1.0
+        # Hot side: the utility's outlet against the stream's inlet, its inlet
+        # against the stream's target; cold side mirrored.
+        gaps = np.minimum(
+            sign * (util_out[:, utility_index] - stream_in[:, stream_index]),
+            sign * (util_in[:, utility_index] - stream_out[:, stream_index]),
+        )
+        return not np.any(gaps[running] < approach)
+
+    def cheapest(stream_index: int, side: str):
+        names = axes["hot_utilities" if side == "hot" else "cold_utilities"]
+        prices = values["hu_cost_period" if side == "hot" else "cu_cost_period"]
+        best = None
+        for name, u in names.items():
+            if not reaches(side, stream_index, u):
+                continue
+            price = float(np.dot(weights, prices[:, u]))
+            if best is None or price < best[0]:
+                best = (price, name)
+        return None if best is None else best[1]
+
+    recovery, heaters, coolers = [], [], []
+    served = set()
+    for exchanger in network.exchangers:
+        if exchanger.kind == HeatExchangerKind.RECOVERY:
+            recovery.append(
+                (exchanger.source_stream, exchanger.sink_stream, exchanger.stage)
+            )
+            continue
+        heater = exchanger.kind == HeatExchangerKind.HOT_UTILITY
+        stream, utility = (
+            (exchanger.sink_stream, exchanger.source_stream)
+            if heater
+            else (exchanger.source_stream, exchanger.sink_stream)
+        )
+        if exchanger.stage is not None:
+            (heaters if heater else coolers).append((stream, utility, exchanger.stage))
+            continue
+        # An end utility the basis period could use may not reach the stream
+        # in another period: it is replaced by one that does.
+        side = "hot" if heater else "cold"
+        streams = axes["cold_process_streams" if heater else "hot_process_streams"]
+        utilities = axes["hot_utilities" if heater else "cold_utilities"]
+        if not reaches(side, streams[stream], utilities[utility]):
+            continue
+        (heaters if heater else coolers).append((stream, utility))
+        served.add(stream)
+
+    for side, streams, placements in (
+        ("hot", axes["cold_process_streams"], heaters),
+        ("cold", axes["hot_process_streams"], coolers),
+    ):
+        for stream, index in streams.items():
+            if stream in served:
+                continue
+            utility = cheapest(index, side)
+            if utility is not None:
+                placements.append((stream, utility))
+
+    return HeatExchangerNetwork.from_structure(
+        recovery=recovery,
+        heaters=heaters,
+        coolers=coolers,
+        stage_count=network.stage_count,
+    )
+
+
+__all__ = ["with_stream_end_utilities"]

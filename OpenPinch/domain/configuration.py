@@ -185,6 +185,12 @@ class HensConfig:
 
     search_width: int
     search_depth: int
+    design_basis: str
+    basis_clusters: int
+    basis_active_share: float
+    basis_candidates: str
+    overdesign_percentage: float | str | None
+    overdesign_max: float
     dt_cont_multipliers: list[float] | None
     derivative_thresholds: list[float]
     min_exchanger_approach_share: float
@@ -192,6 +198,7 @@ class HensConfig:
     pdm_min_unit_networks: int
     pdm_extra_unit_networks: int
     heuristic_pdm_networks: int | None
+    heuristic_pdm_evolution_seeds: int | None
     pdm_milp: bool | None
     tdm_parent_limit: int | None
     stage_packing: str

@@ -2367,7 +2367,7 @@ class _FakeSolver:
 
 def _patch_pyomo_solve(monkeypatch, solve) -> None:
     pyomo = SimpleNamespace(
-        SolverFactory=lambda _name: _FakeSolver(solve),
+        SolverFactory=lambda _name, **_kwargs: _FakeSolver(solve),
         value=lambda expression, exception=True: expression,
     )
     monkeypatch.setattr(
@@ -3531,3 +3531,31 @@ def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch
 
     assert model.solver == "scip"
     assert configured == [("scip", {"limits/time": 9.0})]
+
+
+class _UnreadableSolverValue:
+    def __float__(self) -> float:
+        raise AssertionError("extraction read the state of an inactive match")
+
+
+def test_extraction_skips_the_state_of_matches_with_no_duty() -> None:
+    # Building period states for every candidate match dominated extraction
+    # on large cases, where nearly all of them carry no duty.
+    solved = _SolvedCase()
+    solved.theta_1[0][1] = [_UnreadableSolverValue()]
+    solved.theta_1[1][0] = [_UnreadableSolverValue()]
+
+    network = extract_heat_exchanger_network(
+        solved, _solver_arrays(), run_id="inactive", include_inactive=False
+    )
+
+    assert (
+        len(
+            [
+                exchanger
+                for exchanger in network.exchangers
+                if exchanger.kind is HeatExchangerKind.RECOVERY
+            ]
+        )
+        == 2
+    )

@@ -119,7 +119,8 @@ enter through ``PinchProblem.design``:
 
    problem.design.heat_exchanger_network()
    problem.design.heat_exchanger_network(width=2, depth=3)
-   problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
+   problem.design.heat_exchanger_network(design_basis="all")
+   problem.design.heat_exchanger_network(period_id="peak")
    problem.design.network_evolution((existing_network,))
    problem.design.optimise_duties(network, objective="cost")
 

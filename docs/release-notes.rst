@@ -4,6 +4,178 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.9.1 (2026-11-16)
+------------------
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``target.heat_pump_and_refrigeration(cycle, ...)`` targets any registered
+  cycle (``"carnot"``, ``"vapour_compression"``, ``"mvr"``; ``"brayton"`` is
+  registered but unavailable) through one call: ``duty``, ``topology`` and
+  ``placement`` as arguments, and the load, levels, the cycle's own options
+  and the search limits as typed models from ``OpenPinch.contracts.hpr``
+  (``HprLoad``, ``HprLevels``, the cycle's options model,
+  ``HprSearchLimits``) or mappings of their fields. ``request=`` takes all of
+  it as one ``HprTargetRequest``, which a client can validate as JSON. It is
+  also on ``target.all_periods``. The seven named methods
+  (``carnot_heat_pump`` and the rest) now run through it with unchanged
+  results.
+- ``target.hpr_cycles()`` lists the registered cycles: duties, topologies,
+  availability, optional dependencies and the JSON Schema of each cycle's
+  options, for building a cycle picker and option form. It is also a
+  command.
+- The cycles are registered once each in
+  ``OpenPinch.analysis.heat_pumps.cycles.registry``: ``register_cycle``,
+  ``cycle_spec``, ``registered_cycles``, ``spec_for_cycle`` and
+  ``family_handlers``, with ``HprCycleSpec`` holding a cycle's topologies,
+  duties, options model and the ``HPR_*`` keys they set, dependencies,
+  screening layouts and analysis handlers. A new cycle is its model, its
+  options model and one ``register_cycle`` call.
+- ``target.all_periods.heat_pump_and_refrigeration(request=...)`` targets
+  each period in turn; a request naming another period than the call is
+  rejected.
+- The named heat pump and refrigeration methods accept
+  ``expander_efficiency=0`` (no expander recovery) and
+  ``maximum_restarts=0`` (the first start only) again; the gateway's models
+  had rejected both.
+- A newly registered cycle with screened refrigerants runs once per
+  proposed fluid set through the gateway, as the named methods do.
+- A multiperiod summary after a heat pump or refrigeration target replays
+  it for each period. The replay failed on the cycle type it had recorded;
+  a recorded run now leaves out the options its method selects and keeps
+  the gateway's cycle, duty, topology and placement, so a parallel or
+  indirect run replays as one.
+
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.heat_exchanger_network(overdesign_percentage=...)`` (stored as
+  ``HENS_OVERDESIGN_PERCENTAGE``) adds a margin to every heat-recovery area
+  and rates the network over every period at those areas, with bypass. A
+  percentage is applied as given; ``"optimise"`` picks the margin up to
+  ``HENS_OVERDESIGN_MAX`` (50 %) for the least total annual cost. The margin,
+  each period's recovery and utility before and after, the cost with and
+  without it, and the margins tried are in
+  ``selected_network.summary_metrics["overdesign"]``.
+  ``design.optimise_duties()`` gains the ``"rating"`` objective: least
+  utility cost at the network's installed areas, recovery, heaters and
+  coolers alike, each of which needs an area. Heaters and coolers keep
+  their installed areas under a margin, so a rated period cannot use more
+  utility than they carry. An exchanger's ``area`` may now exceed what its
+  segment slices need (an installed, overdesigned area); one below them is
+  still rejected.
+- Call ``options`` set ``HENS_DESIGN_BASIS``, ``HENS_BASIS_CLUSTERS``,
+  ``HENS_BASIS_ACTIVE_SHARE``, ``HENS_BASIS_CANDIDATES``,
+  ``HENS_OVERDESIGN_PERCENTAGE`` and ``HENS_OVERDESIGN_MAX`` for that call,
+  as the stored options do; they were ignored. The all-period fit and the
+  rating solves run with the call's options, solver and tolerance, and a
+  median or period design's provenance keeps the settings its basis
+  synthesis ran with. A margin applies to the fitted network only, never
+  also to the basis design.
+- ``application.case_derivation.single_period_case(problem, period_id)``
+  derives a new problem holding one period's data alone.
+- The all-period fit replaces a basis design's end heater or cooler that
+  cannot serve its stream in every period with the cheapest one that can.
+- Median basis clusters of identical periods each keep their own period, so
+  no cluster is left empty.
+- The heuristic pinch design method finds the largest feasible duty of a
+  match exactly, piece by piece along the streams' profiles. With segmented
+  streams, bisection could stop at the end of the first feasible stretch;
+  splits away from the pinch now also find duties that need some load
+  before their stage keeps its approach, which can add complete proposals.
+- A multiperiod ``design.heat_exchanger_network()`` now synthesises on a
+  median basis by default (``HENS_DESIGN_BASIS`` ``"median"``), so default
+  multiperiod results change: a synthetic single-period case of each
+  stream's period-weighted median over the operating periods, whose network
+  is then fitted to every period. ``basis_clusters`` (``HENS_BASIS_CLUSTERS``)
+  groups the periods by weighted k-medoids first and takes the heaviest
+  group's median; ``HENS_BASIS_CANDIDATES`` ``"all"`` tries every group's.
+  ``design.design_basis()`` previews the clusters and the synthetic streams
+  without synthesis. ``design_basis="all"`` keeps the simultaneous
+  all-period design.
+- ``design.multiperiod_heat_exchanger_network()`` is removed, and its
+  command returns ``Unknown command``. ``design.heat_exchanger_network()``
+  now designs multiperiod networks itself: ``design_basis`` (stored as
+  ``HENS_DESIGN_BASIS``) sets what the network is synthesised from.
+  ``"all"`` designs over every period at once, as the multiperiod method
+  did, running all-period targeting first when there is
+  none; ``design_basis="all"`` reproduces the old results. A saved design
+  from the removed method reads back as ``design.heat_exchanger_network``
+  with ``HENS_DESIGN_BASIS`` ``"all"``.
+- ``period_id`` on a multiperiod ``heat_exchanger_network()`` is now a basis
+  period, and its results change. Synthesis runs on that period alone, then
+  the network is fitted to every period: one area per exchanger, the largest
+  any period needs, with a bypass where a period needs less, and a heater or
+  cooler at a stream end where a period needs one. Before, ``period_id`` only
+  labelled the run, which still designed over every period.
+
+- Network evolution runs the ``openpinch-solvers`` Ipopt again when IDAES is
+  installed. Looking for Couenne (the default TDM solver) imports IDAES,
+  which puts its older Ipopt download first on ``PATH``, so every later
+  evolution solve ran that Ipopt instead. The IDAES directory is now a
+  fallback after ``openpinch-solvers`` however it reached ``PATH``, and Ipopt
+  and Couenne run the executable found when their solve is configured.
+  OpenPinch's own IDAES lookup no longer leaves IDAES first on ``PATH``, so
+  worker processes, which inherit it, also run the ``openpinch-solvers``
+  Ipopt. Ipopt runs as the bundled executable rather than through the
+  ``ipopt`` launcher ``openpinch-solvers`` installs, which started Python
+  for every solve (about 17 ms each).
+- Multiperiod networks converge where Ipopt's restoration phase failed. The
+  area cost's offset at zero area rises from 1e-8 m2 to 1e-4 m2, which keeps
+  its slope at an idle unit's zero area moderate: every root solve of the
+  dairy chilling sample ended "Restoration Failed" at a feasible point, and
+  now all ten converge, with the same final network.
+- The default (single-path) network evolution solves each topology once per
+  search. It cycled through the same add and remove moves and re-solved
+  them, including one infeasible removal at every depth; it now reuses the
+  first solve. On the twelve literature cases and the dairy sample this cuts
+  evolution solves by about a third, with the same final networks.
+- Ipopt (``ipopt-pyomo``) now defaults to ``acceptable_tol 1e-4``,
+  ``acceptable_iter 5`` and ``max_wall_time 120`` alongside its bound
+  pushes, so a solve that stalls near the optimum stops there, and a solve
+  that hangs stops after two minutes. Nine-stream's evolution solves that
+  stalled short of convergence now converge, with the same networks.
+  Together with the changes above, network evolution on the twelve
+  literature cases and the dairy sample takes about 30 % less wall time and
+  40 % less Ipopt time, every root solve converges (221 of 221, from 211),
+  and every final network and its cost are unchanged.
+  ``acceptable_iter`` and ``max_wall_time`` need Ipopt 3.14 or later, which
+  ``openpinch-solvers`` ships; an older Ipopt first on ``PATH`` rejects them
+  and fails its solves. Set any of them in the stage's solver options to
+  change it.
+- Only the cheapest heuristic pinch design networks seed network evolution:
+  ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS`` per dt_cont multiplier, set by the
+  search depth when unset (3 at depths 1 and 2, 20 at depth 3, 50 at
+  depth 4). The rest are still final candidates. Previously every heuristic
+  network seeded evolution. On the 12 OpenHENS benchmark cases at the
+  default width and depth, evolution goes from up to 30 seeds per case to
+  up to 9, about half the run time, with the same best network on every
+  case. Set the option to ``HENS_HEURISTIC_PDM_NETWORKS`` or more to evolve
+  every network as before.
+- The heuristic pinch design method searches a pinch side again when it
+  finds fewer complete proposals than ``HENS_HEURISTIC_PDM_NETWORKS``: first
+  trying the next nearest must streams to the pinch as well as the nearest,
+  then splitting a partner away from the pinch when no partner can take a
+  stream's load in series. New proposals follow the first search's, so
+  existing ones and their order are unchanged. On the
+  12 OpenHENS benchmark cases at the default width and depth 0, Ten-stream
+  Ahmad at multiplier 1.0 now gets heuristic networks where the MILP stood
+  in, and distinct target-meeting topologies rise from 87 to 93 in the same
+  time; with 50 networks per multiplier, from 206 to 250 for about 20 %
+  more time. The best network is unchanged or better on every case.
+- Extracting a network from a solved model is faster: it reads Pyomo values
+  directly rather than through ``float()``, which Pyomo disables with an
+  error message that is slow to build, and skips matches that carry no duty
+  in any period before reading their temperatures. On the pulp mill sample
+  case extraction drops from 213 s to 14 s (profiled), and a heat exchanger
+  network design from 137 s to 79 s, with the same network.
+- Building a heat exchanger network model is faster: its parameters, mostly
+  placeholders for disallowed matches, come from blocks of fixed variables
+  allocated ahead rather than one at a time. On the pulp mill sample case a
+  design takes about 7.5 s less (136 s to 129 s, measured before the faster
+  extraction above), with the same network.
+
 0.9.0 (2026-11-14)
 ------------------
 

@@ -1,8 +1,48 @@
 Heat Pump and Refrigeration Workflows
 =====================================
 
-OpenPinch exposes each HPR model as a descriptive method, so process engineers
-do not need internal enum or string answers.
+One method targets every heat pump and refrigeration cycle OpenPinch
+registers: ``target.heat_pump_and_refrigeration()``. The named methods below
+(``carnot_heat_pump`` and the rest) are shorthands for it, with the same
+results.
+
+One Gateway for Every Cycle
+---------------------------
+
+.. code-block:: python
+
+   from OpenPinch import PinchProblem
+   from OpenPinch.contracts.hpr import HprLevels, HprLoad, HprSearchLimits
+
+   problem = PinchProblem("basic_pinch.json", project_name="HPR Study")
+   heat_pump = problem.target.heat_pump_and_refrigeration(
+       "carnot",                 # or "vapour_compression", "mvr"
+       duty="heat_pump",         # or "refrigeration"
+       topology="cascade",       # or "parallel"; default: the cycle's own
+       placement="process",      # or "utility" (indirect placement)
+       load=HprLoad(fraction=0.25),
+       levels=HprLevels(condensers=1, evaporators=1),
+       cycle_options={"compressor_efficiency": 0.7},
+       search=HprSearchLimits(restarts=1),
+   )
+
+- ``load`` takes exactly one of ``fraction``, ``duty`` (kW) or
+  ``period_loads`` (kW by period).
+- ``cycle_options`` are the cycle's own: efficiencies for Carnot cycles;
+  refrigerants, compressor model and simulation backend for vapour
+  compression; MVR fluids, stages and motor efficiency for an MVR cascade.
+  Options another cycle owns are rejected.
+- ``request=HprTargetRequest(...)`` passes the whole call as one model,
+  which a client can validate as JSON before sending it.
+- ``target.all_periods.heat_pump_and_refrigeration(...)`` runs it per period.
+
+``target.hpr_cycles()`` lists every registered cycle: its duties (the MVR
+cascade is heat pump only), topologies, availability (Brayton is registered
+but unavailable), optional dependencies and the JSON Schema of its options,
+so a client can build its cycle picker and option form from it. A new cycle
+is a model, an options model in ``OpenPinch.contracts.hpr`` and one
+``register_cycle`` call in ``OpenPinch/analysis/heat_pumps/cycles/registry.py``;
+it then appears in the gateway and in ``hpr_cycles()`` with no other change.
 
 Carnot Screening
 ----------------

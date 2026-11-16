@@ -115,3 +115,37 @@ def with_utilities_from(receiver, donor, *, project_name=None):
     )
     derived._invalidate_analysis()
     return derived
+
+
+def single_period_case(problem, period_id, *, project_name=None):
+    """A new single-period problem holding ``period_id``'s data alone.
+
+    Every per-period quantity takes that period's value; the period keeps its
+    id and a weight of one. Synthesis and targeting run on it unchanged.
+    """
+    period_ids = list(problem.period_ids)
+    period_id = str(period_id)
+    if period_id not in period_ids:
+        raise ValueError(
+            f"unknown period {period_id!r}; the problem has periods "
+            + ", ".join(repr(item) for item in period_ids)
+            + "."
+        )
+    if problem._process_components:
+        raise ValueError(
+            "a single-period case cannot be derived from a problem with "
+            "process components."
+        )
+    from ..analysis.heat_exchanger_networks.basis.synthetic_case import period_source
+
+    source = period_source(
+        problem.to_problem_json(), period_ids.index(period_id), period_id
+    )
+    source["options"] |= {
+        "PROBLEM_PERIOD_IDS": [period_id],
+        "PROBLEM_PERIOD_WEIGHTS": [1.0],
+    }
+    return type(problem)(
+        source,
+        project_name=problem.project_name if project_name is None else project_name,
+    )

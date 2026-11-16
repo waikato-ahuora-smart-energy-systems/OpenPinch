@@ -15,6 +15,7 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - `is_screened`, `plan_fluid_set_runs`, `run_fluid_sets` (`hpr_fluid_set_runs.py`): plan and run one vapour compression target per fluid set a refrigerant screen or layout proposes.
 - `run_problem_utility_placement`, `build_problem_placement_context` (`utility_placement.py`, in `__all__`): optimise a utility set and return it as a new solved `PinchProblem`, or build the detached `(blueprints, context)` pair.
 - `with_utilities_from` (`case_derivation.py`): receiver problem with the donor's utilities, aligned by period identity.
+- `single_period_case` (`case_derivation.py`): a new single-period problem holding one period's data alone, keeping its period id with weight 1; the basis a HEN is synthesised from before it is fitted to every period.
 - `residual_basis`, `create_hpr_residual_case`, `residual_utility_service`, `prepare_residual_problem` (`residual_utility.py`): frozen HPR residual cases.
 - `hpr_result_digest`, `retain_hpr_target`, `validate_hpr_target`, `select_hpr_graphs` (`hpr_selection.py`): identify local HPR targets and select their graphs.
 - Subdirectories: [_problem](./_problem/README.md) problem internals (input, periods, targeting, output, accessors); [_workspace](./_workspace/README.md) case-input and case-state helpers for `PinchWorkspace`.
@@ -45,6 +46,7 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - A local HPR target is valid only if its owner id, input fingerprint and retained result digest all match the problem [hpr_selection.py:validate_hpr_target].
 - A residual case is frozen to one period, and its utilities start with zero duty (segmented utilities carry duty fractions) [residual_utility.py:create_hpr_residual_case].
 - `with_utilities_from` requires matching period sets and a `PinchProblem` donor, and does not copy donor results [case_derivation.py:with_utilities_from].
+- `single_period_case` reduces every per-period quantity to that period's `value` with `period_source` (`analysis/heat_exchanger_networks/basis`), and rejects an unknown period and a problem with process components; the derived problem's targets equal that period's all-period targets [case_derivation.py:single_period_case].
 
 ## Side Effects
 - `commands._SESSIONS` is module-level state holding live problems, workspaces and returned targets until the `close` command or process exit; each `open` and each returned case adds an entry [commands.py:_SESSIONS].

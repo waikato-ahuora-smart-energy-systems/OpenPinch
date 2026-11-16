@@ -16,6 +16,7 @@ from .hpr_performance_map import HprPerformanceMap, HprPerformanceMapRequest
 from .hpr_refrigerant_screen import HprRefrigerantScreenResult
 from .input import TargetInput
 from .output import TargetOutput
+from .synthesis.basis import HenDesignBasis
 from .synthesis.result import HeatExchangerNetworkSynthesisResult
 from .synthesis.view import HeatExchangerNetworkView
 from .utility_placement import UtilityPlacementResult
@@ -162,6 +163,7 @@ CONTRACTS: dict[str, tuple[type[BaseModel], str]] = {
         "serialization",
     ),
     "HeatExchangerNetworkView": (HeatExchangerNetworkView, "serialization"),
+    "HenDesignBasis": (HenDesignBasis, "serialization"),
 }
 
 

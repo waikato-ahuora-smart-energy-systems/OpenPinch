@@ -7,6 +7,9 @@ from contextvars import copy_context
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
+from pydantic import ValidationError
+
+from ....analysis.heat_pumps.cycles.registry import cycle_spec, registered_cycles
 from ....analysis.heat_pumps.performance_maps.generation import (
     generate_hpr_performance_map,
 )
@@ -17,12 +20,28 @@ from ....analysis.heat_pumps.performance_maps.targeting import (
     normalize_hpr_simulation_backend,
 )
 from ....analysis.parallelism import supported_workers
-from ....contracts.hpr import HPRSearchBudget, HPRTopologyIdentifier
+from ....contracts.hpr import (
+    BraytonCycleOptions,
+    CarnotCycleOptions,
+    HprCycleCatalog,
+    HprCycleInfo,
+    HprLevels,
+    HprLoad,
+    HPRSearchBudget,
+    HprSearchLimits,
+    HprTargetRequest,
+    MvrCycleOptions,
+    VapourCompressionCycleOptions,
+)
 from ....contracts.hpr_performance_map import (
     HprPerformanceMap,
     HprPerformanceMapRequest,
 )
 from ....contracts.output import TargetOutput
+from ....domain.configuration_fields import (
+    CONFIG_FIELD_SPECS,
+    USER_CONFIG_FIELD_SPECS,
+)
 from ....domain.enums import (
     HeatPumpAndRefrigerationCycle,
     TargetType,
@@ -108,16 +127,63 @@ def _set_if_not_none(options: dict[str, Any], key: str, value: Any) -> None:
         options[key] = value
 
 
-def _vapour_compression_methods(is_cascade_cycle: bool):
-    if is_cascade_cycle:
-        return (
-            HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
-            HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION,
-        )
-    return (
-        HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION,
-        HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
+# A recorded gateway run keeps the request's cycle, duty, topology and
+# placement under this key of its recorded options, for replay.
+_GATEWAY_REPLAY_KEY = "hpr_gateway"
+
+# The named method each registered cycle and duty had before the gateway: a
+# gateway run records it as its surface, so recorded runs replay through it.
+_LEGACY_HPR_SURFACES = {
+    ("carnot", "heat_pump"): "carnot_heat_pump",
+    ("carnot", "refrigeration"): "carnot_refrigeration",
+    ("vapour_compression", "heat_pump"): "vapour_compression_heat_pump",
+    ("vapour_compression", "refrigeration"): "vapour_compression_refrigeration",
+    ("mvr", "heat_pump"): "mvr_heat_pump",
+    ("brayton", "heat_pump"): "brayton_heat_pump",
+    ("brayton", "refrigeration"): "brayton_refrigeration",
+}
+
+
+def _legacy_load(load_fraction, load_duty, period_loads):
+    """An ``HprLoad`` from a named method's load arguments, or ``None``."""
+    _load_options(
+        load_fraction=load_fraction, load_duty=load_duty, period_loads=period_loads
     )
+    if load_fraction is None and load_duty is None and period_loads is None:
+        return None
+    return HprLoad(fraction=load_fraction, duty=load_duty, period_loads=period_loads)
+
+
+def _legacy_hpr_arguments(request, topology, cycle_options, zone) -> dict[str, Any]:
+    """A gateway request as its named method's keyword arguments."""
+    load = request.load or None
+    levels = request.levels or HprLevels()
+    limits = request.search or HprSearchLimits()
+    utility_flag = (
+        "is_utility_heat_pump"
+        if request.duty == "heat_pump"
+        else "is_utility_refrigeration"
+    )
+    arguments = {
+        utility_flag: request.placement == "utility",
+        "zone": zone,
+        "include_subzones": request.include_subzones,
+        "period_id": request.period_id,
+        "options": request.options,
+        "load_fraction": None if load is None else load.fraction,
+        "load_duty": None if load is None else load.duty,
+        "period_loads": None if load is None else load.period_loads,
+        "condensers": levels.condensers,
+        "evaporators": levels.evaporators,
+        "minimum_approach_temperature": levels.minimum_approach_temperature,
+        "maximum_restarts": limits.restarts,
+        "maximum_iterations": limits.iterations,
+        "maximum_evaluations": limits.evaluations,
+    }
+    if request.cycle in ("carnot", "vapour_compression"):
+        arguments["is_cascade_cycle"] = topology == "cascade"
+    arguments |= cycle_options.model_dump(exclude={"cycle"})
+    return arguments
 
 
 class _AllPeriodsTargetAccessor:
@@ -235,6 +301,7 @@ install_catalog_forwarders(
     exclude=(
         "brayton_heat_pump",
         "brayton_refrigeration",
+        "hpr_cycles",
         "hpr_performance_map",
         "hpr_refrigerant_screen",
     ),
@@ -313,6 +380,7 @@ class _TargetAccessor:
         period_id: str | None,
         direct_service=None,
         indirect_service=None,
+        record_options: Mapping[str, Any] | None = None,
     ) -> BaseTargetModel:
         from ...residual_utility import residual_basis, residual_utility_service
 
@@ -344,9 +412,16 @@ class _TargetAccessor:
                 direct_service_func=direct_service,
                 indirect_service_func=indirect_service,
             )
+        # Options the method selects itself (HPR_TYPE, ORC_MODEL) cannot be
+        # passed back to it, so a replay leaves them to the method.
+        recorded = {
+            key: value
+            for key, value in {**config_overrides, **runtime}.items()
+            if not (key in CONFIG_FIELD_SPECS and key not in USER_CONFIG_FIELD_SPECS)
+        }
         self._problem._record_target_run(
             surface,
-            options={**config_overrides, **runtime},
+            options=recorded | dict(record_options or {}),
             zone_name=zone.name if hasattr(zone, "name") else zone,
             include_subzones=include_subzones,
         )
@@ -575,7 +650,6 @@ class _TargetAccessor:
         cycle: HeatPumpAndRefrigerationCycle,
         is_heat_pump: bool,
         is_utility: bool,
-        is_cascade_cycle: bool | None = None,
         zone: str | Zone | None = None,
         include_subzones: bool = False,
         period_id: str | None = None,
@@ -585,14 +659,13 @@ class _TargetAccessor:
         period_loads: Mapping[str, float] | None = None,
         condensers: int | None = None,
         evaporators: int | None = None,
-        compressor_efficiency: float | None = None,
-        expander_efficiency: float | None = None,
         minimum_approach_temperature: float | None = None,
         maximum_restarts: int | None = None,
         maximum_iterations: int | None = None,
         maximum_evaluations: int | None = None,
         extra_configuration: Mapping[str, Any] | None = None,
         simulation_backend: str | None = None,
+        record_options: Mapping[str, Any] | None = None,
     ) -> BaseTargetModel:
         require_available(f"target.{surface}")
         normalized_backend = (
@@ -600,19 +673,6 @@ class _TargetAccessor:
             if simulation_backend is None
             else normalize_hpr_simulation_backend(simulation_backend)
         )
-        if is_cascade_cycle is not None:
-            if cycle is HeatPumpAndRefrigerationCycle.CascadeCarnot:
-                cycle = (
-                    HeatPumpAndRefrigerationCycle.CascadeCarnot
-                    if is_cascade_cycle
-                    else HeatPumpAndRefrigerationCycle.ParallelCarnot
-                )
-            elif cycle is HeatPumpAndRefrigerationCycle.CascadeVapourComp:
-                cycle = (
-                    HeatPumpAndRefrigerationCycle.CascadeVapourComp
-                    if is_cascade_cycle
-                    else HeatPumpAndRefrigerationCycle.ParallelVapourComp
-                )
         configuration = {"HPR_TYPE": cycle.value}
         configuration.update(
             _load_options(
@@ -624,8 +684,6 @@ class _TargetAccessor:
         for key, value in (
             ("HPR_N_COND", condensers),
             ("HPR_N_EVAP", evaporators),
-            ("HPR_ETA_COMP", compressor_efficiency),
-            ("HPR_ETA_EXP", expander_efficiency),
             ("HPR_DT_CONT", minimum_approach_temperature),
             ("HPR_MAX_MULTISTART", maximum_restarts),
         ):
@@ -679,6 +737,7 @@ class _TargetAccessor:
             period_id=period_id,
             direct_service=None if is_utility else direct_service,
             indirect_service=indirect_service if is_utility else None,
+            record_options=record_options,
         )
 
     def _fluid_set_runs(
@@ -706,18 +765,29 @@ class _TargetAccessor:
         )
         method = getattr(self, surface)
 
+        def run(fluids, condensers, evaporators, mvr_stages):
+            if mvr_stages is not None:
+                arguments["mvr_stages"] = mvr_stages
+            return method(
+                **arguments,
+                refrigerants=fluids,
+                condensers=condensers,
+                evaporators=evaporators,
+            )
+
+        return self._run_fluid_sets(plan, run)
+
+    def _run_fluid_sets(self, plan, run):
+        """Run each planned fluid set with ``run(fluids, condensers,
+        evaporators, mvr_stages)``, keeping the last successful run's state."""
+
         def solve(item):
-            if item.mvr_stages is not None:
-                arguments["mvr_stages"] = item.mvr_stages
             # A run that raises commits nothing; one that reports failure has
             # committed, so the problem goes back to the last successful run.
             before = snapshot_problem(self._problem)
             period_states = dict(self._problem._period_states)
-            target = method(
-                **arguments,
-                refrigerants=list(item.fluids),
-                condensers=item.condensers,
-                evaporators=item.evaporators,
+            target = run(
+                list(item.fluids), item.condensers, item.evaporators, item.mvr_stages
             )
             if not target.hpr_success:
                 commit_problem(self._problem, before)
@@ -725,6 +795,214 @@ class _TargetAccessor:
             return target
 
         return run_fluid_sets(plan, solve)
+
+    def heat_pump_and_refrigeration(
+        self,
+        cycle: str = "carnot",
+        *,
+        duty: str = "heat_pump",
+        topology: str | None = None,
+        placement: str = "process",
+        load=None,
+        levels=None,
+        cycle_options=None,
+        search=None,
+        zone=None,
+        include_subzones: bool = False,
+        period_id: str | None = None,
+        options=None,
+        request=None,
+    ):
+        """Target a heat pump or refrigeration cycle of any registered kind.
+
+        ``cycle`` is a registered cycle id (``target.hpr_cycles``):
+        ``"carnot"``, ``"vapour_compression"``, ``"mvr"`` or ``"brayton"``.
+        ``duty`` is ``"heat_pump"`` or ``"refrigeration"``; ``topology``
+        (``"cascade"`` or ``"parallel"``) defaults to the cycle's own;
+        ``placement`` is ``"process"`` (direct) or ``"utility"`` (indirect).
+        ``load`` (``HprLoad``: exactly one of ``fraction``, ``duty`` or
+        ``period_loads``), ``levels`` (``HprLevels``), ``cycle_options`` (the
+        cycle's own options model) and ``search`` (``HprSearchLimits``) take
+        the models or mappings of their fields. ``request`` passes all of it
+        as one ``HprTargetRequest`` instead. Screened refrigerants run once
+        per proposed fluid set, as the named methods do.
+        """
+        if options is not None and _GATEWAY_REPLAY_KEY in options:
+            # A recorded run replayed: its cycle, duty, topology and placement.
+            options = dict(options)
+            recorded = options.pop(_GATEWAY_REPLAY_KEY)
+            cycle, duty = recorded["cycle"], recorded["duty"]
+            topology, placement = recorded["topology"], recorded["placement"]
+        if request is None:
+            request = HprTargetRequest.model_validate(
+                {
+                    "cycle": cycle,
+                    "duty": duty,
+                    "topology": topology,
+                    "placement": placement,
+                    "load": load,
+                    "levels": levels,
+                    "cycle_options": cycle_options,
+                    "search": search,
+                    "include_subzones": include_subzones,
+                    "period_id": period_id,
+                    "options": None if options is None else dict(options),
+                }
+            )
+        else:
+            request = HprTargetRequest.model_validate(request)
+            zone = request.zone
+            # all_periods passes each period as period_id beside the request.
+            if period_id is not None:
+                if request.period_id not in (None, period_id):
+                    raise ValueError(
+                        f"the request targets period {request.period_id!r}, but the "
+                        f"call targets period {period_id!r}."
+                    )
+                request = request.model_copy(update={"period_id": period_id})
+        spec = cycle_spec(request.cycle)
+        legacy = _LEGACY_HPR_SURFACES.get((spec.id, request.duty))
+        if not spec.available:
+            if legacy is not None:
+                require_available(f"target.{legacy}")
+            raise NotImplementedError(f"The {spec.id} cycle is not available.")
+        if request.duty not in spec.duties:
+            raise ValueError(
+                f"the {spec.id} cycle serves {', '.join(sorted(spec.duties))} only; "
+                f"got duty {request.duty!r}."
+            )
+        topology = request.topology or spec.default_topology
+        if topology not in spec.topologies:
+            raise ValueError(
+                f"the {spec.id} cycle's topologies are "
+                f"{', '.join(spec.topologies)}; got {topology!r}."
+            )
+        chosen = request.cycle_options or spec.options_model()
+        if not isinstance(chosen, spec.options_model):
+            try:
+                # The request already checked the options name this cycle.
+                fields = chosen if isinstance(chosen, dict) else chosen.model_dump()
+                chosen = spec.options_model.model_validate(
+                    {key: value for key, value in fields.items() if key != "cycle"}
+                )
+            except ValidationError as error:
+                raise ValueError(
+                    f"invalid options for the {spec.id} cycle: {error}"
+                ) from error
+        backend = getattr(chosen, "simulation_backend", None)
+        if backend is not None:
+            backend = normalize_hpr_simulation_backend(backend)
+        if is_screened(getattr(chosen, "refrigerants", None)):
+            if legacy is not None:
+                return getattr(self, legacy)(
+                    **_legacy_hpr_arguments(request, topology, chosen, zone)
+                )
+            return self._gateway_fluid_set_runs(spec, request, topology, chosen, zone)
+        load = request.load
+        levels = request.levels or HprLevels()
+        limits = request.search or HprSearchLimits()
+        return self._hpr(
+            surface=legacy or "heat_pump_and_refrigeration",
+            cycle=spec.topologies[topology],
+            is_heat_pump=request.duty == "heat_pump",
+            is_utility=request.placement == "utility",
+            zone=zone,
+            include_subzones=request.include_subzones,
+            period_id=request.period_id,
+            options=request.options,
+            load_fraction=None if load is None else load.fraction,
+            load_duty=None if load is None else load.duty,
+            period_loads=None if load is None else load.period_loads,
+            condensers=levels.condensers,
+            evaporators=levels.evaporators,
+            minimum_approach_temperature=levels.minimum_approach_temperature,
+            maximum_restarts=limits.restarts,
+            maximum_iterations=limits.iterations,
+            maximum_evaluations=limits.evaluations,
+            extra_configuration=spec.to_configuration(chosen),
+            simulation_backend=backend,
+            # A recorded run replays through its surface, the gateway reading
+            # its cycle, duty, topology and placement back from here.
+            record_options={
+                _GATEWAY_REPLAY_KEY: {
+                    "cycle": spec.id,
+                    "duty": request.duty,
+                    "topology": topology,
+                    "placement": request.placement,
+                }
+            },
+        )
+
+    def _gateway_fluid_set_runs(self, spec, request, topology, cycle_options, zone):
+        """Run a cycle with no named method once per screened fluid set."""
+        methods = spec.screening_methods.get(topology)
+        if not methods:
+            raise ValueError(
+                f"the {spec.id} cycle has no fluid-set screening for the "
+                f"{topology} topology; pass a list of refrigerants."
+            )
+        if getattr(cycle_options, "mvr_fluids", None) is not None:
+            raise ValueError(
+                "mvr_fluids names the vapour compression fluids, which the "
+                "screened fluid sets choose; drop mvr_fluids."
+            )
+        levels = request.levels or HprLevels()
+        plan = plan_fluid_set_runs(
+            cycle_options.refrigerants,
+            methods=methods,
+            is_heat_pumping=request.duty == "heat_pump",
+            condensers=levels.condensers,
+            evaporators=levels.evaporators,
+            mvr_stages=getattr(cycle_options, "mvr_stages", None),
+        )
+
+        def run(fluids, condensers, evaporators, mvr_stages):
+            update = {"refrigerants": fluids}
+            if mvr_stages is not None:
+                update["mvr_stages"] = mvr_stages
+            return self.heat_pump_and_refrigeration(
+                spec.id,
+                duty=request.duty,
+                topology=topology,
+                placement=request.placement,
+                load=request.load,
+                levels=levels.model_copy(
+                    update={"condensers": condensers, "evaporators": evaporators}
+                ),
+                cycle_options=cycle_options.model_copy(update=update),
+                search=request.search,
+                zone=zone,
+                include_subzones=request.include_subzones,
+                period_id=request.period_id,
+                options=request.options,
+            )
+
+        return self._run_fluid_sets(plan, run)
+
+    def hpr_cycles(self) -> HprCycleCatalog:
+        """Every registered heat pump and refrigeration cycle.
+
+        Each entry gives the cycle's id and label, the duties it serves, its
+        topologies and default, whether it is available and runs across all
+        periods, its optional dependencies, and the JSON Schema of its
+        options model, from which a client can build the cycle's form.
+        """
+        return HprCycleCatalog(
+            cycles=tuple(
+                HprCycleInfo(
+                    id=spec.id,
+                    label=spec.label,
+                    duties=tuple(sorted(spec.duties)),
+                    topologies=tuple(spec.topologies),
+                    default_topology=spec.default_topology,
+                    available=spec.available,
+                    all_periods=spec.all_periods,
+                    dependencies=spec.dependencies,
+                    options_schema=spec.options_model.model_json_schema(),
+                )
+                for spec in registered_cycles()
+            )
+        )
 
     def carnot_heat_pump(
         self,
@@ -747,27 +1025,30 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
-        return self._hpr(
-            surface="carnot_heat_pump",
-            cycle=HeatPumpAndRefrigerationCycle.CascadeCarnot,
-            is_heat_pump=True,
-            is_utility=is_utility_heat_pump,
-            is_cascade_cycle=is_cascade_cycle,
+        return self.heat_pump_and_refrigeration(
+            "carnot",
+            duty="heat_pump",
+            topology="cascade" if is_cascade_cycle else "parallel",
+            placement="utility" if is_utility_heat_pump else "process",
+            load=_legacy_load(load_fraction, load_duty, period_loads),
+            levels=HprLevels(
+                condensers=condensers,
+                evaporators=evaporators,
+                minimum_approach_temperature=minimum_approach_temperature,
+            ),
+            cycle_options=CarnotCycleOptions(
+                compressor_efficiency=compressor_efficiency,
+                expander_efficiency=expander_efficiency,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            period_loads=period_loads,
-            condensers=condensers,
-            evaporators=evaporators,
-            compressor_efficiency=compressor_efficiency,
-            expander_efficiency=expander_efficiency,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
         )
 
     def carnot_refrigeration(
@@ -791,27 +1072,30 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
-        return self._hpr(
-            surface="carnot_refrigeration",
-            cycle=HeatPumpAndRefrigerationCycle.CascadeCarnot,
-            is_heat_pump=False,
-            is_utility=is_utility_refrigeration,
-            is_cascade_cycle=is_cascade_cycle,
+        return self.heat_pump_and_refrigeration(
+            "carnot",
+            duty="refrigeration",
+            topology="cascade" if is_cascade_cycle else "parallel",
+            placement="utility" if is_utility_refrigeration else "process",
+            load=_legacy_load(load_fraction, load_duty, period_loads),
+            levels=HprLevels(
+                condensers=condensers,
+                evaporators=evaporators,
+                minimum_approach_temperature=minimum_approach_temperature,
+            ),
+            cycle_options=CarnotCycleOptions(
+                compressor_efficiency=compressor_efficiency,
+                expander_efficiency=expander_efficiency,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            period_loads=period_loads,
-            condensers=condensers,
-            evaporators=evaporators,
-            compressor_efficiency=compressor_efficiency,
-            expander_efficiency=expander_efficiency,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
         )
 
     def vapour_compression_heat_pump(
@@ -845,42 +1129,42 @@ class _TargetAccessor:
             return self._fluid_set_runs(
                 "vapour_compression_heat_pump",
                 locals(),
-                methods=_vapour_compression_methods(is_cascade_cycle),
+                methods=cycle_spec("vapour_compression").screening_methods[
+                    "cascade" if is_cascade_cycle else "parallel"
+                ],
                 is_heat_pumping=True,
             )
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
-        extra = {}
-        for key, value in (
-            ("HPR_REFRIGERANTS", refrigerants),
-            ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
-            ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
-            ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
-            ("HPR_COMPRESSOR_MODEL", compressor_model),
-        ):
-            _set_if_not_none(extra, key, value)
-        return self._hpr(
-            surface="vapour_compression_heat_pump",
-            cycle=HeatPumpAndRefrigerationCycle.CascadeVapourComp,
-            is_heat_pump=True,
-            is_utility=is_utility_heat_pump,
-            is_cascade_cycle=is_cascade_cycle,
-            extra_configuration=extra,
+        return self.heat_pump_and_refrigeration(
+            "vapour_compression",
+            duty="heat_pump",
+            topology="cascade" if is_cascade_cycle else "parallel",
+            placement="utility" if is_utility_heat_pump else "process",
+            load=_legacy_load(load_fraction, load_duty, period_loads),
+            levels=HprLevels(
+                condensers=condensers,
+                evaporators=evaporators,
+                minimum_approach_temperature=minimum_approach_temperature,
+            ),
+            cycle_options=VapourCompressionCycleOptions(
+                compressor_efficiency=compressor_efficiency,
+                expander_efficiency=expander_efficiency,
+                refrigerants=refrigerants,
+                initialize_from_carnot=initialize_from_carnot,
+                sort_refrigerants=sort_refrigerants,
+                allow_integrated_expander=allow_integrated_expander,
+                compressor_model=compressor_model,
+                simulation_backend=simulation_backend,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            period_loads=period_loads,
-            condensers=condensers,
-            evaporators=evaporators,
-            compressor_efficiency=compressor_efficiency,
-            expander_efficiency=expander_efficiency,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
-            simulation_backend=simulation_backend,
         )
 
     def vapour_compression_refrigeration(
@@ -914,42 +1198,42 @@ class _TargetAccessor:
             return self._fluid_set_runs(
                 "vapour_compression_refrigeration",
                 locals(),
-                methods=_vapour_compression_methods(is_cascade_cycle),
+                methods=cycle_spec("vapour_compression").screening_methods[
+                    "cascade" if is_cascade_cycle else "parallel"
+                ],
                 is_heat_pumping=False,
             )
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
-        extra = {}
-        for key, value in (
-            ("HPR_REFRIGERANTS", refrigerants),
-            ("HPR_INITIALISE_SIMULATED_CYCLE", initialize_from_carnot),
-            ("HPR_REFRIGERANT_SORT_ENABLED", sort_refrigerants),
-            ("HPR_INTEGRATED_EXPANDER_ENABLED", allow_integrated_expander),
-            ("HPR_COMPRESSOR_MODEL", compressor_model),
-        ):
-            _set_if_not_none(extra, key, value)
-        return self._hpr(
-            surface="vapour_compression_refrigeration",
-            cycle=HeatPumpAndRefrigerationCycle.CascadeVapourComp,
-            is_heat_pump=False,
-            is_utility=is_utility_refrigeration,
-            is_cascade_cycle=is_cascade_cycle,
-            extra_configuration=extra,
+        return self.heat_pump_and_refrigeration(
+            "vapour_compression",
+            duty="refrigeration",
+            topology="cascade" if is_cascade_cycle else "parallel",
+            placement="utility" if is_utility_refrigeration else "process",
+            load=_legacy_load(load_fraction, load_duty, period_loads),
+            levels=HprLevels(
+                condensers=condensers,
+                evaporators=evaporators,
+                minimum_approach_temperature=minimum_approach_temperature,
+            ),
+            cycle_options=VapourCompressionCycleOptions(
+                compressor_efficiency=compressor_efficiency,
+                expander_efficiency=expander_efficiency,
+                refrigerants=refrigerants,
+                initialize_from_carnot=initialize_from_carnot,
+                sort_refrigerants=sort_refrigerants,
+                allow_integrated_expander=allow_integrated_expander,
+                compressor_model=compressor_model,
+                simulation_backend=simulation_backend,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            period_loads=period_loads,
-            condensers=condensers,
-            evaporators=evaporators,
-            compressor_efficiency=compressor_efficiency,
-            expander_efficiency=expander_efficiency,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
-            simulation_backend=simulation_backend,
         )
 
     def brayton_heat_pump(
@@ -969,24 +1253,25 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
-        return self._hpr(
-            surface="brayton_heat_pump",
-            cycle=HeatPumpAndRefrigerationCycle.Brayton,
-            is_heat_pump=True,
-            is_utility=is_utility_heat_pump,
-            is_cascade_cycle=None,
+        return self.heat_pump_and_refrigeration(
+            "brayton",
+            duty="heat_pump",
+            placement="utility" if is_utility_heat_pump else "process",
+            load=_legacy_load(load_fraction, load_duty, None),
+            levels=HprLevels(minimum_approach_temperature=minimum_approach_temperature),
+            cycle_options=BraytonCycleOptions(
+                compressor_efficiency=compressor_efficiency,
+                expander_efficiency=expander_efficiency,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            compressor_efficiency=compressor_efficiency,
-            expander_efficiency=expander_efficiency,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
         )
 
     def brayton_refrigeration(
@@ -1006,24 +1291,25 @@ class _TargetAccessor:
         maximum_iterations=None,
         maximum_evaluations=None,
     ):
-        return self._hpr(
-            surface="brayton_refrigeration",
-            cycle=HeatPumpAndRefrigerationCycle.Brayton,
-            is_heat_pump=False,
-            is_utility=is_utility_refrigeration,
-            is_cascade_cycle=None,
+        return self.heat_pump_and_refrigeration(
+            "brayton",
+            duty="refrigeration",
+            placement="utility" if is_utility_refrigeration else "process",
+            load=_legacy_load(load_fraction, load_duty, None),
+            levels=HprLevels(minimum_approach_temperature=minimum_approach_temperature),
+            cycle_options=BraytonCycleOptions(
+                compressor_efficiency=compressor_efficiency,
+                expander_efficiency=expander_efficiency,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            compressor_efficiency=compressor_efficiency,
-            expander_efficiency=expander_efficiency,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
         )
 
     def mvr_heat_pump(
@@ -1055,40 +1341,36 @@ class _TargetAccessor:
             return self._fluid_set_runs(
                 "mvr_heat_pump",
                 locals(),
-                methods=(HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,),
+                methods=cycle_spec("mvr").screening_methods["cascade"],
                 is_heat_pumping=True,
             )
-        extra = {}
-        for key, value in (
-            ("HPR_REFRIGERANTS", refrigerants),
-            ("HPR_MVR_FLUIDS", mvr_fluids),
-            ("HPR_MVR_ETA_COMP", mvr_compressor_efficiency),
-            ("HPR_MVR_COUNT", mvr_stages),
-            ("HPR_MVR_ETA_MOTOR", motor_efficiency),
-            ("HPR_COMPRESSOR_MODEL", compressor_model),
-            ("HPR_MVR_COMPRESSOR_MODEL", mvr_compressor_model),
-        ):
-            _set_if_not_none(extra, key, value)
-        return self._hpr(
-            surface="mvr_heat_pump",
-            cycle=HeatPumpAndRefrigerationCycle.VapourCompMVR,
-            is_heat_pump=True,
-            is_utility=is_utility_heat_pump,
-            is_cascade_cycle=None,
-            extra_configuration=extra,
+        return self.heat_pump_and_refrigeration(
+            "mvr",
+            placement="utility" if is_utility_heat_pump else "process",
+            load=_legacy_load(load_fraction, load_duty, period_loads),
+            levels=HprLevels(
+                condensers=condensers,
+                evaporators=evaporators,
+                minimum_approach_temperature=minimum_approach_temperature,
+            ),
+            cycle_options=MvrCycleOptions(
+                refrigerants=refrigerants,
+                mvr_fluids=mvr_fluids,
+                mvr_compressor_efficiency=mvr_compressor_efficiency,
+                mvr_compressor_model=mvr_compressor_model,
+                compressor_model=compressor_model,
+                mvr_stages=mvr_stages,
+                motor_efficiency=motor_efficiency,
+            ),
+            search=HprSearchLimits(
+                restarts=maximum_restarts,
+                iterations=maximum_iterations,
+                evaluations=maximum_evaluations,
+            ),
             zone=zone,
             include_subzones=include_subzones,
             period_id=period_id,
             options=options,
-            load_fraction=load_fraction,
-            load_duty=load_duty,
-            period_loads=period_loads,
-            condensers=condensers,
-            evaporators=evaporators,
-            minimum_approach_temperature=minimum_approach_temperature,
-            maximum_restarts=maximum_restarts,
-            maximum_iterations=maximum_iterations,
-            maximum_evaluations=maximum_evaluations,
         )
 
     def _orc(

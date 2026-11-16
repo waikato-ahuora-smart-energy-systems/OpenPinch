@@ -17,6 +17,8 @@ EXPECTED_TARGET_METHODS = {
     "brayton_heat_pump",
     "brayton_refrigeration",
     "carnot_heat_pump",
+    "heat_pump_and_refrigeration",
+    "hpr_cycles",
     "carnot_orc",
     "carnot_refrigeration",
     "cogeneration",
@@ -51,8 +53,8 @@ FORBIDDEN_AMBIGUOUS_TARGET_METHODS = {
 
 EXPECTED_COMPONENT_METHODS = {"add_process_mvr"}
 EXPECTED_DESIGN_METHODS = {
+    "design_basis",
     "heat_exchanger_network",
-    "multiperiod_heat_exchanger_network",
     "network_evolution",
     "optimise_duties",
     "pinch_design",

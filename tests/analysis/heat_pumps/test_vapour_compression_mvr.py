@@ -55,6 +55,11 @@ class _ThermoState:
         return self._t
 
 
+def _patch_placement(monkeypatch, handler):
+    """Make the registry's placement lookup return ``handler`` for any cycle."""
+    monkeypatch.setattr(hp, "_placement_handler", lambda _hpr_type: handler)
+
+
 def _specific_mvr_payload(*, q_shaft: float = 100.0) -> dict[str, object]:
     return {
         "state_points": [
@@ -1532,9 +1537,8 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
             hpr_type=HeatPumpAndRefrigerationCycle.VapourCompMVR.value
         ),
     )
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS,
-        HeatPumpAndRefrigerationCycle.VapourCompMVR.value,
+    _patch_placement(
+        monkeypatch,
         lambda args: HPRBackendResult(
             obj=0.1,
             utility_tot=1.0,

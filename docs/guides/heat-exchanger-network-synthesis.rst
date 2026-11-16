@@ -124,9 +124,62 @@ Successful synthesis stores the serializable result on
 provides the selected network, ranked candidates, manifest, diagnostics, and
 task metadata without requiring process engineers to call contributor services.
 
-For multiple operating periods, call
-``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
-all-period targeting.
+Multiple Operating Periods
+--------------------------
+
+On a case with several operating periods, ``heat_exchanger_network()``
+designs one network that serves every period. ``design_basis`` (stored as
+``HENS_DESIGN_BASIS``) sets what it is synthesised from:
+
+- ``"median"`` (the default): a synthetic single-period case whose streams
+  take their period-weighted medians, of supply and target temperature, heat
+  flow, film coefficient and ``dt_cont``, over the operating periods (weight
+  above zero, some stream running). With ``basis_clusters`` (stored as
+  ``HENS_BASIS_CLUSTERS``) above 1, the operating periods are first grouped
+  by weighted k-medoids on each stream's temperatures, heat flow and running
+  flag, and the median is over the heaviest group; ``HENS_BASIS_CANDIDATES``
+  ``"all"`` designs from every group's case and keeps the cheapest. A stream
+  running in less than ``HENS_BASIS_ACTIVE_SHARE`` (0.5) of the group's
+  weight is left out; utilities come from the group's medoid period.
+- ``"period"``: one period alone, the ``period_id`` given, for example the
+  peak or the most frequent period. Passing ``period_id`` implies
+  ``"period"``.
+- ``"all"``: every period at once, with no fit. Synthesis targets every
+  period first when the problem has no period results.
+
+A median or period design is then fitted to every period: each exchanger
+gets one area, the largest any period needs, and a period needing less runs
+with a bypass. A stream with no utility at its end first gets the cheapest
+one that can serve it there in every period; one no period uses is removed.
+
+.. code-block:: python
+
+   basis = problem.design.design_basis(basis_clusters=2)  # preview, no synthesis
+   problem.design.heat_exchanger_network()  # the median basis
+   problem.design.heat_exchanger_network(period_id="peak")
+   problem.design.heat_exchanger_network(design_basis="all")
+
+``overdesign_percentage`` (stored as ``HENS_OVERDESIGN_PERCENTAGE``) adds a
+margin to every heat-recovery area; heaters and coolers are not scaled. The
+network is then rated over every period at the larger areas: each period's
+duties are re-optimised for the least utility cost, with a bypass where a
+period needs less. ``"optimise"`` chooses the margin, between 0 and
+``HENS_OVERDESIGN_MAX`` (50 %), for the least total annual cost, from about
+15 rating solves. ``selected_network.summary_metrics["overdesign"]`` reports
+the margin, each period's recovery and utility before and after, the cost
+with and without the margin, and every margin tried, for plotting cost
+against margin. ``design.optimise_duties(network, objective="rating")`` rates
+any network with installed areas the same way.
+
+.. code-block:: python
+
+   design = problem.design.heat_exchanger_network(overdesign_percentage="optimise")
+   design.selected_network.summary_metrics["overdesign"]["percentage"]
+
+The result's provenance records the basis (``HENS_DESIGN_BASIS``, with
+``basis_period_id`` for a period basis, or ``HENS_BASIS_CLUSTERS``,
+``basis_period_ids`` and ``basis_medoid`` for a median one) and lists every
+period.
 
 Heuristic Pinch Design
 ----------------------
@@ -160,8 +213,18 @@ verify are dropped. With several operating periods, each period is designed
 on its own and a proposal is the union of one design per period, one shared
 topology.
 
-In the main synthesis workflow every heuristic network seeds network
-evolution directly (from search depth 1). Heuristic networks never go to the
+A side left with fewer complete proposals than the cap is searched again by
+two fallbacks in turn, least intrusive first, and their new proposals follow
+the first search's: the first also tries the next nearest must streams to the
+pinch, not just the nearest; the second lets a stream that no partner can take
+in series split a partner away from the pinch, matching it in parallel with
+that partner's last match where the stage keeps its approach. A side the first
+search fills is not searched again.
+
+In the main synthesis workflow the cheapest heuristic networks seed network
+evolution directly (from search depth 1): ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS``
+per dt_cont multiplier, 3 at depths 1 and 2, set by the depth (see below).
+The rest stay final candidates as they are. Heuristic networks never go to the
 thermal derivative method.
 
 From search depth 2, or with ``HENS_PDM_MILP`` set, the MILP pinch design
@@ -209,25 +272,31 @@ The depth picks the stages run at each multiplier and their effort:
    * - Depth
      - Stages
      - Heuristic networks
+     - Heuristic networks evolved
      - Evolution breadth
    * - 0
      - heuristic pinch design only
      - 10
      - none
+     - none
    * - 1 (default)
      - heuristic, then evolution
      - 10
+     - 3
      - 1
    * - 2
      - heuristic and MILP; MILP through the thermal derivative method
      - 10
+     - 3
      - 1
    * - 3
      - as 2; every MILP network also straight to evolution
      - 20
+     - 20
      - 2
    * - 4
      - as 3
+     - 50
      - 50
      - 3
 
@@ -237,8 +306,9 @@ default) to add them at any depth that runs the MILP.
 
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
-and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_PDM_MILP``,
-``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the depth. A call's
+and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS``,
+``HENS_PDM_MILP``, ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` the
+depth. A call's
 ``width`` and ``depth`` win over the call's ``options``, which win over the
 stored options for that call only. A governed option stored on the problem
 also wins over a stored level: a stored ``HENS_PDM_MILP: false`` keeps the

@@ -29,7 +29,7 @@ a docstring.
   - [targeting](./targeting/README.md): per-topology placement optimisation.
 
 ## Invariants
-- The service dispatches on `config.hpr.type` through a fixed handler table; an unknown type raises `ValueError`, and the Brayton entry's handler raises `NotImplementedError`. [service.py:_HP_PLACEMENT_HANDLERS] [service.py:_get_hpr_targets]
+- The service dispatches on `config.hpr.type` through the cycle registry: the model family's `placement` handler, imported when first used; an unregistered type raises `ValueError`, and the Brayton handler raises `NotImplementedError`. The accepted target's topology identifier also comes from the registry (cascade vapour compression with one condenser and one evaporator reports the single-stage identifier). [service.py:_placement_handler] [service.py:_get_hpr_targets] [optimisation_adapter.py:_hpr_topology_identifier]
 - Targeting runs against the zone's `DI` (direct) or `II` (indirect) target; the indirect case rebuilds the cascade from inverted utility streams. [service.py:_compute_single_period_hpr_target]
 - Hot enthalpy is passed to input construction as non-positive and cold as non-negative. [service.py:_get_hpr_targets]
 - The TESPy backend is preflighted before its handler runs; handlers for other backends are called without it. [service.py:_get_hpr_targets]

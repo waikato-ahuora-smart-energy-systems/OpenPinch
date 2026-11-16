@@ -49,6 +49,7 @@ from ...optimisation.models import (
 )
 from ...optimisation.service import run_multistart_minimisation
 from .common._shared.streams import get_ambient_air_stream
+from .cycles.registry import family_handlers
 
 HPRObjective = Callable[..., HPRBackendResult]
 HPRTargetInputs = HeatPumpTargetInputs | MultiPeriodHPRTargetInputs
@@ -502,18 +503,10 @@ def _hpr_topology_identifier(
             and int(stage_args.n_evap) == 1
         ):
             return HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
-    mapping = {
-        HeatPumpAndRefrigerationCycle.CascadeVapourComp.value: (
-            HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION
-        ),
-        HeatPumpAndRefrigerationCycle.ParallelVapourComp.value: (
-            HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
-        ),
-        HeatPumpAndRefrigerationCycle.VapourCompMVR.value: (
-            HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR
-        ),
-    }
-    return mapping.get(hpr_type)
+    try:
+        return family_handlers(hpr_type).topology_identifier
+    except ValueError:
+        return None
 
 
 def run_hpr_candidate_search(

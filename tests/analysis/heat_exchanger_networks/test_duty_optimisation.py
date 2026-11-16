@@ -1522,3 +1522,55 @@ def test_executor_drops_ipopt_options_when_it_falls_back_to_scip(monkeypatch) ->
         )
 
     assert seen == [("scip", {})]
+
+
+def test_rating_design_points_follow_the_solver_periods_and_utility_temperatures():
+    # Solver arrays restricted to one period number it 0, whatever its index
+    # in the network. A synthesised heater records no approaches, only its
+    # inlet and outlet temperatures, from which its end approaches follow.
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+
+    def states(duties, temperatures=None, approaches=()):
+        source_in, source_out, sink_in, sink_out = temperatures or (None,) * 4
+        return tuple(
+            HeatExchangerPeriodState(
+                period_id=period_id,
+                period_idx=index,
+                duty=duty,
+                active=True,
+                approach_temperatures=approaches,
+                source_inlet_temperature=source_in,
+                source_outlet_temperature=source_out,
+                sink_inlet_temperature=sink_in,
+                sink_outlet_temperature=sink_out,
+            )
+            for index, (period_id, duty) in enumerate(zip(("base", "peak"), duties))
+        )
+
+    network = _four_stream_structure()
+    exchangers = []
+    for exchanger in network.exchangers:
+        if exchanger.kind is HeatExchangerKind.HOT_UTILITY:
+            update = {
+                "period_states": states((400.0, 500.0), (680.0, 680.0, 590.0, 650.0))
+            }
+        else:
+            update = {"period_states": states((100.0, 120.0), approaches=(20.0, 10.0))}
+        exchangers.append(exchanger.model_copy(update=update | {"area": 10.0}))
+    network = network.model_copy(update={"exchangers": tuple(exchangers)})
+
+    spec = fixed_network_structure(
+        _request(network, objective="rating"),
+        AXIS_MAPS | {"periods": {"peak": 0}},
+    ).spec
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
+        HEATER,
+    )
+
+    (heater,) = [e for e, match in enumerate(spec.utilities) if match.side == HEATER]
+    assert spec.utility_design_points[heater] == {0: (500.0, 30.0, 90.0, None)}
+    assert set(spec.recovery_design_points[0]) == {0}
+    assert spec.recovery_design_points[0][0] == (120.0, 20.0, 10.0, None)

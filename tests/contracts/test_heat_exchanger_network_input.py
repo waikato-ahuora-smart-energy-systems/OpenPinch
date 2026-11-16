@@ -267,7 +267,9 @@ def test_network_input_mirrors_nested_order_area_and_extra_field_validation() ->
         TargetInput.model_validate({"streams": [], "network": invalid_idx})
 
     invalid_area = deepcopy(payload)
-    invalid_area["exchangers"][0]["area"] = 99.0
+    # Below what a period's slices need; an area above them is an installed
+    # (overdesigned) area and is kept.
+    invalid_area["exchangers"][0]["area"] = 0.01
     with pytest.raises(ValidationError, match="maximum period-total segment area"):
         TargetInput.model_validate({"streams": [], "network": invalid_area})
 

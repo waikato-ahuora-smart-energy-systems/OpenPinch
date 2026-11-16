@@ -22,6 +22,11 @@ from tests.analysis.heat_pumps.helpers import _base_args
 from tests.strategies.hpr_targeting import BACKENDS, WORKING_FLUIDS
 
 
+def _patch_placement(monkeypatch, handler):
+    """Make the registry's placement lookup return ``handler`` for any cycle."""
+    monkeypatch.setattr(hp, "_placement_handler", lambda _hpr_type: handler)
+
+
 def _target_args(**overrides) -> HeatPumpTargetInputs:
     values = {
         "hpr_type": HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
@@ -233,9 +238,8 @@ def test_service_rejects_incompatible_tespy_before_optimizer_handler(
 ) -> None:
     args = _target_args(n_cond=2)
     monkeypatch.setattr(hp, "construct_HPRTargetInputs", lambda **_kwargs: args)
-    monkeypatch.setitem(
-        hp._HP_PLACEMENT_HANDLERS,
-        args.hpr_type,
+    _patch_placement(
+        monkeypatch,
         lambda _args: pytest.fail("optimizer handler must not start"),
     )
 

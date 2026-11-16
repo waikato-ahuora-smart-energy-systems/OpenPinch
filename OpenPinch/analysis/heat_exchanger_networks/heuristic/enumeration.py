@@ -6,6 +6,11 @@ at the smaller of its two loads, then matches the remaining must-stream loads
 away from the pinch, nearest the pinch first, branching over the partners whose
 temperatures allow it. Partners left with load take utilities. Proposals are
 topologies only: the pinch side model realises their duties.
+
+A side left with fewer complete proposals than requested is searched again
+by a ladder of fallbacks, least intrusive first: backtracking over which
+must stream is matched next, then splitting a partner away from the pinch.
+Their complete proposals are appended after the first search's.
 """
 
 from __future__ import annotations
@@ -23,7 +28,6 @@ from .side_streams import PinchSide, SideStream
 LOAD_FRACTION_TOLERANCE = 1e-3
 # DFS nodes allowed per proposal requested, across a side's search.
 _NODES_PER_PROPOSAL = 2000
-_BISECTION_STEPS = 40
 # Pinch-match sets collected per one kept, before ordering by CP similarity.
 _COLLECTED_PER_PROPOSAL = 4
 # Search nodes spent without a complete proposal, once the incomplete ones
@@ -31,6 +35,25 @@ _COLLECTED_PER_PROPOSAL = 4
 _STALL_NODES = 1000
 # Partner combinations tried per must stream at one search node.
 _COMBINATIONS_PER_NODE = 64
+
+
+@dataclass(frozen=True)
+class _Rung:
+    """One search of a side: the base search or one of its fallbacks.
+
+    ``must_branches`` is how many open must streams, nearest the pinch
+    first, a search node tries in turn. ``split`` lets a must stream that no
+    partner can take in series match a partner in parallel with that
+    partner's last match.
+    """
+
+    must_branches: int = 1
+    split: bool = False
+
+
+_BASE_RUNG = _Rung()
+# Least intrusive first; each runs only while the side is short of the cap.
+_FALLBACK_RUNGS = (_Rung(must_branches=3), _Rung(split=True))
 
 
 def cp_distance(cp_a: float, cp_b: float) -> float:
@@ -304,21 +327,40 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
     matches away from the pinch; the searches take turns, so the proposals
     vary the pinch design as well as the later choices. Complete proposals
     come first, and incomplete ones fill the cap only when too few are
-    complete.
+    complete. While too few are complete, each fallback rung searches the
+    side again and adds its new complete proposals after those found so far.
     """
 
     if limit <= 0:
         return []
+    complete, incomplete = _search(side, limit=limit, rung=_BASE_RUNG)
+    seen = {proposal.signature for proposal in complete + incomplete}
+    for rung in _FALLBACK_RUNGS:
+        if len(complete) >= limit:
+            break
+        found, _incomplete = _search(side, limit=limit, rung=rung)
+        for proposal in found:
+            if proposal.signature not in seen:
+                seen.add(proposal.signature)
+                complete.append(proposal)
+    return (complete + incomplete)[:limit]
+
+
+def _search(
+    side: PinchSide, *, limit: int, rung: _Rung
+) -> tuple[list[SideProposal], list[SideProposal]]:
+    """Up to ``limit`` complete and ``limit`` incomplete distinct proposals."""
+
     # One node budget for the whole side, shared by every pinch-match search.
     nodes = [_NODES_PER_PROPOSAL * limit]
     searches = [
-        _completions(side, assignment, nodes=nodes)
+        _completions(side, assignment, nodes=nodes, rung=rung)
         if not assignment or cp_feasible(side, assignment)
         # Pinch matches that break the CP rule (its last fallback) cannot
         # make a complete design, whatever follows.
         else (
             replace(proposal, complete=False)
-            for proposal in _completions(side, assignment, nodes=nodes)
+            for proposal in _completions(side, assignment, nodes=nodes, rung=rung)
         )
         for assignment in pinch_assignments(side, limit=limit)
     ]
@@ -351,7 +393,7 @@ def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SidePropos
                 incomplete.append(proposal)
             if len(complete) >= limit:
                 break
-    return (complete + incomplete)[:limit]
+    return complete, incomplete
 
 
 def _allowed(side: PinchSide, must: SideStream, partner: SideStream) -> bool:
@@ -376,7 +418,7 @@ class _State:
 
 
 def _completions(
-    side: PinchSide, assignment, *, nodes: list[int]
+    side: PinchSide, assignment, *, nodes: list[int], rung: _Rung = _BASE_RUNG
 ) -> Iterator[SideProposal]:
     """Depth-first completions of one set of pinch matches.
 
@@ -394,7 +436,7 @@ def _completions(
     )
     partner_kind = "cold" if must_kind == "hot" else "hot"
     state = _tick_off(side, state, streams, assignment, must_kind, partner_kind)
-    yield from _extend(side, state, streams, must_kind, nodes)
+    yield from _extend(side, state, streams, must_kind, nodes, rung)
 
 
 def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _State:
@@ -434,7 +476,7 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
         hot, cold = _hot_cold(must, partner)
         matches.append((hot.index, cold.index, 0, duty))
     split = len(must_edges) < len(assignment) or len(partner_edges) < len(assignment)
-    if split and not _mixed_stage_feasible(side, streams, matches, used):
+    if split and not _stage_feasible(side, streams, matches, {}, used):
         relief = [(hot, cold, 1, 0.0) for hot, cold, _layer, _duty in matches]
         matches += relief
         for hot, cold, _layer, _duty in relief:
@@ -449,32 +491,93 @@ def _tick_off(side, state, streams, assignment, must_kind, partner_kind) -> _Sta
     )
 
 
-def _mixed_stage_feasible(side, streams, matches, stage_heat) -> bool:
-    """Whether every match in the pinch stage keeps its approach at both ends.
+def _stage_feasible(side, streams, matches, start_heat, end_heat) -> bool:
+    """Whether every match in a stage keeps its approach at both ends.
 
-    Each stream runs from its pinch end to ``stage_heat`` (its whole duty in
-    the stage, as mixed branches leave at one temperature), scaled by each
-    period's load.
+    Each stream runs from ``start_heat`` to ``end_heat`` (its heat from its
+    pinch end before and through the stage, 0 when absent: mixed branches
+    leave a stage at one temperature), scaled by each period's load.
     """
 
+    return all(
+        margin >= 0.0
+        for margin in _stage_margins(side, streams, matches, start_heat, end_heat)
+    )
+
+
+def _stage_margins(side, streams, matches, start_heat, end_heat) -> list[float]:
+    """Each match's temperature difference less its approach, at both stage ends,
+    in every period both its streams run, in a fixed order."""
+
+    margins = []
     for hot_index, cold_index, _layer, _duty in matches:
         hot, cold = streams[("hot", hot_index)], streams[("cold", cold_index)]
+        hot_key, cold_key = ("hot", hot_index), ("cold", cold_index)
         for n in range(side.periods):
             if not (hot.active(n) and cold.active(n)):
                 continue
             approach = side.approach[n][hot_index][cold_index] - 1e-6
-            hot_far = stage_heat[("hot", hot_index)] * hot.loads[n] / hot.load
-            cold_far = stage_heat[("cold", cold_index)] * cold.loads[n] / cold.load
-            for hot_heat, cold_heat in ((0.0, 0.0), (hot_far, cold_far)):
-                if (
-                    hot.temperature(n, hot_heat) - cold.temperature(n, cold_heat)
-                    < approach
-                ):
-                    return False
-    return True
+            hot_scale = hot.loads[n] / hot.load
+            cold_scale = cold.loads[n] / cold.load
+            for heat in (start_heat, end_heat):
+                margins.append(
+                    hot.temperature(n, heat.get(hot_key, 0.0) * hot_scale)
+                    - cold.temperature(n, heat.get(cold_key, 0.0) * cold_scale)
+                    - approach
+                )
+    return margins
 
 
-def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
+def _largest_feasible(margins, breakpoints, limit: float) -> float:
+    """The largest duty in [0, ``limit``] at which every margin is non-negative.
+
+    ``margins(q)`` lists the constraint margins at duty ``q``; each is linear
+    in ``q`` between consecutive ``breakpoints`` (where a stream's profile
+    changes slope). Pieces are searched from the top, so a feasible stretch
+    above an infeasible one is still found, and within a piece the margins'
+    zero crossings bound the feasible duties exactly. A segmented stream can
+    make the margins dip below zero and recover, which bisection would miss.
+    """
+
+    # Feasibility at zero duty is not required: a new match joining a mixed
+    # stage may need some duty before its ends keep their approach.
+    if limit <= 0.0:
+        return 0.0
+    points = sorted({0.0, float(limit), *(q for q in breakpoints if 0.0 < q < limit)})
+    for low, high in reversed(list(zip(points, points[1:]))):
+        start, end = low, high
+        for below, above in zip(margins(low), margins(high)):
+            if below >= 0.0 and above >= 0.0:
+                continue
+            if below < 0.0 and above < 0.0:
+                start, end = high, low
+                break
+            crossing = low + (high - low) * below / (below - above)
+            if below < 0.0:
+                start = max(start, crossing)
+            else:
+                end = min(end, crossing)
+        if start <= end:
+            return end
+    return 0.0
+
+
+def _profile_breakpoints(side, stream: SideStream, heat_before: float):
+    """Duties at which a match starting ``heat_before`` along ``stream`` (from
+    its pinch end) reaches one of the stream's profile breakpoints, in any
+    period it runs."""
+
+    return [
+        heat * stream.load / stream.loads[n] - heat_before
+        for n in range(side.periods)
+        if stream.active(n)
+        for heat in stream.heats[n]
+    ]
+
+
+def _extend(
+    side, state, streams, must_kind, nodes, rung: _Rung = _BASE_RUNG
+) -> Iterator[SideProposal]:
     if nodes[0] <= 0:
         return
     nodes[0] -= 1
@@ -488,8 +591,8 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
         return
     # The stream nearest the pinch first, so it takes the partners' slices
     # nearest the pinch before a stream far from it uses them up; then the
-    # largest remaining load.
-    must = min(
+    # largest remaining load. A fallback rung also tries the next nearest.
+    ordered = sorted(
         open_must,
         key=lambda s: (
             _distance_from_pinch(side, s, state.used[(s.kind, s.index)]),
@@ -497,33 +600,124 @@ def _extend(side, state, streams, must_kind, nodes) -> Iterator[SideProposal]:
             s.index,
         ),
     )
-    candidates = _candidates(side, state, streams, must, repeat=False)
-    if not candidates:
-        # A pair matched already may match again further out, as a second
-        # exchanger in another stage, when no new partner can take the load.
-        candidates = _candidates(side, state, streams, must, repeat=True)
-    if not candidates:
-        yield _proposal(side, state, streams, must_kind, complete=False)
-        return
-    must_remaining = state.remaining[(must.kind, must.index)]
-    must_cp = must.cp_at(state.used[(must.kind, must.index)])
-    # Tick-off first, then the most similar CP at the matched ends, then duty.
-    candidates.sort(
-        key=lambda item: (
-            item[1] < must_remaining - _tolerance(must),
-            cp_distance(
-                must_cp, item[0].cp_at(state.used[(item[0].kind, item[0].index)])
-            ),
-            -item[1],
-            item[0].index,
+    for must in ordered[: rung.must_branches]:
+        candidates = _candidates(side, state, streams, must, repeat=False)
+        if not candidates:
+            # A pair matched already may match again further out, as a second
+            # exchanger in another stage, when no new partner can take the load.
+            candidates = _candidates(side, state, streams, must, repeat=True)
+        if not candidates:
+            if rung.split:
+                yield from _split_partner(
+                    side, state, streams, must, must_kind, nodes, rung
+                )
+            else:
+                yield _proposal(side, state, streams, must_kind, complete=False)
+            continue
+        must_remaining = state.remaining[(must.kind, must.index)]
+        must_cp = must.cp_at(state.used[(must.kind, must.index)])
+        # Tick-off first, then the most similar CP at the matched ends, then duty.
+        candidates.sort(
+            key=lambda item: (
+                item[1] < must_remaining - _tolerance(must),
+                cp_distance(
+                    must_cp, item[0].cp_at(state.used[(item[0].kind, item[0].index)])
+                ),
+                -item[1],
+                item[0].index,
+            )
         )
-    )
-    for partner, duty in candidates:
+        for partner, duty in candidates:
+            if nodes[0] <= 0:
+                return
+            yield from _extend(
+                side,
+                _place(state, must, partner, duty),
+                streams,
+                must_kind,
+                nodes,
+                rung,
+            )
+
+
+def _split_partner(side, state, streams, must, must_kind, nodes, rung):
+    """Match the must stream in parallel with a partner's last match.
+
+    No partner can take the must stream's load in series, so a partner is
+    split away from the pinch: the new match shares the later of the two
+    streams' last stages, at the largest duty that keeps every match in that
+    stage at its approach at both stage ends. When no partner can, the
+    proposal is incomplete.
+    """
+
+    must_key = (must.kind, must.index)
+    placed = False
+    for partner in streams.values():
+        partner_key = (partner.kind, partner.index)
+        if partner.kind == must.kind or partner_key not in state.layer:
+            continue
+        if not _allowed(side, must, partner) or _met(
+            partner, state.remaining[partner_key]
+        ):
+            continue
+        layer = max(state.layer[partner_key], state.layer.get(must_key, 0))
+        hot, cold = _hot_cold(must, partner)
+        if any(match[:3] == (hot.index, cold.index, layer) for match in state.matches):
+            continue
+        duty = _parallel_duty(
+            side,
+            state,
+            streams,
+            (hot.index, cold.index, layer),
+            min(state.remaining[must_key], state.remaining[partner_key]),
+        )
+        if duty <= _tolerance(must):
+            continue
+        placed = True
         if nodes[0] <= 0:
             return
         yield from _extend(
-            side, _place(state, must, partner, duty), streams, must_kind, nodes
+            side,
+            _place(state, must, partner, duty, layer=layer),
+            streams,
+            must_kind,
+            nodes,
+            rung,
         )
+    if not placed:
+        yield _proposal(side, state, streams, must_kind, complete=False)
+
+
+def _parallel_duty(side, state, streams, match, limit: float) -> float:
+    """The largest duty, up to ``limit``, for ``match`` to join its stage."""
+
+    hot_index, cold_index, layer = match
+
+    def margins(duty: float) -> list[float]:
+        matches = state.matches + ((hot_index, cold_index, layer, duty),)
+        start: dict = {}
+        end: dict = {}
+        for hot, cold, other_layer, other_duty in matches:
+            for key in (("hot", hot), ("cold", cold)):
+                if other_layer < layer:
+                    start[key] = start.get(key, 0.0) + other_duty
+                if other_layer <= layer:
+                    end[key] = end.get(key, 0.0) + other_duty
+        in_stage = [m for m in matches if m[2] == layer]
+        return _stage_margins(side, streams, in_stage, start, end)
+
+    def heat_through(key) -> float:
+        return sum(
+            duty
+            for hot, cold, other_layer, duty in state.matches
+            if other_layer <= layer and key in (("hot", hot), ("cold", cold))
+        )
+
+    hot_key, cold_key = ("hot", hot_index), ("cold", cold_index)
+    breakpoints = _profile_breakpoints(
+        side, streams[hot_key], heat_through(hot_key)
+    ) + _profile_breakpoints(side, streams[cold_key], heat_through(cold_key))
+    return _largest_feasible(margins, breakpoints, limit)
 
 
 def _candidates(side, state, streams, must, *, repeat: bool):
@@ -566,9 +760,19 @@ def _distance_from_pinch(side, stream: SideStream, heat: float) -> float:
     return sum(temperatures) / len(temperatures)
 
 
-def _place(state: _State, must: SideStream, partner: SideStream, duty: float):
+def _place(
+    state: _State,
+    must: SideStream,
+    partner: SideStream,
+    duty: float,
+    *,
+    layer: int | None = None,
+):
+    """Add a match, by default one stage beyond both streams' last."""
+
     keys = ((must.kind, must.index), (partner.kind, partner.index))
-    layer = 1 + max(state.layer.get(key, -1) for key in keys)
+    if layer is None:
+        layer = 1 + max(state.layer.get(key, -1) for key in keys)
     remaining = dict(state.remaining)
     used = dict(state.used)
     layers = dict(state.layer)
@@ -601,37 +805,29 @@ def _feasible_duty(side, state, must, partner) -> float:
         state.remaining[(partner.kind, partner.index)],
     )
 
-    def feasible(duty: float) -> bool:
+    hot_used = state.used[("hot", hot.index)]
+    cold_used = state.used[("cold", cold.index)]
+
+    def margins(duty: float) -> list[float]:
+        found = []
         for n in range(side.periods):
             if not (hot.active(n) and cold.active(n)):
                 continue
             approach = side.approach[n][hot.index][cold.index] - 1e-6
             for q in (0.0, duty):
-                hot_heat = (
-                    (state.used[("hot", hot.index)] + q) * hot.loads[n] / hot.load
+                hot_heat = (hot_used + q) * hot.loads[n] / hot.load
+                cold_heat = (cold_used + q) * cold.loads[n] / cold.load
+                found.append(
+                    hot.temperature(n, hot_heat)
+                    - cold.temperature(n, cold_heat)
+                    - approach
                 )
-                cold_heat = (
-                    (state.used[("cold", cold.index)] + q) * cold.loads[n] / cold.load
-                )
-                if (
-                    hot.temperature(n, hot_heat) - cold.temperature(n, cold_heat)
-                    < approach
-                ):
-                    return False
-        return True
+        return found
 
-    if limit <= 0.0 or not feasible(0.0):
-        return 0.0
-    if feasible(limit):
-        return limit
-    low, high = 0.0, limit
-    for _step in range(_BISECTION_STEPS):
-        middle = (low + high) / 2.0
-        if feasible(middle):
-            low = middle
-        else:
-            high = middle
-    return low
+    breakpoints = _profile_breakpoints(side, hot, hot_used) + _profile_breakpoints(
+        side, cold, cold_used
+    )
+    return _largest_feasible(margins, breakpoints, limit)
 
 
 def _proposal(side, state, streams, must_kind, *, complete: bool) -> SideProposal:

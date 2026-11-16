@@ -43,6 +43,25 @@ def test_param_is_a_fixed_value_that_can_be_changed():
     assert pyo.value(selector) == pytest.approx(0.0)
 
 
+def test_params_come_from_preallocated_blocks_and_unused_entries_stay_out(
+    tmp_path,
+):
+    # Adding to a VarList one parameter at a time cost several seconds per
+    # large design; parameters are handed out from blocks allocated ahead.
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0, ub=5.0)
+    parameters = [model.Param(value=float(index)) for index in range(3)]
+    model.Equation(x >= parameters[2])
+    model.Minimize(x)
+
+    block = parameters[0].parent_component()
+    assert all(parameter.parent_component() is block for parameter in parameters)
+    assert len(block) > len(parameters)
+    assert [pyo.value(parameter) for parameter in parameters] == [0.0, 1.0, 2.0]
+    assert all(parameter.fixed for parameter in parameters)
+    model.model.write(str(tmp_path / "model.nl"))
+
+
 def test_equations_become_constraints_of_the_model():
     model = PyomoModel()
     x = model.Var(value=0.0, lb=0.0, ub=5.0)
@@ -219,6 +238,40 @@ def test_an_early_stop_without_a_solution_is_failed(monkeypatch, termination):
     assert termination in run.failure_reason
 
 
+@pytest.mark.parametrize(
+    ("solver_name", "binary"), [("ipopt-pyomo", "ipopt"), ("couenne", "couenne")]
+)
+def test_a_solve_runs_the_executable_its_configuration_found(
+    monkeypatch, solver_name, binary
+):
+    # Importing IDAES (to look for Couenne) puts its older Ipopt first on
+    # PATH, so the solve must not look the executable up on PATH again.
+    model, _x, _y = _bounded_model(4.0)
+    seen = {}
+
+    class _Solver:
+        options: dict = {}
+
+        def solve(self, *_args, **_kwargs):
+            raise RuntimeError("not solved")
+
+    def factory(_name, **kwargs):
+        seen.update(kwargs)
+        return _Solver()
+
+    monkeypatch.setattr(
+        backend, "require_solver_backend", lambda _name: f"/opt/bin/{binary}"
+    )
+    monkeypatch.setattr(backend, "_require_pyomo_solver_available", lambda *_a: None)
+    monkeypatch.setattr(pyo, "SolverFactory", factory)
+
+    backend.configure_pyomo_solver(model, solver_name)
+    backend.solve_pyomo_model(model, solver_name=solver_name)
+    backend.cleanup_model_run_directory(model)
+
+    assert seen["executable"] == f"/opt/bin/{binary}"
+
+
 @pytest.mark.solver
 @pytest.mark.skipif(
     "not _solver_available('ipopt-pyomo')", reason="needs the ipopt binary"
@@ -308,10 +361,31 @@ def test_is_linear_checks_constraints_and_objective():
 @pytest.mark.parametrize(
     ("user_options", "expected"),
     [
-        (None, {"bound_push": 1e-6, "bound_frac": 1e-6}),
+        # An acceptable level of 1e-4 over 5 iterations made Nine-stream's
+        # failing evolution solves converge (25/30 to 30/30) with the same
+        # networks; the 120 s wall-time cap is a guard, never reached in the
+        # EVM benchmark (2026-11-15). tol 1e-6 did as well, but made a duty
+        # optimisation's restoration fail and a Four-stream network dearer.
+        (
+            None,
+            {
+                "bound_push": 1e-6,
+                "bound_frac": 1e-6,
+                "acceptable_tol": 1e-4,
+                "acceptable_iter": 5,
+                "max_wall_time": 120.0,
+            },
+        ),
         (
             {"bound_push": 1e-2, "max_iter": 50},
-            {"bound_push": 1e-2, "bound_frac": 1e-6, "max_iter": 50},
+            {
+                "bound_push": 1e-2,
+                "bound_frac": 1e-6,
+                "acceptable_tol": 1e-4,
+                "acceptable_iter": 5,
+                "max_wall_time": 120.0,
+                "max_iter": 50,
+            },
         ),
     ],
 )

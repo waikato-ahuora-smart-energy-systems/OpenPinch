@@ -124,6 +124,7 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
     assert documented_replays == {
         "problem.target.all_periods.carnot_heat_pump",
         "problem.target.all_periods.carnot_refrigeration",
+        "problem.target.all_periods.heat_pump_and_refrigeration",
         "problem.target.all_periods.mvr_heat_pump",
         "problem.target.all_periods.vapour_compression_heat_pump",
         "problem.target.all_periods.vapour_compression_refrigeration",
@@ -172,7 +173,7 @@ def test_manifest_tracks_required_semantic_dimensions_and_evidence() -> None:
         "all periods",
         "per-period;weighted average",
         "named case;active case;ordered batch",
-        "multiperiod_heat_exchanger_network",
+        "design_result.views",
         "return figure;explicit export",
     ):
         assert required_mode in combined

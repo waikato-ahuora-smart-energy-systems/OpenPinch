@@ -12,7 +12,6 @@ from ...contracts.hpr import HeatPumpTargetOutputs, HPRSearchBudget
 from ...domain.configuration import Configuration, tol
 from ...domain.enums import (
     GraphType,
-    HeatPumpAndRefrigerationCycle,
     ProblemTableLabel,
     TargetType,
 )
@@ -41,28 +40,11 @@ from .common.postprocessing import _get_hpr_residual_utility_summary
 from .common.preprocessing import (
     construct_HPRTargetInputs,
 )
+from .cycles.registry import family_handlers, resolve_handler
 from .optimisation_adapter import translate_hpr_output
 from .performance_maps.targeting import (
     normalize_hpr_simulation_backend,
     preflight_tespy_hpr_targeting,
-)
-from .targeting.brayton import (
-    optimise_brayton_heat_pump_placement,
-)
-from .targeting.cascade_carnot import (
-    optimise_cascade_carnot_heat_pump_placement,
-)
-from .targeting.cascade_vapour_compression import (
-    optimise_cascade_heat_pump_placement,
-)
-from .targeting.parallel_carnot import (
-    optimise_parallel_carnot_heat_pump_placement,
-)
-from .targeting.parallel_vapour_compression import (
-    optimise_parallel_heat_pump_placement,
-)
-from .targeting.vapour_compression_mvr import (
-    optimise_vapour_compression_mvr_heat_pump_placement,
 )
 
 __all__ = [
@@ -344,9 +326,7 @@ def _get_hpr_targets(
         search_budget=search_budget,
         background_is_utility=background_is_utility,
     )
-    handler = _HP_PLACEMENT_HANDLERS.get(args.hpr_type)
-    if handler is None:
-        raise ValueError("No valid heat pump targeting type selected.")
+    handler = _placement_handler(args.hpr_type)
     if getattr(args, "simulation_backend", normalized_backend) == "tespy":
         prepared_tespy = preflight_tespy_hpr_targeting(args)
         result = handler(
@@ -565,24 +545,13 @@ def _calc_hpr_cascade(
     return pt
 
 
-_HP_PLACEMENT_HANDLERS = {
-    HeatPumpAndRefrigerationCycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HeatPumpAndRefrigerationCycle.CascadeCarnot.value: (
-        optimise_cascade_carnot_heat_pump_placement
-    ),
-    HeatPumpAndRefrigerationCycle.ParallelVapourComp.value: (
-        optimise_parallel_heat_pump_placement
-    ),
-    HeatPumpAndRefrigerationCycle.CascadeVapourComp.value: (
-        optimise_cascade_heat_pump_placement
-    ),
-    HeatPumpAndRefrigerationCycle.VapourCompMVR.value: (
-        optimise_vapour_compression_mvr_heat_pump_placement
-    ),
-    HeatPumpAndRefrigerationCycle.ParallelCarnot.value: (
-        optimise_parallel_carnot_heat_pump_placement
-    ),
-}
+def _placement_handler(hpr_type: str):
+    """The registered cycle's placement optimiser for this ``HPR_TYPE``."""
+    try:
+        handlers = family_handlers(hpr_type)
+    except ValueError:
+        raise ValueError("No valid heat pump targeting type selected.") from None
+    return resolve_handler(handlers.placement)
 
 
 def _hpr_numerical_records(
