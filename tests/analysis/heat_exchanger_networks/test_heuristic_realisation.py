@@ -16,6 +16,7 @@ from OpenPinch.analysis.heat_exchanger_networks.heuristic.enumeration import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
     InternalHeatExchangerNetworkProblem,
+    _side_topology,
 )
 from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
     network_structure_signature,
@@ -278,3 +279,36 @@ def test_proposals_realising_the_same_side_network_are_paired_once():
     assert report["repeated"] <= 1
     networks = _networks(problem)
     assert len({network_structure_signature(n) for n in networks}) == len(networks)
+
+
+def test_a_repeated_side_stands_in_when_its_first_pairing_fails(monkeypatch):
+    # Repeats share their matches but not always their duties: when the
+    # first side's pairing fails, a repeat may still amalgamate.
+    pinch = PinchProblem(
+        source=json.loads(
+            (
+                REPOSITORY_ROOT
+                / "tests/fixtures/openhens/Five-stream-Kim-et-al-2017-1.json"
+            ).read_text(encoding="utf-8")
+        ),
+        project_name="Five-stream",
+    )
+    pinch.target.all_heat_integration()
+    dTmin = nominal_approach_temperature(pinch.master_zone.config, 1.0)
+    problem = _problem(pinch, dTmin, limit=10)
+    first_below: dict = {}
+    pdm_variant = InternalHeatExchangerNetworkProblem._pdm_variant
+
+    def first_below_side_fails(self, above, below):
+        if first_below.setdefault(_side_topology(below), below) is below:
+            return None
+        return pdm_variant(self, above, below)
+
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem, "_pdm_variant", first_below_side_fails
+    )
+
+    problem.get_solution(print_output=False)
+
+    assert problem.heuristic_report["repeated_sides"]["below"] >= 1
+    assert problem.heuristic_report["networks"] >= 1

@@ -1,5 +1,6 @@
 Pre-Release Notes
-==========
+=================
+
 Unreleased
 ----------
 
@@ -7,8 +8,9 @@ Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - The heuristic pinch design method realises networks faster: side
-  proposals that solve to a side network already found are dropped before
-  their pairings are amalgamated, since each would repeat a network. On the
+  proposals that solve to a side network already found are not paired,
+  since each pairing would repeat a network; they stand in only for a
+  pairing that fails. On the
   12 OpenHENS cases at the default width and depth 0 it takes about 23 %
   less time at 10 networks per multiplier, with the same best networks and
   at least as many distinct ones. ``heuristic_report`` counts the dropped
@@ -21,7 +23,6 @@ Heat exchanger network synthesis
   four cases. The pulp mill case takes 188 s instead of 45 s, finds 11
   minimum-unit networks instead of 2, and its best network is within 0.01 %.
   Set ``HENS_HEURISTIC_PDM_NETWORKS`` to 10 for the earlier, faster search.
-=======
 - Post-processing a solved stage-wise model is faster. The alpha flow-on
   system computes each stream's flow-on terms once per stage rather than once
   per partner, and drops zero terms when it builds them. Flow fractions read
