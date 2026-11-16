@@ -334,3 +334,52 @@ def test_design_retrofit_runs_the_search_from_a_mapping(fake_solver):
     assert match.fixed_cost >= 34_600.0
     # The search runs on a snapshot under a temporary configuration.
     assert dict(problem.config) == stored
+
+
+INSTALLED = {
+    "E1": 609.7,
+    "E2": 579.2,
+    "E3": 1008.5,
+    "E4": 117.96,
+    "E5": 787.5,
+    "E6": 104.6,
+    "E7": 246.75,
+}
+
+
+def test_the_structure_strategy_steps_by_structure_and_sizes_area(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            strategy="structure",
+            max_modifications=2,
+            new_match_candidates=2,
+            **COSTS,
+        ),
+    )
+
+    assert len(result.frontier) == 3
+    for depth, design in enumerate(result.frontier):
+        structural = [m for m in design.modifications if m.kind != "area_addition"]
+        assert len(structural) == depth
+    additions = [
+        m
+        for design in result.frontier[1:]
+        for m in design.modifications
+        if m.kind == "area_addition"
+    ]
+    # Every existing unit may grow on the fake; a unit keeps its added area
+    # only when it is at least 1 % of its installed area (E3's 10 m2 on
+    # 1,008.5 m2 is not), and each pays the area-addition cost once.
+    assert additions
+    for m in additions:
+        assert m.added_area >= 0.01 * INSTALLED[m.exchanger_id]
+        assert m.fixed_cost == pytest.approx(COSTS["area_addition_cost"])
+        assert m.area_cost == pytest.approx(AREA_COST * m.added_area)
+    assert "E3" not in {m.exchanger_id for m in additions}

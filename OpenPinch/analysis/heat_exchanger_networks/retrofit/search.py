@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import sys
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from ....contracts.synthesis.retrofit import (
     HeatExchangerNetworkRetrofitDesign,
@@ -49,6 +49,11 @@ from .moves import (
 _MIN_ADDED_AREA = 1e-3
 # An existing unit needing this share of its widened area is at its cap.
 _BINDING_SHARE = 0.99
+# The structure strategy keeps a unit's added area only from this share of
+# its installed area, and at least this many m2.
+_MIN_KEPT_SHARE = 0.01
+_MIN_KEPT_AREA = 1.0
+STRATEGIES = ("stepwise", "structure")
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,14 @@ class RetrofitSettings:
     ``None`` leaves them out. ``new_utility_units`` also tries each new match
     and relocation with each new end heater or cooler the network lacks, in
     the same step, priced as one more new unit.
+
+    ``strategy`` "stepwise" makes one modification per step, an area
+    addition being one. "structure" makes one structural change per step
+    (new match, relocation, paired utility): ``ceiling_candidates`` screened
+    changes are ranked by the utility cost their structure reaches with
+    unlimited area, the ``new_match_candidates`` best are solved with every
+    existing exchanger free to grow, and a unit keeps added area of at least
+    1 % of its installed area (1 m2 or more).
     """
 
     max_modifications: int = 3
@@ -84,6 +97,8 @@ class RetrofitSettings:
     relocation_cost: float | None = None
     relocation_candidates: int = 8
     new_utility_units: bool = False
+    strategy: str = "stepwise"
+    ceiling_candidates: int = 12
 
 
 @dataclass(frozen=True)
@@ -108,6 +123,7 @@ class _Evaluated:
     design: HeatExchangerNetworkRetrofitDesign
     solved: HeatExchangerNetwork
     binding: tuple[str, ...]
+    added: dict[str, float] = field(default_factory=dict)
 
 
 def run_retrofit_search(
@@ -120,6 +136,10 @@ def run_retrofit_search(
     be None or finite and non-negative.
     """
 
+    if settings.strategy not in STRATEGIES:
+        raise ValueError(
+            f"strategy must be one of {STRATEGIES}; got {settings.strategy!r}."
+        )
     fraction = settings.max_added_area_fraction
     if fraction is not None and not (math.isfinite(fraction) and fraction >= 0.0):
         raise ValueError(
@@ -154,15 +174,25 @@ def run_retrofit_search(
     frontier = [base.design]
     beam = [base]
     seen = {_signature(base.state, evaluator.existing)}
+    structural = settings.strategy == "structure"
     for _depth in range(max(0, int(settings.max_modifications))):
         children = []
         for parent in beam:
+            states = []
             for state in _children(parent, settings, evaluator):
+                if structural:
+                    state = _structure_only(state)
                 signature = _signature(state, evaluator.existing)
                 if signature in seen:
                     continue
                 seen.add(signature)
-                evaluated = evaluator.evaluate(state)
+                states.append(state)
+            if structural:
+                states = evaluator.best_ceilings(states)
+            for state in states:
+                evaluated = (
+                    evaluator.sized(state) if structural else evaluator.evaluate(state)
+                )
                 if evaluated is not None:
                     children.append(evaluated)
         if not children:
@@ -184,7 +214,10 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
     each new end utility exchanger the network lacks."""
 
     state = parent.state
-    for exchanger_id in parent.binding:
+    structural = settings.strategy == "structure"
+    if structural:
+        settings = replace(settings, new_match_candidates=settings.ceiling_candidates)
+    for exchanger_id in () if structural else parent.binding:
         yield replace(
             state,
             enlarged=state.enlarged | {exchanger_id},
@@ -304,6 +337,17 @@ def _new_id(network: HeatExchangerNetwork, match: NewMatch) -> str:
         n += 1
         exchanger_id = f"{stem}:{n}"
     return exchanger_id
+
+
+def _structure_only(state: _State) -> _State:
+    """``state`` without its area additions: the structure strategy sizes
+    area afresh for every structure."""
+
+    return replace(
+        state,
+        enlarged=frozenset(),
+        moves=tuple(m for m in state.moves if m.kind != "area_addition"),
+    )
 
 
 def _signature(state: _State, existing):
@@ -463,9 +507,83 @@ class _Evaluator:
                 net_annual_benefit=savings - annualised,
                 payback_years=capital / savings if savings > 0.0 else None,
             )
-            return _Evaluated(state, design, _with_names(solved, self.names), binding)
+            added = {i: float(r.added_area) for i, r in results.items()}
+            return _Evaluated(
+                state, design, _with_names(solved, self.names), binding, added
+            )
         finally:
             model.cleanup()
+
+    def best_ceilings(self, states: list[_State]) -> list[_State]:
+        """The ``new_match_candidates`` states whose structures reach the
+        lowest utility cost with unlimited area, best first."""
+
+        ceilings = [(self.ceiling(state), n, state) for n, state in enumerate(states)]
+        ranked = sorted(
+            (item for item in ceilings if item[0] is not None),
+            key=lambda item: (item[0], item[1]),
+        )
+        limit = max(0, int(self.settings.new_match_candidates))
+        return [state for _cost, _n, state in ranked[:limit]]
+
+    def ceiling(self, state: _State) -> float | None:
+        """The utility cost ($/y) ``state``'s structure reaches with
+        unlimited area (its network pinch); ``None`` if the solve fails."""
+
+        from ..models.fixed_structure import FixedStructureModel
+
+        self.evaluations += 1
+        request = build_duty_optimisation_request(
+            state.network,
+            objective="cost",
+            min_approach_temperature=self.settings.approach,
+        )
+        structure = fixed_network_structure(request, self.arrays.axis_maps)
+        model = FixedStructureModel(
+            name="retrofit-ceiling",
+            solver=self.solver,
+            solver_arrays=self.arrays,
+            spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
+            minimisation_goal="total utility",
+            default_approach=self.settings.approach,
+            tol=self.tol,
+            solver_options=dict(self.solver_options),
+        )
+        try:
+            model.optimise(print_output=False)
+            if getattr(model, "mSuccess", 0) != 1:
+                return None
+            return float(model.utility_cost_value)
+        finally:
+            model.cleanup()
+
+    def sized(self, state: _State) -> _Evaluated | None:
+        """``state``'s structure with its added area sized: solved with every
+        existing unit free to grow, then again with only the units whose
+        added area is worth keeping, each an area addition."""
+
+        free = self.evaluate(replace(state, enlarged=frozenset(self.installed)))
+        if free is None:
+            return self.evaluate(state)
+        keep = tuple(
+            sorted(
+                unit
+                for unit, added in free.added.items()
+                if unit in self.installed
+                and added >= max(_MIN_KEPT_AREA, _MIN_KEPT_SHARE * self.installed[unit])
+            )
+        )
+        if not keep:
+            return self.evaluate(state)
+        sized = self.evaluate(
+            replace(
+                state,
+                enlarged=frozenset(keep),
+                moves=state.moves
+                + tuple(_Move("area_addition", unit) for unit in keep),
+            )
+        )
+        return sized if sized is not None else self.evaluate(state)
 
     def _widened(self, network: HeatExchangerNetwork) -> HeatExchangerNetwork:
         """``network`` with each existing unit's installed area widened by
