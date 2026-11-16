@@ -9,6 +9,7 @@ makes the frontier over the number of modifications.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 
 from ....contracts.synthesis.retrofit import (
@@ -93,9 +94,16 @@ def run_retrofit_search(
     """Search modifications of ``existing``, one at a time.
 
     Every exchanger of ``existing`` needs its installed ``area``; a
-    ``ValueError`` names those without one.
+    ``ValueError`` names those without one. ``max_added_area_fraction`` must
+    be None or finite and non-negative.
     """
 
+    fraction = settings.max_added_area_fraction
+    if fraction is not None and not (math.isfinite(fraction) and fraction >= 0.0):
+        raise ValueError(
+            "max_added_area_fraction must be None or a finite fraction of at "
+            f"least 0; got {fraction!r}."
+        )
     missing = [
         str(e.exchanger_id)
         for e in _structural_exchangers(existing)

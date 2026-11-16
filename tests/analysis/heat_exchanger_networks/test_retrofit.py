@@ -318,6 +318,23 @@ def test_retrofit_search_needs_the_installed_area_of_every_existing_unit():
         run_retrofit_search(_case_problem(), network, RetrofitSettings())
 
 
+@pytest.mark.parametrize("fraction", [-0.1, float("nan"), float("inf")])
+def test_retrofit_search_rejects_a_cap_that_is_not_finite_and_non_negative(
+    fraction,
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    with pytest.raises(ValueError, match="max_added_area_fraction"):
+        run_retrofit_search(
+            _case_problem(),
+            _existing_network(),
+            RetrofitSettings(max_added_area_fraction=fraction),
+        )
+
+
 @pytest.mark.synthesis
 @pytest.mark.solver
 @_needs_live_solver
