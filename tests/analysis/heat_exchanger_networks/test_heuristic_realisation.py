@@ -281,6 +281,7 @@ def test_proposals_realising_the_same_side_network_are_paired_once():
     assert len({network_structure_signature(n) for n in networks}) == len(networks)
 
 
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
 def test_a_repeated_side_stands_in_when_its_first_pairing_fails(monkeypatch):
     # Repeats share their matches but not always their duties: when the
     # first side's pairing fails, a repeat may still amalgamate.
