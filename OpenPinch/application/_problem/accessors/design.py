@@ -929,6 +929,8 @@ class _DesignAccessor:
         relocation_cost: float | None = None,
         relocation_candidates: int = 8,
         new_utility_units: bool = False,
+        strategy: str = "stepwise",
+        ceiling_candidates: int = 12,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -973,6 +975,15 @@ class _DesignAccessor:
         a stream that has none, which can free the units a move needs; the
         pair is one modification, costing one more ``new_unit_cost`` and the
         utility exchanger's area.
+
+        ``strategy`` "stepwise" (the default) makes one modification per
+        step, an area addition being one. "structure" makes one structural
+        change per step: ``ceiling_candidates`` screened changes are ranked
+        by the utility cost their structure reaches with unlimited area (its
+        network pinch), the ``new_match_candidates`` best are solved with
+        every existing exchanger free to grow, and an exchanger keeps added
+        area of at least 1 % of its installed area, as an area addition. The
+        frontier then counts structural changes.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
@@ -1030,6 +1041,8 @@ class _DesignAccessor:
                     ),
                     relocation_candidates=relocation_candidates,
                     new_utility_units=new_utility_units,
+                    strategy=strategy,
+                    ceiling_candidates=ceiling_candidates,
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

@@ -383,3 +383,22 @@ def test_the_structure_strategy_steps_by_structure_and_sizes_area(fake_solver):
         assert m.fixed_cost == pytest.approx(COSTS["area_addition_cost"])
         assert m.area_cost == pytest.approx(AREA_COST * m.added_area)
     assert "E3" not in {m.exchanger_id for m in additions}
+
+
+def test_design_retrofit_takes_the_search_strategy(fake_solver):
+    problem = _problem()
+
+    result = problem.design.retrofit(
+        _existing_network(),
+        strategy="structure",
+        ceiling_candidates=3,
+        max_modifications=1,
+        new_match_candidates=1,
+    )
+
+    (design,) = result.frontier[1:]
+    assert [m.kind for m in design.modifications if m.kind != "area_addition"] == [
+        "new_match"
+    ]
+    with pytest.raises(ValueError, match="strategy"):
+        problem.design.retrofit(_existing_network(), strategy="greedy")
