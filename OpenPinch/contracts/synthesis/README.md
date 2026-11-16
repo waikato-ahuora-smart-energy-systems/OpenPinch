@@ -16,6 +16,7 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - `HeatExchangerNetworkSynthesisResult` (`result.py`): network, identities, solver status, objective values and ranked outcomes.
 - `HeatExchangerNetworkView` and its rows (`view.py`): ranking, utility duties and grid layout (`HeatExchangerNetworkGridLayout`, `...GridMatch`, `...GridStream`, `...GridBranchCount`, `...RankingRow`, `...UtilityDuty`); `GridMatchKind`.
 - `HenDesignBasis`, `HenBasisCluster`, `HenBasisStream` (`basis.py`): the median design basis preview: clusters of operating periods (members, weights, weight shares, medoid), the basis cluster and its synthetic stream table.
+- `HeatExchangerNetworkRetrofitModification`, `HeatExchangerNetworkRetrofitDesign`, `HeatExchangerNetworkRetrofitResult` (`retrofit.py`): one retrofit modification (`"new_match"` or `"area_addition"`, added area in m2, fixed and area cost in $, new splits), a design (its modifications, solved network, period-weighted utilities in kW, utility cost, savings, annualised capital and net annual benefit in $/y, capital in $, payback in years, `dominated`), and the result: `frontier`, one design per modification count from the existing network up, `evaluated_designs`, and `selected`.
 - Private helpers in `common.py` (`_validate_run_id` and similar) are imported by the sibling modules.
 - Subdirectories: none.
 
@@ -27,11 +28,12 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - `task_id` is `hens-task-` plus the first 16 hex characters of a SHA-256 of the sorted-key JSON of the task's identifying fields (`task_id`, `seed_network` and `metadata` are excluded; `settings` must be JSON-serialisable), so equal definitions give equal ids; a supplied `task_id` is kept (stripped of surrounding whitespace) [method.py:HeatExchangerNetworkSynthesisMethodInput.generate_task_id].
 - Method output `objective_value` and result `objective_values` are finite and non-negative; `stage_count` is positive on the method input and the result [method.py:HeatExchangerNetworkSynthesisMethodOutput, result.py:HeatExchangerNetworkSynthesisResult].
 - Topology restriction `stage` is positive and `duty` non-negative and finite [topology.py:HeatExchangerNetworkTopologyRestriction].
-- Models forbid extra fields and validate on assignment, except the view models, which are frozen [view.py:_ViewModel].
+- Models forbid extra fields and validate on assignment, except the view models, which are frozen [view.py:_ViewModel], and the retrofit models, which forbid extra fields only [retrofit.py].
+- A retrofit result has at least one design; `selected` is the design with the best net annual benefit, the fewer modifications on a tie [retrofit.py:HeatExchangerNetworkRetrofitResult.selected].
 - By convention, layouts built by `presentation/network_grid/layout.py` list recovery, then heater, then cooler matches; the model does not enforce the order, and drawing positions are left to the client [view.py:HeatExchangerNetworkGridLayout].
 
 ## Side Effects
 - None. Method input fills `task_id` and output fills `method` from `task` during validation [method.py:_ensure_task_id, _fill_method_from_task].
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_contracts.py` (the nearest existing test; there is no dedicated synthesis model test under tests/contracts).
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_contracts.py tests/analysis/heat_exchanger_networks/test_retrofit_frontier.py` (the nearest existing tests; there is no dedicated synthesis model test under tests/contracts).

@@ -56,7 +56,7 @@ from .base import BaseHeatExchangerNetworkModel
 from .thermal_profiles import ThermalProfile, smooth_clip
 
 FIXED_STRUCTURE_GOALS = frozenset(
-    {"total utility", "total area", "total cost", "rating"}
+    {"total utility", "total area", "total cost", "rating", "retrofit"}
 )
 HEATER = "hot"
 COOLER = "cold"
@@ -112,6 +112,12 @@ class FixedStructureSpec:
     utility_design_points: Mapping[int, Mapping[int, tuple]] = field(
         default_factory=dict
     )
+    # The "retrofit" goal widens each installed area by this fraction, to
+    # cover Chen's LMTD error and rounded plant areas.
+    area_tolerance: float = 0.0
+    # Existing units the "retrofit" goal may enlarge, by solver index.
+    enlargeable_recovery: frozenset[int] = frozenset()
+    enlargeable_utilities: frozenset[int] = frozenset()
 
 
 @dataclass
@@ -139,6 +145,8 @@ class ExchangerResult:
     periods: list[ExchangerPeriodResult]
     area: float
     capital_cost: float
+    # Area a retrofit installs on this unit: all of a new unit's area.
+    added_area: float = 0.0
 
     @property
     def active(self) -> bool:
@@ -774,6 +782,8 @@ def build_fixed_structure_equations(owner) -> None:
         _common_areas(owner)
     elif owner.minimisation_goal == "rating":
         _installed_areas(owner)
+    elif owner.minimisation_goal == "retrofit":
+        _retrofit_areas(owner)
     else:
         owner.area_r = None
         owner.area_u = None
@@ -1180,44 +1190,80 @@ def chen_lmtd(theta_1, theta_2):
     return (theta_1 * theta_2 * (theta_1 + theta_2) / 2 + _AREA_SMOOTHING) ** (1 / 3)
 
 
-def _common_areas(owner) -> None:
-    """One area per exchanger, at least what every period needs.
+def _unit_terms(owner, side: str, index: int):
+    """One unit's duty, U and end approaches in every period."""
+
+    duty, coefficient, theta = (
+        (owner.q_r, owner.recovery_U, owner.theta_r)
+        if side == "recovery"
+        else (owner.q_u, owner.utility_U, owner.theta_u)
+    )
+    periods = range(owner.N_periods)
+    return (
+        [duty[n][index] for n in periods],
+        [coefficient[n][index] for n in periods],
+        [theta[n][index] for n in periods],
+    )
+
+
+def _common_area(owner, name: str, duties, coefficients, thetas):
+    """One area for a unit, at least what every period needs.
 
     With one period the area is the Chen-LMTD expression itself. With several
     periods it is a variable bounded below by each period's requirement, so
     periods that need less area run with a bypass.
     """
 
-    def area_term(name: str, duties, coefficients, thetas):
-        if owner.N_periods == 1:
-            return owner._intermediate(
-                duties[0] / (coefficients[0] * chen_lmtd(*thetas[0])), name
-            )
-        start = max(
-            _numeric(duties[n]) / (coefficients[n] * _start_lmtd(thetas[n]))
-            for n in range(owner.N_periods)
+    if owner.N_periods == 1:
+        return owner._intermediate(
+            duties[0] / (coefficients[0] * chen_lmtd(*thetas[0])), name
         )
-        area = owner._var(name, start, 0.0, None)
-        for n in range(owner.N_periods):
-            owner._at_least(area * coefficients[n] * chen_lmtd(*thetas[n]), duties[n])
-        return area
+    start = max(
+        _numeric(duties[n]) / (coefficients[n] * _start_lmtd(thetas[n]))
+        for n in range(owner.N_periods)
+    )
+    area = owner._var(name, start, 0.0, None)
+    for n in range(owner.N_periods):
+        owner._at_least(area * coefficients[n] * chen_lmtd(*thetas[n]), duties[n])
+    return area
+
+
+def _design_factor(point, coefficient: float) -> float:
+    """Installed-area capacity factor at a unit's design point (1 without)."""
+
+    if point is None:
+        return 1.0
+    duty, theta_1, theta_2, required = point
+    if duty <= 0.0 or min(theta_1, theta_2) <= 0.0:
+        return 1.0
+    chen = chen_lmtd(theta_1, theta_2)
+    if required:
+        return duty / (float(coefficient) * chen) / float(required)
+    return exact_lmtd(theta_1, theta_2) / chen
+
+
+def _cap_installed(owner, capacity, design, duties, coefficients, thetas) -> None:
+    """The unit's duty in every period fits ``capacity`` (an area)."""
+
+    for n in range(owner.N_periods):
+        owner._at_least(
+            capacity
+            * _design_factor(design.get(n), coefficients[n])
+            * coefficients[n]
+            * chen_lmtd(*thetas[n]),
+            duties[n],
+        )
+
+
+def _common_areas(owner) -> None:
+    """One area per exchanger, at least what every period needs."""
 
     owner.area_r = [
-        area_term(
-            f"ar{r}",
-            [owner.q_r[n][r] for n in range(owner.N_periods)],
-            [owner.recovery_U[n][r] for n in range(owner.N_periods)],
-            [owner.theta_r[n][r] for n in range(owner.N_periods)],
-        )
+        _common_area(owner, f"ar{r}", *_unit_terms(owner, "recovery", r))
         for r in range(len(owner.spec.recovery))
     ]
     owner.area_u = [
-        area_term(
-            f"au{e}",
-            [owner.q_u[n][e] for n in range(owner.N_periods)],
-            [owner.utility_U[n][e] for n in range(owner.N_periods)],
-            [owner.theta_u[n][e] for n in range(owner.N_periods)],
-        )
+        _common_area(owner, f"au{e}", *_unit_terms(owner, "utility", e))
         for e in range(len(owner.spec.utilities))
     ]
 
@@ -1225,47 +1271,78 @@ def _common_areas(owner) -> None:
 def _installed_areas(owner) -> None:
     """Each exchanger's installed area caps its duty in every period."""
 
-    def factor(point, coefficient: float) -> float:
-        if point is None:
-            return 1.0
-        duty, theta_1, theta_2, required = point
-        if duty <= 0.0 or min(theta_1, theta_2) <= 0.0:
-            return 1.0
-        chen = chen_lmtd(theta_1, theta_2)
-        if required:
-            return duty / (float(coefficient) * chen) / float(required)
-        return exact_lmtd(theta_1, theta_2) / chen
-
-    def installed(areas, points, duties, coefficients, thetas, count):
+    def installed(side, areas, points, count):
         fixed = []
         for e in range(count):
             area = float(areas[e])
-            design = points.get(e, {})
-            for n in range(owner.N_periods):
-                capacity = area * factor(design.get(n), coefficients[n][e])
-                owner._at_least(
-                    capacity * coefficients[n][e] * chen_lmtd(*thetas[n][e]),
-                    duties[n][e],
-                )
+            _cap_installed(owner, area, points.get(e, {}), *_unit_terms(owner, side, e))
             fixed.append(area)
         return fixed
 
+    spec = owner.spec
     owner.area_r = installed(
-        owner.spec.recovery_areas,
-        owner.spec.recovery_design_points,
-        owner.q_r,
-        owner.recovery_U,
-        owner.theta_r,
-        len(owner.spec.recovery),
+        "recovery",
+        spec.recovery_areas,
+        spec.recovery_design_points,
+        len(spec.recovery),
     )
     owner.area_u = installed(
-        owner.spec.utility_areas,
-        owner.spec.utility_design_points,
-        owner.q_u,
-        owner.utility_U,
-        owner.theta_u,
-        len(owner.spec.utilities),
+        "utility", spec.utility_areas, spec.utility_design_points, len(spec.utilities)
     )
+
+
+def _retrofit_areas(owner) -> None:
+    """Existing units keep their installed areas; new units are sized.
+
+    A unit with an installed area (an existing unit) is capped at that area
+    widened by ``spec.area_tolerance``; an enlargeable one adds a free added
+    area to the cap. A unit without one (a new unit) gets a common design
+    area, all of it added. The objective prices every added area.
+    """
+
+    widen = 1.0 + float(owner.spec.area_tolerance)
+
+    def unit(side, tag, index, areas, points, enlargeable):
+        terms = _unit_terms(owner, side, index)
+        if index not in areas:
+            area = _common_area(owner, f"{tag}{index}", *terms)
+            return area, area
+        installed = float(areas[index])
+        added = (
+            owner._var(f"d{tag}{index}", 0.0, 0.0, None)
+            if index in enlargeable
+            else 0.0
+        )
+        _cap_installed(owner, installed * widen + added, points.get(index, {}), *terms)
+        return installed, added
+
+    spec = owner.spec
+    recovery = [
+        unit(
+            "recovery",
+            "ar",
+            r,
+            spec.recovery_areas,
+            spec.recovery_design_points,
+            spec.enlargeable_recovery,
+        )
+        for r in range(len(spec.recovery))
+    ]
+    utilities = [
+        unit(
+            "utility",
+            "au",
+            e,
+            spec.utility_areas,
+            spec.utility_design_points,
+            spec.enlargeable_utilities,
+        )
+        for e in range(len(spec.utilities))
+    ]
+    owner.area_r = [area for area, _added in recovery]
+    owner.added_area_r = [added for _area, added in recovery]
+    owner.area_u = [area for area, _added in utilities]
+    owner.added_area_u = [added for _area, added in utilities]
 
 
 def _start_lmtd(thetas) -> float:
@@ -1286,6 +1363,10 @@ def set_fixed_structure_objective(owner) -> None:
         owner.objective_expression = _sum(list(owner.area_r) + list(owner.area_u))
     elif goal == "rating":
         owner.objective_expression = operating_cost_expression(owner)
+    elif goal == "retrofit":
+        owner.objective_expression = operating_cost_expression(
+            owner
+        ) + retrofit_capital_expression(owner)
     else:
         owner.objective_expression = operating_cost_expression(
             owner
@@ -1328,6 +1409,29 @@ def capital_cost_expression(owner):
         coeff, exponent = _utility_area_cost_parameters(owner, e)
         terms.append(_area_cost(coeff, exponent, area))
     return _sum(terms) + fixed_unit_cost(owner)
+
+
+def retrofit_capital_expression(owner):
+    """Annualised area cost of the area a retrofit adds (fixed costs apart)."""
+
+    return _sum(_added_area_costs(owner, owner.added_area_r, owner.added_area_u))
+
+
+def _added_area_costs(owner, recovery, utilities) -> list:
+    terms = [
+        _area_cost(owner.A_coeff[0], owner.A_exp[0], added)
+        for added in recovery
+        if not _is_zero(added)
+    ]
+    for e, added in enumerate(utilities):
+        if not _is_zero(added):
+            coeff, exponent = _utility_area_cost_parameters(owner, e)
+            terms.append(_area_cost(coeff, exponent, added))
+    return terms
+
+
+def _is_zero(value: Any) -> bool:
+    return isinstance(value, int | float) and value == 0.0
 
 
 def fixed_unit_cost(owner) -> float:
@@ -1465,15 +1569,12 @@ def post_process_fixed_structure(owner) -> None:
                     slices=slices,
                 )
             )
-        area = (
-            float(spec.recovery_areas[r])
-            if owner.minimisation_goal == "rating"
-            else _design_area(periods)
-        )
+        area, added = _reported_area(owner, spec.recovery_areas, r, periods, "recovery")
         owner.recovery_results.append(
             ExchangerResult(
                 periods=periods,
                 area=area,
+                added_area=added,
                 capital_cost=_capital(
                     area, owner.unit_cost[0], owner.A_coeff[0], owner.A_exp[0]
                 ),
@@ -1557,11 +1658,7 @@ def post_process_fixed_structure(owner) -> None:
                     slices=slices,
                 )
             )
-        area = (
-            float(spec.utility_areas[e])
-            if owner.minimisation_goal == "rating"
-            else _design_area(periods)
-        )
+        area, added = _reported_area(owner, spec.utility_areas, e, periods, "utility")
         unit, coeff, exponent = (
             (owner.hu_unit_cost[0], owner.hu_coeff[0], owner.hu_exp[0])
             if match.side == HEATER
@@ -1571,6 +1668,7 @@ def post_process_fixed_structure(owner) -> None:
             ExchangerResult(
                 periods=periods,
                 area=area,
+                added_area=added,
                 capital_cost=_capital(area, unit, coeff, exponent),
             )
         )
@@ -1594,6 +1692,37 @@ def post_process_fixed_structure(owner) -> None:
     owner.total_area = sum(
         result.area for result in owner.recovery_results + owner.utility_results
     )
+    if owner.minimisation_goal == "retrofit":
+        owner.retrofit_capital_value = float(
+            sum(
+                _added_area_costs(
+                    owner,
+                    [result.added_area for result in owner.recovery_results],
+                    [result.added_area for result in owner.utility_results],
+                )
+            )
+        )
+
+
+def _reported_area(
+    owner, installed: Mapping[int, float], index: int, periods, side: str
+) -> tuple[float, float]:
+    """A unit's reported area and the part of it a retrofit adds.
+
+    Rating reports the installed area. A retrofit reports an existing unit's
+    installed area plus any area it adds, and a new unit's design area, all
+    of it added.
+    """
+
+    goal = owner.minimisation_goal
+    if goal == "rating":
+        return float(installed[index]), 0.0
+    if goal == "retrofit" and index in installed:
+        added_areas = owner.added_area_r if side == "recovery" else owner.added_area_u
+        added = max(0.0, _numeric(added_areas[index]))
+        return float(installed[index]) + added, added
+    area = _design_area(periods)
+    return area, area if goal == "retrofit" else 0.0
 
 
 def _solved_utility_cost(owner, n: int, e: int, result: ExchangerResult) -> float:

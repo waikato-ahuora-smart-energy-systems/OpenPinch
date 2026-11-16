@@ -115,6 +115,8 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
         "batch.target.all_periods.organic_rankine_cycle",
         "problem.plot.grand_composite_curve_with_orc",
         "problem.plot.net_load_profiles_with_orc",
+        "problem.design.retrofit",
+        "batch.design.retrofit",
     }
     documented_replays = {
         row["operation"]
