@@ -468,3 +468,49 @@ def test_retrofit_search_prices_each_modification_with_the_report_costs():
     assert design.capital_cost == pytest.approx(
         modification.fixed_cost + modification.area_cost
     )
+
+
+# The existing network as a mapping with installed areas and plant tags.
+EXISTING_STRUCTURE = {
+    "recovery": [
+        {"hot": "H3", "cold": "C2", "stage": 1, "area": 609.7, "id": "E1"},
+        {"hot": "H3", "cold": "C1", "stage": 2, "area": 579.2, "id": "E2"},
+        {"hot": "H1", "cold": "C1", "stage": 1, "area": 1008.5, "id": "E3"},
+        {"hot": "H2", "cold": "C2", "stage": 2, "area": 117.96, "id": "E4"},
+    ],
+    "heaters": [{"stream": "C2", "area": 246.75, "id": "E7"}],
+    "coolers": [
+        {"stream": "H1", "area": 787.5, "id": "E5"},
+        {"stream": "H2", "area": 104.6, "id": "E6"},
+    ],
+}
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_takes_the_existing_network_as_a_mapping():
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=1,
+        beam_width=4,
+        new_match_candidates=2,
+        area_addition_cost=8_650.0,
+        split_cost=10_000.0,
+    )
+
+    base = result.frontier[0]
+    assert base.hot_utility == pytest.approx(REPORTED_HOT_UTILITY, rel=0.02)
+    assert {e.exchanger_id for e in base.network.exchangers} == set(EXISTING_AREAS)
+    assert {e.exchanger_id: e.area for e in base.network.exchangers} == (
+        pytest.approx(EXISTING_AREAS)
+    )
+    (modification,) = result.frontier[1].modifications
+    if modification.kind == "new_match":
+        # The new-unit cost defaults to COSTING_HX_UNIT_COST ($34,600).
+        assert modification.fixed_cost == pytest.approx(
+            34_600.0 + 10_000.0 * len(modification.new_splits)
+        )
+    else:
+        assert modification.exchanger_id in EXISTING_AREAS
+        assert modification.fixed_cost == pytest.approx(8_650.0)

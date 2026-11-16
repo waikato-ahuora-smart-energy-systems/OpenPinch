@@ -16,6 +16,19 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- New ``design.retrofit(existing, ...)`` finds cost-effective modifications
+  of an existing network. The existing network, with every exchanger's
+  installed area, is rated, then modified one step at a time, as in network
+  evolution: more area on an exchanger its area limits, or a new match
+  (joining a stage or in a new one). Each candidate is solved on the
+  fixed-structure model with a new ``"retrofit"`` goal (existing area sunk,
+  added area and fixed costs for new units, added area and splits). The
+  result's ``frontier`` gives the best design for each number of
+  modifications with savings, capital, payback and net annual benefit, and
+  marks dominated ones. Network mappings for ``optimise_duties`` and
+  ``retrofit`` now take entries as mappings with ``area`` and ``id``. Tested
+  on the Ciric and Floudas (1989) retrofit case; see "Retrofit of an Existing
+  Network" in the HEN synthesis guide.
 - The heuristic pinch design method realises networks faster: side
   proposals that solve to a side network already found are not paired,
   since each pairing would repeat a network; they stand in only for a
