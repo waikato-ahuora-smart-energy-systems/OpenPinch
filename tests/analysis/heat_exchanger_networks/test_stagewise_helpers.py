@@ -1057,6 +1057,46 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     assert target.alpha == []
 
 
+def test_update_with_best_model_keeps_solved_cost_values_not_expressions():
+    # Copying a Pyomo expression copies the whole model behind it; verify()
+    # only reads the solved values, so those are what the owner keeps.
+    pyo = pytest.importorskip("pyomo.environ")
+    solved = pyo.ConcreteModel()
+    solved.x = pyo.Var(initialize=2.0)
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.set_initial_values_for_variables = lambda best: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_cost_solver_by_period=[3 * solved.x],
+        cu_cost_solver_by_period=[4 * solved.x, 5.0],
+        recovery_area_cost_filtered=[[6 * solved.x, 0]],
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+    )
+
+    _update_with_best_model(target, best)
+
+    assert target.hu_cost_solver_by_period == [6.0]
+    assert target.cu_cost_solver_by_period == [8.0, 5.0]
+    assert target.recovery_area_cost_filtered == [[12.0, 0.0]]
+    assert all(
+        type(value) is float
+        for value in (
+            *target.hu_cost_solver_by_period,
+            *target.cu_cost_solver_by_period,
+            *target.recovery_area_cost_filtered[0],
+        )
+    )
+
+
 def test_evolution_skips_a_child_that_did_not_converge():
     # Its TAC is not a converged optimum, so it can't replace any network.
     candidate = _VerifiedCandidate(m_success=1)

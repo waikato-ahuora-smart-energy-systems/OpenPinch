@@ -38,6 +38,11 @@ Heat exchanger network synthesis
   each solved value once. Per-match work whose result was discarded, and a
   utility price recomputed for every match, are gone. On the pulp mill
   sample case a design drops from 76 s to 65 s, with the same network.
+- Adopting an evolved stage-wise topology keeps the candidate's solved
+  utility and area costs as numbers instead of deep-copying their Pyomo
+  expressions, each of which copied the candidate's whole model. On the pulp
+  mill sample case its eight adoptions take 0.7 s instead of about 10 s, with
+  the same network.
 
 0.9.1 (2026-11-16)
 ------------------
