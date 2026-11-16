@@ -569,6 +569,34 @@ eight new-match candidates end at $1.17M/y after a better first step; and
 trying all 24 positions with new utility exchangers reaches $1.97M/y (496
 solves). Compare a few settings on a real case.
 
+Validation
+~~~~~~~~~~
+
+Two published cases check the method; the tests run both.
+
+Ciric and Floudas (1989), as Example 1 of Hallberg and Scribner (2009)
+   The existing network rates at 17,519 kW of hot utility against the
+   published 17,759 kW. Under the report's rules (10 K approach, at most 20 %
+   more area on an existing exchanger, $17,300 per added shell, at most two
+   new exchangers) the best design with two new exchangers adds H1-C2 and
+   H2-C2 matches and 20 % more area on E1 and E3: $1.91M capital and 5,532 m2
+   of network area, against the report's MILP at $1.73M and 5,088 m2 with
+   different matches. The report's savings figures cannot be compared: its
+   NPV, annualised savings and return on investment do not reconcile.
+Akpomiemie and Smith (2018), simplified crude preheat train
+   Stream data, the existing network and its duties are from the paper
+   (Tables 3 and 4, Figs. 10 and 19). Every stream has h = 0.5 kW/m2K and
+   installed areas are back-calculated from the published duties, so U*A
+   matches the paper. With unlimited area at a 10 K approach the existing
+   structure saves 13.9 % of hot utility and the paper's retrofitted
+   structure reaches 10,960 kW (24.2 %, every cooler at zero), both as
+   published. The search reaches the same hot utility in seven steps with
+   ``new_match_candidates=24``, but by six new exchangers and more area on
+   one, where the paper moves one exchanger, adds one and enlarges several:
+   the search counts each enlarged exchanger as a step, and the paper's
+   $4,000 fixed cost per unit makes new exchangers cheap. With the default
+   four candidates it stops at 20.5 % after six steps.
+
 Serialized Network Input
 ------------------------
 

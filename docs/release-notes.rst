@@ -39,7 +39,9 @@ Heat exchanger network synthesis
   ``retrofit`` now take entries as mappings with ``area`` and ``id``. Tested
   on the Ciric and Floudas (1989) retrofit case, packaged as
   ``Five-stream-Ciric-and-Floudas-1989.json`` and demonstrated in notebook
-  16; see "Retrofit of an Existing Network" in the HEN synthesis guide.
+  16, and checked against Akpomiemie and Smith's (2018) crude preheat train,
+  whose published retrofit targets it reproduces; see "Retrofit of an
+  Existing Network" in the HEN synthesis guide.
 - The heuristic pinch design method realises networks faster: side
   proposals that solve to a side network already found are not paired,
   since each pairing would repeat a network; they stand in only for a
