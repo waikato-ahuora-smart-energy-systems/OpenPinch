@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 
 from .._base import alpha as _alpha
-from .._base import approach as _approach
 from .._base import area as _area
 from .._base.costing import set_period_totals_and_costs
 from .._base.execution import _value
@@ -72,35 +71,7 @@ def _get_multiperiod_post_process(owner) -> None:
                         owner._active_binary_value(owner.theta_1_by_period[n][i][j][k]),
                         owner._active_binary_value(owner.theta_2_by_period[n][i][j][k]),
                         _value(owner.z[i][j][k]),
-                        formula_allowed=(
-                            abs(
-                                owner._active_binary_value(
-                                    owner.theta_1_by_period[n][i][j][k]
-                                )
-                                - owner._active_binary_value(
-                                    owner.theta_2_by_period[n][i][j][k]
-                                )
-                            )
-                            > owner.tol
-                            and abs(
-                                owner._active_binary_value(
-                                    owner.theta_1_by_period[n][i][j][k]
-                                )
-                                - _approach._recovery_approach_temperature(
-                                    owner, i, j, n
-                                )
-                            )
-                            >= owner.tol
-                            and abs(
-                                owner._active_binary_value(
-                                    owner.theta_2_by_period[n][i][j][k]
-                                )
-                                - _approach._recovery_approach_temperature(
-                                    owner, i, j, n
-                                )
-                            )
-                            >= owner.tol
-                        ),
+                        formula_allowed=False,
                     )
                     for k in range(owner.S)
                 ]
@@ -194,21 +165,20 @@ def _get_multiperiod_post_process(owner) -> None:
         [[None for _k in range(owner.S)] for _j in range(owner.J)]
         for _i in range(owner.I)
     ]
+    utility_price = _area.recovered_utility_price(owner)
     for k in range(owner.S):
         for j in range(owner.J):
             for i in range(owner.I):
                 if owner.area_r[i][j][k] > 0.0:
-                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * (
-                        _area.recovered_utility_price(owner)
-                    ) - (
+                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * utility_price - (
                         owner.A_coeff[0]
                         * owner.A_exp[0]
                         * owner.area_r[i][j][k] ** (owner.A_exp[0] - 1)
                     )
                 else:
-                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * (
-                        _area.recovered_utility_price(owner)
-                    ) - (owner.A_coeff[0] * owner.A_exp[0])
+                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * utility_price - (
+                        owner.A_coeff[0] * owner.A_exp[0]
+                    )
     owner.alpha_dqda = [
         [
             [
