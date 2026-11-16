@@ -273,8 +273,10 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     Each existing recovery unit not yet moved may go to any screened match
     that shares one of its streams (its own pair elsewhere is a repiping).
     A move scores the match's potential less the unit's present duty, the
-    heat it gives up; positive scores are kept, best first. A unit that is
-    the only exchanger on one of its streams stays on that stream.
+    heat it gives up, best first. The stepwise search keeps positive scores
+    only; the structure search keeps them all, as the ceiling ranking judges
+    a move by what its whole structure can reach. A unit that is the only
+    exchanger on one of its streams stays on that stream.
     """
 
     solved = parent.solved
@@ -304,7 +306,7 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
             )
             if (match.hot == hot or match.cold == cold) and not stranded:
                 score = potential - duty
-                if score > 0.0:
+                if score > 0.0 or settings.strategy == "structure":
                     scored.append((score, unit, match))
     scored.sort(key=lambda item: -item[0])
     limit = max(0, int(settings.relocation_candidates))
@@ -515,8 +517,11 @@ class _Evaluator:
             model.cleanup()
 
     def best_ceilings(self, states: list[_State]) -> list[_State]:
-        """The ``new_match_candidates`` states whose structures reach the
-        lowest utility cost with unlimited area, best first."""
+        """For each kind of change (new match, relocation), the
+        ``new_match_candidates`` states whose structures reach the lowest
+        utility cost with unlimited area, best first. Separate quotas keep
+        many relocations from crowding out the new matches, and the other
+        way round."""
 
         ceilings = [(self.ceiling(state), n, state) for n, state in enumerate(states)]
         ranked = sorted(
@@ -524,7 +529,14 @@ class _Evaluator:
             key=lambda item: (item[0], item[1]),
         )
         limit = max(0, int(self.settings.new_match_candidates))
-        return [state for _cost, _n, state in ranked[:limit]]
+        kept: dict[str, int] = {}
+        best = []
+        for _cost, _n, state in ranked:
+            kind = state.moves[-1].kind
+            if kept.get(kind, 0) < limit:
+                kept[kind] = kept.get(kind, 0) + 1
+                best.append(state)
+        return best
 
     def ceiling(self, state: _State) -> float | None:
         """The utility cost ($/y) ``state``'s structure reaches with

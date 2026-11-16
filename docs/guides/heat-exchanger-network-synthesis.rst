@@ -549,8 +549,14 @@ Relocation
    of moving an existing recovery exchanger, plus ``split_cost`` per stream
    the move splits; the moved exchanger keeps its installed area at no area
    cost. ``relocation_candidates`` (default 8) moves are tried from each
-   design, ranked by the heat the new position could recover less the duty
-   the exchanger gives up. Relocation can enlarge the search several-fold:
+   design, ordered by the heat the new position could recover less the duty
+   the exchanger gives up. The stepwise search tries only moves that gain
+   more than they give up; the default search passes them all to the
+   ceiling ranking, where relocations and new matches each get
+   ``new_match_candidates`` full solves. On Akpomiemie and Smith's case,
+   with ``relocation_candidates=100`` it finds the paper's resequencing of
+   exchanger 7 as the best single change; at the default eight that move
+   ranks too low to be tried. Relocation can enlarge the search several-fold:
    on the Ciric and Floudas case with 30 candidates it takes 319 solves
    instead of 48 with the stepwise search, and leaves the frontier
    unchanged, since most moves strand a stream whose utility exchanger is

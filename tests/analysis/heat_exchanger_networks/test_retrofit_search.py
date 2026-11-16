@@ -417,3 +417,68 @@ def test_design_retrofit_steps_by_structure_by_default(fake_solver):
     assert any(
         m.kind == "area_addition" for d in result.frontier for m in d.modifications
     )
+
+
+def test_the_ceiling_ranks_relocations_that_give_up_more_than_they_gain(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Every relocation now scores below zero: the move gives up more duty
+    # than its new position's potential. The stepwise search drops such
+    # moves; the structure search lets the ceiling judge them.
+    monkeypatch.setattr(search, "match_potential", lambda *args, **kwargs: 0.0)
+    ranked = []
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        ranked.append(state.moves[-1].kind)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=1,
+            relocation_cost=5_000.0,
+            relocation_candidates=3,
+            **COSTS,
+        ),
+    )
+
+    assert ranked.count("relocation") == 3
+
+
+def test_relocations_and_new_matches_each_get_their_best_solved(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # On the fake a new match always has the lower ceiling (one more
+    # recovery match), so one shared quota would solve new matches only.
+    solved = []
+    sized = search._Evaluator.sized
+
+    def spy(self, state):
+        solved.append(state.moves[-1].kind)
+        return sized(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "sized", spy)
+
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=2,
+            relocation_cost=5_000.0,
+            relocation_candidates=4,
+            **COSTS,
+        ),
+    )
+
+    assert solved.count("new_match") == 2
+    assert solved.count("relocation") == 2
