@@ -339,3 +339,42 @@ def test_a_recorded_named_run_replays_its_own_topology(monkeypatch):
 
     assert seen[-1]["HPR_TYPE"] == "Parallel Carnot cycles"
     assert seen[-1]["HPR_LOAD_FRACTION"] == 0.25
+
+
+class StirlingOptions(BaseModel):
+    """Options of a test-only cycle with a model family of its own."""
+
+    model_config = ConfigDict(extra="forbid")
+    cycle: Literal["stirling"] = "stirling"
+
+
+def test_a_cycle_with_a_model_family_of_its_own_runs_end_to_end(monkeypatch):
+    # No HeatPumpAndRefrigerationCycle member: the cycle names its family,
+    # here with Carnot's handlers, and the gateway runs it.
+    from OpenPinch.domain import configuration_fields
+
+    monkeypatch.setattr(registry, "_REGISTRY", dict(registry._REGISTRY))
+    monkeypatch.setattr(
+        configuration_fields,
+        "_REGISTERED_HPR_TYPES",
+        set(configuration_fields._REGISTERED_HPR_TYPES),
+    )
+    carnot = registry.cycle_spec("carnot")
+    registry.register_cycle(
+        replace(
+            carnot,
+            id="stirling",
+            label="Stirling cycle",
+            topologies={"single": "Stirling cycle"},
+            default_topology="single",
+            handlers={"single": carnot.handlers["cascade"]},
+            options_model=StirlingOptions,
+            configuration_keys={},
+        )
+    )
+
+    target = PinchProblem("basic_pinch.json").target.heat_pump_and_refrigeration(
+        "stirling", **CHEAP
+    )
+
+    assert target.hpr_success

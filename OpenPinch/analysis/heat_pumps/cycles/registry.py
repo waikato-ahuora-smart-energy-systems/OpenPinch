@@ -24,6 +24,7 @@ from ....contracts.hpr import (
     MvrCycleOptions,
     VapourCompressionCycleOptions,
 )
+from ....domain.configuration_fields import register_hpr_type
 from ....domain.enums import HeatPumpAndRefrigerationCycle
 
 DUTIES = frozenset({"heat_pump", "refrigeration"})
@@ -60,7 +61,9 @@ class HprCycleSpec:
 
     id: str
     label: str
-    topologies: Mapping[str, HeatPumpAndRefrigerationCycle]
+    # A topology's model family: a HeatPumpAndRefrigerationCycle member, or
+    # the HPR_TYPE string of a family registered with the cycle.
+    topologies: Mapping[str, HeatPumpAndRefrigerationCycle | str]
     default_topology: str
     duties: frozenset[str]
     options_model: type[BaseModel]
@@ -107,9 +110,11 @@ def register_cycle(spec: HprCycleSpec) -> HprCycleSpec:
     if spec.id in _REGISTRY:
         raise ValueError(f"cycle {spec.id!r} is already registered.")
     taken = {
-        member for other in _REGISTRY.values() for member in other.topologies.values()
+        family_value(member)
+        for other in _REGISTRY.values()
+        for member in other.topologies.values()
     }
-    if taken & set(spec.topologies.values()):
+    if taken & {family_value(member) for member in spec.topologies.values()}:
         raise ValueError(f"cycle {spec.id!r} reuses another cycle's model family.")
     if spec.default_topology not in spec.topologies:
         raise ValueError(
@@ -119,6 +124,11 @@ def register_cycle(spec: HprCycleSpec) -> HprCycleSpec:
         raise ValueError(f"cycle {spec.id!r} needs handlers for every topology.")
     if not spec.duties or not spec.duties <= DUTIES:
         raise ValueError(f"cycle {spec.id!r} duties must be among {sorted(DUTIES)}.")
+    for member in spec.topologies.values():
+        if not isinstance(member, HeatPumpAndRefrigerationCycle):
+            # A family of the cycle's own becomes a valid HPR_TYPE (the enum
+            # is a str subclass, so test for it, not for str).
+            register_hpr_type(member)
     _REGISTRY[spec.id] = spec
     return spec
 
@@ -142,14 +152,23 @@ def registered_cycles() -> tuple[HprCycleSpec, ...]:
     return tuple(_REGISTRY.values())
 
 
-def spec_for_cycle(member: HeatPumpAndRefrigerationCycle) -> tuple[HprCycleSpec, str]:
+def family_value(member: HeatPumpAndRefrigerationCycle | str) -> str:
+    """A model family's ``HPR_TYPE`` value."""
+
+    return member.value if isinstance(member, HeatPumpAndRefrigerationCycle) else member
+
+
+def spec_for_cycle(
+    member: HeatPumpAndRefrigerationCycle | str,
+) -> tuple[HprCycleSpec, str]:
     """The spec and topology that select the model family ``member``."""
 
+    value = family_value(member)
     for spec in _REGISTRY.values():
         for topology, family in spec.topologies.items():
-            if family is member:
+            if family_value(family) == value:
                 return spec, topology
-    raise ValueError(f"no registered cycle selects {member.value!r}.")
+    raise ValueError(f"no registered cycle selects {value!r}.")
 
 
 def family_handlers(hpr_type: str) -> CycleFamilyHandlers:
@@ -157,7 +176,7 @@ def family_handlers(hpr_type: str) -> CycleFamilyHandlers:
 
     for spec in _REGISTRY.values():
         for topology, family in spec.topologies.items():
-            if family.value == hpr_type:
+            if family_value(family) == hpr_type:
                 return spec.handlers[topology]
     raise ValueError(f"no registered cycle selects {hpr_type!r}.")
 
@@ -296,6 +315,7 @@ __all__ = [
     "HprCycleSpec",
     "cycle_spec",
     "family_handlers",
+    "family_value",
     "register_cycle",
     "registered_cycles",
     "resolve_handler",
