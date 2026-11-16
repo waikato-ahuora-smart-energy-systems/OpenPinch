@@ -270,50 +270,55 @@ class _Evaluator:
             tol=self.tol,
             solver_options=dict(self.solver_options),
         )
-        model.optimise(print_output=False)
-        if getattr(model, "mSuccess", 0) != 1:
-            return None
-        solved = build_solution_network(request, structure, model, self.arrays)
-        results = dict(zip(ids, structure.results(model), strict=True))
-        widen = 1.0 + float(settings.area_tolerance)
-        binding = tuple(
-            exchanger_id
-            for exchanger_id in ids
-            if exchanger_id in self.existing
-            and exchanger_id not in state.enlarged
-            and results[exchanger_id].active
-            and max(p.required_area for p in results[exchanger_id].periods)
-            >= _BINDING_SHARE * widen * results[exchanger_id].area
-        )
-        metrics = solved.summary_metrics
-        utility_cost = float(model.utility_cost_value)
-        if self.base_utility_cost is None:
-            self.base_utility_cost = utility_cost
-        savings = self.base_utility_cost - utility_cost
-        stages = {e.exchanger_id: e.stage for e in state.network.exchangers}
-        modifications = tuple(
-            self._modification(
-                move, results[move.exchanger_id], stages[move.exchanger_id]
+        # Read the solved values, then remove the model's run directory
+        # (Couenne writes one per model) whether or not it is kept.
+        try:
+            model.optimise(print_output=False)
+            if getattr(model, "mSuccess", 0) != 1:
+                return None
+            solved = build_solution_network(request, structure, model, self.arrays)
+            results = dict(zip(ids, structure.results(model), strict=True))
+            widen = 1.0 + float(settings.area_tolerance)
+            binding = tuple(
+                exchanger_id
+                for exchanger_id in ids
+                if exchanger_id in self.existing
+                and exchanger_id not in state.enlarged
+                and results[exchanger_id].active
+                and max(p.required_area for p in results[exchanger_id].periods)
+                >= _BINDING_SHARE * widen * results[exchanger_id].area
             )
-            for move in state.moves
-        )
-        if any(m is None for m in modifications):
-            return None
-        capital = sum(m.fixed_cost + m.area_cost for m in modifications)
-        annualised = self.recovery_factor * capital
-        design = HeatExchangerNetworkRetrofitDesign(
-            modifications=modifications,
-            network=solved,
-            hot_utility=float(metrics["hot_utility_load"]),
-            cold_utility=float(metrics["cold_utility_load"]),
-            utility_cost=utility_cost,
-            annual_savings=savings,
-            capital_cost=capital,
-            annualised_capital_cost=annualised,
-            net_annual_benefit=savings - annualised,
-            payback_years=capital / savings if savings > 0.0 else None,
-        )
-        return _Evaluated(state, design, _with_names(solved, self.names), binding)
+            metrics = solved.summary_metrics
+            utility_cost = float(model.utility_cost_value)
+            if self.base_utility_cost is None:
+                self.base_utility_cost = utility_cost
+            savings = self.base_utility_cost - utility_cost
+            stages = {e.exchanger_id: e.stage for e in state.network.exchangers}
+            modifications = tuple(
+                self._modification(
+                    move, results[move.exchanger_id], stages[move.exchanger_id]
+                )
+                for move in state.moves
+            )
+            if any(m is None for m in modifications):
+                return None
+            capital = sum(m.fixed_cost + m.area_cost for m in modifications)
+            annualised = self.recovery_factor * capital
+            design = HeatExchangerNetworkRetrofitDesign(
+                modifications=modifications,
+                network=solved,
+                hot_utility=float(metrics["hot_utility_load"]),
+                cold_utility=float(metrics["cold_utility_load"]),
+                utility_cost=utility_cost,
+                annual_savings=savings,
+                capital_cost=capital,
+                annualised_capital_cost=annualised,
+                net_annual_benefit=savings - annualised,
+                payback_years=capital / savings if savings > 0.0 else None,
+            )
+            return _Evaluated(state, design, _with_names(solved, self.names), binding)
+        finally:
+            model.cleanup()
 
     def _modification(self, move: _Move, result, stage: int | None):
         """``move`` priced from its unit's added area; ``None`` when it does

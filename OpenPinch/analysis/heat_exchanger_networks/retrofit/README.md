@@ -28,7 +28,7 @@ Retrofit of an existing heat exchanger network: a search, derived from the netwo
 - A match's potential is the smaller heat capacity flowrate times the hot less cold temperature at its position less the approach, at least zero. The screen tries every hot-cold pair joining each stage (except a stage the pair already shares) and in a new stage at each of the `S + 1` positions, keeps positive potentials, and ranks them by potential, fewest new splits, stage, joining before a new stage, then names [moves.py:match_potential, screen_new_matches].
 
 ## Side Effects
-- `run_retrofit_search` runs direct heat integration through `problem.target` when no targets are cached, and solves each candidate with the configured `HENS_SOLVER_EVM` solver (an external executable via Pyomo), serially in-process [search.py:run_retrofit_search, _Evaluator].
+- `run_retrofit_search` runs direct heat integration through `problem.target` when no targets are cached, and solves each candidate with the configured `HENS_SOLVER_EVM` solver (an external executable via Pyomo), serially in-process, and removes each candidate model's run directory once its values are read, solved or not [search.py:run_retrofit_search, _Evaluator.evaluate].
 - `moves.py` and `frontier.py` are pure.
 
 ## Verification

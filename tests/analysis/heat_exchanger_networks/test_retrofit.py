@@ -318,6 +318,37 @@ def test_retrofit_search_needs_the_installed_area_of_every_existing_unit():
         run_retrofit_search(_case_problem(), network, RetrofitSettings())
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_search_cleans_up_every_candidate_model(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
+        FixedStructureModel,
+    )
+
+    optimised, cleaned = [], []
+    optimise, cleanup = FixedStructureModel.optimise, FixedStructureModel.cleanup
+
+    def spy_optimise(self, print_output):
+        optimised.append(id(self))
+        return optimise(self, print_output)
+
+    def spy_cleanup(self):
+        cleaned.append(id(self))
+        return cleanup(self)
+
+    monkeypatch.setattr(FixedStructureModel, "optimise", spy_optimise)
+    monkeypatch.setattr(FixedStructureModel, "cleanup", spy_cleanup)
+
+    _case_problem().design.retrofit(
+        EXISTING_STRUCTURE, max_modifications=1, beam_width=2
+    )
+
+    # Couenne leaves a run directory per model until cleanup removes it.
+    assert optimised
+    assert sorted(cleaned) == sorted(optimised)
+
+
 def test_retrofit_search_needs_unique_exchanger_ids():
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
         RetrofitSettings,
