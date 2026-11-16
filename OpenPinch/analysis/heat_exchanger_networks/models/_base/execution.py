@@ -166,20 +166,29 @@ def _solver_value(model, value: Any) -> float:
         return float(getattr(value, "value", value))
 
 
+_NO_VALUE = object()
+
+
 def _value(value) -> float:
     """Read a number from a plain number, a ``[value]`` list, or a Pyomo component."""
 
+    if value.__class__ is float or value.__class__ is int:
+        return float(value)
     if hasattr(value, "is_expression_type") and value.is_expression_type():
         # A Pyomo expression, such as an Intermediate of a PyomoModel.
         return float(_pyomo_value(value))
+    # A Pyomo variable or parameter holds its number in ``value``. Reading it
+    # before trying ``value[0]`` saves raising and catching a TypeError on
+    # every read of a solved model.
+    number = getattr(value, "value", _NO_VALUE)
+    if number is not _NO_VALUE:
+        return float(number)
     if isinstance(value, int | float):
         return float(value)
     try:
         return float(value[0])
     except (TypeError, IndexError, KeyError):
         pass
-    if hasattr(value, "value"):
-        return float(value.value)
     return float(value)
 
 
