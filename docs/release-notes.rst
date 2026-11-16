@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Post-processing a solved stage-wise model is faster. The alpha flow-on
+  system computes each stream's flow-on terms once per stage rather than once
+  per partner, and drops zero terms when it builds them. Flow fractions read
+  each solved value once. Per-match work whose result was discarded, and a
+  utility price recomputed for every match, are gone. On the pulp mill
+  sample case a design drops from 76 s to 65 s, with the same network.
+
 0.9.1 (2026-11-16)
 ------------------
 
