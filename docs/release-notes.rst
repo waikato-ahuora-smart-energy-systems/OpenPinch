@@ -1,5 +1,5 @@
 Pre-Release Notes
-==========
+=================
 
 Unreleased
 ----------
@@ -12,7 +12,7 @@ Heat pumps and refrigeration
   ``register_cycle`` makes it a valid ``HPR_TYPE``, and
   ``target.heat_pump_and_refrigeration`` runs it. Families compare by
   ``HPR_TYPE`` value (``family_value``).
-=======
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
