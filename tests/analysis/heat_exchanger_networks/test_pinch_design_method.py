@@ -3559,3 +3559,34 @@ def test_extraction_skips_the_state_of_matches_with_no_duty() -> None:
         )
         == 2
     )
+
+
+def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
+    monkeypatch,
+) -> None:
+    # Post-processing runs over every hot stream, cold stream, stage and
+    # period; per-cell work that cannot change dominated it on large cases.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        area as base_area,
+    )
+
+    model = _source_shaped_lmtd_post_process_model(StageWiseModel)
+    price_calls = []
+    approach_calls = []
+    price = base_area.recovered_utility_price
+    approach = base_approach._recovery_approach_temperature
+    monkeypatch.setattr(
+        base_area,
+        "recovered_utility_price",
+        lambda owner: price_calls.append(1) or price(owner),
+    )
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda *args: approach_calls.append(1) or approach(*args),
+    )
+
+    model.get_post_process()
+
+    assert len(price_calls) == 1
+    assert approach_calls == []

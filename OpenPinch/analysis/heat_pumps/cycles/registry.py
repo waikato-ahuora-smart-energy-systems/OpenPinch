@@ -125,8 +125,9 @@ def register_cycle(spec: HprCycleSpec) -> HprCycleSpec:
     if not spec.duties or not spec.duties <= DUTIES:
         raise ValueError(f"cycle {spec.id!r} duties must be among {sorted(DUTIES)}.")
     for member in spec.topologies.values():
-        if isinstance(member, str):
-            # A family of the cycle's own becomes a valid HPR_TYPE.
+        if not isinstance(member, HeatPumpAndRefrigerationCycle):
+            # A family of the cycle's own becomes a valid HPR_TYPE (the enum
+            # is a str subclass, so test for it, not for str).
             register_hpr_type(member)
     _REGISTRY[spec.id] = spec
     return spec

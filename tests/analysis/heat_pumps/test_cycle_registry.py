@@ -203,3 +203,13 @@ def test_a_cycle_can_name_a_model_family_of_its_own(fresh_registry):
     assert (
         fresh_registry.family_handlers("Stirling cycle") is carnot.handlers["cascade"]
     )
+
+
+def test_the_built_in_families_add_no_hpr_type_of_their_own():
+    # The enum is a str subclass: only a plain string family is registered.
+    from OpenPinch.domain.configuration_fields import _REGISTERED_HPR_TYPES
+
+    assert not any(
+        name.startswith("HeatPumpAndRefrigerationCycle.")
+        for name in _REGISTERED_HPR_TYPES
+    )
