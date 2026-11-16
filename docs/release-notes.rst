@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.9.1 (2026-11-16)
+------------------
+
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
