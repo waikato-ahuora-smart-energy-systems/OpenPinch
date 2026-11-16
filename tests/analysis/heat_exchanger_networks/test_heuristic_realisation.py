@@ -250,3 +250,31 @@ def test_every_heuristic_network_holds_the_utility_targets():
     assert solved is not None and solved.mSuccess == 1
     hot = [_hot_utility(network) for network in _networks(problem)]
     assert max(hot) == pytest.approx(min(hot), rel=1e-6)
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_proposals_realising_the_same_side_network_are_paired_once():
+    # Several below-pinch proposals of Kim's five streams solve to one side
+    # network; amalgamating each pairing only to drop it as a repeat cost
+    # most of the realisation time.
+    pinch = PinchProblem(
+        source=json.loads(
+            (
+                REPOSITORY_ROOT
+                / "tests/fixtures/openhens/Five-stream-Kim-et-al-2017-1.json"
+            ).read_text(encoding="utf-8")
+        ),
+        project_name="Five-stream",
+    )
+    pinch.target.all_heat_integration()
+    dTmin = nominal_approach_temperature(pinch.master_zone.config, 1.0)
+    problem = _problem(pinch, dTmin, limit=10)
+
+    problem.get_solution(print_output=False)
+
+    report = problem.heuristic_report
+    assert report["repeated_sides"]["below"] >= 1
+    assert report["pairs"] == report["realised"]["above"] * report["realised"]["below"]
+    assert report["repeated"] <= 1
+    networks = _networks(problem)
+    assert len({network_structure_signature(n) for n in networks}) == len(networks)

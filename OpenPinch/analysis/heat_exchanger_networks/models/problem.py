@@ -571,7 +571,11 @@ class InternalHeatExchangerNetworkProblem:
         from ..reporting.ranking import network_structure_signature
 
         limit = self.heuristic_network_limit
-        report: dict[str, Any] = {"proposed": {}, "realised": {}}
+        report: dict[str, Any] = {
+            "proposed": {},
+            "realised": {},
+            "repeated_sides": {"above": 0, "below": 0},
+        }
         sides = {}
         for name in ("above", "below"):
             template = getattr(self, name)
@@ -579,11 +583,22 @@ class InternalHeatExchangerNetworkProblem:
                 sides[name] = [template]
                 continue
             proposals = propose_side_topologies(pinch_side(template), limit=limit)
-            realised = [
-                side
-                for rank, proposal in enumerate(proposals)
-                if (side := self._realise_side(name, proposal, rank)) is not None
-            ]
+            realised = []
+            topologies = set()
+            for rank, proposal in enumerate(proposals):
+                side = self._realise_side(name, proposal, rank)
+                if side is None:
+                    continue
+                # Proposals often realise the same side network, and every
+                # pairing of a repeat would amalgamate into a repeated
+                # network: keep the first.
+                topology = _side_topology(side)
+                if topology in topologies:
+                    _cleanup_model(side)
+                    report["repeated_sides"][name] += 1
+                    continue
+                topologies.add(topology)
+                realised.append(side)
             report["proposed"][name] = len(proposals)
             report["realised"][name] = len(realised)
             sides[name] = realised
@@ -985,6 +1000,32 @@ def _peak_recovery_duties(case) -> list:
         ]
         for i in range(case.I)
     ]
+
+
+def _side_topology(side) -> tuple:
+    """A solved side's network: its recovery matches, numbered over the
+    stages that carry recovery, and the heaters and coolers it uses."""
+
+    peak = _peak_recovery_duties(side)
+    used = [
+        k
+        for k in range(side.S)
+        if any(peak[i][j][k] > side.tol for i in range(side.I) for j in range(side.J))
+    ]
+    matches = tuple(
+        (i, j, position)
+        for position, k in enumerate(used)
+        for i in range(side.I)
+        for j in range(side.J)
+        if peak[i][j][k] > side.tol
+    )
+    heaters = _used_in_any_period(side, "Q_h")
+    coolers = _used_in_any_period(side, "Q_c")
+    return (
+        matches,
+        tuple(map(tuple, heaters)),
+        tuple(map(tuple, coolers)),
+    )
 
 
 def _used_in_any_period(case, name: str) -> list[list[int]]:

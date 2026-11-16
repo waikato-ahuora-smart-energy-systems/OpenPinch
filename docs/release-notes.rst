@@ -4,6 +4,17 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The heuristic pinch design method realises networks faster: side
+  proposals that solve to a side network already found are dropped before
+  their pairings are amalgamated, since each would repeat a network. On the
+  12 OpenHENS cases at the default width and depth 0 it takes about 23 %
+  less time at 10 networks per multiplier, with the same best networks and
+  at least as many distinct ones. ``heuristic_report`` counts the dropped
+  sides as ``repeated_sides``.
+
 0.9.1 (2026-11-16)
 ------------------
 
