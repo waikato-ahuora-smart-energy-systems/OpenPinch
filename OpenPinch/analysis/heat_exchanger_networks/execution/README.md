@@ -35,7 +35,7 @@ Resolves synthesis settings, and the options the search width and depth set, fro
 - The fake executor requires successful parents for downstream tasks [fake_executor.py:FakeSynthesisExecutor.execute].
 
 ## Side Effects
-- Spawns solver worker processes through `ProcessPoolExecutor`, falling back to serial when the pool raises `NotImplementedError`. The default pool raises it, after logging a warning, when the start method is not fork and the `__main__` script has no main guard, so it reads and parses that script [executor.py:_process_pool, LocalSynthesisExecutor._start_pool] [../../../optimisation/execution.py:_main_module_reruns_in_workers].
+- Spawns solver worker processes through `ProcessPoolExecutor`, falling back to serial when the pool raises `NotImplementedError`. The default pool raises it, after logging a warning, when the start method is not fork and the `__main__` script has no main guard, so it reads and parses that script, or `__main__.__file__` names no file (a script read from stdin or a string) [executor.py:_process_pool, LocalSynthesisExecutor._start_pool] [../../../optimisation/execution.py:_main_module_blocks_workers].
 - Emits progress events [executor.py:LocalSynthesisExecutor._report_progress].
 - Mutates its own bookkeeping (`executed_tasks`, `stage_order`, `problems_by_task_id`, `best_objective`) [executor.py:LocalSynthesisExecutor].
 - Emits a `RuntimeWarning` when the Couenne fallback is taken [fallbacks.py:_warn_couenne_fallback].

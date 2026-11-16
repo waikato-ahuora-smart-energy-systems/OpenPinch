@@ -306,6 +306,37 @@ def test_guarded_main_module_uses_worker_processes(
     assert execution._pool_worker_count(2, 2) == 2
 
 
+def _main_module(monkeypatch, **attributes):
+    main = types.ModuleType("__main__")
+    for name, value in attributes.items():
+        setattr(main, name, value)
+    monkeypatch.setitem(sys.modules, "__main__", main)
+    monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "spawn")
+
+
+@pytest.mark.parametrize("source", ["<stdin>", "<string>"])
+def test_main_module_without_a_source_file_runs_serially_with_a_warning(
+    native_platform, monkeypatch, caplog, source
+):
+    _main_module(monkeypatch, __file__=source)
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        xs, fs = execution._collect_candidates_in_parallel(
+            _record_run, n_runs=2, pool_executor_cls=_ForbiddenPool
+        )
+
+    assert fs.tolist() == [0.0, 1.0]
+    assert source in caplog.text
+
+
+def test_main_module_without_a_file_attribute_uses_worker_processes(
+    native_platform, monkeypatch
+):
+    # Jupyter kernels and ``python -c`` give __main__ no __file__.
+    _main_module(monkeypatch)
+    assert execution._pool_worker_count(2, 2) == 2
+
+
 def test_search_pool_is_capped_at_the_cpu_count(native_platform, monkeypatch):
     monkeypatch.setattr(execution.os, "cpu_count", lambda: 2)
     started = []
@@ -331,7 +362,7 @@ needs_threads = pytest.mark.skipif(
 def importing_workers(native_platform, monkeypatch):
     """Use a start method whose workers import OpenPinch before any task."""
     monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "spawn")
-    monkeypatch.setattr(execution, "_main_module_reruns_in_workers", lambda: False)
+    monkeypatch.setattr(execution, "_main_module_blocks_workers", lambda: None)
 
 
 @needs_threads
