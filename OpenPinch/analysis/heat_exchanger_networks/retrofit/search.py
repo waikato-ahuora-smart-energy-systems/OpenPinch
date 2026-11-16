@@ -271,8 +271,12 @@ class _Evaluator:
         if self.base_utility_cost is None:
             self.base_utility_cost = utility_cost
         savings = self.base_utility_cost - utility_cost
+        stages = {e.exchanger_id: e.stage for e in state.network.exchangers}
         modifications = tuple(
-            self._modification(move, results[move.exchanger_id]) for move in state.moves
+            self._modification(
+                move, results[move.exchanger_id], stages[move.exchanger_id]
+            )
+            for move in state.moves
         )
         if any(m is None for m in modifications):
             return None
@@ -292,9 +296,10 @@ class _Evaluator:
         )
         return _Evaluated(state, design, _with_names(solved, self.names), binding)
 
-    def _modification(self, move: _Move, result):
+    def _modification(self, move: _Move, result, stage: int | None):
         """``move`` priced from its unit's added area; ``None`` when it does
-        nothing (no added area, or a unit with no duty)."""
+        nothing (no added area, or a unit with no duty). A new match reports
+        ``stage``, its stage in the design's network."""
 
         added = float(result.added_area)
         if added < _MIN_ADDED_AREA or not result.active:
@@ -314,7 +319,7 @@ class _Evaluator:
             area_cost=self.area_coeff * added**self.area_exp,
             hot_stream=match.hot if match else None,
             cold_stream=match.cold if match else None,
-            stage=match.stage if match else None,
+            stage=stage if match else None,
             new_stage=bool(match and match.new_stage),
             new_splits=move.splits,
         )

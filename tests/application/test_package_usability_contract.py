@@ -58,6 +58,7 @@ EXPECTED_DESIGN_METHODS = {
     "network_evolution",
     "optimise_duties",
     "pinch_design",
+    "retrofit",
     "thermal_derivative",
 }
 EXPECTED_WORKSPACE_METHODS = {

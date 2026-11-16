@@ -4,12 +4,12 @@ Tutorial Coverage Map
 Coverage Result
 ---------------
 
-The released public denominator contains **231 operations** across
+The released public denominator contains **233 operations** across
 ``PinchProblem``, ``PinchWorkspace``, targeting, all-period targeting,
 components and returned component results, ordered case batches, HEN
 design/result views, and plotting. The canonical manifest maps every operation
 except those still under development to an executable tutorial code cell:
-**217/231 operations are mapped**. Routine fake and guarded
+**217/233 operations are mapped**. Routine fake and guarded
 real-engine pytest profiles provide
 additional evidence for the specialist target-owned HPR map operation.
 
@@ -25,7 +25,8 @@ The two Brayton callables, and their batch mirrors, are marked
 solver is under development, so no tutorial demonstrates them. The ORC
 operations (``carnot_orc``, ``organic_rankine_cycle``, their all-period and
 batch mirrors, and two ORC plots) are also unmapped while ORC is under
-development; they run, but no tutorial owns them.
+development; they run, but no tutorial owns them. HEN ``design.retrofit``
+and its batch mirror are unmapped too until a tutorial demonstrates them.
 
 Counting Rules
 --------------

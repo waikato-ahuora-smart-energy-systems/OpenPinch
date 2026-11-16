@@ -384,6 +384,27 @@ def test_the_result_counts_the_designs_the_search_solved():
     assert result.evaluated_designs >= len(result.frontier)
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_a_new_match_reports_its_stage_in_the_final_network():
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=4,
+        area_addition_cost=8_650.0,
+        split_cost=10_000.0,
+    )
+
+    checked = 0
+    for design in result.frontier:
+        stages = {e.exchanger_id: e.stage for e in design.network.exchangers}
+        for modification in design.modifications:
+            if modification.kind == "new_match":
+                assert modification.stage == stages[modification.exchanger_id]
+                checked += 1
+    assert checked
+
+
 @functools.cache
 def _deep_search():
     """A deep, narrow search: six modifications, a beam of one."""

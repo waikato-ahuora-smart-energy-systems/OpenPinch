@@ -143,6 +143,7 @@ METHOD_CATALOG = MappingProxyType(
                 "network_evolution",
                 "optimise_duties",
                 "pinch_design",
+                "retrofit",
                 "thermal_derivative",
             )
         },
