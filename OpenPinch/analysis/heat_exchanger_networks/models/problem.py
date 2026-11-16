@@ -571,19 +571,39 @@ class InternalHeatExchangerNetworkProblem:
         from ..reporting.ranking import network_structure_signature
 
         limit = self.heuristic_network_limit
-        report: dict[str, Any] = {"proposed": {}, "realised": {}}
+        report: dict[str, Any] = {
+            "proposed": {},
+            "realised": {},
+            "repeated_sides": {"above": 0, "below": 0},
+        }
         sides = {}
+        # Repeats of each realised side, by identity: stand-ins for a
+        # pairing of that side that fails.
+        alternates: dict[int, list] = {}
         for name in ("above", "below"):
             template = getattr(self, name)
             if not template.side_required:
                 sides[name] = [template]
                 continue
             proposals = propose_side_topologies(pinch_side(template), limit=limit)
-            realised = [
-                side
-                for rank, proposal in enumerate(proposals)
-                if (side := self._realise_side(name, proposal, rank)) is not None
-            ]
+            realised = []
+            first_by_topology: dict[tuple, Any] = {}
+            for rank, proposal in enumerate(proposals):
+                side = self._realise_side(name, proposal, rank)
+                if side is None:
+                    continue
+                # Proposals often realise the same side network, and every
+                # pairing of a repeat would amalgamate into a repeated
+                # network: pair the first. A repeat may differ in duties, so
+                # it stands in only where the first's pairing fails.
+                topology = _side_topology(side)
+                if topology in first_by_topology:
+                    alternates[id(first_by_topology[topology])].append(side)
+                    report["repeated_sides"][name] += 1
+                    continue
+                first_by_topology[topology] = side
+                alternates[id(side)] = []
+                realised.append(side)
             report["proposed"][name] = len(proposals)
             report["realised"][name] = len(realised)
             sides[name] = realised
@@ -597,8 +617,8 @@ class InternalHeatExchangerNetworkProblem:
         for (_a, above), (_b, below) in pairs:
             if len(networks) >= limit:
                 break
-            variant = self._pdm_variant(above, below)
-            if variant is None or not variant.case.verify()[0]:
+            variant = self._verified_heuristic_variant(above, below, alternates)
+            if variant is None:
                 failed += 1
                 continue
             signature = network_structure_signature(
@@ -611,7 +631,10 @@ class InternalHeatExchangerNetworkProblem:
             networks.append(variant)
         # Results live on the model variables: drop every side's run directory,
         # and the unsolved templates' that the realised sides replace.
-        for side in sides["above"] + sides["below"] + [self.above, self.below]:
+        repeats = [side for group in alternates.values() for side in group]
+        for side in (
+            sides["above"] + sides["below"] + repeats + [self.above, self.below]
+        ):
             _cleanup_model(side)
         report.update(
             pairs=len(pairs), failed=failed, repeated=repeated, networks=len(networks)
@@ -625,6 +648,23 @@ class InternalHeatExchangerNetworkProblem:
         first, *rest = networks
         self.above, self.below, self.case = first.above, first.below, first.case
         self.pdm_variants = rest
+
+    def _verified_heuristic_variant(self, above, below, alternates):
+        """Amalgamate a side pair, or failing that a pair of their repeats.
+
+        Repeats share a side's matches but may differ in duties, so one may
+        amalgamate where the side does not. They cost nothing until a pairing
+        fails.
+        """
+
+        for stand_in_above, stand_in_below in product(
+            [above, *alternates.get(id(above), [])],
+            [below, *alternates.get(id(below), [])],
+        ):
+            variant = self._pdm_variant(stand_in_above, stand_in_below)
+            if variant is not None and variant.case.verify()[0]:
+                return variant
+        return None
 
     def _realise_side(self, name: str, proposal, rank: int):
         """Solve one side proposal, or return ``None`` if it cannot be."""
@@ -985,6 +1025,32 @@ def _peak_recovery_duties(case) -> list:
         ]
         for i in range(case.I)
     ]
+
+
+def _side_topology(side) -> tuple:
+    """A solved side's network: its recovery matches, numbered over the
+    stages that carry recovery, and the heaters and coolers it uses."""
+
+    peak = _peak_recovery_duties(side)
+    used = [
+        k
+        for k in range(side.S)
+        if any(peak[i][j][k] > side.tol for i in range(side.I) for j in range(side.J))
+    ]
+    matches = tuple(
+        (i, j, position)
+        for position, k in enumerate(used)
+        for i in range(side.I)
+        for j in range(side.J)
+        if peak[i][j][k] > side.tol
+    )
+    heaters = _used_in_any_period(side, "Q_h")
+    coolers = _used_in_any_period(side, "Q_c")
+    return (
+        matches,
+        tuple(map(tuple, heaters)),
+        tuple(map(tuple, coolers)),
+    )
 
 
 def _used_in_any_period(case, name: str) -> list[list[int]]:

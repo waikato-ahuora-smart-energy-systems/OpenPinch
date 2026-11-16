@@ -276,22 +276,22 @@ The depth picks the stages run at each multiplier and their effort:
      - Evolution breadth
    * - 0
      - heuristic pinch design only
-     - 10
+     - 50
      - none
      - none
    * - 1 (default)
      - heuristic, then evolution
-     - 10
+     - 50
      - 3
      - 1
    * - 2
      - heuristic and MILP; MILP through the thermal derivative method
-     - 10
+     - 50
      - 3
      - 1
    * - 3
      - as 2; every MILP network also straight to evolution
-     - 20
+     - 50
      - 20
      - 2
    * - 4
