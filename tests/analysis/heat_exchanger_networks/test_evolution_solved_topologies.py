@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
 from types import SimpleNamespace
 
@@ -248,6 +249,7 @@ class _InProcessPool:
 def test_tasks_in_worker_processes_get_no_store(monkeypatch):
     # Which tasks share a worker is up to the pool, so sharing there would
     # make results depend on scheduling.
+    monkeypatch.setattr(sys, "platform", "linux")
     received = _stub_stage(monkeypatch)
 
     LocalSynthesisExecutor(worker_pool_factory=_InProcessPool).execute(
@@ -258,6 +260,21 @@ def test_tasks_in_worker_processes_get_no_store(monkeypatch):
     )
 
     assert received == [None, None]
+
+
+def test_tasks_share_one_store_where_worker_processes_cannot_start(monkeypatch):
+    # Pyodide runs every task serially however many workers are asked for.
+    monkeypatch.setattr(sys, "platform", "emscripten")
+    received = _stub_stage(monkeypatch)
+
+    LocalSynthesisExecutor(worker_pool_factory=_InProcessPool).execute(
+        [_evolution_task(index) for index in range(2)],
+        problem=None,
+        parent_outcomes={},
+        max_parallel=2,
+    )
+
+    assert isinstance(received[0], dict) and received[1] is received[0]
 
 
 def test_a_built_evolution_task_hands_the_store_to_its_solve():
