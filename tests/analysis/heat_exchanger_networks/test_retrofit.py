@@ -668,3 +668,41 @@ def test_design_retrofit_caps_added_area_like_the_report():
     for modification in additions:
         installed = EXISTING_AREAS[modification.exchanger_id]
         assert modification.added_area <= 0.2 * installed * (1 + 1e-6)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_relocates_an_existing_exchanger_when_cheapest():
+    # New units and added area priced out: a relocation is the best step.
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=1,
+        new_unit_cost=1e9,
+        area_addition_cost=1e9,
+        split_cost=1_000.0,
+        relocation_cost=5_000.0,
+        # Repiping E4 into stage 1, the one relocation that pays here, ranks
+        # about 24th: most moves strand a stream whose utility is at its area.
+        relocation_candidates=30,
+    )
+
+    (modification,) = result.frontier[1].modifications
+    assert modification.kind == "relocation"
+    assert modification.exchanger_id in EXISTING_AREAS
+    assert modification.added_area == 0.0
+    assert modification.area_cost == 0.0
+    assert modification.fixed_cost == pytest.approx(
+        5_000.0 + 1_000.0 * len(modification.new_splits)
+    )
+    moved = next(
+        e
+        for e in result.frontier[1].network.exchangers
+        if e.exchanger_id == modification.exchanger_id
+    )
+    # It keeps its installed area at its new match.
+    assert moved.area == pytest.approx(EXISTING_AREAS[modification.exchanger_id])
+    # The design's network carries the solver's zone-qualified stream names.
+    assert moved.source_stream.endswith(modification.hot_stream)
+    assert moved.sink_stream.endswith(modification.cold_stream)
+    assert result.frontier[1].annual_savings > 0.0

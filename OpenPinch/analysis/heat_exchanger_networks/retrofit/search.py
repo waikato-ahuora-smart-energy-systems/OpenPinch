@@ -10,6 +10,7 @@ makes the frontier over the number of modifications.
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass, replace
 
 from ....contracts.synthesis.retrofit import (
@@ -30,7 +31,14 @@ from ..duty_optimisation import (
 )
 from ..execution.settings import configured_stage_solver, stage_solver_options
 from .frontier import mark_dominated
-from .moves import NewMatch, apply_new_match, new_splits, screen_new_matches
+from .moves import (
+    NewMatch,
+    apply_new_match,
+    apply_relocation,
+    match_potential,
+    new_splits,
+    screen_new_matches,
+)
 
 # Added area below this (m2) is no modification.
 _MIN_ADDED_AREA = 1e-3
@@ -51,7 +59,10 @@ class RetrofitSettings:
     ``new_unit_cost`` ($ per new exchanger), ``area_addition_cost`` ($ per
     existing exchanger given more area) and ``split_cost`` ($ per stream a new
     match splits) add to the area cost (the ``COSTING_HX_AREA_*`` law on the
-    added area).
+    added area). ``relocation_cost`` ($ per existing recovery exchanger moved
+    to another match or position, plus ``split_cost`` per new split) enables
+    relocation moves (``relocation_candidates`` tried from each design);
+    ``None`` leaves them out.
     """
 
     max_modifications: int = 3
@@ -63,6 +74,8 @@ class RetrofitSettings:
     new_unit_cost: float = 0.0
     area_addition_cost: float = 0.0
     split_cost: float = 0.0
+    relocation_cost: float | None = None
+    relocation_candidates: int = 8
 
 
 @dataclass(frozen=True)
@@ -131,12 +144,14 @@ def run_retrofit_search(
         )
     frontier = [base.design]
     beam = [base]
-    seen = {_signature(base.state)}
+    seen = {_signature(base.state, evaluator.existing)}
     for _depth in range(max(0, int(settings.max_modifications))):
         children = []
         for parent in beam:
-            for state in _children(parent, evaluator.ends, settings):
-                signature = _signature(state)
+            for state in _children(
+                parent, evaluator.ends, settings, evaluator.existing
+            ):
+                signature = _signature(state, evaluator.existing)
                 if signature in seen:
                     continue
                 seen.add(signature)
@@ -153,9 +168,11 @@ def run_retrofit_search(
     )
 
 
-def _children(parent: _Evaluated, ends, settings: RetrofitSettings):
+def _children(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
     """Each one-modification step from ``parent``: added area on each
-    existing unit at its cap, then the screened new matches."""
+    existing unit at its cap, the screened new matches, then (with a
+    ``relocation_cost``) each existing recovery unit not yet moved that
+    shares a stream with a screened match, moved there."""
 
     state = parent.state
     for exchanger_id in parent.binding:
@@ -164,12 +181,13 @@ def _children(parent: _Evaluated, ends, settings: RetrofitSettings):
             enlarged=state.enlarged | {exchanger_id},
             moves=state.moves + (_Move("area_addition", exchanger_id),),
         )
-    for match in screen_new_matches(
+    matches = screen_new_matches(
         parent.solved,
         ends,
         approach=settings.approach,
         limit=settings.new_match_candidates,
-    ):
+    )
+    for match in matches:
         exchanger_id = _new_id(state.network, match)
         move = _Move("new_match", exchanger_id, match, new_splits(state.network, match))
         yield replace(
@@ -177,6 +195,57 @@ def _children(parent: _Evaluated, ends, settings: RetrofitSettings):
             network=apply_new_match(state.network, match, exchanger_id),
             moves=state.moves + (move,),
         )
+    if settings.relocation_cost is None:
+        return
+    for unit, match in _relocations(parent, ends, settings, existing):
+        remaining = state.network.model_copy(
+            update={
+                "exchangers": tuple(
+                    e for e in state.network.exchangers if e.exchanger_id != unit
+                )
+            }
+        )
+        move = _Move("relocation", unit, match, new_splits(remaining, match))
+        yield replace(
+            state,
+            network=apply_relocation(state.network, unit, match),
+            moves=state.moves + (move,),
+        )
+
+
+def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
+    """The ``relocation_candidates`` most promising relocations from ``parent``.
+
+    Each existing recovery unit not yet moved may go to any screened match
+    that shares one of its streams (its own pair elsewhere is a repiping).
+    A move scores the match's potential less the unit's present duty, the
+    heat it gives up; positive scores are kept, best first.
+    """
+
+    solved = parent.solved
+    moved = {m.exchanger_id for m in parent.state.moves if m.kind == "relocation"}
+    duties = {
+        e.exchanger_id: (e.source_stream, e.sink_stream, e.period_states[0].duty)
+        for e in solved.exchangers
+        if e.kind is HeatExchangerKind.RECOVERY
+        and e.exchanger_id in existing
+        and e.exchanger_id not in moved
+    }
+    # Every screened match, not just the best few.
+    pool = screen_new_matches(
+        solved, ends, approach=settings.approach, limit=sys.maxsize
+    )
+    scored = []
+    for match in pool:
+        potential = match_potential(solved, ends, match, approach=settings.approach)
+        for unit, (hot, cold, duty) in duties.items():
+            if match.hot == hot or match.cold == cold:
+                score = potential - duty
+                if score > 0.0:
+                    scored.append((score, unit, match))
+    scored.sort(key=lambda item: -item[0])
+    limit = max(0, int(settings.relocation_candidates))
+    return [(unit, match) for _score, unit, match in scored[:limit]]
 
 
 def _new_id(network: HeatExchangerNetwork, match: NewMatch) -> str:
@@ -189,11 +258,17 @@ def _new_id(network: HeatExchangerNetwork, match: NewMatch) -> str:
     return exchanger_id
 
 
-def _signature(state: _State):
-    """Recovery matches by stage and the enlarged units: one per structure."""
+def _signature(state: _State, existing):
+    """Recovery matches by stage, with the existing unit installed at each
+    (new units are alike), and the enlarged units: one per structure."""
 
     recovery = frozenset(
-        (e.source_stream, e.sink_stream, e.stage)
+        (
+            e.source_stream,
+            e.sink_stream,
+            e.stage,
+            e.exchanger_id if e.exchanger_id in existing else None,
+        )
         for e in state.network.exchangers
         if e.kind is HeatExchangerKind.RECOVERY
     )
@@ -322,25 +397,32 @@ class _Evaluator:
 
     def _modification(self, move: _Move, result, stage: int | None):
         """``move`` priced from its unit's added area; ``None`` when it does
-        nothing (no added area, or a unit with no duty). A new match reports
-        ``stage``, its stage in the design's network."""
+        nothing (no added area, or a unit with no duty). A relocation adds no
+        area. A new or moved match reports ``stage``, its stage in the
+        design's network."""
 
-        added = float(result.added_area)
-        if added < _MIN_ADDED_AREA or not result.active:
+        if not result.active:
             return None
-        if move.kind == "new_match":
-            fixed = self.settings.new_unit_cost + self.settings.split_cost * len(
-                move.splits
-            )
+        settings = self.settings
+        splits = settings.split_cost * len(move.splits)
+        if move.kind == "relocation":
+            added, fixed = 0.0, settings.relocation_cost + splits
         else:
-            fixed = self.settings.area_addition_cost
+            added = float(result.added_area)
+            if added < _MIN_ADDED_AREA:
+                return None
+            fixed = (
+                settings.new_unit_cost + splits
+                if move.kind == "new_match"
+                else settings.area_addition_cost
+            )
         match = move.match
         return HeatExchangerNetworkRetrofitModification(
             kind=move.kind,
             exchanger_id=move.exchanger_id,
             added_area=added,
             fixed_cost=float(fixed),
-            area_cost=self.area_coeff * added**self.area_exp,
+            area_cost=self.area_coeff * added**self.area_exp if added else 0.0,
             hot_stream=match.hot if match else None,
             cold_stream=match.cold if match else None,
             stage=stage if match else None,

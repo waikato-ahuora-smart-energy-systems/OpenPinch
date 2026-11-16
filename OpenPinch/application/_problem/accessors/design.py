@@ -926,6 +926,8 @@ class _DesignAccessor:
         new_unit_cost: float | None = None,
         area_addition_cost: float = 0.0,
         split_cost: float = 0.0,
+        relocation_cost: float | None = None,
+        relocation_candidates: int = 8,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -960,6 +962,12 @@ class _DesignAccessor:
         in $ and annualised with the capital recovery factor.
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
+        With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
+        split) a step may also move an existing recovery exchanger, with its
+        installed area, to a screened match that shares one of its streams
+        (None, the default: no relocations); ``relocation_candidates`` are
+        tried from each design, ranked by the match's heat potential less the
+        unit's present duty.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
@@ -1012,6 +1020,10 @@ class _DesignAccessor:
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),
                     split_cost=float(split_cost),
+                    relocation_cost=(
+                        None if relocation_cost is None else float(relocation_cost)
+                    ),
+                    relocation_candidates=relocation_candidates,
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

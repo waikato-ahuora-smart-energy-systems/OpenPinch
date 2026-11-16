@@ -476,7 +476,10 @@ The method follows network evolution, one modification at a time:
    existing exchanger whose duty is limited by its area, and the most
    promising new matches. New matches are screened by the heat they could
    recover where they would sit, joining a stage (which may split a stream)
-   or in a new stage between two existing ones.
+   or in a new stage between two existing ones. With ``relocation_cost``
+   set, a step may also move an existing recovery exchanger, with its
+   installed area, to a screened match that shares one of its streams; its
+   own pair at another position is a repiping.
 3. Each candidate is solved on the fixed-structure model: existing exchangers
    keep their installed area unless they are given more, new exchangers are
    sized, and the objective is utility cost plus the annualised cost of the
@@ -490,8 +493,8 @@ A design no better than one with fewer modifications is marked
 ``dominated``. ``result.selected`` is the design with the best net annual
 benefit.
 
-Each design lists its ``modifications`` (``"new_match"`` or
-``"area_addition"``, the exchanger, the added area, fixed and area cost, and
+Each design lists its ``modifications`` (``"new_match"``,
+``"area_addition"`` or ``"relocation"``, the exchanger, the added area, fixed and area cost, and
 any new splits), the rated network, hot and cold utility (kW), utility cost,
 annual savings, capital cost ($), annualised capital and net annual benefit
 ($/y), and the simple payback in years.
@@ -519,10 +522,20 @@ Search size
    step solves up to ``beam_width * (existing exchangers +
    new_match_candidates)`` small NLPs. ``min_approach_temperature`` (default
    1 K) applies to every exchanger.
+Relocation
+   ``relocation_cost`` (default ``None``: no relocations) is the fixed cost
+   of moving an existing recovery exchanger, plus ``split_cost`` per stream
+   the move splits; the moved exchanger keeps its installed area at no area
+   cost. ``relocation_candidates`` (default 8) moves are tried from each
+   design, ranked by the heat the new position could recover less the duty
+   the exchanger gives up. Relocation can enlarge the search several-fold:
+   on the Ciric and Floudas case with 30 candidates it takes 319 solves
+   instead of 48, and leaves the frontier unchanged, since most moves strand
+   a stream whose utility exchanger is already at its area.
 
-Not yet covered: moving an existing exchanger to another match (relocation),
-repiping an existing match to another position, area reduction, and new
-utility exchangers.
+Not yet covered: new utility exchangers and moving utility exchangers. Area
+reduction is not a move: an exchanger may always run below its area, and
+existing area is sunk.
 
 Serialized Network Input
 ------------------------
