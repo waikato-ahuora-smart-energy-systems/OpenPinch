@@ -39,4 +39,4 @@ Retrofit of an existing heat exchanger network: a search, derived from the netwo
 - `moves.py` and `frontier.py` are pure.
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_retrofit_moves.py tests/analysis/heat_exchanger_networks/test_retrofit_frontier.py tests/analysis/heat_exchanger_networks/test_retrofit.py` (the last needs Ipopt and is marked `solver`).
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_retrofit_moves.py tests/analysis/heat_exchanger_networks/test_retrofit_frontier.py tests/analysis/heat_exchanger_networks/test_retrofit_search.py tests/analysis/heat_exchanger_networks/test_retrofit.py` (`test_retrofit_search.py` runs the search on a fake solver; `test_retrofit.py` needs Ipopt and is marked `solver`).
