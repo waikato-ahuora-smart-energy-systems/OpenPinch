@@ -488,6 +488,9 @@ The method follows network evolution, one modification at a time:
    sized, and the objective is utility cost plus the annualised cost of the
    added area. Candidates are ranked by net annual benefit, savings less the
    annualised capital, and the best ``beam_width`` go on to the next step.
+   Every solved design is checked as optimised duties are (approach
+   temperatures, heat balances and areas, with installed areas widened by
+   ``area_tolerance``) and dropped if it fails.
 
 ``result.frontier`` holds the best design found for each number of
 modifications, from the existing network (0) up to ``max_modifications``, so

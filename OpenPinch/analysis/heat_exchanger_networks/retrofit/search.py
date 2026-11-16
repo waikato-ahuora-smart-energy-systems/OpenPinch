@@ -28,6 +28,7 @@ from ..duty_optimisation import (
     build_duty_optimisation_request,
     build_solution_network,
     fixed_network_structure,
+    verify_solution,
 )
 from ..execution.settings import configured_stage_solver, stage_solver_options
 from .frontier import mark_dominated
@@ -329,6 +330,9 @@ class _Evaluator:
         self.existing = frozenset(
             e.exchanger_id for e in _structural_exchangers(existing)
         )
+        self.installed = {
+            e.exchanger_id: float(e.area) for e in _structural_exchangers(existing)
+        }
         self.arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
         hens = config.hens
         self.solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")
@@ -402,6 +406,11 @@ class _Evaluator:
             if getattr(model, "mSuccess", 0) != 1:
                 return None
             solved = build_solution_network(request, structure, model, self.arrays)
+            # The solver accepts loosely converged points: drop a design whose
+            # approaches, heat balances or areas fail the duty optimiser's
+            # checks, judging installed areas as the model did (widened).
+            if verify_solution(structure, model, self._widened(solved)):
+                return None
             results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
             binding = tuple(
@@ -447,6 +456,26 @@ class _Evaluator:
             return _Evaluated(state, design, _with_names(solved, self.names), binding)
         finally:
             model.cleanup()
+
+    def _widened(self, network: HeatExchangerNetwork) -> HeatExchangerNetwork:
+        """``network`` with each existing unit's installed area widened by
+        ``area_tolerance``, as the model rates it."""
+
+        tolerance = float(self.settings.area_tolerance)
+        return network.model_copy(
+            update={
+                "exchangers": tuple(
+                    e.model_copy(
+                        update={
+                            "area": e.area + tolerance * self.installed[e.exchanger_id]
+                        }
+                    )
+                    if e.exchanger_id in self.installed and e.area is not None
+                    else e
+                    for e in network.exchangers
+                )
+            }
+        )
 
     def _modification(
         self, move: _Move, result, stage: int | None, utility=None

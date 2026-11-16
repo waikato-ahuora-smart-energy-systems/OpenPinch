@@ -741,3 +741,30 @@ def test_design_retrofit_pairs_a_move_with_the_new_utility_it_needs():
         857.0 * (modification.added_area + modification.utility_area)
     )
     assert paired.net_annual_benefit > alone.net_annual_benefit
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_search_drops_designs_that_fail_solution_verification(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    def reject_new_units(structure, model, network):
+        return tuple(
+            f"{e.exchanger_id} rejected"
+            for e in network.exchangers
+            if e.exchanger_id.startswith("new:")
+        )
+
+    monkeypatch.setattr(search, "verify_solution", reject_new_units)
+
+    result = search.run_retrofit_search(
+        _case_problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=2, **REPORT_COSTS),
+    )
+
+    assert len(result.frontier) > 1
+    assert all(
+        m.kind == "area_addition" for d in result.frontier for m in d.modifications
+    )
