@@ -96,14 +96,18 @@ def _main_module_blocks_workers() -> str | None:
     repeats its whole run in every worker, and a main module read from
     stdin or a string (``__file__`` of ``"<stdin>"``) cannot be rerun at
     all. A main module with no ``__file__`` (Jupyter, ``python -c``) is not
-    rerun.
+    rerun, and one with a spec name (a zipapp) is imported by that name.
     """
     if multiprocessing.get_start_method() == "fork":
         return None
-    path = getattr(sys.modules.get("__main__"), "__file__", None)
+    main = sys.modules.get("__main__")
+    path = getattr(main, "__file__", None)
     if not path:
         return None
-    if not Path(path).is_file():
+    # Workers import a main module that has a spec name (``python -m``, a
+    # zipapp) by that name, so its path need not be a file.
+    named = getattr(getattr(main, "__spec__", None), "name", None) is not None
+    if not named and not Path(path).is_file():
         return (
             f"worker processes cannot rerun the main module from {path!r}. "
             "Run the code from a script file or a notebook to use worker "

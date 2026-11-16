@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.machinery
 import logging
 import multiprocessing
 import os
@@ -334,6 +335,21 @@ def test_main_module_without_a_file_attribute_uses_worker_processes(
 ):
     # Jupyter kernels and ``python -c`` give __main__ no __file__.
     _main_module(monkeypatch)
+    assert execution._pool_worker_count(2, 2) == 2
+
+
+def test_main_module_imported_by_name_uses_worker_processes(
+    native_platform, monkeypatch, tmp_path
+):
+    # A zipapp's __main__ has no file on disk, but workers import it by its
+    # spec name instead of running its path.
+    archive = tmp_path / "app.pyz"
+    archive.write_bytes(b"")
+    _main_module(
+        monkeypatch,
+        __file__=str(archive / "__main__.py"),
+        __spec__=importlib.machinery.ModuleSpec("__main__", None),
+    )
     assert execution._pool_worker_count(2, 2) == 2
 
 
