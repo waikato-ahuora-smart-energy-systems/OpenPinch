@@ -70,6 +70,11 @@ Heat exchanger network synthesis
   expressions, each of which copied the candidate's whole model. On the pulp
   mill sample case its eight adoptions take 0.7 s instead of about 10 s, with
   the same network.
+- Building a design stage's tasks copies the prepared zone once, not on
+  every read: ``PinchProblem.master_zone`` deep-copies the whole zone tree,
+  and each task read it many times for its settings and solver arrays. On
+  the pulp mill sample case a design reads it 3 times instead of 139, which
+  saves about 6.5 s, with the same network.
 
 0.9.1 (2026-11-16)
 ------------------

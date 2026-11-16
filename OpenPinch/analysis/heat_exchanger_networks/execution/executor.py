@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ProcessPoolExecutor
+from functools import cached_property
 from typing import Any, Callable, Protocol, Sequence
 
 from ....contracts.synthesis.task import (
@@ -93,17 +94,19 @@ class LocalSynthesisExecutor:
             self.stage_order.append(tasks[0].method)
             self._report_progress(tasks, 0)
 
+        shared = _ZoneCopiedOnce(problem)
         max_parallel = supported_workers(int(max_parallel))
         worker_count = max(1, min(max_parallel, len(tasks)))
         pool = self._start_pool(worker_count)
         if pool is not None and _can_build_tasks_in_workers(tasks, parent_outcomes):
+            # Workers get the problem itself; each copies the zone once.
             solve_inputs = (
                 (
                     task,
                     problem,
                     self.print_output,
                     self.model_factories,
-                    _evolution_options(problem, task, max_parallel=1),
+                    _evolution_options(shared, task, max_parallel=1),
                 )
                 for task in tasks
             )
@@ -124,13 +127,13 @@ class LocalSynthesisExecutor:
         failed: dict[str, HeatExchangerNetworkSynthesisTaskOutcome] = {}
         for task in tasks:
             try:
-                task_model_factories = self._model_factories_for_task(task, problem)
+                task_model_factories = self._model_factories_for_task(task, shared)
                 built.append(
                     (
                         task,
                         self._build_problem(
                             task,
-                            problem=problem,
+                            problem=shared,
                             parent_outcomes=parent_outcomes,
                         ),
                         task_model_factories,
@@ -163,7 +166,7 @@ class LocalSynthesisExecutor:
                 internal_problem,
                 self.print_output,
                 task_model_factories,
-                _evolution_options(problem, task, max_parallel=branch_parallel)
+                _evolution_options(shared, task, max_parallel=branch_parallel)
                 | {"solved_topologies": solved_topologies},
             )
             for task, internal_problem, task_model_factories in built
@@ -565,6 +568,38 @@ def _variant_key(task: HeatExchangerNetworkSynthesisTask) -> str:
     return "pdm_variant"
 
 
+class _ZoneCopiedOnce:
+    """A prepared problem whose ``master_zone`` is copied on first read only.
+
+    ``PinchProblem.master_zone`` deep-copies the whole zone tree on every
+    read, and building one stage's tasks reads it many times for settings
+    and solver arrays, none of which change it. Readers share this copy;
+    the pinch design decomposition makes its own before changing a zone.
+    Every other attribute, such as the validated input records the solver
+    arrays order streams by, is the problem's own.
+    """
+
+    def __init__(self, problem) -> None:
+        self._problem = problem
+
+    def __getattr__(self, name: str):
+        if name == "_problem":
+            raise AttributeError(name)
+        return getattr(self._problem, name)
+
+    @cached_property
+    def master_zone(self):
+        return self._problem.master_zone
+
+    @property
+    def results(self):
+        return self._problem.results
+
+    @property
+    def project_name(self) -> str:
+        return self._problem.project_name
+
+
 def _build_and_solve_root_task(
     worker_args: tuple[
         HeatExchangerNetworkSynthesisTask,
@@ -579,6 +614,7 @@ def _build_and_solve_root_task(
     InternalHeatExchangerNetworkProblem | None,
 ]:
     task, problem, print_output, model_factories, evolution_options = worker_args
+    problem = _ZoneCopiedOnce(problem)
     executor = LocalSynthesisExecutor(
         print_output=print_output,
         model_factories=model_factories,
