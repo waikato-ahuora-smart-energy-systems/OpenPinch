@@ -62,6 +62,36 @@ def test_params_come_from_preallocated_blocks_and_unused_entries_stay_out(
     model.model.write(str(tmp_path / "model.nl"))
 
 
+def test_a_parameter_block_is_fixed_as_a_whole_when_allocated():
+    # Fixing each parameter as it is handed out cost about a microsecond
+    # apiece, several seconds over a pulp mill design's 14 million
+    # parameters; fixing the block at once is ten times cheaper.
+    model = PyomoModel()
+
+    parameter = model.Param(value=2.0)
+
+    block = parameter.parent_component()
+    assert all(entry.fixed for entry in block.values())
+    assert pyo.value(parameter) == pytest.approx(2.0)
+
+
+def test_building_a_model_looks_pyomo_up_only_once(monkeypatch):
+    # Looking the module up on every variable cost about a second per pulp
+    # mill design.
+    from OpenPinch.analysis.heat_exchanger_networks.solver import pyomo_model
+
+    model = PyomoModel()
+    monkeypatch.setattr(pyomo_model, "_pyomo", lambda: pytest.fail("looked up"))
+
+    x = model.Var(value=1.0, lb=0.0, ub=5.0)
+    z = model.Var(value=1, lb=0, ub=1, integer=True)
+    parameters = [model.Param(value=float(index)) for index in range(100)]
+    model.Equation(x <= model.sum([z, *parameters]))
+    model.Minimize(x)
+
+    assert z.domain is pyo.Integers
+
+
 def test_equations_become_constraints_of_the_model():
     model = PyomoModel()
     x = model.Var(value=0.0, lb=0.0, ub=5.0)
