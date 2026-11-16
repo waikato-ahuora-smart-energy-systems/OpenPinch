@@ -160,6 +160,36 @@ def new_splits(network: HeatExchangerNetwork, move: NewMatch) -> tuple[str, ...]
     return tuple(stream for stream in (move.hot, move.cold) if stream in matched)
 
 
+def apply_relocation(
+    network: HeatExchangerNetwork, exchanger_id: str, move: NewMatch
+) -> HeatExchangerNetwork:
+    """``network`` with recovery exchanger ``exchanger_id`` moved to ``move``.
+
+    The exchanger leaves its match and position and is re-installed, with
+    its id and installed area, as the match ``move`` describes (inserting a
+    stage as ``apply_new_match`` does). Its old stage stays, even if empty.
+    """
+
+    (old,) = (e for e in network.exchangers if e.exchanger_id == exchanger_id)
+    remaining = network.model_copy(
+        update={
+            "exchangers": tuple(e for e in network.exchangers if e is not old),
+            "stage_count": stage_count(network),
+        }
+    )
+    moved = apply_new_match(remaining, move, exchanger_id)
+    return moved.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": old.area})
+                if e.exchanger_id == exchanger_id
+                else e
+                for e in moved.exchangers
+            )
+        }
+    )
+
+
 def apply_new_match(
     network: HeatExchangerNetwork, move: NewMatch, exchanger_id: str
 ) -> HeatExchangerNetwork:

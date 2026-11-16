@@ -5,6 +5,7 @@ from __future__ import annotations
 from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
     NewMatch,
     apply_new_match,
+    apply_relocation,
     match_potential,
     new_splits,
     screen_new_matches,
@@ -50,6 +51,37 @@ def test_a_match_joining_a_stage_splits_streams_already_matched_there():
     assert new_splits(network, NewMatch("H2", "C2", 1, new_stage=False)) == ()
     assert new_splits(network, NewMatch("H1", "C1", 2, new_stage=True)) == ()
 
+
+
+def test_a_relocated_exchanger_keeps_its_id_and_installed_area():
+    network = _network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": 50.0})
+                if e.exchanger_id == "recovery:H1->C1:S1"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    moved = apply_relocation(
+        network, "recovery:H1->C1:S1", NewMatch("H2", "C2", 2, new_stage=False)
+    )
+
+    exchanger = next(
+        e for e in moved.exchangers if e.exchanger_id == "recovery:H1->C1:S1"
+    )
+    assert (exchanger.source_stream, exchanger.sink_stream, exchanger.stage) == (
+        "H2",
+        "C2",
+        2,
+    )
+    assert exchanger.area == 50.0
+    assert len(moved.exchangers) == len(network.exchangers)
+    # The network keeps its two stages (from_structure leaves stage_count unset).
+    assert moved.stage_count == 2
 
 # Stream supply, target (C) and heat capacity flowrate (kW/K).
 ENDS = {
