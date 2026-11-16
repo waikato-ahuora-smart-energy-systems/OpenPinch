@@ -27,10 +27,17 @@ from OpenPinch.contracts.hpr import (
     HPRTargetingError,
 )
 
+# Two short periods: these run in the Pyodide lane, where the crude case's
+# three periods took over a minute per test.
+from tests.analysis.heat_exchanger_networks.test_hen_period_handling import (
+    _two_period_problem,
+)
+
 CHEAP = dict(
     load=HprLoad(fraction=0.25),
     levels=HprLevels(condensers=1, evaporators=1),
-    search=HprSearchLimits(restarts=1),
+    # A bounded search, as the notebooks use: the Pyodide lane runs these.
+    search=HprSearchLimits(restarts=1, iterations=20, evaluations=50),
 )
 
 
@@ -77,12 +84,17 @@ def _hpr_work(outputs) -> dict[str, float]:
 
 def test_the_gateway_over_all_periods_matches_the_named_method():
     def work(run):
-        problem = PinchProblem("crude_preheat_train_multiperiod.json")
+        problem = _two_period_problem()
         return _hpr_work(run(problem.target.all_periods))
 
     named = work(
         lambda periods: periods.carnot_heat_pump(
-            load_fraction=0.25, condensers=1, evaporators=1, maximum_restarts=1
+            load_fraction=0.25,
+            condensers=1,
+            evaporators=1,
+            maximum_restarts=1,
+            maximum_iterations=20,
+            maximum_evaluations=50,
         )
     )
     gateway = work(
@@ -252,13 +264,18 @@ def test_all_periods_runs_a_request_once_per_period():
     from OpenPinch.contracts.hpr import HprTargetRequest
 
     work = _hpr_work
-    named = PinchProblem("crude_preheat_train_multiperiod.json").target.all_periods
+    named = _two_period_problem().target.all_periods
     request = HprTargetRequest(cycle="carnot", **CHEAP)
-    gateway = PinchProblem("crude_preheat_train_multiperiod.json").target.all_periods
+    gateway = _two_period_problem().target.all_periods
 
     assert work(gateway.heat_pump_and_refrigeration(request=request)) == work(
         named.carnot_heat_pump(
-            load_fraction=0.25, condensers=1, evaporators=1, maximum_restarts=1
+            load_fraction=0.25,
+            condensers=1,
+            evaporators=1,
+            maximum_restarts=1,
+            maximum_iterations=20,
+            maximum_evaluations=50,
         )
     )
 
@@ -266,7 +283,7 @@ def test_all_periods_runs_a_request_once_per_period():
 def test_a_request_naming_another_period_than_the_call_is_rejected():
     from OpenPinch.contracts.hpr import HprTargetRequest
 
-    problem = PinchProblem("crude_preheat_train_multiperiod.json")
+    problem = _two_period_problem()
 
     with pytest.raises(ValueError, match="period"):
         problem.target.heat_pump_and_refrigeration(
