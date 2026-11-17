@@ -1636,7 +1636,7 @@ def test_utility_cost_goal_loads_the_cheaper_utility_first() -> None:
     assert duties["HPS"] == pytest.approx(300.0, abs=0.5)
 
 
-def _retrofit_small_model(recovery_area: float, solver_factory=None):
+def _retrofit_small_model(recovery_area: float, solver_factory=None, enhancement=None):
     from dataclasses import replace
 
     from OpenPinch.analysis.heat_exchanger_networks.context import (
@@ -1672,6 +1672,7 @@ def _retrofit_small_model(recovery_area: float, solver_factory=None):
         structure.spec,
         recovery_areas={0: recovery_area},
         utility_areas={e: 1.0e4 for e in range(len(structure.spec.utilities))},
+        enhanced_recovery=enhancement or {},
     )
     factory = solver_factory or fixed_model.FixedStructureModel
     return factory(
@@ -1706,3 +1707,21 @@ def test_retrofit_area_values_match_the_cost_of_more_area() -> None:
         for (side, _index), v in model.area_values.items()
         if side == "utility"
     )
+
+
+def test_an_enhanced_unit_works_as_one_with_its_area_times_the_factor() -> None:
+    # Enhancement raises the unit's heat transfer coefficient by the
+    # factor, so 2 m2 enhanced 1.5 times recovers what 3 m2 plain does.
+    factory = scipy_fixed_structure_model()
+    enhanced = _retrofit_small_model(2.0, factory, enhancement={0: 1.5})
+    plain = _retrofit_small_model(3.0, factory)
+    small = _retrofit_small_model(2.0, factory)
+    for model in (enhanced, plain, small):
+        model.optimise()
+        assert model.mSuccess == 1
+
+    def recovered(model):
+        return model.recovery_results[0].periods[0].duty
+
+    assert recovered(small) < recovered(plain)
+    assert recovered(enhanced) == pytest.approx(recovered(plain), rel=1e-4)

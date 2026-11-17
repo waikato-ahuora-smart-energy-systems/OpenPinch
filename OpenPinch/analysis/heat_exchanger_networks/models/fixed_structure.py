@@ -124,6 +124,11 @@ class FixedStructureSpec:
     # Caps an enlargeable unit's added area at this fraction of its installed
     # area; None leaves it uncapped.
     max_added_area_fraction: float | None = None
+    # Existing units the "retrofit" goal treats as enhanced (tube inserts,
+    # for example), by solver index: each multiplies the unit's heat
+    # transfer coefficient, so its capacity, by the factor.
+    enhanced_recovery: Mapping[int, float] = field(default_factory=dict)
+    enhanced_utilities: Mapping[int, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -1327,9 +1332,24 @@ def _retrofit_areas(owner) -> None:
         added = (
             owner._var(f"d{tag}{index}", 0.0, 0.0, cap) if index in enlargeable else 0.0
         )
-        owner.area_caps[(side, index)] = _cap_installed(
-            owner, installed * widen + added, points.get(index, {}), *terms
+        enhancement = float(
+            (
+                owner.spec.enhanced_recovery
+                if side == "recovery"
+                else owner.spec.enhanced_utilities
+            ).get(index, 1.0)
         )
+        caps = _cap_installed(
+            owner,
+            (installed * widen + added) * enhancement,
+            points.get(index, {}),
+            *terms,
+        )
+        # The value of installed area counts its widening and enhancement.
+        owner.area_caps[(side, index)] = [
+            (constraint, factor * widen * enhancement, thetas)
+            for constraint, factor, thetas in caps
+        ]
         return installed, added
 
     spec = owner.spec
