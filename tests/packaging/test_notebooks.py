@@ -540,6 +540,17 @@ def test_notebook_16_follows_the_live_network_record() -> None:
     assert "heat_exchanger_network(" not in source
 
 
+def test_notebook_16_retrofits_with_relocation_and_tube_inserts() -> None:
+    notebook = _load_notebook(
+        ROOT / "OpenPinch" / "tutorials" / "notebooks" / "16_advanced_hen_methods.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert "relocation_cost=" in source
+    assert "enhancement_factors=" in source
+    assert "display(upgraded_frontier)" in source
+
+
 def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
     notebook = _load_notebook(
         ROOT
