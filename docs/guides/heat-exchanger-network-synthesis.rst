@@ -619,11 +619,11 @@ Relocation
    Smith's case the paper's resequencing of exchanger 7 has the best ceiling
    of 395 moves but scores 127th. Ranking them all, the search finds that
    move and builds on it ($740,000/y net at two changes, against $712,000/y
-   when only the 100 best-scored moves were ranked), at a cost: 2,621 solves
-   and about 100 s instead of 889 and 28 s. ``HENS_MAX_PARALLEL`` (in
-   ``options``) solves the ceilings on that many threads with the same
-   result: with 8, the search took 74 s instead of 160 s on a loaded
-   machine. The stepwise search tries the
+   when only the 100 best-scored moves were ranked), at a cost: about 2,700
+   solves instead of 889. ``HENS_MAX_PARALLEL`` (in ``options``) runs each
+   step's solves, ceilings and sizing, on that many threads with the same
+   result: with 8 the search took 37 s instead of 89 s serially. The
+   stepwise search tries the
    ``relocation_candidates`` (default 8) best-scored moves, and only those
    that gain more than they give up. On the Ciric and Floudas case
    relocation leaves the frontier unchanged, since most moves strand a

@@ -1105,8 +1105,8 @@ class _DesignAccessor:
         area of at least 1 % of its installed area, as an area addition, so
         the frontier counts structural changes. "stepwise" instead makes one
         modification per step, an area addition being one. With
-        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 the ceiling solves run
-        on that many threads; the result is the same.
+        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 each step's solves
+        run on that many threads; the result is the same.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design after each number of steps (0 is the existing
