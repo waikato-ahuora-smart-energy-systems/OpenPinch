@@ -654,8 +654,13 @@ Heat transfer enhancement
    The stepwise search tries enhancing each exchanger at its area limit as
    a step; the default search, after sizing a structure, sizes it again
    with the exchangers it would enlarge enhanced where they have a factor,
-   and keeps the better design. Pressure drop is not modelled: leave out
-   exchangers whose stream cannot take more.
+   and keeps the better design. Inserts raise pressure drop:
+   ``enhancement_pressure_drops`` gives each exchanger's insert as the
+   stream it is on and the pressure drop it adds (kPa), and
+   ``pressure_drop_allowances`` the extra pressure drop each stream can take;
+   no design's inserts exceed a stream's allowance. Hydraulics are not
+   modelled beyond these sums: take the figures from a rating of each
+   exchanger.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
@@ -713,9 +718,11 @@ Akpomiemie and Smith (2018), simplified crude preheat train
    for E5 (U from 0.325 to 0.448) and E1 (0.517 to 0.669), inserts at $500
    plus $10/m2 and no other changes allowed, the stepwise search enhances E5
    and then E1, as the paper does, and reaches 13,545 kW against its
-   13,661.52 kW (5.7 % saved from the rated base against 5.5 %). The paper's
-   next candidate, E2, breaks the cold stream's pressure drop limit and is
-   left out. Combining enhancement with structural changes (Section 5.3),
+   13,661.52 kW (5.7 % saved from the rated base against 5.5 %). Given E2's
+   factor too and the paper's pressure drops (E5's insert adds 21.94 kPa to
+   C1, E1's 1.96 and E2's 31.91, with C1 at 668.51 of its 700 kPa), the
+   search never enhances E2, as the paper concludes; without the allowance
+   it adds E2 as a third step. Combining enhancement with structural changes (Section 5.3),
    with relocation at $10,000 and factors for every exchanger the paper
    enhances: the first change becomes the paper's relocation of E7 with
    five exchangers enhanced ($762k/y net against $621k/y without

@@ -788,3 +788,63 @@ def test_enhancement_factors_for_unknown_exchangers_are_an_error(fake_solver):
                 **COSTS,
             ),
         )
+
+
+@pytest.mark.parametrize(
+    ("extra", "match"),
+    [
+        (
+            {"enhancement_pressure_drops": {"E9": ("C1", 5.0)}},
+            "enhancement_pressure_drops.*E9",
+        ),
+        (
+            {"enhancement_pressure_drops": {"E1": ("C9", 5.0)}},
+            "enhancement_pressure_drops.*C9",
+        ),
+        ({"pressure_drop_allowances": {"C9": 30.0}}, "pressure_drop_allowances.*C9"),
+    ],
+)
+def test_pressure_drop_settings_must_name_existing_exchangers_and_streams(
+    fake_solver, extra, match
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    with pytest.raises(ValueError, match=match):
+        search.run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=1,
+                enhancement_factors={"E1": 1.3},
+                **extra,
+                **COSTS,
+            ),
+        )
+
+
+def test_the_structure_search_keeps_inserts_within_the_pressure_drop_allowance(
+    fake_solver,
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # E1 and E2 are both enlarged on the fake and both worth an insert, but
+    # C1 can take only one insert's pressure drop.
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            enhancement_factors={"E1": 1.3, "E2": 1.3},
+            enhancement_cost=500.0,
+            enhancement_pressure_drops={"E1": ("C1", 10.0), "E2": ("C1", 10.0)},
+            pressure_drop_allowances={"C1": 15.0},
+            **COSTS,
+        ),
+    )
+
+    enhanced = [
+        m.exchanger_id
+        for m in result.frontier[1].modifications
+        if m.kind == "enhancement"
+    ]
+    assert len(enhanced) == 1

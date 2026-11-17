@@ -57,7 +57,8 @@ Heat exchanger network synthesis
   exchanger. ``enhancement_factors``, ``enhancement_cost`` and
   ``enhancement_area_cost`` add heat transfer enhancement (tube inserts)
   of existing exchangers as a move, checked against Akpomiemie and Smith
-  (2018). With Ipopt the stepwise search adds area only on exchangers whose
+  (2018); ``enhancement_pressure_drops`` and ``pressure_drop_allowances``
+  keep inserts within each stream's pressure drop allowance. With Ipopt the stepwise search adds area only on exchangers whose
   area is worth something, from the solver's duals; the fixed-structure
   model reports them as ``area_values`` and has a ``"utility cost"`` goal.
   ``HENS_MAX_PARALLEL`` runs each step's solves on threads.
