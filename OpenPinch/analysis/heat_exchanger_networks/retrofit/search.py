@@ -238,8 +238,13 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             enlarged=state.enlarged | {exchanger_id},
             moves=state.moves + (_Move("area_addition", exchanger_id),),
         )
+    # A unit given area earlier is not at its cap, but an insert may still
+    # replace part of that area, so enlarged units stay candidates.
     factors = settings.enhancement_factors or {}
-    for exchanger_id in () if structural else parent.binding:
+    candidates = parent.binding + tuple(
+        sorted(state.enlarged.difference(parent.binding))
+    )
+    for exchanger_id in () if structural else candidates:
         if exchanger_id in factors and exchanger_id not in state.enhanced:
             yield replace(
                 state,

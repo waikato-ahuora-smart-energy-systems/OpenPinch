@@ -739,3 +739,37 @@ def test_the_structure_search_enhances_units_it_would_enlarge(fake_solver):
         if m.kind not in {"area_addition", "enhancement"}
     ]
     assert len(structural) == 1
+
+
+def test_a_unit_given_area_in_one_step_can_be_enhanced_in_the_next(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # New units and inserts are priced so the first step's beam holds area
+    # additions only; the second step must still offer each enlarged unit
+    # an insert (it may replace part of the added area).
+    states = []
+    evaluate = search._Evaluator.evaluate
+
+    def spy(self, state):
+        states.append(state)
+        return evaluate(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "evaluate", spy)
+    units = ("E1", "E2", "E3", "E4", "E5", "E6", "E7")
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=2,
+            strategy="stepwise",
+            new_unit_cost=1e9,
+            area_addition_cost=8_650.0,
+            split_cost=1e4,
+            enhancement_factors=dict.fromkeys(units, 1.3),
+            enhancement_cost=1e6,
+        ),
+    )
+
+    assert any(state.enlarged & state.enhanced for state in states)
