@@ -512,8 +512,8 @@ def test_an_evolution_search_admits_each_improvement_while_it_runs():
 class _WorkerPool:
     """Runs each task as a worker process would: in a context of its own.
 
-    Tasks run in reverse order, so their networks reach the main process in a
-    different order from a serial run.
+    Tasks run in their own contexts, so a worker's networks reach the main
+    process only through the hand-off.
     """
 
     def __init__(self, worker_count):
@@ -525,12 +525,13 @@ class _WorkerPool:
     def __exit__(self, *exc_info):
         return False
 
-    def map(self, function, items):
+    def submit(self, function, item):
         import contextvars
+        from concurrent.futures import Future
 
-        items = list(items)
-        results = [contextvars.Context().run(function, item) for item in items[::-1]]
-        return iter(results[::-1])
+        future = Future()
+        future.set_result(contextvars.Context().run(function, item))
+        return future
 
 
 def _evolution_options(*args, max_parallel):
@@ -717,3 +718,47 @@ def _content(record):
 
 def test_admitting_outside_a_recording_does_nothing():
     assert admit(_outcome("t1", A, 100.0)) is False
+
+
+class _SlowInternalProblem(_EvolvingInternalProblem):
+    """A solve that takes a while before its search improves."""
+
+    def get_solution(self, **kwargs):
+        import time
+
+        time.sleep(0.5)
+        return super().get_solution(**kwargs)
+
+
+@needs_threads
+def test_a_pooled_task_enters_the_record_when_it_finishes_not_in_input_order(
+    monkeypatch,
+):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    # evm-a solves slowly and evm-b at once. Each task's final outcome is
+    # admitted by the main process as its result comes back; taking results
+    # in input order would hold evm-b back until evm-a had finished.
+    admitted = []
+    admit = executor.admit
+
+    def spy(outcome):
+        if threading.current_thread() is threading.main_thread():
+            admitted.append(outcome.task.task_id)
+        return admit(outcome)
+
+    monkeypatch.setattr(executor, "admit", spy)
+    _evolution_tasks_through_the_executor(
+        monkeypatch,
+        max_parallel=2,
+        pool=ThreadPoolExecutor,
+        problems={
+            "evm-a": _SlowInternalProblem((90.0,)),
+            "evm-b": _EvolvingInternalProblem((70.0,)),
+        },
+    )
+
+    assert admitted == ["evm-b", "evm-a"]

@@ -1423,15 +1423,20 @@ def test_local_executor_uses_worker_pool_for_prebuilt_tasks(monkeypatch) -> None
             self.worker_count = worker_count
 
         def __enter__(self):
+            self.submitted = 0
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            pool_calls.append((self.worker_count, self.submitted))
             return False
 
-        def map(self, func, iterable):
-            args = tuple(iterable)
-            pool_calls.append((self.worker_count, len(args)))
-            return tuple(func(item) for item in args)
+        def submit(self, func, item):
+            from concurrent.futures import Future
+
+            self.submitted += 1
+            future = Future()
+            future.set_result(func(item))
+            return future
 
     class SuccessfulInternalProblem:
         case = SimpleNamespace(solver_run=SimpleNamespace(status="ok"))
