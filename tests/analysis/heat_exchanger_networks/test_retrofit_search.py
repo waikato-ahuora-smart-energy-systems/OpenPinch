@@ -575,3 +575,43 @@ def test_the_ceiling_minimises_utility_cost_not_duty(fake_solver):
     )
 
     assert fake_solver.goals["retrofit-ceiling"] == {"utility cost"}
+
+
+@pytest.mark.parametrize("strategy", ["structure", "stepwise"])
+def test_hens_max_parallel_solves_each_step_on_threads_with_the_same_result(
+    fake_solver, monkeypatch, strategy
+):
+    import threading
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+    from OpenPinch.analysis.parallelism import supported_workers
+
+    threads = set()
+    evaluate = search._Evaluator.evaluate
+
+    def spy(self, state):
+        if state.moves:
+            threads.add(threading.current_thread().name)
+        return evaluate(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "evaluate", spy)
+
+    def run(max_parallel: int):
+        case = json.loads(read_sample_case(CASE))
+        case["options"]["HENS_MAX_PARALLEL"] = max_parallel
+        result = search.run_retrofit_search(
+            PinchProblem(case),
+            _existing_network(),
+            search.RetrofitSettings(max_modifications=2, strategy=strategy, **COSTS),
+        )
+        return result.evaluated_designs, [
+            (d.net_annual_benefit, [m.exchanger_id for m in d.modifications])
+            for d in result.frontier
+        ]
+
+    serial = run(1)
+    assert threads == {threading.main_thread().name}
+    threads.clear()
+    assert run(4) == serial
+    if supported_workers(4) > 1:
+        assert threading.main_thread().name not in threads

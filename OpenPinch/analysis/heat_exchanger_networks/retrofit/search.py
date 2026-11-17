@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import sys
+import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
@@ -192,12 +193,12 @@ def run_retrofit_search(
                 states.append(state)
             if structural:
                 states = evaluator.best_ceilings(states)
-            for state in states:
-                evaluated = (
-                    evaluator.sized(state) if structural else evaluator.evaluate(state)
-                )
-                if evaluated is not None:
-                    children.append(evaluated)
+            solve = evaluator.sized if structural else evaluator.evaluate
+            children.extend(
+                evaluated
+                for evaluated in evaluator.map(solve, states)
+                if evaluated is not None
+            )
         if not children:
             break
         children.sort(key=lambda child: -child.design.net_annual_benefit)
@@ -414,6 +415,7 @@ class _Evaluator:
         }
         self.base_utility_cost: float | None = None
         self.evaluations = 0
+        self._count_lock = threading.Lock()
         costing = config.costing
         self.area_coeff = float(costing.hx_area_coeff)
         self.area_exp = float(costing.hx_area_exp)
@@ -426,7 +428,8 @@ class _Evaluator:
 
         from ..models.fixed_structure import FixedStructureModel
 
-        self.evaluations += 1
+        with self._count_lock:
+            self.evaluations += 1
         settings = self.settings
         request = build_duty_optimisation_request(
             state.network, objective="cost", min_approach_temperature=settings.approach
@@ -523,6 +526,17 @@ class _Evaluator:
         finally:
             model.cleanup()
 
+    def map(self, solve, states: list[_State]) -> list:
+        """``solve`` applied to each of ``states``, in order: on
+        ``HENS_MAX_PARALLEL`` threads when it is above 1 (each solve is an
+        external solver subprocess), otherwise serially."""
+
+        if self.max_parallel > 1 and len(states) > 1:
+            workers = min(self.max_parallel, len(states))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                return list(pool.map(solve, states))
+        return [solve(state) for state in states]
+
     def best_ceilings(self, states: list[_State]) -> list[_State]:
         """For each kind of change (new match, relocation), the
         ``new_match_candidates`` states whose structures reach the lowest
@@ -532,13 +546,9 @@ class _Evaluator:
         solved on that many threads (each solve is an Ipopt subprocess); the
         ranking is the same either way."""
 
-        self.evaluations += len(states)
-        if self.max_parallel > 1 and len(states) > 1:
-            workers = min(self.max_parallel, len(states))
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                costs = list(pool.map(self.ceiling, states))
-        else:
-            costs = [self.ceiling(state) for state in states]
+        with self._count_lock:
+            self.evaluations += len(states)
+        costs = self.map(self.ceiling, states)
         ceilings = [
             (cost, n, state) for n, (cost, state) in enumerate(zip(costs, states))
         ]
