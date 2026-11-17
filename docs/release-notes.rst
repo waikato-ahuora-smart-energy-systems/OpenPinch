@@ -115,6 +115,13 @@ Heat exchanger network synthesis
   which ran Pyomo's domain and bound check on every write. On the pulp mill
   sample case a design takes about 124 s of CPU time instead of 130 s, with
   the same network.
+- The amalgamated pinch design network is built without constraints or an
+  objective. It holds the above- and below-pinch sides' solved values and is
+  only read, never solved, so a values-only model (``values_only=True``) has
+  the same variables and parameters and refuses to be solved. On the pulp
+  mill sample case this saves about 20 s of CPU time per design (107 s
+  instead of 128 s, measured before the index-grid change above), with the
+  same network.
 
 0.9.1 (2026-11-16)
 ------------------

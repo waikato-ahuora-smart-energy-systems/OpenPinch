@@ -1360,7 +1360,7 @@ class _UnreadValue:
         raise AssertionError("an inactive match's approach was read")
 
 
-def _built_two_stage_model(monkeypatch) -> StageWiseModel:
+def _built_two_stage_model(monkeypatch, **options) -> StageWiseModel:
     """The four-stream case built, not solved: two hot and two cold streams.
 
     Nothing is solved, so no solver executable is needed.
@@ -1387,9 +1387,9 @@ def _built_two_stage_model(monkeypatch) -> StageWiseModel:
         z_restriction=None,
         min_dqda=0.0,
         minimisation_goal="total cost",
-        non_isothermal_model=False,
         integers=True,
         tol=1e-6,
+        **{"non_isothermal_model": False, **options},
     )
     model.solver_run = SimpleNamespace(objective_value=1.0)
     return model
@@ -1440,3 +1440,55 @@ def test_post_process_reads_each_stream_temperature_once(monkeypatch):
     # Once for dQ/dA, once for the alpha solve and at most twice for heater
     # and cooler areas; it was twice per partner in every stage.
     assert max(value.reads for value in counted) <= 4
+
+
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_a_values_only_model_has_the_same_variables_and_no_constraints(
+    monkeypatch, non_isothermal_model
+):
+    # An amalgamated pinch design network only holds the sides' solved
+    # values: building its constraints and objective was about a quarter of
+    # a pulp mill design and nothing read them.
+    pyo = pytest.importorskip("pyomo.environ")
+
+    full = _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model
+    )
+    values_only = _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model, values_only=True
+    )
+
+    def numbers(model):
+        return [
+            (variable.value, variable.lb, variable.ub, variable.fixed)
+            for variable in model.m.model.component_data_objects(pyo.Var)
+        ]
+
+    assert numbers(values_only) == numbers(full)
+    assert list(values_only.m.model.component_data_objects(pyo.Constraint)) == []
+    assert values_only.m.objective is None
+
+
+def test_a_values_only_model_cannot_be_solved(monkeypatch):
+    # With no constraints, a solver would return any values in the bounds.
+    model = _built_two_stage_model(monkeypatch, values_only=True)
+
+    with pytest.raises(RuntimeError, match="values-only"):
+        model.optimise(print_output=False)
+
+
+def test_refusing_a_values_only_solve_still_removes_its_run_directory(monkeypatch):
+    # optimise always removes the model's run directory, which Couenne and
+    # Ipopt configuration create for their option file.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        execution as base_execution,
+    )
+
+    model = _built_two_stage_model(monkeypatch, values_only=True)
+    cleaned = []
+    monkeypatch.setattr(base_execution, "cleanup_model", cleaned.append)
+
+    with pytest.raises(RuntimeError, match="values-only"):
+        model.optimise(print_output=False)
+
+    assert cleaned == [model]

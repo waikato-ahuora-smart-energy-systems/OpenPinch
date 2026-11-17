@@ -26,6 +26,11 @@ def optimise(model, print_output: bool) -> None:
     """
 
     try:
+        if getattr(model, "values_only", False):
+            raise RuntimeError(
+                f"{model.name} is a values-only model: it has no constraints or "
+                "objective and cannot be solved."
+            )
         _solve_and_post_process(model, print_output)
     finally:
         cleanup_model(model)
@@ -149,7 +154,11 @@ def setup_model(model) -> None:
     """
 
     backend.require_solver_backend(model.solver)
-    model.m = PyomoModel()
+    model.m = (
+        PyomoModel(constraints=False)
+        if getattr(model, "values_only", False)
+        else PyomoModel()
+    )
     model.mSuccess: int = 0
     model.solver_run = backend.configure_pyomo_solver(
         model.m,
