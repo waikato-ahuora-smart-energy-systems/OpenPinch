@@ -70,6 +70,7 @@ class _Backend:
         self.goals: dict[str, set[str]] = {}
         self.area_values = lambda spec: None
         self.unbuildable = lambda spec: False
+        self.rating_allowances = lambda spec: None
 
 
 @pytest.fixture
@@ -103,6 +104,7 @@ def fake_solver(monkeypatch) -> _Backend:
                 - 20_000.0 * (enlarged + enhanced)
             )
             self.area_values = backend.area_values(spec)
+            self.rating_allowances = backend.rating_allowances(spec)
             self.mSuccess = 0 if backend.fail(spec) else 1
 
         def cleanup(self) -> None:
@@ -955,46 +957,30 @@ def test_ceiling_relocations_caps_the_relocations_ranked_per_design(
     assert ranked.count("relocation") == 2
 
 
-def test_verification_allows_an_installed_unit_its_off_design_chen_error():
-    from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
-        chen_lmtd,
-        exact_lmtd,
-    )
+def test_verification_uses_the_models_rating_allowance_for_installed_units(
+    fake_solver,
+):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
-    from OpenPinch.domain._heat_exchanger.period_state import (
-        HeatExchangerPeriodState,
+
+    # The model reports how much more area verification needs than its cap
+    # for each installed unit (its design calibration and Chen's LMTD);
+    # verification widens the unit by it, so the two judge alike.
+    fake_solver.rating_allowances = lambda spec: {
+        **{("recovery", r): 1.1 for r in spec.recovery_areas},
+        **{("utility", e): 1.1 for e in spec.utility_areas},
+    }
+    verified = []
+
+    def record(network):
+        verified.append({e.exchanger_id: e.area for e in network.exchangers})
+        return ()
+
+    fake_solver.reject = record
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=0, area_tolerance=0.02, **COSTS),
     )
 
-    # The model calibrates an installed unit's capacity at its design point
-    # (exact over Chen LMTD there) and rates other states with Chen's LMTD;
-    # verification sizes with the exact LMTD. A unit designed at lopsided
-    # approaches (40 and 2 K) and run at even ones (10 and 10 K) carries
-    # Chen's ratio there over the design one more duty in the model, which
-    # verification must allow; at its design state it needs no allowance.
-    def state(hot_in, hot_out, cold_in, cold_out):
-        return HeatExchangerPeriodState(
-            period_id="a",
-            period_idx=0,
-            duty=10.0,
-            active=True,
-            source_inlet_temperature=hot_in,
-            source_outlet_temperature=hot_out,
-            sink_inlet_temperature=cold_in,
-            sink_outlet_temperature=cold_out,
-        )
-
-    unit = _existing_network().exchangers[0]
-    even = unit.model_copy(update={"period_states": (state(100.0, 60.0, 50.0, 90.0),)})
-    lopsided = unit.model_copy(
-        update={"period_states": (state(150.0, 52.0, 50.0, 110.0),)}
-    )
-    design = {0: (10.0, 40.0, 2.0, None)}
-
-    def ratio(theta_1, theta_2):
-        return chen_lmtd(theta_1, theta_2) / exact_lmtd(theta_1, theta_2)
-
-    assert search._chen_allowance(even, design) == pytest.approx(
-        ratio(10.0, 10.0) / ratio(40.0, 2.0), rel=1e-6
-    )
-    assert search._chen_allowance(lopsided, design) == pytest.approx(1.0)
-    assert search._chen_allowance(even, {}) == pytest.approx(1.0, abs=1e-6)
+    assert verified[0]["E3"] == pytest.approx(1008.5 * 1.02 * 1.1)
+    assert verified[0]["E7"] == pytest.approx(246.75 * 1.02 * 1.1)

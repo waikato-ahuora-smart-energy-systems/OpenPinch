@@ -1636,7 +1636,9 @@ def test_utility_cost_goal_loads_the_cheaper_utility_first() -> None:
     assert duties["HPS"] == pytest.approx(300.0, abs=0.5)
 
 
-def _retrofit_small_model(recovery_area: float, solver_factory=None, enhancement=None):
+def _retrofit_small_model(
+    recovery_area: float, solver_factory=None, enhancement=None, design_points=None
+):
     from dataclasses import replace
 
     from OpenPinch.analysis.heat_exchanger_networks.context import (
@@ -1673,6 +1675,7 @@ def _retrofit_small_model(recovery_area: float, solver_factory=None, enhancement
         recovery_areas={0: recovery_area},
         utility_areas={e: 1.0e4 for e in range(len(structure.spec.utilities))},
         enhanced_recovery=enhancement or {},
+        recovery_design_points=design_points or {},
     )
     factory = solver_factory or fixed_model.FixedStructureModel
     return factory(
@@ -1725,3 +1728,36 @@ def test_an_enhanced_unit_works_as_one_with_its_area_times_the_factor() -> None:
 
     assert recovered(small) < recovered(plain)
     assert recovered(enhanced) == pytest.approx(recovered(plain), rel=1e-4)
+
+
+def test_the_retrofit_goal_reports_how_far_its_rating_outruns_verification() -> None:
+    # The model calibrates an installed unit at its design point and rates
+    # other states with Chen's LMTD; verification sizes with the exact LMTD
+    # (or summed slice areas). Each installed unit reports the most extra
+    # area verification needs over the model, at least 1: its period
+    # required area times the cap's factor and Chen LMTD over the duty.
+    model = _retrofit_small_model(
+        2.0,
+        scipy_fixed_structure_model(),
+        design_points={0: {0: (100.0, 40.0, 2.0, None)}},
+    )
+    model.optimise()
+    assert model.mSuccess == 1
+
+    period = model.recovery_results[0].periods[0]
+    coefficient = 0.5  # h = 1 on both streams
+    factor = fixed_model._design_factor((100.0, 40.0, 2.0, None), coefficient)
+    expected = (
+        period.required_area
+        * factor
+        * coefficient
+        * fixed_model.chen_lmtd(*period.approach)
+        / period.duty
+    )
+    assert expected > 1.0
+    assert model.rating_allowances[("recovery", 0)] == pytest.approx(expected)
+    assert all(
+        value == pytest.approx(1.0)
+        for (side, _index), value in model.rating_allowances.items()
+        if side == "utility"
+    )
