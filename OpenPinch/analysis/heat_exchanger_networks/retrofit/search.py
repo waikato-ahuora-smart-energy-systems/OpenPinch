@@ -25,6 +25,8 @@ from ....contracts.synthesis.retrofit import (
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ...economics import compute_capital_recovery_factor
+from ...heat_pumps.common.compressor_efficiency import compressor_efficiency_model
+from ...heat_pumps.cycles.limits import CycleLimits
 from ...parallelism import supported_workers
 from ..context import ensure_target_results
 from ..duty_optimisation import (
@@ -36,7 +38,19 @@ from ..duty_optimisation import (
     verify_solution,
 )
 from ..execution.settings import configured_stage_solver, stage_solver_options
+from ..solver.arrays import annual_cost_scales
 from .frontier import mark_dominated
+from .heat_pumps import (
+    HeatPumpCandidate,
+    carnot_rating,
+    condenser_name,
+    evaporator_name,
+    heat_pump_candidates,
+    screen_heat_pumps,
+    vapour_compression_capital,
+    vapour_compression_rating,
+    with_heat_pump_utilities,
+)
 from .moves import (
     NewMatch,
     NewUtility,
@@ -60,6 +74,7 @@ _MIN_KEPT_SHARE = 0.01
 _MIN_AREA_VALUE = 1e-3
 _MIN_KEPT_AREA = 1.0
 STRATEGIES = ("stepwise", "structure")
+HEAT_PUMP_CYCLES = (None, "carnot", "vapour_compression")
 
 
 @dataclass(frozen=True)
@@ -91,6 +106,18 @@ class RetrofitSettings:
     is on and the pressure drop, kPa, it adds) and
     ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa, it
     can take) keep every design's inserts within each stream's allowance.
+    ``repiping_cost`` ($ per stream) adds to a new match, relocation or
+    new end heater or cooler the cost of each stream whose piping it
+    changes. ``heat_pump_cycle`` enables heat pump moves (None: none): an
+    evaporator at the end of a hot stream and a condenser at the end of a
+    cold one, rated by the HPR service's cycle models, with work at
+    ``COSTING_HPR_ELE_PRICE``. "carnot" rates them with
+    ``HPR_ETA_II_CARNOT``, pricing the exchangers' area like any new
+    exchanger's and the compressor and its package at ``heat_pump_cost``
+    ($ per kW of condenser capacity). "vapour_compression" rates them with a
+    single stage on the best of ``HPR_REFRIGERANTS`` within the HPR cycle
+    limits, and prices the whole machine with the HPR service's installed
+    capital.
 
     ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened
@@ -121,6 +148,9 @@ class RetrofitSettings:
     enhancement_area_cost: float = 0.0
     enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None
     pressure_drop_allowances: Mapping[str, float] | None = None
+    repiping_cost: float = 0.0
+    heat_pump_cycle: str | None = None
+    heat_pump_cost: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -130,6 +160,8 @@ class _Move:
     match: NewMatch | None = None
     splits: tuple[str, ...] = ()
     utility_id: str | None = None
+    repiped: tuple[str, ...] = ()
+    heat_pump: HeatPumpCandidate | None = None
 
 
 @dataclass(frozen=True)
@@ -164,6 +196,11 @@ def run_retrofit_search(
     if settings.strategy not in STRATEGIES:
         raise ValueError(
             f"strategy must be one of {STRATEGIES}; got {settings.strategy!r}."
+        )
+    if settings.heat_pump_cycle not in HEAT_PUMP_CYCLES:
+        raise ValueError(
+            f"heat_pump_cycle must be one of {HEAT_PUMP_CYCLES}; got "
+            f"{settings.heat_pump_cycle!r}."
         )
     fraction = settings.max_added_area_fraction
     if fraction is not None and not (math.isfinite(fraction) and fraction >= 0.0):
@@ -298,14 +335,22 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             )
     for network, move in _structural_steps(parent, settings, evaluator):
         yield replace(state, network=network, moves=state.moves + (move,))
-        if not settings.new_utility_units:
+        if not settings.new_utility_units or move.kind == "heat_pump":
             continue
         for utility in new_utility_candidates(network, **evaluator.utility_axes):
             utility_id = _new_utility_id(network, utility)
             yield replace(
                 state,
                 network=apply_new_utility(network, utility, utility_id),
-                moves=state.moves + (replace(move, utility_id=utility_id),),
+                moves=state.moves
+                + (
+                    replace(
+                        move,
+                        utility_id=utility_id,
+                        # Each stream is repiped (and charged) once.
+                        repiped=tuple(dict.fromkeys(move.repiped + (utility.stream,))),
+                    ),
+                ),
             )
 
 
@@ -338,10 +383,12 @@ def _within_pressure_drop(
 
 
 def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
-    """The screened new matches and, with a ``relocation_cost``, the
-    relocations from ``parent``, each as ``(network, move)``."""
+    """The screened new matches, the screened heat pumps (with a
+    ``heat_pump_cost``) and, with a ``relocation_cost``, the relocations
+    from ``parent``, each as ``(network, move)``."""
 
     network = parent.state.network
+    yield from _heat_pump_steps(parent, settings, evaluator)
     matches = screen_new_matches(
         parent.solved,
         evaluator.ends,
@@ -350,7 +397,13 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
     )
     for match in matches:
         exchanger_id = _new_id(network, match)
-        move = _Move("new_match", exchanger_id, match, new_splits(network, match))
+        move = _Move(
+            "new_match",
+            exchanger_id,
+            match,
+            new_splits(network, match),
+            repiped=(match.hot, match.cold),
+        )
         yield apply_new_match(network, match, exchanger_id), move
     if settings.relocation_cost is None:
         return
@@ -364,8 +417,75 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
                 )
             }
         )
-        move = _Move("relocation", unit, match, new_splits(remaining, match))
+        move = _Move(
+            "relocation",
+            unit,
+            match,
+            new_splits(remaining, match),
+            repiped=_relocation_repiping(network, unit, match),
+        )
         yield apply_relocation(network, unit, match), move
+
+
+def _heat_pump_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
+    """The ``new_match_candidates`` heat pumps that could relieve the most
+    utility in ``parent``, each not yet installed, as ``(network, move)``:
+    the evaporator added at its hot stream's end, the condenser at its cold
+    stream's."""
+
+    network = parent.state.network
+    installed = {str(e.source_stream) for e in network.exchangers}
+    for candidate in screen_heat_pumps(
+        parent.solved,
+        [c for c in evaluator.heat_pumps if condenser_name(c) not in installed],
+        limit=settings.new_match_candidates,
+    ):
+        evaporator = NewUtility(candidate.hot, evaporator_name(candidate), False)
+        evaporator_id = _new_utility_id(network, evaporator)
+        piped = apply_new_utility(network, evaporator, evaporator_id)
+        condenser = NewUtility(candidate.cold, condenser_name(candidate), True)
+        condenser_id = _new_utility_id(piped, condenser)
+        yield (
+            apply_new_utility(piped, condenser, condenser_id),
+            _Move(
+                "heat_pump",
+                evaporator_id,
+                utility_id=condenser_id,
+                repiped=(candidate.hot, candidate.cold),
+                heat_pump=candidate,
+            ),
+        )
+
+
+def _heat_pump_links(state: _State, structure, ids) -> tuple:
+    """Each heat pump of ``state`` as (evaporator, condenser, COP), the two
+    by index among ``structure``'s utility exchangers (``ids`` names each
+    slot)."""
+
+    slot = {
+        exchanger_id: index
+        for (kind, index), exchanger_id in zip(structure.slots, ids)
+        if kind == "utility"
+    }
+    return tuple(
+        (slot[m.exchanger_id], slot[m.utility_id], m.heat_pump.cop)
+        for m in state.moves
+        if m.kind == "heat_pump"
+    )
+
+
+def _relocation_repiping(
+    network: HeatExchangerNetwork, unit: str, match: NewMatch
+) -> tuple[str, ...]:
+    """The streams moving ``unit`` to ``match`` repipes: those it leaves
+    and those it joins, less any it stays on in the same stage."""
+
+    old = next(e for e in network.exchangers if e.exchanger_id == unit)
+    before = (str(old.source_stream), str(old.sink_stream))
+    after = (match.hot, match.cold)
+    in_place = not match.new_stage and match.stage == old.stage
+    kept = set(before).intersection(after) if in_place else set()
+    return tuple(s for s in dict.fromkeys(before + after) if s not in kept)
 
 
 def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
@@ -516,6 +636,48 @@ class _Evaluator:
             "hot_utilities": tuple(self.names[n] for n in axes["hot_utilities"]),
             "cold_utilities": tuple(self.names[n] for n in axes["cold_utilities"]),
         }
+        # Heat pumps add their condensers and evaporators as utilities,
+        # after the network's own (which new utility exchangers draw on).
+        self.heat_pumps: list[HeatPumpCandidate] = []
+        self.cycle_settings = _cycle_settings(config.hpr)
+        if settings.heat_pump_cycle is not None:
+            rating = (
+                carnot_rating(float(config.hpr.eta_ii_carnot))
+                if settings.heat_pump_cycle == "carnot"
+                else vapour_compression_rating(
+                    list(config.hpr.normalised_refrigerants), **self.cycle_settings
+                )
+            )
+            # A pump whose condenser or evaporator would take a name the
+            # problem already uses is left out, so that name keeps resolving
+            # to the problem's own stream or utility.
+            taken = [
+                str(key)
+                for axis in (
+                    "hot_process_streams",
+                    "cold_process_streams",
+                    "hot_utilities",
+                    "cold_utilities",
+                )
+                for key in axes[axis]
+            ]
+            self.heat_pumps = [
+                candidate
+                for candidate in heat_pump_candidates(
+                    self.ends, approach=settings.approach, rating=rating
+                )
+                if not any(
+                    key == name or key.endswith("." + name)
+                    for name in (condenser_name(candidate), evaporator_name(candidate))
+                    for key in taken
+                )
+            ]
+            price_scale, _capital = annual_cost_scales(config.costing)
+            self.arrays = with_heat_pump_utilities(
+                self.arrays,
+                self.heat_pumps,
+                float(config.costing.hpr_ele_price) * price_scale,
+            )
         self.base_utility_cost: float | None = None
         self.evaluations = 0
         self._count_lock = threading.Lock()
@@ -567,6 +729,7 @@ class _Evaluator:
                 enlargeable_utilities=enlargeable["utility"],
                 enhanced_recovery=enhanced["recovery"],
                 enhanced_utilities=enhanced["utility"],
+                heat_pumps=_heat_pump_links(state, structure, ids),
             ),
         )
         # A move can leave a structure the model cannot build (streams
@@ -637,6 +800,15 @@ class _Evaluator:
                 )
             )
             metrics = solved.summary_metrics
+            # Heat pump condensers and evaporators are not utility use.
+            pumped = [
+                (
+                    self._weighted(results[m.utility_id]),
+                    self._weighted(results[m.exchanger_id]),
+                )
+                for m in state.moves
+                if m.kind == "heat_pump"
+            ]
             utility_cost = float(model.utility_cost_value)
             if self.base_utility_cost is None:
                 self.base_utility_cost = utility_cost
@@ -658,8 +830,10 @@ class _Evaluator:
             design = HeatExchangerNetworkRetrofitDesign(
                 modifications=modifications,
                 network=solved,
-                hot_utility=float(metrics["hot_utility_load"]),
-                cold_utility=float(metrics["cold_utility_load"]),
+                hot_utility=float(metrics["hot_utility_load"])
+                - sum(condenser for condenser, _evaporator in pumped),
+                cold_utility=float(metrics["cold_utility_load"])
+                - sum(evaporator for _condenser, evaporator in pumped),
                 utility_cost=utility_cost,
                 annual_savings=savings,
                 capital_cost=capital,
@@ -673,6 +847,16 @@ class _Evaluator:
             )
         finally:
             model.cleanup()
+
+    def _weighted(self, result) -> float:
+        """``result``'s duty, period-weighted (kW)."""
+
+        weights = [float(w) for w in self.arrays.arrays["period_weights"]]
+        total = sum(weights) or 1.0
+        return (
+            sum(w * p.duty for w, p in zip(weights, result.periods, strict=True))
+            / total
+        )
 
     def map(self, solve, states: list[_State]) -> list:
         """``solve`` applied to each of ``states``, in order: on
@@ -726,12 +910,19 @@ class _Evaluator:
             min_approach_temperature=self.settings.approach,
         )
         structure = fixed_network_structure(request, self.arrays.axis_maps)
+        exchangers = _structural_exchangers(state.network)
+        ids = [exchangers[p].exchanger_id for p in structure.positions]
         try:
             model = FixedStructureModel(
                 name="retrofit-ceiling",
                 solver=self.solver,
                 solver_arrays=self.arrays,
-                spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
+                spec=replace(
+                    structure.spec,
+                    recovery_areas={},
+                    utility_areas={},
+                    heat_pumps=_heat_pump_links(state, structure, ids),
+                ),
                 minimisation_goal="utility cost",
                 default_approach=self.settings.approach,
                 tol=self.tol,
@@ -887,6 +1078,18 @@ class _Evaluator:
         splits = settings.split_cost * len(move.splits)
         if move.kind == "relocation":
             added, fixed = 0.0, settings.relocation_cost + splits
+        elif move.kind == "heat_pump" and move.heat_pump.refrigerant is not None:
+            # The HPR machine capital covers the exchangers too.
+            added = 0.0
+            fixed = vapour_compression_capital(
+                move.heat_pump,
+                utility.max_duty,
+                (float(result.added_area), float(utility.added_area)),
+                **self.cycle_settings,
+            )
+        elif move.kind == "heat_pump":
+            added = float(result.added_area)
+            fixed = settings.heat_pump_cost * utility.max_duty
         elif move.kind == "enhancement":
             added = 0.0
             fixed = (
@@ -903,9 +1106,30 @@ class _Evaluator:
                 else settings.area_addition_cost
             )
         utility_area = 0.0 if utility is None else float(utility.added_area)
-        if utility is not None:
+        machine = move.heat_pump is not None and move.heat_pump.refrigerant is not None
+        if utility is not None and move.kind != "heat_pump":
             fixed += settings.new_unit_cost
+        fixed += settings.repiping_cost * len(move.repiped)
         match = move.match
+        pump = move.heat_pump
+        if pump is not None:
+            return HeatExchangerNetworkRetrofitModification(
+                kind=move.kind,
+                exchanger_id=move.exchanger_id,
+                added_area=float(result.added_area),
+                fixed_cost=float(fixed),
+                area_cost=0.0
+                if machine
+                else self._area_cost(added) + self._area_cost(utility_area),
+                hot_stream=pump.hot,
+                cold_stream=pump.cold,
+                utility_exchanger_id=move.utility_id,
+                utility_area=utility_area,
+                repiped_streams=move.repiped,
+                heat_pump_cop=pump.cop,
+                heat_pump_capacity=utility.max_duty,
+                heat_pump_refrigerant=pump.refrigerant,
+            )
         return HeatExchangerNetworkRetrofitModification(
             kind=move.kind,
             exchanger_id=move.exchanger_id,
@@ -919,12 +1143,32 @@ class _Evaluator:
             new_splits=move.splits,
             utility_exchanger_id=move.utility_id,
             utility_area=utility_area,
+            repiped_streams=move.repiped,
         )
 
     def _area_cost(self, area: float) -> float:
         """Installed cost ($) of ``area`` m2 of new area."""
 
         return self.area_coeff * area**self.area_exp if area > 0.0 else 0.0
+
+
+def _cycle_settings(hpr) -> dict:
+    """The HPR service's vapour compression settings: the approach,
+    compressor and motor efficiencies and cycle limits (pressures in Pa)."""
+
+    return {
+        "dtcont": float(hpr.dt_cont),
+        "eta_comp": compressor_efficiency_model(hpr.compressor_model, hpr.eta_comp),
+        "eta_motor": float(hpr.eta_motor),
+        "limits": CycleLimits(
+            max_discharge_superheat=hpr.max_discharge_superheat,
+            max_pressure_ratio=hpr.max_pressure_ratio,
+            max_discharge_pressure=hpr.max_discharge_pressure * 1e5,
+            max_discharge_pressure_co2=hpr.max_discharge_pressure_co2 * 1e5,
+            min_suction_pressure=hpr.screen_min_suction_pressure * 1e5,
+            min_lift=float(hpr.min_stage_lift),
+        ),
+    }
 
 
 def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]:

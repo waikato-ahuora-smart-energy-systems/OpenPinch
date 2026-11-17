@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import threading
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
@@ -33,6 +35,30 @@ _DEPTH_OPTIONS = (
 # Design bases synthesised on a derived case, whose networks are then fitted
 # to every period.
 _FITTED_BASES = ("median", "period")
+
+
+def _rounded(value):
+    if isinstance(value, float):
+        return float(f"{value:.9g}")
+    if isinstance(value, dict):
+        return {key: _rounded(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_rounded(item) for item in value]
+    return value
+
+
+def _finalise_key(network) -> str:
+    """What fitting and rating ``network`` depend on, as a lookup key.
+
+    The task labels (``task_id`` and the ``dt_cont_multiplier`` summary
+    metric) are left out: neither fit nor rating reads them. Values are
+    rounded to 9 significant digits, since solves of one network in
+    different tasks agree to about 1e-15 relative, not bit for bit.
+    """
+    data = network.model_dump(mode="json")
+    data.pop("task_id", None)
+    data.get("summary_metrics", {}).pop("dt_cont_multiplier", None)
+    return json.dumps(_rounded(data), sort_keys=True)
 
 
 class UtilityChoiceError(ValueError):
@@ -511,17 +537,33 @@ class _DesignAccessor:
         source: dict[str, Any] = {"current": {}}
         finalised: dict[int, tuple] = {}
         failures: list[Exception] = []
+        # Each distinct network is fitted and rated once: searches offer the
+        # same network again from other tasks. ``None`` marks a failed one.
+        finished: dict[str, tuple | None] = {}
+        # Pooled runs offer networks from a hand-off thread and the calling
+        # thread at once; one finalises at a time so each key is done once.
+        finishing = threading.Lock()
 
         def finalise(outcome):
-            try:
-                view, fitted = self._finalise_network(
-                    outcome.network, fit=fit, margin=margin, hens=hens, **call
-                )
-            except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
-                raise
-            except (ValueError, RuntimeError) as exc:
-                failures.append(exc)
+            key = _finalise_key(outcome.network)
+            with finishing:
+                if key not in finished:
+                    try:
+                        finished[key] = self._finalise_network(
+                            outcome.network, fit=fit, margin=margin, hens=hens, **call
+                        )
+                    except (
+                        MissingSynthesisDependencyError,
+                        MissingSynthesisSolverError,
+                    ):
+                        raise
+                    except (ValueError, RuntimeError) as exc:
+                        failures.append(exc)
+                        finished[key] = None
+                done = finished[key]
+            if done is None:
                 return None
+            view, fitted = done
             network = view.selected_network
             final = outcome.model_copy(
                 update={
@@ -1057,6 +1099,9 @@ class _DesignAccessor:
         enhancement_area_cost: float = 0.0,
         enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None,
         pressure_drop_allowances: Mapping[str, float] | None = None,
+        repiping_cost: float = 0.0,
+        heat_pump_cycle: str | None = None,
+        heat_pump_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1111,7 +1156,25 @@ class _DesignAccessor:
         is on and the pressure drop, kPa, it adds) and
         ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa,
         it can take) keep the inserts of every design within each stream's
-        allowance.
+        allowance. ``repiping_cost`` ($ per stream) adds the cost of each
+        stream whose piping a new match, relocation or new end heater or
+        cooler changes: both streams of a new match, the streams a relocated
+        exchanger leaves and joins (not one it stays on in the same stage),
+        and the stream of a new heater or cooler. A relocated exchanger may
+        also take added area, as an area addition. With ``heat_pump_cycle``
+        (None, the default: no heat pumps) a step may add a heat pump: an
+        evaporator at the end of a hot stream, evaporating
+        ``min_approach_temperature`` below its target, and a condenser at the
+        end of a cold stream, condensing as far above its target, rated by
+        the HPR service. "carnot" uses its Carnot cycle
+        (``HPR_ETA_II_CARNOT``), pricing the compressor and package at
+        ``heat_pump_cost`` ($ per kW of condenser capacity) and the two
+        exchangers' area by the area law. "vapour_compression" solves a
+        single stage on the best of ``HPR_REFRIGERANTS`` within the HPR cycle
+        limits (the other ``HPR_*`` cycle options apply) and prices the
+        machine with the HPR service's installed capital. The work costs
+        ``COSTING_HPR_ELE_PRICE``; the heat pump's duties are not counted as
+        utility.
 
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked
@@ -1205,6 +1268,9 @@ class _DesignAccessor:
                         if pressure_drop_allowances is None
                         else {k: float(v) for k, v in pressure_drop_allowances.items()}
                     ),
+                    repiping_cost=float(repiping_cost),
+                    heat_pump_cycle=heat_pump_cycle,
+                    heat_pump_cost=float(heat_pump_cost),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

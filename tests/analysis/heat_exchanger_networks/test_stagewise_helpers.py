@@ -9,6 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+    alpha as base_alpha,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import (
     _set_value,
 )
@@ -80,6 +83,7 @@ class _FloatOnly:
 def test_stagewise_setup_preserves_solver_construction_order():
     model = StageWiseModel.__new__(StageWiseModel)
     model.framework = "TDM"
+    model.values_only = False
     calls = []
     ordered_steps = (
         "set_blank_input_parameters",
@@ -1059,6 +1063,39 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     assert target.alpha == []
 
 
+def test_update_with_best_model_adopts_the_candidates_own_alpha():
+    # A candidate's alpha is solved only when it is ranked, so an unranked
+    # winner has none yet: the owner takes the alpha solved from the
+    # candidate's values, not one solved later from its own.
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.z_allowed = [[[1]]]
+    target.alpha = []
+    target.set_initial_values_for_variables = lambda best: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        _ranking_alpha_pending=True,
+        get_alpha_values=lambda: [[[[0.25]]]],
+        I=1,
+        J=1,
+        S=1,
+        dqda=[[[2.0]]],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+    )
+
+    _update_with_best_model(target, best)
+
+    assert target.alpha == [[[[0.25]]]]
+
+
 def test_update_with_best_model_keeps_solved_cost_values_not_expressions():
     # Copying a Pyomo expression copies the whole model behind it; verify()
     # only reads the solved values, so those are what the owner keeps.
@@ -1445,6 +1482,50 @@ def test_post_process_reads_each_stream_temperature_once(monkeypatch):
     assert max(value.reads for value in counted) <= 4
 
 
+def test_post_process_leaves_the_alpha_solve_to_benefit_ranking(monkeypatch):
+    # Only evolution's benefit ranking reads alpha, and most solved models
+    # (pinch design variants, rejected evolution candidates) are never
+    # ranked: the alpha solve was over half of pulp mill post-processing.
+    model = _built_two_stage_model(monkeypatch)
+    solves = []
+    solve = base_alpha._solve_flow_on_system
+    monkeypatch.setattr(
+        base_alpha,
+        "_solve_flow_on_system",
+        lambda owner: solves.append(owner) or solve(owner),
+    )
+
+    model._get_multiperiod_post_process()
+    assert solves == []
+
+    model.get_max_benefit_HX_candidates(1)
+    model.get_lowest_benefit_HX_candidates(1)
+    assert solves == [model]
+
+
+def test_a_build_looks_up_each_recovery_approach_once_per_step(monkeypatch):
+    # The approach depends on the period and the pair, not the stage, but the
+    # theta grids looked it up four times per stage slot: about 1 s of each
+    # pulp mill design's amalgamated builds alone.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        approach as base_approach,
+    )
+
+    lookups = []
+    approach = base_approach._recovery_approach_temperature
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda owner, *pair: lookups.append(pair) or approach(owner, *pair),
+    )
+
+    _built_two_stage_model(monkeypatch)
+
+    # Once each for the duty bounds, the big-M bounds and the theta grids,
+    # whatever the number of stages.
+    assert max(lookups.count(pair) for pair in lookups) == 3
+
+
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
 def test_a_values_only_model_has_the_same_variables_and_no_constraints(
     monkeypatch, non_isothermal_model
@@ -1470,6 +1551,35 @@ def test_a_values_only_model_has_the_same_variables_and_no_constraints(
     assert numbers(values_only) == numbers(full)
     assert list(values_only.m.model.component_data_objects(pyo.Constraint)) == []
     assert values_only.m.objective is None
+
+
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_a_values_only_model_builds_no_constraint_expressions(
+    monkeypatch, non_isothermal_model
+):
+    # A values-only model keeps no constraints, so building their expressions
+    # only to drop them was most of building an amalgamated network.
+    from OpenPinch.analysis.heat_exchanger_networks.solver.pyomo_model import (
+        PyomoModel,
+    )
+
+    built = []
+    for name in ("Equation", "Equations"):
+        method = getattr(PyomoModel, name)
+        monkeypatch.setattr(
+            PyomoModel,
+            name,
+            lambda self, expressions, method=method: (
+                built.append(self) if not self.adds_constraints else None,
+                method(self, expressions),
+            )[1],
+        )
+
+    _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model, values_only=True
+    )
+
+    assert built == []
 
 
 def test_a_values_only_model_cannot_be_solved(monkeypatch):

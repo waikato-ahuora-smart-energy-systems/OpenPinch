@@ -2,7 +2,8 @@
 
 The fake keeps the real request building, structure and screen, and stands
 in for the NLP only: a design's utility cost falls by $100,000/y per
-recovery match and $20,000/y per enlarged or enhanced unit, every installed unit needs
+recovery match, $150,000/y per heat pump and $20,000/y per enlarged or
+enhanced unit, every exchanger carries 100 kW, every installed unit needs
 its whole widened area (so it is at its cap), and every new unit gets 25 m2.
 """
 
@@ -71,6 +72,7 @@ class _Backend:
         self.area_values = lambda spec: None
         self.unbuildable = lambda spec: False
         self.rating_allowances = lambda spec: None
+        self.heat_pumps: list = []
 
 
 @pytest.fixture
@@ -98,10 +100,12 @@ def fake_solver(monkeypatch) -> _Backend:
             spec = self.spec
             enlarged = len(spec.enlargeable_recovery) + len(spec.enlargeable_utilities)
             enhanced = len(spec.enhanced_recovery) + len(spec.enhanced_utilities)
+            backend.heat_pumps.append((spec.utilities, spec.heat_pumps))
             self.utility_cost_value = (
                 1_000_000.0
                 - 100_000.0 * len(spec.recovery)
                 - 20_000.0 * (enlarged + enhanced)
+                - 150_000.0 * len(spec.heat_pumps)
             )
             self.area_values = backend.area_values(spec)
             self.rating_allowances = backend.rating_allowances(spec)
@@ -984,3 +988,310 @@ def test_verification_uses_the_models_rating_allowance_for_installed_units(
 
     assert verified[0]["E3"] == pytest.approx(1008.5 * 1.02 * 1.1)
     assert verified[0]["E7"] == pytest.approx(246.75 * 1.02 * 1.1)
+
+
+@pytest.mark.parametrize("strategy", ["stepwise", "structure"])
+@pytest.mark.parametrize("kind", ["new_match", "relocation"])
+def test_repiping_cost_prices_every_stream_a_move_repipes(fake_solver, strategy, kind):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    # A new match repipes both its streams, and a paired end heater or
+    # cooler its stream. A relocation repipes the streams it leaves and
+    # joins; a stream it stays on, in the same stage, keeps its piping.
+    if kind == "relocation":
+        # New matches and added area fail, so the best step is a relocation.
+        fake_solver.fail = lambda spec: (
+            len(spec.recovery) > 4
+            or bool(spec.enlargeable_recovery or spec.enlargeable_utilities)
+        )
+    existing = _existing_network()
+    before = {e.exchanger_id: e for e in existing.exchangers}
+    repiping = 2_000.0
+    result = run_retrofit_search(
+        _problem(),
+        existing,
+        RetrofitSettings(
+            strategy=strategy,
+            max_modifications=1,
+            relocation_cost=5_000.0,
+            new_utility_units=True,
+            repiping_cost=repiping,
+            **COSTS,
+        ),
+    )
+
+    design = result.frontier[1]
+    moves = [m for m in design.modifications if m.kind == kind]
+    assert len(moves) == 1
+    for m in design.modifications:
+        if m.kind in {"area_addition", "enhancement"}:
+            assert m.repiped_streams == ()
+    m = moves[0]
+    expected = {m.hot_stream, m.cold_stream}
+    if kind == "relocation":
+        old = before[m.exchanger_id]
+        kept = (
+            {old.source_stream, old.sink_stream}.intersection(expected)
+            if not m.new_stage and m.stage == old.stage
+            else set()
+        )
+        expected = (expected | {old.source_stream, old.sink_stream}) - kept
+    fixed = {"new_match": COSTS["new_unit_cost"], "relocation": 5_000.0}[kind]
+    fixed += COSTS["split_cost"] * len(m.new_splits)
+    if m.utility_exchanger_id is not None:
+        utility = next(
+            e
+            for e in design.network.exchangers
+            if e.exchanger_id == m.utility_exchanger_id
+        )
+        heater = utility.kind is HeatExchangerKind.HOT_UTILITY
+        expected.add(utility.sink_stream if heater else utility.source_stream)
+        fixed += COSTS["new_unit_cost"]
+    assert set(m.repiped_streams) == expected
+    assert len(m.repiped_streams) == len(expected)
+    assert m.fixed_cost == pytest.approx(fixed + repiping * len(expected))
+
+
+def test_a_paired_utility_on_a_stream_the_match_repipes_is_charged_once(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # Only a new match paired with a new end utility on one of its own
+    # streams solves (a new cooler on H3, which has none, with an H3 match).
+    def shares_a_stream(spec) -> bool:
+        match, utility = spec.recovery[-1], spec.utilities[-1]
+        stream = match.hot if utility.side == "cold" else match.cold
+        return len(spec.utilities) == 4 and utility.stream == stream
+
+    fake_solver.fail = lambda spec: len(spec.recovery) > 4 and not shares_a_stream(spec)
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=50,
+            ceiling_candidates=50,
+            new_utility_units=True,
+            repiping_cost=1_000.0,
+            **COSTS,
+        ),
+    )
+
+    (match,) = [m for m in result.frontier[1].modifications if m.kind == "new_match"]
+    assert match.utility_exchanger_id is not None
+    assert sorted(match.repiped_streams) == sorted(
+        {match.hot_stream, match.cold_stream}
+    )
+    fixed = 2 * COSTS["new_unit_cost"] + COSTS["split_cost"] * len(match.new_splits)
+    assert match.fixed_cost == pytest.approx(fixed + 2 * 1_000.0)
+
+
+def test_design_retrofit_takes_the_repiping_cost(fake_solver):
+    result = _problem().design.retrofit(
+        _existing_network(),
+        max_modifications=1,
+        new_match_candidates=1,
+        new_unit_cost=0.0,
+        repiping_cost=3_000.0,
+    )
+
+    (match,) = [m for m in result.frontier[1].modifications if m.kind == "new_match"]
+    assert len(match.repiped_streams) == 2
+    assert match.fixed_cost == pytest.approx(6_000.0)
+
+
+@pytest.mark.parametrize("strategy", ["stepwise", "structure"])
+def test_a_heat_pump_step_is_priced_by_its_capacity_and_exchanger_area(
+    fake_solver, strategy
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # The existing network heats only C2, so a heat pump delivers there,
+    # from H1 or H2, which have coolers. Its evaporator and condenser carry
+    # the fake's 100 kW and 25 m2 each.
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            strategy=strategy,
+            max_modifications=1,
+            heat_pump_cycle="carnot",
+            heat_pump_cost=300.0,
+            repiping_cost=1_000.0,
+            **COSTS,
+        ),
+    )
+
+    design = result.frontier[1]
+    (pump,) = [m for m in design.modifications if m.kind == "heat_pump"]
+    assert (pump.hot_stream, pump.cold_stream) in {("H1", "C2"), ("H2", "C2")}
+    assert pump.repiped_streams == (pump.hot_stream, pump.cold_stream)
+    assert pump.heat_pump_capacity == pytest.approx(100.0)
+    assert pump.heat_pump_cop > 1.0
+    assert pump.fixed_cost == pytest.approx(300.0 * 100.0 + 2 * 1_000.0)
+    assert (pump.added_area, pump.utility_area) == (NEW_UNIT_AREA, NEW_UNIT_AREA)
+    assert pump.area_cost == pytest.approx(AREA_COST * 2 * NEW_UNIT_AREA)
+    exchangers = {e.exchanger_id: e for e in design.network.exchangers}
+    evaporator = exchangers[pump.exchanger_id]
+    condenser = exchangers[pump.utility_exchanger_id]
+    assert (evaporator.source_stream, condenser.sink_stream) == (
+        pump.hot_stream,
+        pump.cold_stream,
+    )
+    # The heat pump's condenser and evaporator are not hot and cold utility.
+    assert design.hot_utility == pytest.approx(design.utility_cost / 100.0 - 100.0)
+    assert design.cold_utility == pytest.approx(design.utility_cost / 200.0 - 100.0)
+    # The model links the pair's duties by the COP.
+    linked = {
+        (utilities[evaporator].side, utilities[condenser].side, cop)
+        for utilities, pumps in fake_solver.heat_pumps
+        for evaporator, condenser, cop in pumps
+    }
+    assert ("cold", "hot", pump.heat_pump_cop) in linked
+
+
+def test_design_retrofit_rates_carnot_heat_pumps_with_the_hpr_efficiency(fake_solver):
+    def pump(eta_ii: float):
+        result = _problem().design.retrofit(
+            _existing_network(),
+            max_modifications=1,
+            heat_pump_cycle="carnot",
+            heat_pump_cost=300.0,
+            options={"HPR_ETA_II_CARNOT": eta_ii},
+        )
+        (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]
+        return pump
+
+    low, high = pump(0.5), pump(0.6)
+
+    # The HPR Carnot heating COP is 1 + eta_II T_evap / lift.
+    assert (low.hot_stream, low.cold_stream) == (high.hot_stream, high.cold_stream)
+    assert high.heat_pump_cop - 1.0 == pytest.approx(
+        1.2 * (low.heat_pump_cop - 1.0), rel=1e-12
+    )
+    assert low.fixed_cost == pytest.approx(300.0 * 100.0)
+
+
+def test_an_unknown_heat_pump_cycle_is_an_error(fake_solver):
+    with pytest.raises(ValueError, match="heat_pump_cycle.*brayton"):
+        _problem().design.retrofit(_existing_network(), heat_pump_cycle="brayton")
+    assert fake_solver.solved == 0
+
+
+def test_a_real_fluid_heat_pump_is_priced_by_the_hpr_machine_capital(fake_solver):
+    from OpenPinch.analysis.heat_pumps.common.capital import (
+        CompressorDuty,
+        MachineComponents,
+        installed_capital,
+    )
+    from OpenPinch.analysis.heat_pumps.cycles.limits import CycleLimits
+    from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_cycle import (
+        VapourCompressionCycle,
+    )
+
+    # Ciric and Floudas heats only C2, to 538 K: a single water stage lifts
+    # that far only with the pressure ratio and suction limits relaxed. New
+    # matches fail, so the step is a heat pump, however dear its machine.
+    fake_solver.fail = lambda spec: len(spec.recovery) > 4
+    options = {
+        "HPR_REFRIGERANTS": ["water"],
+        "HPR_MAX_PRESSURE_RATIO": 200.0,
+        "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.1,
+    }
+    result = _problem().design.retrofit(
+        _existing_network(),
+        max_modifications=1,
+        heat_pump_cycle="vapour_compression",
+        heat_pump_cost=300.0,
+        repiping_cost=1_000.0,
+        options=options,
+    )
+
+    design = result.frontier[1]
+    (pump,) = [m for m in design.modifications if m.kind == "heat_pump"]
+    # The HPR service's spelling of the fluid.
+    assert pump.heat_pump_refrigerant == "WATER"
+    # The machine (compressor, motor, evaporator and condenser) at its 100 kW
+    # capacity, as the HPR service prices it; heat_pump_cost is for Carnot.
+    hot = {"H1": 350.15, "H2": 361.15}[pump.hot_stream] - 1.0
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        hot - 273.15,
+        538.15 + 1.0 - 273.15,
+        dtcont=1.0,
+        eta_comp=0.7,
+        eta_motor=0.95,
+        refrigerant="water",
+        Q_heat=100.0,
+        limits=CycleLimits(
+            max_pressure_ratio=200.0,
+            max_discharge_superheat=50.0,
+            max_discharge_pressure=60e5,
+            max_discharge_pressure_co2=140e5,
+            min_suction_pressure=0.1e5,
+            min_lift=5.0,
+        ),
+    )
+    machine = MachineComponents(
+        compressors=(
+            CompressorDuty("water", cycle.suction_volume_flow, cycle.shaft_power),
+        ),
+        exchanger_areas=(NEW_UNIT_AREA, NEW_UNIT_AREA),
+    )
+    assert pump.heat_pump_cop == pytest.approx(cycle.COP_h, rel=1e-9)
+    assert pump.fixed_cost == pytest.approx(installed_capital(machine) + 2_000.0)
+    assert pump.area_cost == 0.0
+
+
+def test_a_utility_named_like_a_heat_pump_keeps_its_own_properties(fake_solver):
+    # The case's hot utility carries the name the H1 -> C2 heat pump's
+    # condenser would take; the existing heater must still draw on it.
+    name = "HP H1->C2:condenser"
+    data = json.loads(read_sample_case(CASE))
+    for utility in data["utilities"]:
+        if utility["type"] == "Hot":
+            utility["name"] = name
+    existing = _existing_network()
+    existing = existing.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"source_stream": name})
+                if e.source_stream == "HU"
+                else e
+                for e in existing.exchangers
+            )
+        }
+    )
+
+    PinchProblem(data).design.retrofit(
+        existing, max_modifications=1, heat_pump_cycle="carnot"
+    )
+
+    baseline, _pumps = fake_solver.heat_pumps[0]
+    assert [u.utility for u in baseline if u.side == "hot"] == [0]
+
+
+def test_a_period_named_like_a_heat_pump_leaves_the_heat_pump_offered(fake_solver):
+    # Only stream and utility names can clash with a heat pump's utilities;
+    # a period, stage or segment of the same name does not.
+    def pump(problem: PinchProblem):
+        result = problem.design.retrofit(
+            _existing_network(), max_modifications=1, heat_pump_cycle="carnot"
+        )
+        (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]
+        return pump.hot_stream, pump.cold_stream
+
+    hot, cold = pump(_problem())
+    named = _problem()
+    named.update_options({"PROBLEM_PERIOD_IDS": [f"HP {hot}->{cold}:condenser"]})
+
+    assert pump(named) == (hot, cold)
