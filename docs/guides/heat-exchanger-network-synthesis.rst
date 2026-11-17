@@ -645,6 +645,17 @@ New utility exchangers
    exchanger carries no duty is dropped. On the Ciric and Floudas case a
    cooler on H3 lets a new H1-C2 match in a new third stage save about
    $836k/y instead of $222k/y alone.
+Heat transfer enhancement
+   ``enhancement_factors`` maps an existing exchanger's id to the factor
+   its heat transfer coefficient can be raised by, tube inserts for
+   example, as limited by its geometry. An enhanced exchanger works as one
+   with its area times the factor. Each costs ``enhancement_cost`` plus
+   ``enhancement_area_cost`` per m2 of its installed area, and adds no area.
+   The stepwise search tries enhancing each exchanger at its area limit as
+   a step; the default search, after sizing a structure, sizes it again
+   with the exchangers it would enlarge enhanced where they have a factor,
+   and keeps the better design. Pressure drop is not modelled: leave out
+   exchangers whose stream cannot take more.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
@@ -689,6 +700,21 @@ Akpomiemie and Smith (2018), simplified crude preheat train
    stepwise search, counting each enlarged exchanger as a step, needs seven
    steps and every new-match position (811 solves), and stops at 20.5 %
    after six with four candidates.
+
+   Enhancement (Section 5.1, Tables 5, 6 and 8): with the paper's factors
+   for E5 (U from 0.325 to 0.448) and E1 (0.517 to 0.669), inserts at $500
+   plus $10/m2 and no other changes allowed, the stepwise search enhances E5
+   and then E1, as the paper does, and reaches 13,545 kW against its
+   13,661.52 kW (5.7 % saved from the rated base against 5.5 %). The paper's
+   next candidate, E2, breaks the cold stream's pressure drop limit and is
+   left out. Combining enhancement with structural changes (Section 5.3),
+   with relocation at $10,000 and factors for every exchanger the paper
+   enhances: the first change becomes the paper's relocation of E7 with
+   five exchangers enhanced ($762k/y net against $621k/y without
+   enhancement), and at two changes enhancement cuts capital from $506k to
+   $346k and added area from 1,473 to 932 m2, raising the net benefit from
+   $740k/y to $934k/y. The paper reports about 65 % more retrofit profit
+   from the combination, under its own sizing and pressure drop limits.
 
 The default (structure-first) and stepwise searches compared (report costs; Smith's
 Table 5 costs at a 10 K approach):

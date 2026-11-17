@@ -48,7 +48,13 @@ Heat exchanger network synthesis
   utility they could cut at first order. With ``new_utility_units=True`` a
   change may come with the new end heater or cooler that frees the units it
   needs. ``max_added_area_fraction`` caps the area added to an existing
-  exchanger. ``HENS_MAX_PARALLEL`` runs each step's solves on threads.
+  exchanger. ``enhancement_factors``, ``enhancement_cost`` and
+  ``enhancement_area_cost`` add heat transfer enhancement (tube inserts)
+  of existing exchangers as a move, checked against Akpomiemie and Smith
+  (2018). With Ipopt the stepwise search adds area only on exchangers whose
+  area is worth something, from the solver's duals; the fixed-structure
+  model reports them as ``area_values`` and has a ``"utility cost"`` goal.
+  ``HENS_MAX_PARALLEL`` runs each step's solves on threads.
   Every design is checked as optimised duties are (approaches, heat
   balances, areas). The result's ``frontier`` gives the best design
   for each number of structural changes with savings, capital, payback and
