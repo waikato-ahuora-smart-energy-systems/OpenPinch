@@ -564,16 +564,24 @@ class _Evaluator:
                 enhanced_utilities=enhanced["utility"],
             ),
         )
-        model = FixedStructureModel(
-            name="retrofit",
-            solver=self.solver,
-            solver_arrays=self.arrays,
-            spec=structure.spec,
-            minimisation_goal="retrofit",
-            default_approach=settings.approach,
-            tol=self.tol,
-            solver_options=dict(self.solver_options),
-        )
+        # A move can leave a structure the model cannot build (streams
+        # with no utility exchanger whose loads cannot balance): drop it.
+        # The existing network's own error is the user's to see.
+        try:
+            model = FixedStructureModel(
+                name="retrofit",
+                solver=self.solver,
+                solver_arrays=self.arrays,
+                spec=structure.spec,
+                minimisation_goal="retrofit",
+                default_approach=settings.approach,
+                tol=self.tol,
+                solver_options=dict(self.solver_options),
+            )
+        except ValueError:
+            if not state.moves:
+                raise
+            return None
         # Read the solved values, then remove the model's run directory
         # (Couenne writes one per model) whether or not it is kept.
         try:
@@ -706,16 +714,20 @@ class _Evaluator:
             min_approach_temperature=self.settings.approach,
         )
         structure = fixed_network_structure(request, self.arrays.axis_maps)
-        model = FixedStructureModel(
-            name="retrofit-ceiling",
-            solver=self.solver,
-            solver_arrays=self.arrays,
-            spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
-            minimisation_goal="utility cost",
-            default_approach=self.settings.approach,
-            tol=self.tol,
-            solver_options=dict(self.solver_options),
-        )
+        try:
+            model = FixedStructureModel(
+                name="retrofit-ceiling",
+                solver=self.solver,
+                solver_arrays=self.arrays,
+                spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
+                minimisation_goal="utility cost",
+                default_approach=self.settings.approach,
+                tol=self.tol,
+                solver_options=dict(self.solver_options),
+            )
+        except ValueError:
+            # A structure the model cannot build has no ceiling (see evaluate).
+            return None
         try:
             model.optimise(print_output=False)
             if getattr(model, "mSuccess", 0) != 1:

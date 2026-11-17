@@ -69,6 +69,7 @@ class _Backend:
         self.solved = 0
         self.goals: dict[str, set[str]] = {}
         self.area_values = lambda spec: None
+        self.unbuildable = lambda spec: False
 
 
 @pytest.fixture
@@ -86,6 +87,8 @@ def fake_solver(monkeypatch) -> _Backend:
 
     class FakeModel:
         def __init__(self, *, spec, name, minimisation_goal, **_settings) -> None:
+            if backend.unbuildable(spec):
+                raise ValueError("streams H1 have no heater or cooler")
             self.spec = spec
             backend.goals.setdefault(name, set()).add(minimisation_goal)
 
@@ -899,3 +902,23 @@ def test_an_insert_is_rejected_once_a_relocation_takes_its_stream_away():
 
     assert search._within_pressure_drop({"E4"}, settings, network)
     assert not search._within_pressure_drop({"E4"}, settings, moved)
+
+
+@pytest.mark.parametrize("strategy", ["structure", "stepwise"])
+def test_a_structure_the_model_cannot_build_is_dropped(fake_solver, strategy):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # A move can leave streams with no utility exchanger whose loads cannot
+    # balance; the model refuses to build it. The search drops the move.
+    fake_solver.unbuildable = lambda spec: len(spec.recovery) > 4
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1, strategy=strategy, relocation_cost=5_000.0, **COSTS
+        ),
+    )
+
+    assert not any(
+        m.kind == "new_match" for d in result.frontier for m in d.modifications
+    )
