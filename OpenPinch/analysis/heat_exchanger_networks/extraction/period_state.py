@@ -84,6 +84,31 @@ def _approach_temperatures(
     return tuple(value for value in values if value is not None)
 
 
+def _recovery_duty(
+    q_values: Any,
+    q_values_by_period: Any,
+    *,
+    period_idx: int,
+    hot_index: int,
+    cold_index: int,
+    stage_index: int,
+    tolerance: float,
+) -> float:
+    """Return a recovery match's solved duty in one period, checked and clipped."""
+    duty_source = (
+        _index(
+            q_values_by_period,
+            period_idx,
+            hot_index,
+            cold_index,
+            stage_index,
+        )
+        if q_values_by_period is not None
+        else _index(q_values, hot_index, cold_index, stage_index)
+    )
+    return _normalized_solver_duty(duty_source, tolerance=tolerance)
+
+
 def _recovery_period_activity(
     solved_model: Any,
     *,
@@ -96,18 +121,15 @@ def _recovery_period_activity(
     tolerance: float,
 ) -> tuple[float, bool]:
     """Return a recovery match's duty in one period and whether it is active."""
-    duty_source = (
-        _index(
-            q_values_by_period,
-            period_idx,
-            hot_index,
-            cold_index,
-            stage_index,
-        )
-        if q_values_by_period is not None
-        else _index(q_values, hot_index, cold_index, stage_index)
+    duty = _recovery_duty(
+        q_values,
+        q_values_by_period,
+        period_idx=period_idx,
+        hot_index=hot_index,
+        cold_index=cold_index,
+        stage_index=stage_index,
+        tolerance=tolerance,
     )
-    duty = _normalized_solver_duty(duty_source, tolerance=tolerance)
     active = _is_active(
         duty,
         _index(getattr(solved_model, "z", None), hot_index, cold_index, stage_index),

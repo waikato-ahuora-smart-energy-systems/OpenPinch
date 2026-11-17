@@ -15,7 +15,8 @@ Converts a solved equation model (and the solver arrays it was built from) into 
 
 ## Invariants
 - Exchanger ids are `recovery:<hot>-><cold>:S<stage>`, `hot-utility:<utility>-><cold>` and `cold-utility:<hot>-><utility>`; recovery stages are one-based [recovery.py:_recovery_exchangers, utility.py:_hot_utility_exchangers].
-- Exchangers inactive in every period are dropped unless `include_inactive` is true (only `extract_heat_exchanger_network` exposes it); an exchanger is active when its duty and (if present) its binary exceed the tolerance [metadata.py:_is_active].
+- Exchangers inactive in every period are dropped unless `include_inactive` is true (only `extract_heat_exchanger_network` exposes it); an exchanger is active when its duty and (if present) its binary exceed the tolerance; a recovery match's binary is read once and shared by its periods, whose duties are checked in period order until one is active [metadata.py:_is_active] [recovery.py:_recovery_exchangers].
+- Solved values are read through `_optional_float`: a plain float as is, then any object's `value` (a Pyomo variable or parameter), then a scalar Pyomo component, `float()`, or the first element of a `[value]` list [metadata.py:_optional_float].
 - Duties below minus `max(tolerance, 1e-4)` raise `ValueError`; smaller negatives are clipped to zero [metadata.py:_normalized_solver_duty].
 - Period ids must be unique and match `N_periods` [metadata.py:_period_ids].
 - At least one hot and one cold utility must exist on the solver axes [metadata.py:_utilities].

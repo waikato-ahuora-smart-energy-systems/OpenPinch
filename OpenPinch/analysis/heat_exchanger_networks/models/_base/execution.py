@@ -26,6 +26,11 @@ def optimise(model, print_output: bool) -> None:
     """
 
     try:
+        if getattr(model, "values_only", False):
+            raise RuntimeError(
+                f"{model.name} is a values-only model: it has no constraints or "
+                "objective and cannot be solved."
+            )
         _solve_and_post_process(model, print_output)
     finally:
         cleanup_model(model)
@@ -149,7 +154,11 @@ def setup_model(model) -> None:
     """
 
     backend.require_solver_backend(model.solver)
-    model.m = PyomoModel()
+    model.m = (
+        PyomoModel(constraints=False)
+        if getattr(model, "values_only", False)
+        else PyomoModel()
+    )
     model.mSuccess: int = 0
     model.solver_run = backend.configure_pyomo_solver(
         model.m,
@@ -166,20 +175,29 @@ def _solver_value(model, value: Any) -> float:
         return float(getattr(value, "value", value))
 
 
+_NO_VALUE = object()
+
+
 def _value(value) -> float:
     """Read a number from a plain number, a ``[value]`` list, or a Pyomo component."""
 
+    if value.__class__ is float or value.__class__ is int:
+        return float(value)
     if hasattr(value, "is_expression_type") and value.is_expression_type():
         # A Pyomo expression, such as an Intermediate of a PyomoModel.
         return float(_pyomo_value(value))
+    # A Pyomo variable or parameter holds its number in ``value``. Reading it
+    # before trying ``value[0]`` saves raising and catching a TypeError on
+    # every read of a solved model.
+    number = getattr(value, "value", _NO_VALUE)
+    if number is not _NO_VALUE:
+        return float(number)
     if isinstance(value, int | float):
         return float(value)
     try:
         return float(value[0])
     except (TypeError, IndexError, KeyError):
         pass
-    if hasattr(value, "value"):
-        return float(value.value)
     return float(value)
 
 
@@ -191,19 +209,20 @@ def _assign_value(variable: Any, value: Any) -> None:
 
     if isinstance(value, list | tuple):
         (value,) = value
-    if variable.fixed:
-        variable.fix(value)
-    else:
-        variable.set_value(value, skip_validation=True)
+    # A parameter stays fixed; neither it nor a variable is validated, since
+    # the value is copied from a solved model.
+    variable.set_value(value, skip_validation=True)
 
 
 def _set_value(model, variable: Any, value: float) -> None:
     """Assign Pyomo values while preserving source bound-clamping behavior."""
 
     if getattr(variable, "is_variable_type", lambda: False)():
-        # A PyomoModel variable, or a parameter (a fixed variable).
+        # A PyomoModel variable, or a parameter (a fixed variable). A
+        # parameter is fixed already and is an unbounded real, so Pyomo's
+        # domain and bound check (what fix() would run) has nothing to find.
         if variable.fixed:
-            variable.fix(value)
+            variable.set_value(value, skip_validation=True)
             return
         if variable.lb is not None:
             value = max(variable.lb, value)

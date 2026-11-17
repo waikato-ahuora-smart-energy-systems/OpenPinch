@@ -175,11 +175,15 @@ def _evolution_breadths(problem, tasks) -> set[tuple[int, int, int | None]]:
 @pytest.mark.parametrize(
     ("options", "expected"),
     [
-        ({_DEPTH: 2}, {(1, 1, None)}),
+        ({_DEPTH: 2}, {(2, 2, 2)}),
         ({_DEPTH: 3}, {(2, 2, 2)}),
         ({_DEPTH: 4}, {(3, 3, 2)}),
         ({_DEPTH: 4, "HENS_EVM_N_AD_BRANCHES": 1}, {(1, 3, 2)}),
-        ({_DEPTH: 2, "HENS_EVM_N_RM_BRANCHES": 2}, {(1, 2, 2)}),
+        ({_DEPTH: 2, "HENS_EVM_N_RM_BRANCHES": 1}, {(2, 1, 2)}),
+        (
+            {_DEPTH: 1, "HENS_EVM_N_AD_BRANCHES": 1, "HENS_EVM_N_RM_BRANCHES": 1},
+            {(1, 1, None)},
+        ),
     ],
 )
 def test_every_evolution_task_and_the_manifest_use_the_depth_breadth(

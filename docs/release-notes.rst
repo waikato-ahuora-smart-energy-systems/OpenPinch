@@ -57,6 +57,20 @@ Heat exchanger network synthesis
   four cases. The pulp mill case takes 188 s instead of 45 s, finds 11
   minimum-unit networks instead of 2, and its best network is within 0.01 %.
   Set ``HENS_HEURISTIC_PDM_NETWORKS`` to 10 for the earlier, faster search.
+- Network evolution explores two add and two remove branches per step by
+  default (``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now
+  default to 2 at search depths 1 and 2, was 1), and the evolution tasks of
+  a serial stage share the topologies they have solved, so a topology one
+  task solved is reused by the next rather than solved again. Tasks solved
+  in worker processes (``HENS_MAX_PARALLEL`` above 1) do not share. On the
+  12 OpenHENS cases at the default width and depth, the best network costs
+  less on five cases (Five-stream Bogataj 4.0 %, Thirteen-stream Kim 1.6 %,
+  Four-stream Escobar 1.6 %, Five-stream Kim 1.2 %, Ten-stream Ahmad
+  0.04 %), each with one to four fewer units, and no case is worse; the run
+  takes about as long (+2 %). On the pulp mill, chocolate factory and crude
+  preheat sample cases the best networks are within 0.01 % and the runs take
+  about 40 % longer. Set both options to 1 for the earlier single-path
+  search.
 - Post-processing a solved stage-wise model is faster. The alpha flow-on
   system computes each stream's flow-on terms once per stage rather than once
   per partner, and drops zero terms when it builds them. Flow fractions read
@@ -68,6 +82,47 @@ Heat exchanger network synthesis
   expressions, each of which copied the candidate's whole model. On the pulp
   mill sample case its eight adoptions take 0.7 s instead of about 10 s, with
   the same network.
+- Building a design stage's tasks copies the prepared zone once, not on
+  every read: ``PinchProblem.master_zone`` deep-copies the whole zone tree,
+  and each task read it many times for its settings and solver arrays. On
+  the pulp mill sample case a design reads it 3 times instead of 139, which
+  saves about 6.5 s, with the same network.
+- Stage-wise post-processing is faster. Reading a solved Pyomo variable no
+  longer tries to index it first; post-processing reads an inactive match's
+  approaches not at all and each stream temperature once; and the alpha
+  flow-on step builds its fractions and sparse system as NumPy arrays, with
+  the same values to the last place. On the pulp mill sample case
+  post-processing takes about 11 s of CPU time instead of 32 s, and the
+  design about 154 s instead of 181 s, with the same network.
+- Building a stage-wise model is faster: parameter blocks are fixed as a
+  whole when allocated, the Pyomo module is looked up once per model, and the
+  big-M values and duty bounds that multiply binaries are Python floats, so
+  Pyomo builds those terms without NumPy's ufunc dispatch. On the pulp mill
+  sample case the 276 stage-wise builds of a design take about 37 s of CPU
+  time instead of 58 s, and the design about 157 s instead of 175 s, with the
+  same network.
+- A script piped to Python on stdin (``python - <<EOF``) or run from a
+  string no longer crashes network synthesis or multistart optimisation with
+  ``BrokenProcessPool`` under the spawn or forkserver start method (the macOS
+  default). Worker processes cannot rerun such a main module, so its tasks
+  are solved serially with a warning, as for a script with no main guard.
+- Extracting a network from a solved model is faster: a solved Pyomo
+  variable's value is read before asking what the object is, and a recovery
+  match's binary is read once rather than once per period. Extracted
+  networks are unchanged.
+- Building index grids and writing parameters is cheaper. A grid is built
+  with one call per cell rather than a recursive helper call per cell, and a
+  parameter that is already fixed is written without being fixed again,
+  which ran Pyomo's domain and bound check on every write. On the pulp mill
+  sample case a design takes about 124 s of CPU time instead of 130 s, with
+  the same network.
+- The amalgamated pinch design network is built without constraints or an
+  objective. It holds the above- and below-pinch sides' solved values and is
+  only read, never solved, so a values-only model (``values_only=True``) has
+  the same variables and parameters and refuses to be solved. On the pulp
+  mill sample case this saves about 20 s of CPU time per design (107 s
+  instead of 128 s, measured before the index-grid change above), with the
+  same network.
 
 0.9.1 (2026-11-16)
 ------------------

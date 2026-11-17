@@ -961,6 +961,26 @@ def test_extraction_reads_a_scalar_pyomo_value_without_float_conversion():
     assert extraction_metadata._optional_float(_ScalarPyomoValue()) == 2.5
 
 
+class _SolvedVariable:
+    """A solved Pyomo variable: it holds its number in ``value``."""
+
+    value = 6.0
+
+    def is_numeric_type(self) -> bool:
+        raise AssertionError("extraction asked what a solved variable is")
+
+    def is_indexed(self) -> bool:
+        raise AssertionError("extraction asked what a solved variable is")
+
+
+def test_extraction_reads_a_value_before_asking_what_the_object_is():
+    # Asking every value whether it is a scalar Pyomo component took two
+    # lookups and two calls, 31 million times per pulp mill design.
+    assert extraction_metadata._optional_float(_SolvedVariable()) == 6.0
+    assert extraction_metadata._optional_float(1.5) == 1.5
+    assert extraction_metadata._optional_float([2.5]) == 2.5
+
+
 def test_extraction_reads_pyomo_variables_parameters_and_unset_values():
     pyo = pytest.importorskip("pyomo.environ")
     model = pyo.ConcreteModel()
@@ -975,3 +995,53 @@ def test_extraction_reads_pyomo_variables_parameters_and_unset_values():
     assert extraction_metadata._optional_float(model.s) == 5.0
     assert extraction_metadata._optional_float(model.p[0]) == 1.5
     assert extraction_metadata._optional_float(model.unset) is None
+
+
+class _CountedBinary:
+    """A match binary that counts its reads."""
+
+    def __init__(self, value: float) -> None:
+        self._number = value
+        self.reads = 0
+
+    @property
+    def value(self) -> float:
+        self.reads += 1
+        return self._number
+
+
+def test_recovery_extraction_reads_each_match_binary_once():
+    # A match's binary is shared by every period; reading it again for each
+    # period, for every inactive slot, was millions of reads per design.
+    from OpenPinch.analysis.heat_exchanger_networks.extraction.recovery import (
+        _recovery_exchangers,
+    )
+
+    hot, cold, stages, periods = 2, 2, 2, 3
+    binaries = [
+        [[_CountedBinary(0.0) for _k in range(stages)] for _j in range(cold)]
+        for _i in range(hot)
+    ]
+    model = SimpleNamespace(
+        S=stages,
+        z=binaries,
+        Q_r=None,
+        Q_r_by_period=[
+            [[[0.0] * stages for _j in range(cold)] for _i in range(hot)]
+            for _n in range(periods)
+        ],
+    )
+
+    exchangers = _recovery_exchangers(
+        model,
+        solver_arrays=None,
+        hot_streams=("H1", "H2"),
+        cold_streams=("C1", "C2"),
+        stage_total=stages,
+        period_ids=("p1", "p2", "p3"),
+        tolerance=1e-6,
+        include_inactive=False,
+    )
+
+    assert exchangers == ()
+    assert {binary.reads for row in binaries for cell in row for binary in cell} == {1}
