@@ -200,19 +200,20 @@ def _assign_value(variable: Any, value: Any) -> None:
 
     if isinstance(value, list | tuple):
         (value,) = value
-    if variable.fixed:
-        variable.fix(value)
-    else:
-        variable.set_value(value, skip_validation=True)
+    # A parameter stays fixed; neither it nor a variable is validated, since
+    # the value is copied from a solved model.
+    variable.set_value(value, skip_validation=True)
 
 
 def _set_value(model, variable: Any, value: float) -> None:
     """Assign Pyomo values while preserving source bound-clamping behavior."""
 
     if getattr(variable, "is_variable_type", lambda: False)():
-        # A PyomoModel variable, or a parameter (a fixed variable).
+        # A PyomoModel variable, or a parameter (a fixed variable). A
+        # parameter is fixed already and is an unbounded real, so Pyomo's
+        # domain and bound check (what fix() would run) has nothing to find.
         if variable.fixed:
-            variable.fix(value)
+            variable.set_value(value, skip_validation=True)
             return
         if variable.lb is not None:
             value = max(variable.lb, value)
