@@ -1449,7 +1449,7 @@ def test_a_values_only_model_has_the_same_variables_and_no_constraints(
     # An amalgamated pinch design network only holds the sides' solved
     # values: building its constraints and objective was about a quarter of
     # a pulp mill design and nothing read them.
-    import pyomo.environ as pyo
+    pyo = pytest.importorskip("pyomo.environ")
 
     full = _built_two_stage_model(
         monkeypatch, non_isothermal_model=non_isothermal_model
