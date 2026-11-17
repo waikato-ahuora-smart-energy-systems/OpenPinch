@@ -674,7 +674,7 @@ settings on a real case.
 Validation
 ~~~~~~~~~~
 
-Two published cases check the method; the tests run both.
+Three published cases check the method; the tests run all three.
 
 Ciric and Floudas (1989), as Example 1 of Hallberg and Scribner (2009)
    The existing network rates at 17,519 kW of hot utility against the
@@ -685,6 +685,14 @@ Ciric and Floudas (1989), as Example 1 of Hallberg and Scribner (2009)
    of network area, against the report's MILP at $1.73M and 5,088 m2 with
    different matches. The report's savings figures cannot be compared: its
    NPV, annualised savings and return on investment do not reconcile.
+Hallberg and Scribner (2009), Example 2, crude unit
+   Thirteen process streams, eight of them with several segments, and 18
+   existing exchangers. Its existing network rates at 68,666 kW of hot and
+   74,835 kW of cold utility against the published 67,964 and 75,051 kW,
+   once every installed area is widened by 5 % (``area_tolerance=0.05``):
+   some published areas, E6's most, are a little short of their published
+   duties. The report gives no retrofitted utility for this example, so
+   only the existing network is checked.
 Akpomiemie and Smith (2018), simplified crude preheat train
    Stream data, the existing network and its duties are from the paper
    (Tables 3 and 4, Figs. 10 and 19). Every stream has h = 0.5 kW/m2K and
