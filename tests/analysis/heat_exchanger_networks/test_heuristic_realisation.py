@@ -8,12 +8,17 @@ solve is dropped, not raised.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
 
 from OpenPinch.analysis.heat_exchanger_networks.heuristic.enumeration import (
     SideProposal,
+    propose_side_topologies,
+)
+from OpenPinch.analysis.heat_exchanger_networks.heuristic.side_streams import (
+    pinch_side,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
     InternalHeatExchangerNetworkProblem,
@@ -368,3 +373,63 @@ def test_a_side_whose_pairing_is_re_solved_gives_its_own_network():
         for network in _networks(problem)
     )
     assert heaters == [1, 2]
+
+
+def _recording_side_factory(built: list, *, stop_at_limit: bool = False):
+    """The side model factory, recording each model's arguments; with
+    ``stop_at_limit`` every solve reports a time-limited stop."""
+
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    def factory(**kwargs):
+        model = PinchDecompModel(**kwargs)
+        built.append(kwargs)
+        if stop_at_limit and "heuristic" in kwargs["name"]:
+            optimise = model.optimise
+
+            def stopped(*args, **kw):
+                optimise(*args, **kw)
+                model.solver_run = replace(
+                    model.solver_run, termination_condition="maxTimeLimit"
+                )
+
+            model.optimise = stopped
+        return model
+
+    return factory
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_heuristic_side_solve_is_time_limited():
+    # A side proposal is a MIP over its allowed matches, and HiGHS did not
+    # close one of the spray dryer's in hours.
+    built: list = []
+    problem = _problem(_four_stream(), 14.0, limit=10)
+
+    problem.get_solution(
+        print_output=False,
+        model_factories={"pinch_design_method": _recording_side_factory(built)},
+    )
+
+    sides = [kwargs for kwargs in built if "heuristic" in kwargs["name"]]
+    assert sides
+    for kwargs in sides:
+        assert kwargs["solver_options"]["time_limit"] == (
+            backend.HEURISTIC_SIDE_TIME_LIMIT
+        )
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_heuristic_side_stopped_at_its_limit_is_dropped():
+    # Its incumbent need not hold the side's minimum utility.
+    problem = _problem(_four_stream(), 14.0, limit=10)
+    problem.load_model(
+        model_factories={
+            "pinch_design_method": _recording_side_factory([], stop_at_limit=True)
+        }
+    )
+    proposal = propose_side_topologies(pinch_side(problem.below), limit=1)[0]
+
+    assert problem._realise_side("below", proposal, 0) is None

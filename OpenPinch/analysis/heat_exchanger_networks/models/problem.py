@@ -698,6 +698,11 @@ class InternalHeatExchangerNetworkProblem:
                             }
                         ),
                         "stage_selection": [stages, stages],
+                        "solver_options": _with_time_limit(
+                            self.args["solver"],
+                            self.args.get("solver_options"),
+                            seconds=backend.HEURISTIC_SIDE_TIME_LIMIT,
+                        ),
                         "z_restriction": proposal.z_restriction(
                             hot_count=template.I,
                             cold_count=template.J,
@@ -718,7 +723,8 @@ class InternalHeatExchangerNetworkProblem:
         # A proposal the side model cannot solve is dropped by design.
         side.failure_log_level = logging.DEBUG
         side.optimise(print_output=False)
-        if side.mSuccess != 1:
+        # A side stopped at its time limit may miss its minimum utility.
+        if side.mSuccess != 1 or not side.solver_run.converged:
             _cleanup_model(side)
             return None
         # The amalgamated network is built with the above side's restriction,
@@ -993,7 +999,8 @@ def _with_time_limit(
     """The PDM solver options with a time limit added.
 
     The fewest-units limit applies to every fewest-units and minimum-unit
-    solve; the primary sides take ``backend.PDM_TIME_LIMIT``.
+    solve; the primary sides take ``backend.PDM_TIME_LIMIT`` and heuristic
+    side proposals ``backend.HEURISTIC_SIDE_TIME_LIMIT``.
 
     A limit the user set is kept, as are options given as option lines.
     """
