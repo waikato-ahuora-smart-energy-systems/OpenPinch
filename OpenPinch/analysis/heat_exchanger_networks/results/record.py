@@ -220,6 +220,11 @@ def run_record(
     return record
 
 
+def recording_active() -> bool:
+    """Whether any record listens in the current context."""
+    return bool(_DESTINATIONS.get())
+
+
 def admit(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
     """Offer one solved outcome to the installed records.
 
@@ -268,6 +273,7 @@ def _admissible(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
 __all__ = [
     "HeatExchangerNetworkRecord",
     "admit",
+    "recording_active",
     "recording",
     "run_record",
     "running",

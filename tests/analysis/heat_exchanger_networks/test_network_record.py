@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from OpenPinch.analysis.heat_exchanger_networks.results.record import (
@@ -379,6 +381,12 @@ def test_the_design_result_ranks_exactly_the_records_networks(monkeypatch):
     assert view.selected_network == record.outcomes()[0].network
 
 
+needs_threads = pytest.mark.skipif(
+    sys.platform == "emscripten", reason="Pyodide cannot start threads"
+)
+
+
+@needs_threads
 def test_a_reader_thread_polls_networks_while_the_run_works(monkeypatch):
     import threading
 
@@ -525,7 +533,25 @@ class _WorkerPool:
         return iter(results[::-1])
 
 
-def _evolution_tasks_through_the_executor(monkeypatch, *, max_parallel, pool=None):
+def _evolution_options(*args, max_parallel):
+    return {
+        "n_ad_branches": 2,
+        "n_rm_branches": 2,
+        "max_parallel": max_parallel,
+        "no_improvement_patience": None,
+        "beam_width": 4,
+    }
+
+
+def _evolution_tasks_through_the_executor(
+    monkeypatch,
+    *,
+    max_parallel,
+    pool=None,
+    problems=None,
+    record=None,
+    handoff_queue_factory=None,
+):
     import queue
 
     from OpenPinch.analysis.heat_exchanger_networks.execution import executor
@@ -534,13 +560,14 @@ def _evolution_tasks_through_the_executor(monkeypatch, *, max_parallel, pool=Non
         _evolution_task("evm-a"),
         _evolution_task("evm-b"),
     )
-    problems = {
-        "evm-a": _EvolvingInternalProblem((90.0, 80.0)),
-        "evm-b": _EvolvingInternalProblem((70.0,)),
-    }
+    if problems is None:
+        problems = {
+            "evm-a": _EvolvingInternalProblem((90.0, 80.0)),
+            "evm-b": _EvolvingInternalProblem((70.0,)),
+        }
     local = executor.LocalSynthesisExecutor(
         worker_pool_factory=pool or _WorkerPool,
-        handoff_queue_factory=queue.Queue,
+        handoff_queue_factory=handoff_queue_factory or queue.Queue,
     )
     monkeypatch.setattr(
         local,
@@ -548,19 +575,10 @@ def _evolution_tasks_through_the_executor(monkeypatch, *, max_parallel, pool=Non
         lambda task, **kwargs: problems[task.task_id],
     )
     monkeypatch.setattr(local, "_model_factories_for_task", lambda *args: None)
-    monkeypatch.setattr(
-        executor,
-        "_evolution_options",
-        lambda *args, max_parallel: {
-            "n_ad_branches": 2,
-            "n_rm_branches": 2,
-            "max_parallel": max_parallel,
-            "no_improvement_patience": None,
-            "beam_width": 4,
-        },
-    )
+    monkeypatch.setattr(executor, "_evolution_options", _evolution_options)
     monkeypatch.setattr(executor, "supported_workers", lambda requested: requested)
-    record = HeatExchangerNetworkRecord()
+    if record is None:
+        record = HeatExchangerNetworkRecord()
     with recording(record):
         local.execute(
             tasks,
@@ -571,6 +589,7 @@ def _evolution_tasks_through_the_executor(monkeypatch, *, max_parallel, pool=Non
     return record
 
 
+@needs_threads
 def test_workers_hand_their_improvements_to_the_main_process(monkeypatch):
     pooled = _evolution_tasks_through_the_executor(monkeypatch, max_parallel=2)
     serial = _evolution_tasks_through_the_executor(monkeypatch, max_parallel=1)
@@ -581,6 +600,111 @@ def test_workers_hand_their_improvements_to_the_main_process(monkeypatch):
         90.0,
     ]
     assert _content(pooled) == _content(serial)
+
+
+class _LookingInternalProblem(_EvolvingInternalProblem):
+    """A solve that notes which tasks' networks the record holds as it starts."""
+
+    def __init__(self, tac, record, seen):
+        super().__init__((tac,))
+        self.record = record
+        self.seen = seen
+
+    def get_solution(self, **kwargs):
+        from types import SimpleNamespace
+
+        self.seen.append([o.task.task_id for o in self.record.outcomes()])
+        self.case = SimpleNamespace(mSuccess=1, TAC=self.improvements[-1])
+        return self.case
+
+
+def test_each_task_network_enters_the_record_before_the_next_task_solves(
+    monkeypatch,
+):
+    record = HeatExchangerNetworkRecord()
+    seen = []
+    problems = {
+        "evm-a": _LookingInternalProblem(90.0, record, seen),
+        "evm-b": _LookingInternalProblem(70.0, record, seen),
+    }
+
+    _evolution_tasks_through_the_executor(
+        monkeypatch, max_parallel=1, problems=problems, record=record
+    )
+
+    assert seen == [[], ["evm-a"]]
+    assert [o.task.task_id for o in record.outcomes()] == ["evm-b", "evm-a"]
+
+
+def test_a_stage_offers_each_network_to_a_finalising_record_once(monkeypatch):
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.targeting._stage import (
+        run_stage,
+    )
+
+    finalised = []
+
+    def finalise(outcome):
+        finalised.append(outcome.task.task_id)
+        return outcome
+
+    record = HeatExchangerNetworkRecord()
+    problems = {
+        "evm-a": _LookingInternalProblem(90.0, record, []),
+        "evm-b": _LookingInternalProblem(70.0, record, []),
+    }
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    local = executor.LocalSynthesisExecutor()
+    monkeypatch.setattr(
+        local, "_build_problem", lambda task, **kwargs: problems[task.task_id]
+    )
+    monkeypatch.setattr(local, "_model_factories_for_task", lambda *args: None)
+    monkeypatch.setattr(executor, "_evolution_options", _evolution_options)
+    with recording(record, finalise=finalise):
+        run_stage(
+            (_evolution_task("evm-a"), _evolution_task("evm-b")),
+            problem=None,
+            settings=SimpleNamespace(max_parallel=1),
+            executor=local,
+            default_executor=None,
+            parent_outcomes={"force-local-build": None},
+        )
+
+    assert sorted(finalised) == ["evm-a", "evm-b"]
+    assert len(record.outcomes()) == 2
+
+
+def test_a_pool_starts_no_hand_off_when_nothing_records(monkeypatch):
+    def no_queue():
+        raise AssertionError("a hand-off queue started with no record")
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    tasks = (_evolution_task("evm-a"), _evolution_task("evm-b"))
+    problems = {
+        "evm-a": _EvolvingInternalProblem((90.0,)),
+        "evm-b": _EvolvingInternalProblem((70.0,)),
+    }
+    local = executor.LocalSynthesisExecutor(
+        worker_pool_factory=_WorkerPool, handoff_queue_factory=no_queue
+    )
+    monkeypatch.setattr(
+        local, "_build_problem", lambda task, **kwargs: problems[task.task_id]
+    )
+    monkeypatch.setattr(local, "_model_factories_for_task", lambda *args: None)
+    monkeypatch.setattr(executor, "_evolution_options", _evolution_options)
+    monkeypatch.setattr(executor, "supported_workers", lambda requested: requested)
+
+    outcomes = local.execute(
+        tasks,
+        problem=None,
+        parent_outcomes={"force-local-build": None},
+        max_parallel=2,
+    )
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
 
 
 def _content(record):

@@ -8,6 +8,7 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 - `build_synthesis_result` (`assembly.py`): ranks the run record's networks, accepts the first and builds the result with its manifest.
 - `HeatExchangerNetworkRecord` (`record.py`, public): thread-safe record of one run's verified networks; `version`, `status`, `outcomes()`, `snapshot()`, `changed_since(version)`.
 - `admit(outcome)` (`record.py`): offers one solved outcome to the records installed in the current context; returns whether any changed.
+- `recording_active()` (`record.py`): whether any record is installed in the current context.
 - `recording(record, *, finalise=None)` and `running(record, *, finalise=None)` (`record.py`): context managers that install a record; `running` also makes it the run's record and settles its status.
 - `run_record(outcomes)` (`record.py`): the enclosing run's record, or a record of the admissible `outcomes` outside a run.
 - `demote_infeasible_outcomes` (`assembly.py`): marks solver successes that fail `verify_network_feasibility`, or that carry `diagnostics["unconverged_termination"]`, as failed.

@@ -23,7 +23,7 @@ from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models._stagewise.evolution import reporting_improvements
 from ..models.problem import InternalHeatExchangerNetworkProblem
-from ..results.record import admit
+from ..results.record import admit, recording_active
 from ..solver.arrays import (
     PreparedSolverArrays,
     nominal_approach_temperature,
@@ -66,6 +66,10 @@ class SynthesisExecutor(Protocol):
 
 class LocalSynthesisExecutor:
     """Internal executor for moved PDM/TDM/ESM model slices."""
+
+    # Offers each outcome to the run's records as it is solved, so the stage
+    # need not offer them again.
+    admits_outcomes = True
 
     def __init__(
         self,
@@ -206,6 +210,11 @@ class LocalSynthesisExecutor:
             for worker_args in inputs:
                 yield func(worker_args)
             return
+        if not recording_active():
+            # Nothing listens: workers have nothing to hand off.
+            with pool:
+                yield from pool.map(func, inputs)
+            return
         with self._handoff() as handoff, pool:
             yield from pool.map(
                 _handed_off,
@@ -254,6 +263,7 @@ class LocalSynthesisExecutor:
         for result in solved_results:
             collected.append(result)
             outcome = result[1]
+            admit(outcome)
             if outcome.status == "success" and outcome.objective_value is not None:
                 if self.best_objective is None:
                     self.best_objective = outcome.objective_value
@@ -359,6 +369,7 @@ class LocalSynthesisExecutor:
                 )
                 continue
             self._record(variant_task, outcome, variant, outcomes)
+            admit(outcome)
         return outcomes
 
     def _build_problem(
