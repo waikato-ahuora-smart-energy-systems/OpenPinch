@@ -38,6 +38,14 @@ PUBLISHED_HOT_UTILITY = 14_455.41
 PINCHED_SAVING = 0.139
 RETROFITTED_HOT_UTILITY = 10_958.81
 
+# Section 5.1 and Tables 6 and 8: twisted-tape inserts raise U on E5 from
+# 0.325 to 0.448 and on E1 from 0.517 to 0.669; enhancing both (E5 first)
+# brings hot utility to 13,661.52 kW, 5.5 % less. The next candidate, E2,
+# breaks C1's pressure drop limit, which OpenPinch does not model, so it is
+# left out. Inserts cost 500 + 10 A $ (Table 5).
+ENHANCEMENT_FACTORS = {"E5": 0.448 / 0.325, "E1": 0.669 / 0.517}
+ENHANCED_HOT_UTILITY = 13_661.52
+
 # Fig. 10, in stages: C1 from its hot end meets 1, 5, 2, 4, 6, 7, 3; H1 meets
 # 1, 2, 3. Areas in m2 at U = 0.25 from the Table 4 duties.
 EXISTING = {
@@ -190,3 +198,31 @@ def test_the_structure_strategy_reaches_the_target_in_three_changes():
     structural = [m for m in best.modifications if m.kind != "area_addition"]
     assert len(structural) == 3
     assert best.hot_utility == pytest.approx(RETROFITTED_HOT_UTILITY, rel=0.005)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_enhancing_e5_then_e1_reaches_the_published_hot_utility():
+    # A fixed structure: no new units or added area, inserts only.
+    result = _problem().design.retrofit(
+        EXISTING,
+        max_modifications=2,
+        strategy="stepwise",
+        new_unit_cost=1e9,
+        area_addition_cost=1e9,
+        enhancement_factors=ENHANCEMENT_FACTORS,
+        enhancement_cost=500.0,
+        enhancement_area_cost=10.0,
+    )
+
+    steps = [
+        [m.exchanger_id for m in design.modifications if m.kind == "enhancement"]
+        for design in result.frontier
+    ]
+    assert steps == [[], ["E5"], ["E5", "E1"]]
+    # As for the base rating, the 2 % area tolerance lets the rating find a
+    # little less hot utility than the published duties.
+    assert result.frontier[2].hot_utility == pytest.approx(
+        ENHANCED_HOT_UTILITY, rel=0.01
+    )

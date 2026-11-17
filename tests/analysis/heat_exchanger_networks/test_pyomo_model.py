@@ -640,3 +640,35 @@ def test_a_missing_default_is_kept_when_scip_is_missing_too(monkeypatch, recwarn
 
     assert backend.stage_solver("couenne", default="couenne") == "couenne"
     assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
+
+
+def test_a_constraint_has_no_dual_until_duals_are_imported_and_solved():
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0)
+    constraint = model.Equation(x >= 1.0)
+
+    assert model.dual(constraint) is None
+    model.import_duals()
+    assert model.dual(constraint) is None
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not _solver_available('ipopt-pyomo')", reason="needs the ipopt binary"
+)
+def test_ipopt_returns_the_dual_of_a_binding_constraint():
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0, ub=10.0)
+    y = model.Var(value=1.0, lb=0.0, ub=10.0)
+    binding = model.Equation(x + y >= 4.0)
+    slack = model.Equation(x <= 9.0)
+    model.Minimize(x + 3 * y)
+    model.import_duals()
+
+    backend.configure_pyomo_solver(model, "ipopt-pyomo")
+    run = backend.solve_pyomo_model(model, solver_name="ipopt-pyomo")
+
+    assert run.converged
+    # Raising the bound by 1 raises the cost by 1 (x carries it).
+    assert abs(model.dual(binding)) == pytest.approx(1.0, abs=1e-6)
+    assert model.dual(slack) == pytest.approx(0.0, abs=1e-6)

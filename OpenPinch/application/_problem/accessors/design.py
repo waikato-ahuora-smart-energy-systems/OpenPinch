@@ -1051,6 +1051,9 @@ class _DesignAccessor:
         new_utility_units: bool = False,
         strategy: str = "structure",
         ceiling_candidates: int = 12,
+        enhancement_factors: Mapping[str, float] | None = None,
+        enhancement_cost: float = 0.0,
+        enhancement_area_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1095,7 +1098,11 @@ class _DesignAccessor:
         relocation is also tried together with a new end heater or cooler on
         a stream that has none, which can free the units a move needs; the
         pair is one modification, costing one more ``new_unit_cost`` and the
-        utility exchanger's area.
+        utility exchanger's area. ``enhancement_factors`` (existing exchanger
+        id to the factor its heat transfer coefficient can be raised by, with
+        tube inserts for example; None, the default: no enhancement) lets a
+        step enhance an exchanger, at ``enhancement_cost`` ($) plus
+        ``enhancement_area_cost`` ($ per m2 of its installed area).
 
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked
@@ -1105,8 +1112,8 @@ class _DesignAccessor:
         area of at least 1 % of its installed area, as an area addition, so
         the frontier counts structural changes. "stepwise" instead makes one
         modification per step, an area addition being one. With
-        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 the ceiling solves run
-        on that many threads; the result is the same.
+        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 each step's solves
+        run on that many threads; the result is the same.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design after each number of steps (0 is the existing
@@ -1168,6 +1175,13 @@ class _DesignAccessor:
                     new_utility_units=new_utility_units,
                     strategy=strategy,
                     ceiling_candidates=ceiling_candidates,
+                    enhancement_factors=(
+                        None
+                        if enhancement_factors is None
+                        else {k: float(v) for k, v in enhancement_factors.items()}
+                    ),
+                    enhancement_cost=float(enhancement_cost),
+                    enhancement_area_cost=float(enhancement_area_cost),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

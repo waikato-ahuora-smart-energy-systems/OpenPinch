@@ -2,7 +2,7 @@
 
 The fake keeps the real request building, structure and screen, and stands
 in for the NLP only: a design's utility cost falls by $100,000/y per
-recovery match and $20,000/y per enlarged unit, every installed unit needs
+recovery match and $20,000/y per enlarged or enhanced unit, every installed unit needs
 its whole widened area (so it is at its cap), and every new unit gets 25 m2.
 """
 
@@ -68,6 +68,7 @@ class _Backend:
         self.cleaned = 0
         self.solved = 0
         self.goals: dict[str, set[str]] = {}
+        self.area_values = lambda spec: None
 
 
 @pytest.fixture
@@ -92,9 +93,13 @@ def fake_solver(monkeypatch) -> _Backend:
             backend.solved += 1
             spec = self.spec
             enlarged = len(spec.enlargeable_recovery) + len(spec.enlargeable_utilities)
+            enhanced = len(spec.enhanced_recovery) + len(spec.enhanced_utilities)
             self.utility_cost_value = (
-                1_000_000.0 - 100_000.0 * len(spec.recovery) - 20_000.0 * enlarged
+                1_000_000.0
+                - 100_000.0 * len(spec.recovery)
+                - 20_000.0 * (enlarged + enhanced)
             )
+            self.area_values = backend.area_values(spec)
             self.mSuccess = 0 if backend.fail(spec) else 1
 
         def cleanup(self) -> None:
@@ -575,3 +580,211 @@ def test_the_ceiling_minimises_utility_cost_not_duty(fake_solver):
     )
 
     assert fake_solver.goals["retrofit-ceiling"] == {"utility cost"}
+
+
+@pytest.mark.parametrize("strategy", ["structure", "stepwise"])
+def test_hens_max_parallel_solves_each_step_on_threads_with_the_same_result(
+    fake_solver, monkeypatch, strategy
+):
+    import threading
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+    from OpenPinch.analysis.parallelism import supported_workers
+
+    threads = set()
+    evaluate = search._Evaluator.evaluate
+
+    def spy(self, state):
+        if state.moves:
+            threads.add(threading.current_thread().name)
+        return evaluate(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "evaluate", spy)
+
+    def run(max_parallel: int):
+        case = json.loads(read_sample_case(CASE))
+        case["options"]["HENS_MAX_PARALLEL"] = max_parallel
+        result = search.run_retrofit_search(
+            PinchProblem(case),
+            _existing_network(),
+            search.RetrofitSettings(max_modifications=2, strategy=strategy, **COSTS),
+        )
+        return result.evaluated_designs, [
+            (d.net_annual_benefit, [m.exchanger_id for m in d.modifications])
+            for d in result.frontier
+        ]
+
+    serial = run(1)
+    assert threads == {threading.main_thread().name}
+    threads.clear()
+    assert run(4) == serial
+    if supported_workers(4) > 1:
+        assert threading.main_thread().name not in threads
+
+
+def test_the_stepwise_search_adds_area_only_where_more_area_is_worth_something(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Every installed unit is at its cap on the fake, but the solver's
+    # duals say only the first recovery unit's area is worth anything.
+    fake_solver.area_values = lambda spec: {
+        **{("recovery", r): 0.0 for r in spec.recovery_areas},
+        **{("utility", e): 0.0 for e in spec.utility_areas},
+        ("recovery", min(spec.recovery_areas)): 50.0,
+    }
+    tried = []
+    evaluate = search._Evaluator.evaluate
+
+    def spy(self, state):
+        if state.moves and state.moves[-1].kind == "area_addition":
+            tried.append(state.moves[-1].exchanger_id)
+        return evaluate(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "evaluate", spy)
+
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=1, strategy="stepwise", **COSTS),
+    )
+
+    assert len(tried) == 1
+
+
+def test_the_stepwise_search_can_enhance_an_existing_unit_at_its_cap(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Area additions and new units are priced out, so the best first step
+    # is enhancing E3, the only unit with an enhancement factor.
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            strategy="stepwise",
+            new_unit_cost=1e9,
+            area_addition_cost=1e9,
+            split_cost=1e4,
+            enhancement_factors={"E3": 1.3},
+            enhancement_cost=500.0,
+            enhancement_area_cost=10.0,
+        ),
+    )
+
+    (step,) = result.frontier[1].modifications
+    assert step.kind == "enhancement"
+    assert step.exchanger_id == "E3"
+    assert step.added_area == 0.0
+    # The paper's insert cost: $500 plus $10 per m2 of the unit's area.
+    assert step.fixed_cost == pytest.approx(500.0 + 10.0 * 1008.5)
+    assert step.area_cost == 0.0
+    assert result.frontier[1].annual_savings == pytest.approx(20_000.0)
+
+
+def test_an_enhanced_unit_is_verified_at_its_enhanced_capacity(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Verification sizes each unit at the base heat transfer coefficient,
+    # so an enhanced unit must be judged as its widened area times the
+    # factor, as the model rates it.
+    verified = []
+
+    def record(network):
+        areas = {e.exchanger_id: e.area for e in network.exchangers}
+        verified.append(areas["E3"])
+        return ()
+
+    fake_solver.reject = record
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            strategy="stepwise",
+            area_tolerance=0.02,
+            enhancement_factors={"E3": 1.3},
+            **COSTS,
+        ),
+    )
+
+    assert verified[0] == pytest.approx(1008.5 * 1.02)
+    assert pytest.approx(1008.5 * 1.02 * 1.3) in verified
+
+
+def test_the_structure_search_enhances_units_it_would_enlarge(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # On the fake an enhanced unit saves $20,000/y; at $500 an insert is
+    # worth it, so each sized structure keeps E1 enhanced as well as
+    # enlarged (the fake still adds its area).
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            enhancement_factors={"E1": 1.3},
+            enhancement_cost=500.0,
+            **COSTS,
+        ),
+    )
+
+    kinds = {(m.kind, m.exchanger_id) for m in result.frontier[1].modifications}
+    assert ("enhancement", "E1") in kinds
+    assert ("area_addition", "E1") in kinds
+    structural = [
+        m
+        for m in result.frontier[1].modifications
+        if m.kind not in {"area_addition", "enhancement"}
+    ]
+    assert len(structural) == 1
+
+
+def test_a_unit_given_area_in_one_step_can_be_enhanced_in_the_next(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # New units and inserts are priced so the first step's beam holds area
+    # additions only; the second step must still offer each enlarged unit
+    # an insert (it may replace part of the added area).
+    states = []
+    evaluate = search._Evaluator.evaluate
+
+    def spy(self, state):
+        states.append(state)
+        return evaluate(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "evaluate", spy)
+    units = ("E1", "E2", "E3", "E4", "E5", "E6", "E7")
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=2,
+            strategy="stepwise",
+            new_unit_cost=1e9,
+            area_addition_cost=8_650.0,
+            split_cost=1e4,
+            enhancement_factors=dict.fromkeys(units, 1.3),
+            enhancement_cost=1e6,
+        ),
+    )
+
+    assert any(state.enlarged & state.enhanced for state in states)
+
+
+def test_enhancement_factors_for_unknown_exchangers_are_an_error(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    with pytest.raises(ValueError, match="enhancement_factors.*E9"):
+        search.run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=1,
+                enhancement_factors={"E1": 1.3, "E9": 1.2},
+                **COSTS,
+            ),
+        )

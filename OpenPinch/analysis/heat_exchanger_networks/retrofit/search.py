@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import math
 import sys
+import threading
 from collections import Counter
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 
@@ -54,6 +56,8 @@ _BINDING_SHARE = 0.99
 # The structure strategy keeps a unit's added area only from this share of
 # its installed area, and at least this many m2.
 _MIN_KEPT_SHARE = 0.01
+# Area value ($/y per m2) below which more area on a unit is worth nothing.
+_MIN_AREA_VALUE = 1e-3
 _MIN_KEPT_AREA = 1.0
 STRATEGIES = ("stepwise", "structure")
 
@@ -77,7 +81,11 @@ class RetrofitSettings:
     ``relocation_candidates`` best scored in the stepwise one);
     ``None`` leaves them out. ``new_utility_units`` also tries each new match
     and relocation with each new end heater or cooler the network lacks, in
-    the same step, priced as one more new unit.
+    the same step, priced as one more new unit. ``enhancement_factors``
+    (existing exchanger id to the factor its heat transfer coefficient can
+    be raised by, tube inserts for example; None: no enhancement) enables
+    enhancement moves, each costing ``enhancement_cost`` ($) plus
+    ``enhancement_area_cost`` ($ per m2 of the unit's installed area).
 
     ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened
@@ -102,6 +110,9 @@ class RetrofitSettings:
     new_utility_units: bool = False
     strategy: str = "structure"
     ceiling_candidates: int = 12
+    enhancement_factors: Mapping[str, float] | None = None
+    enhancement_cost: float = 0.0
+    enhancement_area_cost: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -118,6 +129,7 @@ class _State:
     network: HeatExchangerNetwork
     enlarged: frozenset[str]
     moves: tuple[_Move, ...]
+    enhanced: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -136,7 +148,8 @@ def run_retrofit_search(
 
     Every exchanger of ``existing`` needs its installed ``area``; a
     ``ValueError`` names those without one. ``max_added_area_fraction`` must
-    be None or finite and non-negative.
+    be None or finite and non-negative, and every id in
+    ``enhancement_factors`` must name an existing exchanger.
     """
 
     if settings.strategy not in STRATEGIES:
@@ -166,6 +179,13 @@ def run_retrofit_search(
             "retrofit needs a unique id on every existing exchanger; "
             "repeated: " + ", ".join(duplicates) + "."
         )
+    unknown = sorted(set(settings.enhancement_factors or {}).difference(ids))
+    if unknown:
+        raise ValueError(
+            "enhancement_factors names exchangers not in the existing network: "
+            + ", ".join(unknown)
+            + "."
+        )
     ensure_target_results(problem, {}, None)
     evaluator = _Evaluator(problem, existing, settings)
     base = evaluator.evaluate(_State(existing, frozenset(), ()))
@@ -192,12 +212,12 @@ def run_retrofit_search(
                 states.append(state)
             if structural:
                 states = evaluator.best_ceilings(states)
-            for state in states:
-                evaluated = (
-                    evaluator.sized(state) if structural else evaluator.evaluate(state)
-                )
-                if evaluated is not None:
-                    children.append(evaluated)
+            solve = evaluator.sized if structural else evaluator.evaluate
+            children.extend(
+                evaluated
+                for evaluated in evaluator.map(solve, states)
+                if evaluated is not None
+            )
         if not children:
             break
         children.sort(key=lambda child: -child.design.net_annual_benefit)
@@ -226,6 +246,19 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             enlarged=state.enlarged | {exchanger_id},
             moves=state.moves + (_Move("area_addition", exchanger_id),),
         )
+    # A unit given area earlier is not at its cap, but an insert may still
+    # replace part of that area, so enlarged units stay candidates.
+    factors = settings.enhancement_factors or {}
+    candidates = parent.binding + tuple(
+        sorted(state.enlarged.difference(parent.binding))
+    )
+    for exchanger_id in () if structural else candidates:
+        if exchanger_id in factors and exchanger_id not in state.enhanced:
+            yield replace(
+                state,
+                enhanced=state.enhanced | {exchanger_id},
+                moves=state.moves + (_Move("enhancement", exchanger_id),),
+            )
     for network, move in _structural_steps(parent, settings, evaluator):
         yield replace(state, network=network, moves=state.moves + (move,))
         if not settings.new_utility_units:
@@ -354,7 +387,10 @@ def _structure_only(state: _State) -> _State:
     return replace(
         state,
         enlarged=frozenset(),
-        moves=tuple(m for m in state.moves if m.kind != "area_addition"),
+        enhanced=frozenset(),
+        moves=tuple(
+            m for m in state.moves if m.kind not in {"area_addition", "enhancement"}
+        ),
     )
 
 
@@ -378,7 +414,7 @@ def _signature(state: _State, existing):
         for e in state.network.exchangers
         if e.kind is not HeatExchangerKind.RECOVERY
     )
-    return recovery, utilities, state.enlarged
+    return recovery, utilities, state.enlarged, state.enhanced
 
 
 class _Evaluator:
@@ -414,6 +450,7 @@ class _Evaluator:
         }
         self.base_utility_cost: float | None = None
         self.evaluations = 0
+        self._count_lock = threading.Lock()
         costing = config.costing
         self.area_coeff = float(costing.hx_area_coeff)
         self.area_exp = float(costing.hx_area_exp)
@@ -426,7 +463,8 @@ class _Evaluator:
 
         from ..models.fixed_structure import FixedStructureModel
 
-        self.evaluations += 1
+        with self._count_lock:
+            self.evaluations += 1
         settings = self.settings
         request = build_duty_optimisation_request(
             state.network, objective="cost", min_approach_temperature=settings.approach
@@ -442,6 +480,15 @@ class _Evaluator:
             )
             for kind in ("recovery", "utility")
         }
+        factors = settings.enhancement_factors or {}
+        enhanced = {
+            kind: {
+                index: float(factors[exchanger_id])
+                for (slot_kind, index), exchanger_id in zip(structure.slots, ids)
+                if slot_kind == kind and exchanger_id in state.enhanced
+            }
+            for kind in ("recovery", "utility")
+        }
         structure = replace(
             structure,
             spec=replace(
@@ -450,6 +497,8 @@ class _Evaluator:
                 max_added_area_fraction=settings.max_added_area_fraction,
                 enlargeable_recovery=enlargeable["recovery"],
                 enlargeable_utilities=enlargeable["utility"],
+                enhanced_recovery=enhanced["recovery"],
+                enhanced_utilities=enhanced["utility"],
             ),
         )
         model = FixedStructureModel(
@@ -472,18 +521,37 @@ class _Evaluator:
             # The solver accepts loosely converged points: drop a design whose
             # approaches, heat balances or areas fail the duty optimiser's
             # checks, judging installed areas as the model did (widened).
-            if verify_solution(structure, model, self._widened(solved)):
+            if verify_solution(structure, model, self._widened(solved, state.enhanced)):
                 return None
             results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
+            values = getattr(model, "area_values", None)
+            worth = (
+                None
+                if values is None
+                else {
+                    exchanger_id: values.get(slot, 0.0)
+                    for slot, exchanger_id in zip(structure.slots, ids)
+                }
+            )
+            # Units at their cap, most valuable area first; with duals, only
+            # those where more area is worth something.
             binding = tuple(
-                exchanger_id
-                for exchanger_id in ids
-                if exchanger_id in self.existing
-                and exchanger_id not in state.enlarged
-                and results[exchanger_id].active
-                and max(p.required_area for p in results[exchanger_id].periods)
-                >= _BINDING_SHARE * widen * results[exchanger_id].area
+                sorted(
+                    (
+                        exchanger_id
+                        for exchanger_id in ids
+                        if exchanger_id in self.existing
+                        and exchanger_id not in state.enlarged
+                        and results[exchanger_id].active
+                        and max(p.required_area for p in results[exchanger_id].periods)
+                        >= _BINDING_SHARE * widen * results[exchanger_id].area
+                        and (worth is None or worth[exchanger_id] > _MIN_AREA_VALUE)
+                    ),
+                    key=lambda exchanger_id: (
+                        0.0 if worth is None else -worth[exchanger_id]
+                    ),
+                )
             )
             metrics = solved.summary_metrics
             utility_cost = float(model.utility_cost_value)
@@ -523,6 +591,17 @@ class _Evaluator:
         finally:
             model.cleanup()
 
+    def map(self, solve, states: list[_State]) -> list:
+        """``solve`` applied to each of ``states``, in order: on
+        ``HENS_MAX_PARALLEL`` threads when it is above 1 (each solve is an
+        external solver subprocess), otherwise serially."""
+
+        if self.max_parallel > 1 and len(states) > 1:
+            workers = min(self.max_parallel, len(states))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                return list(pool.map(solve, states))
+        return [solve(state) for state in states]
+
     def best_ceilings(self, states: list[_State]) -> list[_State]:
         """For each kind of change (new match, relocation), the
         ``new_match_candidates`` states whose structures reach the lowest
@@ -532,13 +611,9 @@ class _Evaluator:
         solved on that many threads (each solve is an Ipopt subprocess); the
         ranking is the same either way."""
 
-        self.evaluations += len(states)
-        if self.max_parallel > 1 and len(states) > 1:
-            workers = min(self.max_parallel, len(states))
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                costs = list(pool.map(self.ceiling, states))
-        else:
-            costs = [self.ceiling(state) for state in states]
+        with self._count_lock:
+            self.evaluations += len(states)
+        costs = self.map(self.ceiling, states)
         ceilings = [
             (cost, n, state) for n, (cost, state) in enumerate(zip(costs, states))
         ]
@@ -589,8 +664,40 @@ class _Evaluator:
     def sized(self, state: _State) -> _Evaluated | None:
         """``state``'s structure with its added area sized: solved with every
         existing unit free to grow, then again with only the units whose
-        added area is worth keeping, each an area addition."""
+        added area is worth keeping, each an area addition. With
+        ``enhancement_factors``, the kept units that have one are also tried
+        enhanced, their area sized again the same way; the better of the two
+        by net annual benefit is kept."""
 
+        sized = self._sized_with(state, frozenset())
+        factors = self.settings.enhancement_factors or {}
+        if sized is None or not factors:
+            return sized
+        enhance = frozenset(
+            m.exchanger_id
+            for m in sized.state.moves
+            if m.kind == "area_addition" and m.exchanger_id in factors
+        )
+        if not enhance:
+            return sized
+        enhanced = self._sized_with(state, enhance)
+        if (
+            enhanced is not None
+            and enhanced.design.net_annual_benefit > sized.design.net_annual_benefit
+        ):
+            return enhanced
+        return sized
+
+    def _sized_with(self, state: _State, enhance: frozenset[str]) -> _Evaluated | None:
+        """``state`` with the ``enhance`` units enhanced and its added area
+        sized (see ``sized``)."""
+
+        state = replace(
+            state,
+            enhanced=enhance,
+            moves=state.moves
+            + tuple(_Move("enhancement", unit) for unit in sorted(enhance)),
+        )
         free = self.evaluate(replace(state, enlarged=frozenset(self.installed)))
         if free is None:
             return self.evaluate(state)
@@ -614,19 +721,27 @@ class _Evaluator:
         )
         return sized if sized is not None else self.evaluate(state)
 
-    def _widened(self, network: HeatExchangerNetwork) -> HeatExchangerNetwork:
+    def _widened(
+        self, network: HeatExchangerNetwork, enhanced: frozenset[str] = frozenset()
+    ) -> HeatExchangerNetwork:
         """``network`` with each existing unit's installed area widened by
-        ``area_tolerance``, as the model rates it."""
+        ``area_tolerance``, and an ``enhanced`` unit's area times its
+        enhancement factor (verification sizes at the base coefficient), as
+        the model rates them."""
 
         tolerance = float(self.settings.area_tolerance)
+        factors = self.settings.enhancement_factors or {}
+
+        def rated(e):
+            area = e.area + tolerance * self.installed[e.exchanger_id]
+            if e.exchanger_id in enhanced:
+                area *= float(factors[e.exchanger_id])
+            return e.model_copy(update={"area": area})
+
         return network.model_copy(
             update={
                 "exchangers": tuple(
-                    e.model_copy(
-                        update={
-                            "area": e.area + tolerance * self.installed[e.exchanger_id]
-                        }
-                    )
+                    rated(e)
                     if e.exchanger_id in self.installed and e.area is not None
                     else e
                     for e in network.exchangers
@@ -650,6 +765,12 @@ class _Evaluator:
         splits = settings.split_cost * len(move.splits)
         if move.kind == "relocation":
             added, fixed = 0.0, settings.relocation_cost + splits
+        elif move.kind == "enhancement":
+            added = 0.0
+            fixed = (
+                settings.enhancement_cost
+                + settings.enhancement_area_cost * self.installed[move.exchanger_id]
+            )
         else:
             added = float(result.added_area)
             if added < _MIN_ADDED_AREA:

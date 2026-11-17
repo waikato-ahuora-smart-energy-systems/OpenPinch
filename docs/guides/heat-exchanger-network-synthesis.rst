@@ -574,8 +574,13 @@ A design no better than one with fewer changes is marked ``dominated``.
 
 ``strategy="stepwise"`` instead makes one modification per step, an area
 addition on an exchanger whose duty its area limits being one, and solves
-every screened change without a ceiling ranking. It was the first version of
-the method and finds less on both validation cases below.
+every screened change without a ceiling ranking. With Ipopt, whose duals
+give each exchanger's area value (what one more m2 would save), it tries
+added area only where that value is above zero, most valuable first; on the
+validation cases this skips one to three solves and leaves the frontier
+unchanged, as almost every exchanger at its area limit is worth enlarging.
+It was the first version of the method and finds less on both validation
+cases below.
 
 Each design lists its ``modifications`` (``"new_match"``,
 ``"area_addition"`` or ``"relocation"``, the exchanger, the added area, fixed and area cost, and
@@ -619,11 +624,11 @@ Relocation
    Smith's case the paper's resequencing of exchanger 7 has the best ceiling
    of 395 moves but scores 127th. Ranking them all, the search finds that
    move and builds on it ($740,000/y net at two changes, against $712,000/y
-   when only the 100 best-scored moves were ranked), at a cost: 2,621 solves
-   and about 100 s instead of 889 and 28 s. ``HENS_MAX_PARALLEL`` (in
-   ``options``) solves the ceilings on that many threads with the same
-   result: with 8, the search took 74 s instead of 160 s on a loaded
-   machine. The stepwise search tries the
+   when only the 100 best-scored moves were ranked), at a cost: about 2,700
+   solves instead of 889. ``HENS_MAX_PARALLEL`` (in ``options``) runs each
+   step's solves, ceilings and sizing, on that many threads with the same
+   result: with 8 the search took 37 s instead of 89 s serially. The
+   stepwise search tries the
    ``relocation_candidates`` (default 8) best-scored moves, and only those
    that gain more than they give up. On the Ciric and Floudas case
    relocation leaves the frontier unchanged, since most moves strand a
@@ -640,6 +645,17 @@ New utility exchangers
    exchanger carries no duty is dropped. On the Ciric and Floudas case a
    cooler on H3 lets a new H1-C2 match in a new third stage save about
    $836k/y instead of $222k/y alone.
+Heat transfer enhancement
+   ``enhancement_factors`` maps an existing exchanger's id to the factor
+   its heat transfer coefficient can be raised by, tube inserts for
+   example, as limited by its geometry. An enhanced exchanger works as one
+   with its area times the factor. Each costs ``enhancement_cost`` plus
+   ``enhancement_area_cost`` per m2 of its installed area, and adds no area.
+   The stepwise search tries enhancing each exchanger at its area limit as
+   a step; the default search, after sizing a structure, sizes it again
+   with the exchangers it would enlarge enhanced where they have a factor,
+   and keeps the better design. Pressure drop is not modelled: leave out
+   exchangers whose stream cannot take more.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
@@ -684,6 +700,21 @@ Akpomiemie and Smith (2018), simplified crude preheat train
    stepwise search, counting each enlarged exchanger as a step, needs seven
    steps and every new-match position (811 solves), and stops at 20.5 %
    after six with four candidates.
+
+   Enhancement (Section 5.1, Tables 5, 6 and 8): with the paper's factors
+   for E5 (U from 0.325 to 0.448) and E1 (0.517 to 0.669), inserts at $500
+   plus $10/m2 and no other changes allowed, the stepwise search enhances E5
+   and then E1, as the paper does, and reaches 13,545 kW against its
+   13,661.52 kW (5.7 % saved from the rated base against 5.5 %). The paper's
+   next candidate, E2, breaks the cold stream's pressure drop limit and is
+   left out. Combining enhancement with structural changes (Section 5.3),
+   with relocation at $10,000 and factors for every exchanger the paper
+   enhances: the first change becomes the paper's relocation of E7 with
+   five exchangers enhanced ($762k/y net against $621k/y without
+   enhancement), and at two changes enhancement cuts capital from $506k to
+   $346k and added area from 1,473 to 932 m2, raising the net benefit from
+   $740k/y to $934k/y. The paper reports about 65 % more retrofit profit
+   from the combination, under its own sizing and pressure drop limits.
 
 The default (structure-first) and stepwise searches compared (report costs; Smith's
 Table 5 costs at a 10 K approach):
