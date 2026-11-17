@@ -323,6 +323,22 @@ def _unit_spec(default: str, group: str, field: str) -> ConfigurationFieldSpec:
 
 
 # fmt: off
+# Model families a registered heat pump and refrigeration cycle names beyond
+# HeatPumpAndRefrigerationCycle (analysis/heat_pumps/cycles/registry.py).
+_REGISTERED_HPR_TYPES: set[str] = set()
+
+
+def register_hpr_type(value: str) -> None:
+    """Accept ``value`` as an ``HPR_TYPE``: a registered cycle's model family."""
+    _REGISTERED_HPR_TYPES.add(str(value))
+
+
+def _hpr_type(name: str, value: Any) -> Any:
+    if isinstance(value, str) and value in _REGISTERED_HPR_TYPES:
+        return value
+    return _enum_value(name, value, HeatPumpAndRefrigerationCycle)
+
+
 CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Problem shape and state handling.
     "PROBLEM_TOP_ZONE_NAME": _spec(str, "Site", "problem", "top_zone_name"),
@@ -437,7 +453,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_RUN_ID": _spec(str, "default", "hens", "run_id", validator=_run_id),
     "HENS_BEST_SOLUTIONS_TO_SAVE": _spec(int, 1, "hens", "best_solutions_to_save", numeric_min=1.0, validator=_positive_int),
     # Heat pump and refrigeration.
-    "HPR_TYPE": _spec(str, HeatPumpAndRefrigerationCycle.CascadeCarnot.value, "hpr", "type", enum_cls=HeatPumpAndRefrigerationCycle),
+    "HPR_TYPE": _spec(str, HeatPumpAndRefrigerationCycle.CascadeCarnot.value, "hpr", "type", enum_cls=HeatPumpAndRefrigerationCycle, validator=_hpr_type),
     "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode", validator=partial(_string_choice, choices=HPR_LOAD_MODE_VALUES)),
     "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0, numeric_max=1.0),
     "HPR_LOAD_DUTY": _spec(float | None, None, "hpr", "load_duty", numeric_min=0.0),

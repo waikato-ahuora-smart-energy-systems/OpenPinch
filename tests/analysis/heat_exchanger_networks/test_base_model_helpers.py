@@ -27,8 +27,10 @@ from OpenPinch.analysis.heat_exchanger_networks.models._base.area import (
     _post_process_lmtd,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import (
+    _assign_value,
     _set_value,
     _solver_value,
+    _value,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models._base.parameters import (
     _normalise_state_arrays,
@@ -97,8 +99,8 @@ class _FakeModel:
         self.intermediates.append(value)
         return value
 
-    def Var(self, *, value, ub, lb, name):
-        self.variables.append({"value": value, "ub": ub, "lb": lb, "name": name})
+    def Var(self, *, value, ub, lb):
+        self.variables.append({"value": value, "ub": ub, "lb": lb})
         return value
 
     def Equation(self, expression):
@@ -260,6 +262,62 @@ def test_base_model_scalar_helpers_and_value_assignment():
     # verification reports its duty without area instead of a made-up one.
     for crossed in ((0.0, 10.0), (10.0, -1.0)):
         assert _post_process_lmtd(model, *crossed, 0.5, formula_allowed=False) == 0.0
+
+
+class _FixedParameter(_PyomoLikeVariable):
+    """A parameter, already fixed, that records how its value was set."""
+
+    def __init__(self, value):
+        super().__init__(value=value, fixed=True)
+        self.validated = None
+
+    def fix(self, value):
+        raise AssertionError("a fixed parameter was fixed again")
+
+    def set_value(self, value, skip_validation=False):
+        self.value = value
+        self.validated = not skip_validation
+
+
+def test_setting_a_parameter_neither_refixes_nor_validates_it():
+    # Warm start writes about 9 million parameters per pulp mill design;
+    # fixing each again ran Pyomo's domain and bound check, which a
+    # parameter (an unbounded real) always passes.
+    parameter = _FixedParameter(1.0)
+
+    _set_value(_model(), parameter, 7.0)
+
+    assert parameter.value == pytest.approx(7.0)
+    assert parameter.fixed
+    assert parameter.validated is False
+
+
+def test_assigning_a_parameter_neither_refixes_nor_validates_it():
+    # Copying a solved network into a model writes millions of parameters.
+    parameter = _FixedParameter(1.0)
+
+    _assign_value(parameter, [3.0])
+
+    assert parameter.value == pytest.approx(3.0)
+    assert parameter.fixed
+    assert parameter.validated is False
+
+
+class _UnindexableVariable:
+    """A Pyomo variable: it holds its number in ``value`` and has no ``[0]``."""
+
+    value = 4.0
+
+    def __getitem__(self, index):
+        raise AssertionError("a variable was read by indexing it")
+
+
+def test_value_reads_a_variable_without_trying_to_index_it():
+    # Trying ``variable[0]`` first raised and caught a TypeError on every
+    # read: 0.47 us instead of 0.14 us, 38 million times per pulp mill design.
+    assert _value(_UnindexableVariable()) == pytest.approx(4.0)
+    assert _value([2.5]) == pytest.approx(2.5)
+    assert _value(1) == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize("ends", [(10.0, 50.0), (50.0, 10.0)])
@@ -724,3 +782,13 @@ def test_utility_approach_equations_skip_streams_inactive_in_a_period(inactive_b
     # Both terminals of the heater in both periods, the cooler in base only.
     assert len(model.m.equations) == 6
     assert all(model.m.equations)
+
+
+def test_setting_a_plain_number_slot_to_another_value_is_refused():
+    # A disallowed match's slot is a plain number. Dropping a different
+    # value silently lost the warm-start outlet temperatures that evolution
+    # starts an added match from.
+    _set_value(_model(), 0.0, 0.0)
+
+    with pytest.raises(ValueError, match="constant"):
+        _set_value(_model(), 0.0, 85.0)

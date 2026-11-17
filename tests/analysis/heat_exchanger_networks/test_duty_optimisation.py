@@ -1574,3 +1574,190 @@ def test_rating_design_points_follow_the_solver_periods_and_utility_temperatures
     assert spec.utility_design_points[heater] == {0: (500.0, 30.0, 90.0, None)}
     assert set(spec.recovery_design_points[0]) == {0}
     assert spec.recovery_design_points[0][0] == (120.0, 20.0, 10.0, None)
+
+
+def test_utility_cost_goal_loads_the_cheaper_utility_first() -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.context import (
+        ensure_target_results,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        build_duty_optimisation_request,
+        fixed_network_structure,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    # LPS (40 $/MWh, 600 K) and HPS (80 $/MWh) both heat C1 in series. Any
+    # split costs the same duty, so only a cost objective fixes it: LPS
+    # takes C1 from 490 K (after recovery) to 590 K, HPS the rest to 650 K.
+    lps = _utility("LPS", "Hot", 600.0, 600.0, 40.0, 5.0)
+    problem = PinchProblem(_small_payload(extra_hot_utility=lps))
+    ensure_target_results(problem, {}, None)
+    network = _with(
+        HeatExchangerNetwork.from_structure(
+            recovery=[("H1", "C1", 1)],
+            heaters=["C1"],
+            coolers=["H1"],
+            hot_utility="HPS",
+            cold_utility="CW",
+        ),
+        _utility_exchanger(
+            HeatExchangerKind.HOT_UTILITY, "LPS", "C1", exchanger_id="lps"
+        ),
+    )
+    arrays = problem_to_solver_arrays(
+        problem, 2.0 * problem.master_zone.config.thermal.dt_cont
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", min_approach_temperature=10.0
+    )
+    structure = fixed_network_structure(request, arrays.axis_maps)
+    model = scipy_fixed_structure_model()(
+        name="ceiling",
+        solver="ipopt-pyomo",
+        solver_arrays=arrays,
+        spec=structure.spec,
+        minimisation_goal="utility cost",
+        default_approach=10.0,
+    )
+
+    model.optimise()
+
+    assert model.mSuccess == 1
+    hot_utilities = arrays.axis_maps["hot_utilities"]
+    lps_index = next(i for n, i in hot_utilities.items() if n.endswith("LPS"))
+    duties = {
+        "LPS" if match.utility == lps_index else "HPS": result.periods[0].duty
+        for match, result in zip(structure.spec.utilities, model.utility_results)
+        if match.side == "hot"
+    }
+    assert duties["LPS"] == pytest.approx(500.0, abs=0.5)
+    assert duties["HPS"] == pytest.approx(300.0, abs=0.5)
+
+
+def _retrofit_small_model(
+    recovery_area: float, solver_factory=None, enhancement=None, design_points=None
+):
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.context import (
+        ensure_target_results,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        build_duty_optimisation_request,
+        fixed_network_structure,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    problem = PinchProblem(_small_payload())
+    ensure_target_results(problem, {}, None)
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("H1", "C1", 1)],
+        heaters=["C1"],
+        coolers=["H1"],
+        hot_utility="HPS",
+        cold_utility="CW",
+    )
+    arrays = problem_to_solver_arrays(
+        problem, 2.0 * problem.master_zone.config.thermal.dt_cont
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", min_approach_temperature=10.0
+    )
+    structure = fixed_network_structure(request, arrays.axis_maps)
+    # The recovery unit is installed small (its area binds); the utility
+    # units are installed far larger than they need.
+    spec = replace(
+        structure.spec,
+        recovery_areas={0: recovery_area},
+        utility_areas={e: 1.0e4 for e in range(len(structure.spec.utilities))},
+        enhanced_recovery=enhancement or {},
+        recovery_design_points=design_points or {},
+    )
+    factory = solver_factory or fixed_model.FixedStructureModel
+    return factory(
+        name="retrofit",
+        solver="ipopt-pyomo",
+        solver_arrays=arrays,
+        spec=spec,
+        minimisation_goal="retrofit",
+        default_approach=10.0,
+    )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_area_values_match_the_cost_of_more_area() -> None:
+    area = 2.0
+    model = _retrofit_small_model(area)
+    model.optimise(print_output=False)
+    larger = _retrofit_small_model(1.01 * area)
+    larger.optimise(print_output=False)
+
+    assert model.mSuccess == 1 and larger.mSuccess == 1
+    saved = model.utility_cost_value - larger.utility_cost_value
+    assert saved > 0.0
+    # $/y per m2 of the recovery unit's installed area, from its cap's dual.
+    value = model.area_values[("recovery", 0)]
+    assert value == pytest.approx(saved / (0.01 * area), rel=0.02)
+    # The utility units are far from their caps: more area is worth nothing.
+    assert all(
+        v == pytest.approx(0.0, abs=1e-6)
+        for (side, _index), v in model.area_values.items()
+        if side == "utility"
+    )
+
+
+def test_an_enhanced_unit_works_as_one_with_its_area_times_the_factor() -> None:
+    # Enhancement raises the unit's heat transfer coefficient by the
+    # factor, so 2 m2 enhanced 1.5 times recovers what 3 m2 plain does.
+    factory = scipy_fixed_structure_model()
+    enhanced = _retrofit_small_model(2.0, factory, enhancement={0: 1.5})
+    plain = _retrofit_small_model(3.0, factory)
+    small = _retrofit_small_model(2.0, factory)
+    for model in (enhanced, plain, small):
+        model.optimise()
+        assert model.mSuccess == 1
+
+    def recovered(model):
+        return model.recovery_results[0].periods[0].duty
+
+    assert recovered(small) < recovered(plain)
+    assert recovered(enhanced) == pytest.approx(recovered(plain), rel=1e-4)
+
+
+def test_the_retrofit_goal_reports_how_far_its_rating_outruns_verification() -> None:
+    # The model calibrates an installed unit at its design point and rates
+    # other states with Chen's LMTD; verification sizes with the exact LMTD
+    # (or summed slice areas). Each installed unit reports the most extra
+    # area verification needs over the model, at least 1: its period
+    # required area times the cap's factor and Chen LMTD over the duty.
+    model = _retrofit_small_model(
+        2.0,
+        scipy_fixed_structure_model(),
+        design_points={0: {0: (100.0, 40.0, 2.0, None)}},
+    )
+    model.optimise()
+    assert model.mSuccess == 1
+
+    period = model.recovery_results[0].periods[0]
+    coefficient = 0.5  # h = 1 on both streams
+    factor = fixed_model._design_factor((100.0, 40.0, 2.0, None), coefficient)
+    expected = (
+        period.required_area
+        * factor
+        * coefficient
+        * fixed_model.chen_lmtd(*period.approach)
+        / period.duty
+    )
+    assert expected > 1.0
+    assert model.rating_allowances[("recovery", 0)] == pytest.approx(expected)
+    assert all(
+        value == pytest.approx(1.0)
+        for (side, _index), value in model.rating_allowances.items()
+        if side == "utility"
+    )

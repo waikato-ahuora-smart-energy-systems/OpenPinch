@@ -4,6 +4,195 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.9.2 (2026-11-17)
+------------------
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- A registered cycle can name a model family of its own as a string
+  topology family, with no new ``HeatPumpAndRefrigerationCycle`` member:
+  ``register_cycle`` makes it a valid ``HPR_TYPE``, and
+  ``target.heat_pump_and_refrigeration`` runs it. Families compare by
+  ``HPR_TYPE`` value (``family_value``).
+
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed: a fixed-structure solve (``optimise_duties``, retrofit) could be
+  infeasible when a segmented stream's heat capacity falls along it, as
+  the duty bounds used the exact total while the balances use the
+  rounded profile. Verification now accepts a segmented exchanger with
+  more area than its duty needs, as it already did for single-segment
+  exchangers, so an existing network with segmented streams can be rated.
+- Fixed: ``design.retrofit`` no longer stops when a move leaves a structure
+  the model cannot build (streams with no utility exchanger whose loads
+  cannot balance); the move is dropped. Verification now allows an
+  installed exchanger the extra duty the model rates it for off its design
+  point, so a multi-period network OpenPinch designed rates again. The
+  default search ranks at most ``ceiling_relocations`` (default 400)
+  relocations per design; the 72-exchanger pulp mill offers 14,617.
+- Fixed: with ``HENS_MAX_PARALLEL`` above 1, each task's network enters a
+  ``HeatExchangerNetworkRecord`` as soon as its task finishes, not after
+  slower tasks submitted before it.
+- New ``HeatExchangerNetworkRecord``
+  (``OpenPinch.analysis.heat_exchanger_networks.results.record``), passed as
+  ``design.heat_exchanger_network(record=...)``: a thread-safe record that
+  receives every network as soon as it is verified and costed in its final
+  form, for another thread to poll with ``version``, ``snapshot()`` and
+  ``changed_since(version)``. Worker processes send their networks to the
+  calling process. See "Networks as They Are Found" in the HEN synthesis
+  guide; tutorial 16 follows its deeper search this way.
+- A synthesis result now ranks every verified network of the run, including
+  each improvement an evolution search finds while it runs, not only the
+  network each task ends with. A network enters only with a converged solve,
+  a total annual cost and a passing feasibility check, so a successful
+  outcome without a total annual cost is no longer accepted.
+- A multiperiod design on a median or period basis now fits every network to
+  every period, and an overdesign margin rates every network, before it is
+  ranked; the cheapest fitted (and rated) network is selected, which can
+  differ from fitting the cheapest basis network alone. These designs take
+  longer, since each network costs a fit and, with a margin, its ratings.
+- New ``design.retrofit(existing, ...)`` finds cost-effective modifications
+  of an existing network. The existing network, with every exchanger's
+  installed area, is rated, then changed one structural step at a time, as
+  in network evolution: a new match (joining a stage or in a new one) or,
+  with ``relocation_cost``, an existing recovery exchanger moved with its
+  area to another match or position. Following the network pinch approach
+  of Smith's group, candidate changes are ranked by the utility their
+  structure reaches with unlimited area, and the best are solved on the
+  fixed-structure model with a new ``"retrofit"`` goal that also sizes the
+  added area each structure needs (existing area sunk; added area, new
+  units, area additions and splits priced). New matches are screened by the
+  utility they could cut at first order. With ``new_utility_units=True`` a
+  change may come with the new end heater or cooler that frees the units it
+  needs. ``max_added_area_fraction`` caps the area added to an existing
+  exchanger. ``enhancement_factors``, ``enhancement_cost`` and
+  ``enhancement_area_cost`` add heat transfer enhancement (tube inserts)
+  of existing exchangers as a move, checked against Akpomiemie and Smith
+  (2018); ``enhancement_pressure_drops`` and ``pressure_drop_allowances``
+  keep inserts within each stream's pressure drop allowance. With Ipopt the stepwise search adds area only on exchangers whose
+  area is worth something, from the solver's duals; the fixed-structure
+  model reports them as ``area_values`` and has a ``"utility cost"`` goal.
+  ``HENS_MAX_PARALLEL`` runs each step's solves on threads.
+  Every design is checked as optimised duties are (approaches, heat
+  balances, areas). The result's ``frontier`` gives the best design
+  for each number of structural changes with savings, capital, payback and
+  net annual benefit, and marks dominated ones; ``strategy="stepwise"``
+  instead counts each area addition as a step. Network mappings for
+  ``optimise_duties`` and ``retrofit`` now take entries as mappings with
+  ``area`` and ``id``. Demonstrated in notebook 16 on the Ciric and Floudas
+  (1989) case, now packaged as ``Five-stream-Ciric-and-Floudas-1989.json``,
+  and checked against Akpomiemie and Smith's (2018) crude preheat train,
+  whose published retrofit targets it reproduces; see "Retrofit of an
+  Existing Network" in the HEN synthesis guide.
+- The heuristic pinch design method realises networks faster: side
+  proposals that solve to a side network already found are not paired,
+  since each pairing would repeat a network; they stand in only for a
+  pairing that fails. On the
+  12 OpenHENS cases at the default width and depth 0 it takes about 23 %
+  less time at 10 networks per multiplier, with the same best networks and
+  at least as many distinct ones. ``heuristic_report`` counts the dropped
+  sides as ``repeated_sides``.
+- A heuristic side that leaves a stage empty is no longer dropped as a
+  repeat of the same side network without one. Only a pairing with an empty
+  stage is re-solved at stage reduction, which can rebalance duties into
+  another network: on Four-stream Escobar the dropped side gave a network
+  with one heater fewer, the parent of the cheapest evolved network
+  (352,267 against 358,065 before evolution explored two branches). On the
+  12 OpenHENS cases at the default width and depth the best networks are
+  unchanged and the run takes about 1 % longer.
+- A heuristic side proposal's solve is limited to 10 s
+  (``HEURISTIC_SIDE_TIME_LIMIT``, unless the solver options set a limit),
+  and a side stopped there is dropped, as its incumbent need not hold the
+  minimum utility. The solve is a MIP over the proposal's matches, and on
+  the Six-stream Spray Dryer case at the default width and depth HiGHS did
+  not close one in hours, so the design never finished. It now takes 171 s
+  (8,256,978 TAC), with 14 of its 404 side solves stopped; on the other 11
+  OpenHENS cases every side solve takes at most 0.25 s and the best
+  networks and run times are unchanged.
+- ``HENS_HEURISTIC_PDM_NETWORKS`` defaults to 50 heuristic networks per
+  dt_cont multiplier at search depths 0 to 3 (was 10 at depths 0 to 2 and 20
+  at depth 3); depth 4 already used 50. With the faster realisation, the 12
+  OpenHENS cases at depth 0 take about 50 s instead of 22 s at 10, give
+  about 2.7 times as many distinct networks, and improve the best network on
+  four cases. The pulp mill case takes 188 s instead of 45 s, finds 11
+  minimum-unit networks instead of 2, and its best network is within 0.01 %.
+  Set ``HENS_HEURISTIC_PDM_NETWORKS`` to 10 for the earlier, faster search.
+- Network evolution explores two add and two remove branches per step by
+  default (``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now
+  default to 2 at search depths 1 and 2, was 1), and the evolution tasks of
+  a serial stage share the topologies they have solved, so a topology one
+  task solved is reused by the next rather than solved again. Tasks solved
+  in worker processes (``HENS_MAX_PARALLEL`` above 1) do not share. On the
+  12 OpenHENS cases at the default width and depth, the best network costs
+  less on five cases (Five-stream Bogataj 4.0 %, Thirteen-stream Kim 1.6 %,
+  Four-stream Escobar 1.6 %, Five-stream Kim 1.2 %, Ten-stream Ahmad
+  0.04 %), each with one to four fewer units, and no case is worse; the run
+  takes about as long (+2 %). On the pulp mill, chocolate factory and crude
+  preheat sample cases the best networks are within 0.01 % and the runs take
+  about 40 % longer. Set both options to 1 for the earlier single-path
+  search.
+- Post-processing a solved stage-wise model is faster. The alpha flow-on
+  system computes each stream's flow-on terms once per stage rather than once
+  per partner, and drops zero terms when it builds them. Flow fractions read
+  each solved value once. Per-match work whose result was discarded, and a
+  utility price recomputed for every match, are gone. On the pulp mill
+  sample case a design drops from 76 s to 65 s, with the same network.
+- Adopting an evolved stage-wise topology keeps the candidate's solved
+  utility and area costs as numbers instead of deep-copying their Pyomo
+  expressions, each of which copied the candidate's whole model. On the pulp
+  mill sample case its eight adoptions take 0.7 s instead of about 10 s, with
+  the same network.
+- Building a design stage's tasks copies the prepared zone once, not on
+  every read: ``PinchProblem.master_zone`` deep-copies the whole zone tree,
+  and each task read it many times for its settings and solver arrays. On
+  the pulp mill sample case a design reads it 3 times instead of 139, which
+  saves about 6.5 s, with the same network.
+- Stage-wise post-processing is faster. Reading a solved Pyomo variable no
+  longer tries to index it first; post-processing reads an inactive match's
+  approaches not at all and each stream temperature once; and the alpha
+  flow-on step builds its fractions and sparse system as NumPy arrays, with
+  the same values to the last place. On the pulp mill sample case
+  post-processing takes about 11 s of CPU time instead of 32 s, and the
+  design about 154 s instead of 181 s, with the same network.
+- Building a stage-wise model is faster: parameter blocks are fixed as a
+  whole when allocated, the Pyomo module is looked up once per model, and the
+  big-M values and duty bounds that multiply binaries are Python floats, so
+  Pyomo builds those terms without NumPy's ufunc dispatch. On the pulp mill
+  sample case the 276 stage-wise builds of a design take about 37 s of CPU
+  time instead of 58 s, and the design about 157 s instead of 175 s, with the
+  same network.
+- A script piped to Python on stdin (``python - <<EOF``) or run from a
+  string no longer crashes network synthesis or multistart optimisation with
+  ``BrokenProcessPool`` under the spawn or forkserver start method (the macOS
+  default). Worker processes cannot rerun such a main module, so its tasks
+  are solved serially with a warning, as for a script with no main guard.
+- Extracting a network from a solved model is faster: a solved Pyomo
+  variable's value is read before asking what the object is, and a recovery
+  match's binary is read once rather than once per period. Extracted
+  networks are unchanged.
+- Building index grids and writing parameters is cheaper. A grid is built
+  with one call per cell rather than a recursive helper call per cell, and a
+  parameter that is already fixed is written without being fixed again,
+  which ran Pyomo's domain and bound check on every write. On the pulp mill
+  sample case a design takes about 124 s of CPU time instead of 130 s, with
+  the same network.
+- The amalgamated pinch design network is built without constraints or an
+  objective. It holds the above- and below-pinch sides' solved values and is
+  only read, never solved, so a values-only model (``values_only=True``) has
+  the same variables and parameters and refuses to be solved. On the pulp
+  mill sample case this saves about 20 s of CPU time per design (107 s
+  instead of 128 s, measured before the index-grid change above), with the
+  same network.
+- Building stage-wise models is cheaper. Variables come from preallocated
+  blocks, as parameters already did; model components are no longer given
+  names, which were never used; and a disallowed match's duty, approach
+  temperatures, binary and branch fractions are plain numbers instead of
+  fixed Pyomo parameters, which also makes loading a model into HiGHS
+  faster. On the pulp mill sample case a design takes about 85 s of CPU
+  time instead of 108 s, with the same network.
+
 0.9.1 (2026-11-16)
 ------------------
 

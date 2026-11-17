@@ -124,6 +124,7 @@ DESIGN_TUTORIALS = {
     "thermal_derivative": 16,
     "network_evolution": 16,
     "optimise_duties": 16,
+    "retrofit": 16,
 }
 PLOT_TUTORIALS = {
     "catalog": 1,

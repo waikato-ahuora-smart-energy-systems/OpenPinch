@@ -86,7 +86,7 @@ class SynthesisWorkflowSettings:
     evm_n_ad_branches: int | None = None
     evm_n_rm_branches: int | None = None
     # Cap on heuristic pinch design networks per multiplier; 0 runs none.
-    heuristic_pdm_networks: int = 10
+    heuristic_pdm_networks: int = 50
     # Heuristic networks per multiplier that seed evolution, cheapest first.
     heuristic_pdm_evolution_seeds: int = 3
     pdm_milp: bool = False

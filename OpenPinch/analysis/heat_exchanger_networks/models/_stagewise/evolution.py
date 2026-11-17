@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -38,6 +42,31 @@ class _EvolutionBranchState:
     signature: tuple[tuple[int, int, int], ...] = ()
 
 
+_IMPROVEMENT_CALLBACK: ContextVar[Callable[[Any], None] | None] = ContextVar(
+    "openpinch_hen_evolution_improvement", default=None
+)
+
+
+@contextmanager
+def reporting_improvements(callback: Callable[[Any], None]) -> Iterator[None]:
+    """Pass each candidate that improves on its search's best to ``callback``.
+
+    Searches run in the enclosed block call it as they go, with the solved,
+    verified candidate model, in the order the search accepts them.
+    """
+    token = _IMPROVEMENT_CALLBACK.set(callback)
+    try:
+        yield
+    finally:
+        _IMPROVEMENT_CALLBACK.reset(token)
+
+
+def _report_improvement(candidate) -> None:
+    callback = _IMPROVEMENT_CALLBACK.get()
+    if callback is not None:
+        callback(candidate)
+
+
 def _stagewise_model_class():
     from ..stagewise import StageWiseModel
 
@@ -54,6 +83,7 @@ def get_net_benefit_evolution(
     no_improvement_patience: int | None = None,
     *,
     beam_width: int = 4,
+    solved_topologies: dict | None = None,
 ):
     """Evolve topology using branched add/remove net-benefit heuristics.
 
@@ -61,6 +91,10 @@ def get_net_benefit_evolution(
     broken on the topology signature), and a topology is solved at most once
     over the whole run, so the solve count is bounded by the beam width rather
     than growing towards (add + remove branches) ** depth.
+
+    ``solved_topologies`` is a store shared by the searches of one run: a
+    topology another search already solved, on the same model inputs, is
+    reused rather than solved again.
     """
 
     if owner.mSuccess != 1:
@@ -72,11 +106,13 @@ def get_net_benefit_evolution(
     max_parallel = max(1, int(max_parallel))
     if no_improvement_patience is not None:
         no_improvement_patience = max(1, int(no_improvement_patience))
+    solved = _shared_solved_topologies(owner, solved_topologies)
     if n_ad_branches == 1 and n_rm_branches == 1 and no_improvement_patience is None:
         return _get_source_net_benefit_evolution(
             owner,
             print_output=print_output,
             max_depth=max_depth,
+            solved=solved,
         )
     beam_width = max(1, int(beam_width))
     seen_signatures: set[tuple[tuple[int, int, int], ...]] = set()
@@ -116,6 +152,7 @@ def get_net_benefit_evolution(
             specs,
             print_output=print_output,
             max_parallel=max_parallel,
+            solved=solved,
         )
         next_frontier: list[_EvolutionBranchState] = []
         for spec, candidate in solved_candidates:
@@ -150,6 +187,7 @@ def get_net_benefit_evolution(
             next_frontier.append(branch_period)
             if best_model is None or candidate.TAC < best_model.TAC:
                 best_model = candidate
+                _report_improvement(candidate)
         # Keep the best branches by TAC, ties broken on topology signature, so
         # the frontier never grows past the beam width.
         next_frontier.sort(
@@ -180,14 +218,16 @@ def _get_source_net_benefit_evolution(
     *,
     print_output: bool,
     max_depth: int,
+    solved: dict | None = None,
 ):
     """Run the original OpenHENS single-path add/remove evolution search."""
 
     model = owner
     best_model = _benchmark_model(owner)
-    # Topologies already solved in this search, by signature: the search
-    # cycles through the same moves, and a re-solve finds the same network.
-    solved: dict[tuple[tuple[int, int, int], ...], Any] = {}
+    # Topologies already solved, by signature: the search cycles through the
+    # same moves, and a re-solve finds the same network.
+    if solved is None:
+        solved = {}
     for unit in range(max_depth):
         logger.debug(
             "Evolution step %s/%s - Current TAC: %s",
@@ -218,6 +258,7 @@ def _get_source_net_benefit_evolution(
             break
         if best_model is None or model.TAC < best_model.TAC:
             best_model = model
+            _report_improvement(model)
             logger.debug(
                 "New best model: %s found with TAC: %.6f",
                 model.name,
@@ -230,6 +271,32 @@ def _get_source_net_benefit_evolution(
         logger.debug("No improvement found over original model.")
     owner.cleanup()
     return owner
+
+
+def _shared_solved_topologies(owner, store: dict | None) -> dict | None:
+    """This search's part of a run's store: the topologies solved on its inputs.
+
+    A child model is built from these inputs and its topology alone, so a
+    topology solved on equal inputs is the same network problem.
+    """
+
+    if store is None:
+        return None
+    arrays = json.dumps(
+        owner.solver_arrays.to_json_dict(), sort_keys=True, default=str
+    ).encode()
+    key = (
+        owner.framework,
+        owner.stages,
+        owner.dTmin,
+        owner.min_dqda,
+        owner.minimisation_goal,
+        owner.non_isothermal_model,
+        owner.solver,
+        repr(owner.solver_options),
+        hashlib.sha256(arrays).hexdigest(),
+    )
+    return store.setdefault(key, {})
 
 
 def _benchmark_model(owner):
@@ -382,19 +449,26 @@ def _solve_evolution_candidates(
     *,
     print_output: bool,
     max_parallel: int,
+    solved: dict | None = None,
 ) -> list[tuple[_EvolutionCandidateSpec, Any]]:
     if supported_workers(max_parallel) <= 1 or len(specs) <= 1:
         return [
             (spec, candidate)
             for spec in specs
-            if (candidate := _solve_evolution_candidate(owner, spec, print_output))
+            if (
+                candidate := _solve_evolution_candidate(
+                    owner, spec, print_output, solved
+                )
+            )
             is not None
         ]
 
     candidates: list[tuple[_EvolutionCandidateSpec, Any]] = []
     with ThreadPoolExecutor(max_workers=min(max_parallel, len(specs))) as pool:
         futures = {
-            pool.submit(_solve_evolution_candidate, owner, spec, print_output): spec
+            pool.submit(
+                _solve_evolution_candidate, owner, spec, print_output, solved
+            ): spec
             for spec in specs
         }
         for future in as_completed(futures):
@@ -412,6 +486,7 @@ def _solve_evolution_candidate(
     owner,
     spec: _EvolutionCandidateSpec,
     print_output: bool,
+    solved: dict | None = None,
 ):
     try:
         if spec.kind == "minus":
@@ -424,6 +499,7 @@ def _solve_evolution_candidate(
                 position=spec.position,
                 z_allowed=spec.z_allowed,
                 branch_label=_evolution_branch_label(owner, spec),
+                solved=solved,
             )
         return _build_and_solve_evolution(
             owner,
@@ -434,6 +510,7 @@ def _solve_evolution_candidate(
             position=spec.position,
             z_allowed=spec.z_allowed,
             branch_label=_evolution_branch_label(owner, spec),
+            solved=solved,
         )
     except Exception as exc:
         logger.debug(
@@ -479,6 +556,43 @@ def _select_best_candidate(
     )
 
 
+def _open_added_match_slots(owner, z_allowed) -> None:
+    """Make the slots of matches ``z_allowed`` adds to ``owner`` writable.
+
+    A disallowed match's slots are plain numbers, which take no value; each
+    becomes a parameter holding the same number, so the adopted network's
+    values can be copied in.
+    """
+
+    def open_slot(row: list, k: int) -> None:
+        if row[k].__class__ is float:
+            row[k] = owner.m.Param(value=row[k])
+
+    added = [
+        (i, j, k)
+        for i in range(owner.I)
+        for j in range(owner.J)
+        for k in range(owner.S)
+        if z_allowed[i][j][k] > 0 and not owner.z_allowed[i][j][k] > 0
+    ]
+    if not added:
+        return
+    by_period = [
+        getattr(owner, name)
+        for name in ("Q_r_by_period", "theta_1_by_period", "theta_2_by_period")
+    ]
+    if owner.non_isothermal_model:
+        by_period.append(owner.X_by_period)
+    for i, j, k in added:
+        open_slot(owner.z[i][j], k)
+        for grid in by_period:
+            for period in grid:
+                open_slot(period[i][j], k)
+        if owner.non_isothermal_model:
+            for period in owner.Y_by_period:
+                open_slot(period[j][i], k)
+
+
 def _update_with_best_model(owner, best_model) -> None:
     """Adopt the selected evolved topology while retaining this model object."""
 
@@ -502,6 +616,7 @@ def _update_with_best_model(owner, best_model) -> None:
         if len(best_model.alpha)
         else []
     )
+    _open_added_match_slots(owner, best_model.z_allowed)
     owner.z_allowed = build_index_grid(
         lambda i, j, k: best_model.z_allowed[i][j][k],
         (owner.I, owner.J, owner.S),
@@ -510,15 +625,17 @@ def _update_with_best_model(owner, best_model) -> None:
 
     owner.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
     owner.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
+    # These are Pyomo expressions on the candidate's model; deep-copying one
+    # copies that whole model. verify() only reads their solved values.
     if hasattr(best_model, "hu_cost_solver_by_period"):
-        owner.hu_cost_solver_by_period = copy.deepcopy(
+        owner.hu_cost_solver_by_period = _solved_values(
             best_model.hu_cost_solver_by_period
         )
-        owner.cu_cost_solver_by_period = copy.deepcopy(
+        owner.cu_cost_solver_by_period = _solved_values(
             best_model.cu_cost_solver_by_period
         )
     if hasattr(best_model, "recovery_area_cost_filtered"):
-        owner.recovery_area_cost_filtered = copy.deepcopy(
+        owner.recovery_area_cost_filtered = _solved_values(
             best_model.recovery_area_cost_filtered
         )
     if hasattr(best_model, "recovery_area_cost_total"):
@@ -542,6 +659,14 @@ def _update_with_best_model(owner, best_model) -> None:
     if hasattr(best_model, "solver_run"):
         owner.solver_run = best_model.solver_run
     owner.get_post_process()
+
+
+def _solved_values(values):
+    """Return ``values`` with each entry, at any list depth, read as a float."""
+
+    if isinstance(values, list):
+        return [_solved_values(value) for value in values]
+    return _value(values)
 
 
 def get_n_minus_one_evolution(

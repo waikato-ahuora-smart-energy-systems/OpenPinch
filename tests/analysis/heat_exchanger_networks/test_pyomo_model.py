@@ -23,8 +23,8 @@ pytestmark = pytest.mark.synthesis
 def test_var_has_its_bounds_start_value_and_domain():
     model = PyomoModel()
 
-    duty = model.Var(value=2.0, lb=0.0, ub=10.0, name="Q")
-    binary = model.Var(value=1, lb=0, ub=1, integer=True, name="z")
+    duty = model.Var(value=2.0, lb=0.0, ub=10.0)
+    binary = model.Var(value=1, lb=0, ub=1, integer=True)
 
     assert duty.value == pytest.approx(2.0)
     assert (duty.lb, duty.ub) == (0.0, 10.0)
@@ -36,7 +36,7 @@ def test_var_has_its_bounds_start_value_and_domain():
 def test_param_is_a_fixed_value_that_can_be_changed():
     model = PyomoModel()
 
-    selector = model.Param(value=1.0, name="active")
+    selector = model.Param(value=1.0)
     selector.fix(0.0)
 
     assert selector.fixed
@@ -60,6 +60,36 @@ def test_params_come_from_preallocated_blocks_and_unused_entries_stay_out(
     assert [pyo.value(parameter) for parameter in parameters] == [0.0, 1.0, 2.0]
     assert all(parameter.fixed for parameter in parameters)
     model.model.write(str(tmp_path / "model.nl"))
+
+
+def test_a_parameter_block_is_fixed_as_a_whole_when_allocated():
+    # Fixing each parameter as it is handed out cost about a microsecond
+    # apiece, several seconds over a pulp mill design's 14 million
+    # parameters; fixing the block at once is ten times cheaper.
+    model = PyomoModel()
+
+    parameter = model.Param(value=2.0)
+
+    block = parameter.parent_component()
+    assert all(entry.fixed for entry in block.values())
+    assert pyo.value(parameter) == pytest.approx(2.0)
+
+
+def test_building_a_model_looks_pyomo_up_only_once(monkeypatch):
+    # Looking the module up on every variable cost about a second per pulp
+    # mill design.
+    from OpenPinch.analysis.heat_exchanger_networks.solver import pyomo_model
+
+    model = PyomoModel()
+    monkeypatch.setattr(pyomo_model, "_pyomo", lambda: pytest.fail("looked up"))
+
+    x = model.Var(value=1.0, lb=0.0, ub=5.0)
+    z = model.Var(value=1, lb=0, ub=1, integer=True)
+    parameters = [model.Param(value=float(index)) for index in range(100)]
+    model.Equation(x <= model.sum([z, *parameters]))
+    model.Minimize(x)
+
+    assert z.domain is pyo.Integers
 
 
 def test_equations_become_constraints_of_the_model():
@@ -610,3 +640,70 @@ def test_a_missing_default_is_kept_when_scip_is_missing_too(monkeypatch, recwarn
 
     assert backend.stage_solver("couenne", default="couenne") == "couenne"
     assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
+
+
+def test_a_constraint_has_no_dual_until_duals_are_imported_and_solved():
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0)
+    constraint = model.Equation(x >= 1.0)
+
+    assert model.dual(constraint) is None
+    model.import_duals()
+    assert model.dual(constraint) is None
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not _solver_available('ipopt-pyomo')", reason="needs the ipopt binary"
+)
+def test_ipopt_returns_the_dual_of_a_binding_constraint():
+    model = PyomoModel()
+    x = model.Var(value=1.0, lb=0.0, ub=10.0)
+    y = model.Var(value=1.0, lb=0.0, ub=10.0)
+    binding = model.Equation(x + y >= 4.0)
+    slack = model.Equation(x <= 9.0)
+    model.Minimize(x + 3 * y)
+    model.import_duals()
+
+    backend.configure_pyomo_solver(model, "ipopt-pyomo")
+    run = backend.solve_pyomo_model(model, solver_name="ipopt-pyomo")
+
+    assert run.converged
+    # Raising the bound by 1 raises the cost by 1 (x carries it).
+    assert abs(model.dual(binding)) == pytest.approx(1.0, abs=1e-6)
+    assert model.dual(slack) == pytest.approx(0.0, abs=1e-6)
+
+
+@pytest.mark.parametrize("builder", ["Var", "Param", "Intermediate"])
+def test_model_components_take_no_name(builder):
+    # Names were never stored, yet building their strings cost about 4 s of
+    # CPU per pulp mill design.
+    model = PyomoModel()
+    arguments = {"Intermediate": (1.0,)}.get(builder, ())
+
+    with pytest.raises(TypeError, match="name"):
+        getattr(model, builder)(*arguments, name="unused")
+
+
+def test_variables_come_from_preallocated_blocks_and_unused_entries_stay_out(
+    tmp_path,
+):
+    # Adding to a VarList one variable at a time cost about 1.2 us more per
+    # variable than handing out entries of a block, several seconds over a
+    # pulp mill design's 3 million variables.
+    model = PyomoModel()
+    variables = [model.Var(value=float(index), lb=0.0, ub=5.0) for index in range(3)]
+    binary = model.Var(value=1, lb=0, ub=1, integer=True)
+    model.Equation(variables[2] + binary >= 1)
+    model.Minimize(variables[2])
+
+    block = variables[0].parent_component()
+    assert all(entry.parent_component() is block for entry in [*variables, binary])
+    assert len(block) > len(variables) + 1
+    assert [variable.value for variable in variables] == [0.0, 1.0, 2.0]
+    assert binary.domain is pyo.Integers
+    assert block[len(variables) + 1].domain is pyo.Reals
+    model.model.write(str(tmp_path / "model.nl"))
+    # The NL header's second line starts with the variable count.
+    header = (tmp_path / "model.nl").read_text().splitlines()[1].split()
+    assert int(header[0]) == 2

@@ -44,8 +44,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         integers: bool,
         tol: float,
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
+        values_only: bool = False,
     ) -> None:
         self.stages = stages
+        # A values-only model has the variables and parameters of a full one
+        # but no constraints or objective: it holds copied values, such as an
+        # amalgamated pinch design network, and is never solved.
+        self.values_only = values_only
         super().__init__(
             name=name,
             framework=framework,
@@ -105,6 +110,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         max_parallel: int = 1,
         no_improvement_patience: int | None = None,
         beam_width: int = 4,
+        solved_topologies: dict | None = None,
     ):
         """Evolve topology using branched add/remove net-benefit heuristics."""
 
@@ -117,6 +123,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             max_parallel,
             no_improvement_patience,
             beam_width=beam_width,
+            solved_topologies=solved_topologies,
         )
 
     def get_n_minus_one_evolution(

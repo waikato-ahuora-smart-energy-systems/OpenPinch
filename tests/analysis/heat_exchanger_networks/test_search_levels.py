@@ -69,10 +69,10 @@ def test_the_levels_are_the_agreed_presets():
         )
         for level in (DEPTH_LEVELS[depth] for depth in range(5))
     ] == [
-        (False, 10, False, 1),
-        (True, 10, False, 1),
-        (True, 10, True, 1),
-        (True, 20, True, 2),
+        (False, 50, False, 1),
+        (True, 50, False, 2),
+        (True, 50, True, 2),
+        (True, 50, True, 2),
         (True, 50, True, 3),
     ]
 
@@ -82,12 +82,12 @@ def test_by_default_synthesis_searches_width_one_at_depth_one():
 
     assert (settings.search_width, settings.search_depth) == (1, 1)
     assert settings.dt_cont_multipliers == (0.75, 1.0, 1.5)
-    assert settings.heuristic_pdm_networks == 10
+    assert settings.heuristic_pdm_networks == 50
     assert settings.pdm_milp is False
     assert settings.runs_evolution is True
     assert settings.runs_thermal_derivative_method is False
-    assert settings.effective_evm_n_ad_branches == 1
-    assert settings.effective_evm_n_rm_branches == 1
+    assert settings.effective_evm_n_ad_branches == 2
+    assert settings.effective_evm_n_rm_branches == 2
 
 
 def test_the_levels_set_the_options_left_unset():

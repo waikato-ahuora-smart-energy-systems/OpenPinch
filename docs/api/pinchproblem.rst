@@ -116,6 +116,11 @@ Interaction Matrix
      - design view
      - designed
      - HEN solver
+   * - ``design.retrofit``
+     - Find cost-effective modifications of an existing network
+     - ``HeatExchangerNetworkRetrofitResult``
+     - none
+     - HEN solver
    * - ``summary_frame``, ``metrics``, ``report`` and state properties
      - Inspect prepared or cached state
      - dataframe, mapping, report, or record

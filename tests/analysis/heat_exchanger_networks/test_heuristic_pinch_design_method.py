@@ -106,13 +106,13 @@ def test_tasks_run_one_per_multiplier_with_the_network_cap():
     assert all(task.settings["heuristic_networks"] == 4 for task in tasks)
 
 
-def test_the_heuristic_gives_ten_networks_and_depth_two_adds_the_milp():
+def test_the_heuristic_gives_fifty_networks_and_depth_two_adds_the_milp():
     settings = workflow_settings_from_problem(_small_problem_with_options({}))
     shallow = workflow_settings_from_problem(
         _small_problem_with_options({"HENS_SEARCH_DEPTH": 1})
     )
 
-    assert settings.heuristic_pdm_networks == 10
+    assert settings.heuristic_pdm_networks == 50
     assert settings.pdm_milp is True
     assert shallow.pdm_milp is False
     assert shallow.runs_milp_pinch_design is False
@@ -392,7 +392,7 @@ def test_the_network_cap_comes_from_the_configuration():
         workflow_settings_from_problem(
             _small_problem_with_options({})
         ).heuristic_pdm_networks
-        == 10
+        == 50
     )
 
 
@@ -564,4 +564,26 @@ def test_evolution_can_add_a_utility_the_parent_did_not_use():
     design = problem.design.heat_exchanger_network(depth=1)
 
     assert design.selected_network.total_annual_cost < 8.5e6
+    assert verify_network_feasibility(design.selected_network) == ()
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_highs_available() and _ipopt_available())", reason="needs HiGHS and Ipopt"
+)
+def test_default_synthesis_finds_escobars_cheapest_network():
+    # Dropping a heuristic side as a repeat lost the parent of this network:
+    # evolution from the network left gave 358,065, 1.6 % dearer.
+    payload = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "tests/fixtures/openhens/Four-stream-Escobar-and-Trierweiler-2013-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    payload["options"] |= {"HENS_OUTPUT_FORMATS": [], "HENS_MAX_PARALLEL": 1}
+    problem = PinchProblem(source=payload, project_name="escobar")
+
+    design = problem.design.heat_exchanger_network()
+
+    assert design.selected_network.total_annual_cost == pytest.approx(352_267, rel=1e-4)
     assert verify_network_feasibility(design.selected_network) == ()

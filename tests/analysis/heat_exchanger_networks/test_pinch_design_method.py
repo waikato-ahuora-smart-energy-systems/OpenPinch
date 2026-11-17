@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -275,7 +275,8 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
         f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
     )
     monkeypatch.setattr(
-        f"{executor_module}._main_module_reruns_in_workers", lambda: True
+        f"{executor_module}._main_module_blocks_workers",
+        lambda: "the main script has no main guard",
     )
     # A platform with worker processes, so Pyodide reaches the pool too.
     monkeypatch.setattr(sys, "platform", "linux")
@@ -286,6 +287,31 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
     assert [outcome.status for outcome in outcomes] == ["success", "success"]
     assert pool_starts == []
     assert "main guard" in caplog.text
+
+
+def test_local_executor_runs_serially_when_workers_cannot_import_main(
+    monkeypatch, caplog
+) -> None:
+    def forbidden_process_pool_executor(**kwargs):
+        raise AssertionError("must not start worker processes")
+
+    executor_module = "OpenPinch.analysis.heat_exchanger_networks.execution.executor"
+    monkeypatch.setattr(
+        f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
+    )
+    # A script piped in with ``python - <<EOF``: spawned workers would try to
+    # run the main module from the path "<stdin>" and fail.
+    main = ModuleType("__main__")
+    main.__file__ = "<stdin>"
+    monkeypatch.setitem(sys.modules, "__main__", main)
+    monkeypatch.setattr("multiprocessing.get_start_method", lambda: "spawn")
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    with caplog.at_level("WARNING"):
+        outcomes = _two_prebuilt_successful_tasks(monkeypatch, _process_pool)
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+    assert "<stdin>" in caplog.text
 
 
 def test_user_couenne_options_are_written_to_model_run_directory(
@@ -563,6 +589,39 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._get_active_stages(case) == [0, 2]
 
 
+def test_a_search_candidate_is_extracted_with_the_tasks_arrays_and_labels(
+    monkeypatch,
+) -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as module
+
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "extract_heat_exchanger_network",
+        lambda model, arrays, **kwargs: calls.append((model, arrays, kwargs)),
+    )
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=_solver_arrays(),
+        framework="ESM",
+        dt_cont_multiplier=1.5,
+        synthesis_task_id="evm-task",
+    )
+    candidate = SimpleNamespace(S=3)
+
+    problem.extract_candidate_network(candidate, run_id="run")
+
+    ((model, arrays, kwargs),) = calls
+    assert model is candidate
+    assert arrays is problem.solver_arrays
+    assert kwargs == {
+        "run_id": "run",
+        "task_id": "evm-task",
+        "method": "ESM",
+        "dt_cont_multiplier": 1.5,
+        "stage_count": 3,
+    }
+
+
 def test_stage_reduction_keeps_all_stages_when_nothing_is_recovered() -> None:
     problem = InternalHeatExchangerNetworkProblem(solver_arrays=_solver_arrays())
     case = _StageReductionCase(stage_duties=[0.0, 0.0, 0.0, 0.0])
@@ -704,6 +763,71 @@ def test_stagewise_evolution_branch_frontier_selects_best_global_tac(
         "1-b1-plus1",
     ]
     assert model.updated_with == "plus-branch-best"
+
+
+def test_branched_evolution_reports_each_candidate_that_improves_its_best(
+    monkeypatch,
+) -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+    tacs = {
+        "0-b0-minus1": 120.0,
+        "0-b0-minus2": 80.0,
+        "0-b0-plus1": 90.0,
+        "0-b0-plus2": 110.0,
+    }
+
+    def solve(**kwargs):
+        label = kwargs["branch_label"]
+        z = kwargs.get("z_allowed_removed", kwargs.get("z_allowed_added"))
+        return _BranchEvolutionCase(
+            name=label,
+            tac=tacs.get(label, 70.0),
+            z=z,
+            add_candidates=((0, 0, 3),) if label == "0-b0-plus1" else (),
+        )
+
+    _patch_evolution_children(monkeypatch, minus=solve, plus=solve)
+    reported: list[str] = []
+
+    with stagewise_evolution.reporting_improvements(
+        lambda candidate: reported.append(candidate.name)
+    ):
+        model.get_net_benefit_evolution(
+            print_output=False, max_depth=2, n_ad_branches=2, n_rm_branches=2
+        )
+
+    # The root costs 100: minus2 (80) improves on it and 1-b1-plus1 (70) on
+    # that; plus1 (90) is cheaper than the root but not than minus2.
+    assert reported == ["0-b0-minus2", "1-b1-plus1"]
+
+
+def test_single_path_evolution_reports_each_improvement(monkeypatch) -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+
+    def solve(name, tac):
+        return lambda **kwargs: _BranchEvolutionCase(
+            name=name,
+            tac=tac,
+            z=kwargs.get("z_allowed_removed", kwargs.get("z_allowed_added")),
+        )
+
+    _patch_evolution_children(
+        monkeypatch, minus=solve("minus", 90.0), plus=solve("plus", 95.0)
+    )
+    reported: list[str] = []
+
+    with stagewise_evolution.reporting_improvements(
+        lambda candidate: reported.append(candidate.name)
+    ):
+        model.get_net_benefit_evolution(print_output=False, max_depth=1)
+
+    assert reported == ["minus"]
 
 
 def test_stagewise_evolution_failed_child_does_not_stop_siblings(monkeypatch) -> None:
@@ -1019,9 +1143,14 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
     evolution_flags = []
 
     def fake_get_solution(
-        self, *, print_output=True, evolution=None, model_factories=None
+        self,
+        *,
+        print_output=True,
+        evolution=None,
+        model_factories=None,
+        **evolution_options,
     ):
-        del print_output, model_factories
+        del print_output, model_factories, evolution_options
         evolution_flags.append((self.synthesis_task_id, evolution))
         if self.parent is not None:
             parent_links.append((self.synthesis_task_id, self.parent.synthesis_task_id))
@@ -1140,6 +1269,48 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
     assert max_active_count == 2
 
 
+def test_local_executor_copies_the_master_zone_once_per_stage(monkeypatch) -> None:
+    # PinchProblem.master_zone deep-copies the whole zone tree on each read.
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    tasks = build_pinch_design_method_tasks(settings)[:2]
+    assert len(tasks) == 2
+    reads = []
+    copy_zone = PinchProblem.master_zone.fget
+    monkeypatch.setattr(
+        PinchProblem,
+        "master_zone",
+        property(lambda self: reads.append(None) or copy_zone(self)),
+    )
+
+    def solve(worker_args):
+        from OpenPinch.contracts.synthesis.task import (
+            HeatExchangerNetworkSynthesisTaskOutcome,
+        )
+
+        task = worker_args[0]
+        outcome = HeatExchangerNetworkSynthesisTaskOutcome(task=task, status="failed")
+        return task, outcome, None
+
+    monkeypatch.setattr(executor_module, "_solve_built_task", solve)
+
+    LocalSynthesisExecutor().execute(
+        tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert len(reads) == 1
+
+
+def test_shared_zone_problem_keeps_the_validated_input_records() -> None:
+    # Solver arrays keep the input order and supplied flow rates from these.
+    problem = _four_stream_problem()
+    expected = problem_to_solver_arrays(problem, 10.0).axis_maps
+    shared = executor_module._ZoneCopiedOnce(problem)
+
+    assert shared._validated_data is problem._validated_data
+    assert problem_to_solver_arrays(shared, 10.0).axis_maps == expected
+
+
 def test_local_executor_passes_user_solver_options_to_internal_problem() -> None:
     problem = _four_stream_problem(
         options={
@@ -1252,15 +1423,20 @@ def test_local_executor_uses_worker_pool_for_prebuilt_tasks(monkeypatch) -> None
             self.worker_count = worker_count
 
         def __enter__(self):
+            self.submitted = 0
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            pool_calls.append((self.worker_count, self.submitted))
             return False
 
-        def map(self, func, iterable):
-            args = tuple(iterable)
-            pool_calls.append((self.worker_count, len(args)))
-            return tuple(func(item) for item in args)
+        def submit(self, func, item):
+            from concurrent.futures import Future
+
+            self.submitted += 1
+            future = Future()
+            future.set_result(func(item))
+            return future
 
     class SuccessfulInternalProblem:
         case = SimpleNamespace(solver_run=SimpleNamespace(status="ok"))
@@ -3504,6 +3680,23 @@ def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() 
     assert amalgamated.z_allowed[0][0] == [1, 1]
 
 
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
+def test_the_amalgamated_network_holds_values_only() -> None:
+    # The amalgamated network is read, never solved: building its constraints
+    # and objective was about a quarter of a pulp mill design.
+    pyo = pytest.importorskip("pyomo.environ")
+    driver = _pdm_amalgamation_driver()
+
+    amalgamated = driver.amalgamate_networks(
+        above_case=_pdm_side_result(hot_utility_target=1.0),
+        below_case=_pdm_side_result(cold_utility_target=1.0),
+    )
+
+    assert amalgamated.values_only
+    assert list(amalgamated.m.model.component_data_objects(pyo.Constraint)) == []
+
+
 def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch):
     # Couenne is an optional extra; SCIP comes with the synthesis extra and
     # also solves a pinch design side that is not linear.
@@ -3559,3 +3752,34 @@ def test_extraction_skips_the_state_of_matches_with_no_duty() -> None:
         )
         == 2
     )
+
+
+def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
+    monkeypatch,
+) -> None:
+    # Post-processing runs over every hot stream, cold stream, stage and
+    # period; per-cell work that cannot change dominated it on large cases.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        area as base_area,
+    )
+
+    model = _source_shaped_lmtd_post_process_model(StageWiseModel)
+    price_calls = []
+    approach_calls = []
+    price = base_area.recovered_utility_price
+    approach = base_approach._recovery_approach_temperature
+    monkeypatch.setattr(
+        base_area,
+        "recovered_utility_price",
+        lambda owner: price_calls.append(1) or price(owner),
+    )
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda *args: approach_calls.append(1) or approach(*args),
+    )
+
+    model.get_post_process()
+
+    assert len(price_calls) == 1
+    assert approach_calls == []

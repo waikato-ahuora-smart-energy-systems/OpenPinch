@@ -12,6 +12,7 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+    from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitResult
     from ....contracts.synthesis.view import (
         HeatExchangerNetworkGridLayout,
         HeatExchangerNetworkView,
@@ -29,6 +30,9 @@ _DEPTH_OPTIONS = (
     "HENS_EVM_N_AD_BRANCHES",
     "HENS_EVM_N_RM_BRANCHES",
 )
+# Design bases synthesised on a derived case, whose networks are then fitted
+# to every period.
+_FITTED_BASES = ("median", "period")
 
 
 class UtilityChoiceError(ValueError):
@@ -46,6 +50,57 @@ class UtilityChoiceError(ValueError):
 def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
     if value is not None:
         values[key] = value
+
+
+_RECOVERY_ENTRY_KEYS = frozenset({"hot", "cold", "stage", "area", "id"})
+_UTILITY_ENTRY_KEYS = frozenset({"stream", "utility", "stage", "area", "id"})
+
+
+def _entry_extra(entry: Mapping[str, Any], allowed, kind: str) -> dict[str, Any]:
+    unknown = sorted(str(key) for key in entry if key not in allowed)
+    if unknown:
+        raise ValueError(
+            f"a {kind} entry accepts {', '.join(sorted(allowed))}; got "
+            + ", ".join(unknown)
+            + "."
+        )
+    extra: dict[str, Any] = {}
+    if entry.get("area") is not None:
+        extra["area"] = float(entry["area"])
+    if entry.get("id") is not None:
+        extra["exchanger_id"] = str(entry["id"])
+    return extra
+
+
+def _recovery_entry(entry) -> tuple[Any, dict[str, Any]]:
+    """A recovery entry as a ``(hot, cold, stage)`` placement and extras."""
+
+    if not isinstance(entry, Mapping):
+        return entry, {}
+    extra = _entry_extra(entry, _RECOVERY_ENTRY_KEYS, "recovery")
+    return (entry["hot"], entry["cold"], entry["stage"]), extra
+
+
+def _utility_entry(entry, default: str | None, side: str) -> tuple[Any, dict]:
+    """A heater or cooler entry as a placement and extras."""
+
+    if not isinstance(entry, Mapping):
+        return entry, {}
+    extra = _entry_extra(entry, _UTILITY_ENTRY_KEYS, side[:-1])
+    utility = entry.get("utility") or default
+    if entry.get("stage") is None:
+        return (entry["stream"], utility), extra
+    return (entry["stream"], utility, entry["stage"]), extra
+
+
+def _names_no_utility(entries) -> bool:
+    """Whether a heater or cooler entry leaves its utility to the default."""
+
+    return any(
+        isinstance(entry, str)
+        or (isinstance(entry, Mapping) and entry.get("utility") is None)
+        for entry in entries
+    )
 
 
 class HeatExchangerNetworkDesignView:
@@ -336,6 +391,7 @@ class _DesignAccessor:
         max_parallel=None,
         best_solutions=None,
         solve_tolerance=None,
+        record=None,
     ) -> HeatExchangerNetworkDesignView:
         """Run HEN synthesis at a search width and depth.
 
@@ -377,72 +433,15 @@ class _DesignAccessor:
         each exchanger's approach by total annual cost, down to 0.1 K, or down
         to ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` (in ``options``) times twice
         the scaled ``THERMAL_DT_CONT`` if that is larger.
+
+        ``record``, a ``HeatExchangerNetworkRecord``, receives every network
+        as soon as it is verified and costed in its final form (fitted to
+        every period and rated at the margin where the design calls for it),
+        so another thread can poll it while the design runs. The result ranks
+        exactly the record's networks. A record collects one call.
         """
         hens = self._effective_hens(options)
         margin = self._overdesign_margin(overdesign_percentage, hens)
-        view = self._synthesise(
-            hens=hens,
-            width=width,
-            depth=depth,
-            options=options,
-            period_id=period_id,
-            design_basis=design_basis,
-            basis_clusters=basis_clusters,
-            dt_cont_multipliers=dt_cont_multipliers,
-            derivative_thresholds=derivative_thresholds,
-            stages=stages,
-            pack_stages=pack_stages,
-            solver=solver,
-            max_parallel=max_parallel,
-            best_solutions=best_solutions,
-            solve_tolerance=solve_tolerance,
-        )
-        if margin is None:
-            return view
-        return self._apply_overdesign(
-            view.selected_network,
-            margin,
-            basis=view,
-            hens=hens,
-            options=options,
-            solver=solver,
-            solve_tolerance=solve_tolerance,
-        )
-
-    def _effective_hens(self, options):
-        """The HENS configuration a call runs with: its options over the stored."""
-        from copy import copy
-
-        if options is not None and not isinstance(options, Mapping):
-            raise TypeError("design options must be supplied as a mapping.")
-        _runtime, configuration = split_runtime_and_configuration_options(options)
-        root = self._problem._require_prepared_root_zone()
-        with temporary_zone_configuration(root, configuration):
-            return copy(root.config.hens)
-
-    def _synthesise(
-        self,
-        *,
-        hens,
-        width,
-        depth,
-        options,
-        period_id,
-        design_basis,
-        basis_clusters,
-        dt_cont_multipliers,
-        derivative_thresholds,
-        stages,
-        pack_stages,
-        solver,
-        max_parallel,
-        best_solutions,
-        solve_tolerance,
-    ) -> HeatExchangerNetworkDesignView:
-        from ....analysis.heat_exchanger_networks.service import (
-            heat_exchanger_network_open_hens_method_service,
-        )
-
         basis = self._design_basis(design_basis, period_id, hens)
         arguments = dict(
             width=width,
@@ -457,10 +456,192 @@ class _DesignAccessor:
             best_solutions=best_solutions,
             solve_tolerance=solve_tolerance,
         )
-        if basis == "period":
-            return self._design_on_basis_period(period_id, **arguments)
-        if basis == "median":
-            return self._design_on_median_basis(basis_clusters, hens, **arguments)
+        if margin is None and basis not in _FITTED_BASES:
+            return self._synthesise(
+                basis=basis, period_id=period_id, record=record, **arguments
+            )
+        return self._design_finalised(
+            record,
+            basis=basis,
+            margin=margin,
+            hens=hens,
+            period_id=period_id,
+            basis_clusters=basis_clusters,
+            arguments=arguments,
+        )
+
+    def _effective_hens(self, options):
+        """The HENS configuration a call runs with: its options over the stored."""
+        from copy import copy
+
+        if options is not None and not isinstance(options, Mapping):
+            raise TypeError("design options must be supplied as a mapping.")
+        _runtime, configuration = split_runtime_and_configuration_options(options)
+        root = self._problem._require_prepared_root_zone()
+        with temporary_zone_configuration(root, configuration):
+            return copy(root.config.hens)
+
+    def _design_finalised(
+        self, record, *, basis, margin, hens, period_id, basis_clusters, arguments
+    ) -> HeatExchangerNetworkDesignView:
+        """Synthesise, admitting each network once fitted and rated.
+
+        On a derived basis every network is fitted to every period; with a
+        margin it is then rated at it. The fitted, rated networks make up
+        ``record`` and the result, whose first is selected.
+        """
+        from ....analysis.heat_exchanger_networks.errors import WorkflowContractError
+        from ....analysis.heat_exchanger_networks.results.record import (
+            HeatExchangerNetworkRecord,
+            running,
+        )
+        from ....analysis.heat_exchanger_networks.results.selection import (
+            select_network,
+        )
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
+
+        record = HeatExchangerNetworkRecord() if record is None else record
+        fit = basis in _FITTED_BASES
+        call = {key: arguments[key] for key in ("options", "solver", "solve_tolerance")}
+        # What the networks admitted now were synthesised from; a derived
+        # basis replaces it for each case it synthesises.
+        source: dict[str, Any] = {"current": {}}
+        finalised: dict[int, tuple] = {}
+        failures: list[Exception] = []
+
+        def finalise(outcome):
+            try:
+                view, fitted = self._finalise_network(
+                    outcome.network, fit=fit, margin=margin, hens=hens, **call
+                )
+            except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+                raise
+            except (ValueError, RuntimeError) as exc:
+                failures.append(exc)
+                return None
+            network = view.selected_network
+            final = outcome.model_copy(
+                update={
+                    "network": network,
+                    "objective_value": network.total_annual_cost,
+                }
+            )
+            finalised[id(final)] = (final, view, fitted, source["current"])
+            return final
+
+        with running(record, finalise=finalise):
+            if basis == "period":
+                self._design_on_basis_period(period_id, source=source, **arguments)
+            elif basis == "median":
+                self._design_on_median_basis(
+                    basis_clusters, hens, source=source, **arguments
+                )
+            else:
+                synthesis = self._synthesise(
+                    basis=basis, period_id=period_id, **arguments
+                )
+                source["current"]["synthesis"] = synthesis
+            ranked = record.outcomes()
+            if not ranked:
+                raise WorkflowContractError(
+                    "no synthesised heat exchanger network could be fitted to "
+                    "every period and rated."
+                ) from (failures[-1] if failures else None)
+            _final, view, fitted, origin = finalised[id(ranked[0])]
+            view.result.provenance = self._finalised_provenance(
+                view, fitted, origin, margin=margin
+            )
+            view.result.ranked_networks = ranked
+            select_network(view.result)
+            self._problem._results.design = view.result
+        return view
+
+    def _finalise_network(
+        self, network, *, fit, margin, hens, options, solver, solve_tolerance
+    ):
+        """``network`` in its final form: fitted to every period, then rated.
+
+        The one fit and rating path: every network a fitted or overdesigned
+        design admits goes through it. Returns the final view and the fit's
+        view (``None`` without a fit).
+        """
+        view = fitted = None
+        if fit:
+            view = fitted = self._fit_to_all_periods(
+                network,
+                options=options,
+                solver=solver,
+                solve_tolerance=solve_tolerance,
+            )
+            network = view.selected_network
+        if margin is not None:
+            view = self._overdesigned(
+                network,
+                margin,
+                hens=hens,
+                options=options,
+                solver=solver,
+                solve_tolerance=solve_tolerance,
+            )
+        return view, fitted
+
+    def _finalised_provenance(self, view, fitted, origin, *, margin):
+        """The final view's provenance: the synthesis settings it came from."""
+        from ..targeting.provenance import canonical_json
+
+        synthesis = origin["synthesis"].result.provenance
+        if fitted is not None:
+            fitted = fitted.result.provenance
+            settings = (
+                dict(fitted.effective_settings)
+                | dict(synthesis.effective_settings)
+                | origin["basis_settings"]
+            )
+            synthesis = fitted.model_copy(
+                update={
+                    "method_id": "design.heat_exchanger_network",
+                    "period_ids": tuple(self._problem.period_ids),
+                    "effective_settings_json": canonical_json(settings),
+                }
+            )
+        if margin is None:
+            return synthesis
+        settings = dict(synthesis.effective_settings) | {
+            "HENS_OVERDESIGN_PERCENTAGE": margin
+        }
+        return view.result.provenance.model_copy(
+            update={
+                "method_id": synthesis.method_id,
+                "effective_settings_json": canonical_json(settings),
+            }
+        )
+
+    def _synthesise(
+        self,
+        *,
+        basis,
+        period_id,
+        width,
+        depth,
+        options,
+        dt_cont_multipliers,
+        derivative_thresholds,
+        stages,
+        pack_stages,
+        solver,
+        max_parallel,
+        best_solutions,
+        solve_tolerance,
+        record=None,
+    ) -> HeatExchangerNetworkDesignView:
+        """Synthesise on this problem: one period, or over every period."""
+        from ....analysis.heat_exchanger_networks.service import (
+            heat_exchanger_network_open_hens_method_service,
+        )
+
         if basis == "all" and not self._problem.period_results:
             self._problem.target.all_periods.all_heat_integration()
         runtime, configuration = self._arguments(
@@ -483,6 +664,7 @@ class _DesignAccessor:
             runtime=runtime,
             configuration=configuration,
             workspace_variant=None,
+            record=record,
         )
 
     def _overdesign_margin(self, overdesign_percentage, hens):
@@ -509,15 +691,37 @@ class _DesignAccessor:
         ``solve_tolerance``; ``hens`` (default: the stored configuration)
         gives the margin limit.
         """
-        from ....analysis.heat_exchanger_networks.overdesign import (
-            apply_overdesign,
-            validate_margin,
-        )
+        from ....analysis.heat_exchanger_networks.overdesign import validate_margin
         from ..targeting.provenance import canonical_json
 
         margin = validate_margin(margin)
         if hens is None:
             hens = self._effective_hens(options)
+        view = self._overdesigned(
+            network,
+            margin,
+            hens=hens,
+            options=options,
+            solver=solver,
+            solve_tolerance=solve_tolerance,
+        )
+        settings = dict((basis or view).result.provenance.effective_settings) | {
+            "HENS_OVERDESIGN_PERCENTAGE": margin
+        }
+        provenance = view.result.provenance.model_copy(
+            update={
+                "method_id": (basis or view).result.provenance.method_id,
+                "effective_settings_json": canonical_json(settings),
+            }
+        )
+        view.result.provenance = provenance
+        self._problem._results.design = view.result
+        return view
+
+    def _overdesigned(self, network, margin, *, hens, options, solver, solve_tolerance):
+        """The rating of ``network`` at ``margin``, its metrics on the network."""
+        from ....analysis.heat_exchanger_networks.overdesign import apply_overdesign
+
         view, metrics = apply_overdesign(
             network,
             margin,
@@ -531,17 +735,6 @@ class _DesignAccessor:
             ),
         )
         view.selected_network.summary_metrics["overdesign"] = metrics
-        settings = dict((basis or view).result.provenance.effective_settings) | {
-            "HENS_OVERDESIGN_PERCENTAGE": margin
-        }
-        provenance = view.result.provenance.model_copy(
-            update={
-                "method_id": (basis or view).result.provenance.method_id,
-                "effective_settings_json": canonical_json(settings),
-            }
-        )
-        view.result.provenance = provenance
-        self._problem._results.design = view.result
         return view
 
     def _design_basis(self, design_basis: str | None, period_id: str | None, hens=None):
@@ -653,21 +846,24 @@ class _DesignAccessor:
             )
         return basis, clusters
 
-    def _design_on_median_basis(self, basis_clusters, hens, **arguments):
-        """Synthesise on median cases, fit every period, keep the cheapest."""
+    def _design_on_median_basis(self, basis_clusters, hens, *, source, **arguments):
+        """Synthesise on each candidate cluster's median case.
+
+        Every case's fitted networks join one record, so the cheapest fitted
+        network over all of them is selected.
+        """
         basis, clusters = self._median_basis(basis_clusters, hens)
         candidates = (
             range(len(basis.clusters))
             if hens.basis_candidates == "all"
             else (basis.basis_cluster,)
         )
-        best = None
         for n in candidates:
             cluster = basis.clusters[n]
             case = type(self._problem)(
                 basis.sources[n], project_name=self._problem.project_name
             )
-            view = self._design_on_derived_basis(
+            self._design_on_derived_basis(
                 case,
                 {
                     "HENS_DESIGN_BASIS": "median",
@@ -675,62 +871,38 @@ class _DesignAccessor:
                     "basis_period_ids": [basis.period_ids[i] for i in cluster.members],
                     "basis_medoid": basis.period_ids[cluster.medoid],
                 },
+                source=source,
                 **arguments,
             )
-            cost = view.selected_network.total_annual_cost
-            if best is None or cost < best[0]:
-                best = (cost, view)
-        self._problem._results.design = best[1].result
-        return best[1]
 
-    def _design_on_basis_period(self, period_id: str, **arguments):
-        """Synthesise on ``period_id`` alone, then fit every period."""
+    def _design_on_basis_period(self, period_id: str, *, source, **arguments):
+        """Synthesise on ``period_id`` alone."""
         from ...case_derivation import single_period_case
 
-        return self._design_on_derived_basis(
+        self._design_on_derived_basis(
             single_period_case(self._problem, period_id),
             {"HENS_DESIGN_BASIS": "period", "basis_period_id": str(period_id)},
+            source=source,
             **arguments,
         )
 
-    def _design_on_derived_basis(self, case, basis_settings, **arguments):
-        """Synthesise on a derived single-period ``case``, then fit every period.
+    def _design_on_derived_basis(self, case, basis_settings, *, source, **arguments):
+        """Synthesise on a derived single-period ``case``.
 
-        The fit runs with the call's options, solver and tolerance; the
-        provenance keeps the settings the basis synthesis ran with.
+        Each network it admits is fitted to every period (and rated) on its
+        way into the run's record; ``source`` tells the fit which case and
+        settings the network came from, for the provenance.
         """
-        from ..targeting.provenance import canonical_json
-
+        origin = {"basis_settings": basis_settings}
+        source["current"] = origin
         # The margin is applied once, to the fitted network, never to the
         # basis design.
         basis_options = dict(arguments["options"] or {}) | {
             "HENS_OVERDESIGN_PERCENTAGE": None
         }
-        basis_view = case.design.heat_exchanger_network(
+        origin["synthesis"] = case.design.heat_exchanger_network(
             **(arguments | {"options": basis_options})
         )
-        view = self._fit_to_all_periods(
-            basis_view.selected_network,
-            options=arguments["options"],
-            solver=arguments["solver"],
-            solve_tolerance=arguments["solve_tolerance"],
-        )
-        provenance = view.result.provenance
-        settings = (
-            dict(provenance.effective_settings)
-            | dict(basis_view.result.provenance.effective_settings)
-            | basis_settings
-        )
-        provenance = provenance.model_copy(
-            update={
-                "method_id": "design.heat_exchanger_network",
-                "period_ids": tuple(self._problem.period_ids),
-                "effective_settings_json": canonical_json(settings),
-            }
-        )
-        view.result.provenance = provenance
-        self._problem._results.design.provenance = provenance
-        return view
 
     def pinch_design(self, *, options=None, period_id=None, **kwargs):
         """Run the pinch design method only.
@@ -827,22 +999,218 @@ class _DesignAccessor:
             )
         if "recovery" not in structure:
             raise ValueError("network structure needs a 'recovery' list.")
-        heaters = tuple(structure.get("heaters", ()))
-        coolers = tuple(structure.get("coolers", ()))
         hot_utility = structure.get("hot_utility")
         cold_utility = structure.get("cold_utility")
-        if hot_utility is None and any(isinstance(e, str) for e in heaters):
+        if hot_utility is None and _names_no_utility(structure.get("heaters", ())):
             hot_utility = self._only_utility("Hot")
-        if cold_utility is None and any(isinstance(e, str) for e in coolers):
+        if cold_utility is None and _names_no_utility(structure.get("coolers", ())):
             cold_utility = self._only_utility("Cold")
-        return HeatExchangerNetwork.from_structure(
-            recovery=tuple(structure["recovery"]),
-            heaters=heaters,
-            coolers=coolers,
+        recovery = [_recovery_entry(entry) for entry in structure["recovery"]]
+        heaters = [
+            _utility_entry(entry, hot_utility, "heaters")
+            for entry in structure.get("heaters", ())
+        ]
+        coolers = [
+            _utility_entry(entry, cold_utility, "coolers")
+            for entry in structure.get("coolers", ())
+        ]
+        network = HeatExchangerNetwork.from_structure(
+            recovery=tuple(placement for placement, _ in recovery),
+            heaters=tuple(placement for placement, _ in heaters),
+            coolers=tuple(placement for placement, _ in coolers),
             hot_utility=hot_utility,
             cold_utility=cold_utility,
             stage_count=structure.get("stage_count"),
         )
+        # from_structure keeps the order: recovery, heaters, then coolers.
+        extras = [extra for _, extra in recovery + heaters + coolers]
+        return network.model_copy(
+            update={
+                "exchangers": tuple(
+                    exchanger.model_copy(update=extra) if extra else exchanger
+                    for exchanger, extra in zip(network.exchangers, extras, strict=True)
+                )
+            }
+        )
+
+    def retrofit(
+        self,
+        existing: "HeatExchangerNetwork | Mapping[str, Any]",
+        *,
+        max_modifications: int = 3,
+        beam_width: int = 3,
+        new_match_candidates: int = 4,
+        area_tolerance: float = 0.02,
+        max_added_area_fraction: float | None = None,
+        min_approach_temperature: float | None = None,
+        new_unit_cost: float | None = None,
+        area_addition_cost: float = 0.0,
+        split_cost: float = 0.0,
+        relocation_cost: float | None = None,
+        relocation_candidates: int = 8,
+        new_utility_units: bool = False,
+        strategy: str = "structure",
+        ceiling_candidates: int = 12,
+        ceiling_relocations: int = 400,
+        enhancement_factors: Mapping[str, float] | None = None,
+        enhancement_cost: float = 0.0,
+        enhancement_area_cost: float = 0.0,
+        enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None,
+        pressure_drop_allowances: Mapping[str, float] | None = None,
+        options: Mapping[str, Any] | None = None,
+        solver=None,
+        solve_tolerance=None,
+    ) -> "HeatExchangerNetworkRetrofitResult":
+        """Find cost-effective modifications of an existing network.
+
+        ``existing`` is the network as built: a ``HeatExchangerNetwork`` or a
+        mapping as for ``optimise_duties``, in which entries may be mappings
+        carrying the installed ``area`` (m2) and an ``id``::
+
+            {
+                "recovery": [
+                    {"hot": "H1", "cold": "C1", "stage": 1, "area": 120.0,
+                     "id": "E1"},
+                ],
+                "heaters": [{"stream": "C1", "area": 30.0}],
+                "coolers": [{"stream": "H1", "utility": "CW", "area": 60.0}],
+            }
+
+        Every exchanger needs its installed area. The existing network is
+        rated at its areas (widened by ``area_tolerance``), then changed one
+        structural step at a time, up to ``max_modifications``: a new match
+        (screened by the utility it could cut where it sits) or, optionally,
+        a relocated exchanger, with the added area each structure needs
+        sized in the same solve. Each step keeps the ``beam_width`` designs
+        with the best net annual benefit.
+
+        Added area costs ``COSTING_HX_AREA_COEFF * area **
+        COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
+        ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
+        added area on an existing exchanger adds ``area_addition_cost``, all
+        in $ and annualised with the capital recovery factor.
+        ``max_added_area_fraction`` caps the added area on an existing
+        exchanger at that fraction of its installed area (None: no cap).
+        With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
+        split) a step may also move an existing recovery exchanger, with its
+        installed area, to a screened match that shares one of its streams
+        (None, the default: no relocations). The default search ranks up to
+        ``ceiling_relocations`` such moves per design (default 400, the best
+        scored first) by their ceiling; the stepwise search tries the
+        ``relocation_candidates`` with the most heat potential at the match
+        less the unit's present duty. With ``new_utility_units`` each new match and
+        relocation is also tried together with a new end heater or cooler on
+        a stream that has none, which can free the units a move needs; the
+        pair is one modification, costing one more ``new_unit_cost`` and the
+        utility exchanger's area. ``enhancement_factors`` (existing exchanger
+        id to the factor its heat transfer coefficient can be raised by, with
+        tube inserts for example; None, the default: no enhancement) lets a
+        step enhance an exchanger, at ``enhancement_cost`` ($) plus
+        ``enhancement_area_cost`` ($ per m2 of its installed area).
+        ``enhancement_pressure_drops`` (exchanger id to the stream its insert
+        is on and the pressure drop, kPa, it adds) and
+        ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa,
+        it can take) keep the inserts of every design within each stream's
+        allowance.
+
+        ``strategy`` "structure" (the default) makes one structural change
+        per step: ``ceiling_candidates`` screened changes are ranked
+        by the utility cost their structure reaches with unlimited area (its
+        network pinch), the ``new_match_candidates`` best are solved with
+        every existing exchanger free to grow, and an exchanger keeps added
+        area of at least 1 % of its installed area, as an area addition, so
+        the frontier counts structural changes. "stepwise" instead makes one
+        modification per step, an area addition being one. With
+        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 each step's solves
+        run on that many threads; the result is the same.
+
+        Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
+        the best design after each number of steps (0 is the existing
+        network; a step is a structural change with the area additions it
+        keeps, or with "stepwise" one modification) with its savings,
+        capital, payback and modifications, and ``selected`` the one with
+        the best net annual benefit. The problem's cached design is not
+        changed. Requires the optional synthesis
+        dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
+        """
+
+        from ....analysis.heat_exchanger_networks.duty_optimisation import (
+            DEFAULT_FEASIBILITY_APPROACH,
+        )
+        from ....analysis.heat_exchanger_networks.retrofit.search import (
+            RetrofitSettings,
+            run_retrofit_search,
+        )
+        from ..targeting.execution import walk_zone_tree
+        from ..targeting.state import commit_problem, snapshot_problem
+
+        if isinstance(existing, Mapping):
+            existing = self._network_from_structure(existing)
+        _runtime, configuration = self._arguments(
+            options=options, period_id=None, solve_tolerance=solve_tolerance
+        )
+        if solver is not None:
+            configuration["HENS_SOLVER_EVM"] = solver
+        isolated = snapshot_problem(self._problem)
+        root = isolated._build_execution_master_zone()
+        stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
+        with temporary_zone_configuration(root, configuration):
+            unit_cost = (
+                isolated.master_zone.config.costing.hx_unit_cost
+                if new_unit_cost is None
+                else new_unit_cost
+            )
+            result = run_retrofit_search(
+                isolated,
+                existing,
+                RetrofitSettings(
+                    max_modifications=max_modifications,
+                    beam_width=beam_width,
+                    new_match_candidates=new_match_candidates,
+                    area_tolerance=area_tolerance,
+                    max_added_area_fraction=max_added_area_fraction,
+                    approach=(
+                        DEFAULT_FEASIBILITY_APPROACH
+                        if min_approach_temperature is None
+                        else min_approach_temperature
+                    ),
+                    new_unit_cost=float(unit_cost),
+                    area_addition_cost=float(area_addition_cost),
+                    split_cost=float(split_cost),
+                    relocation_cost=(
+                        None if relocation_cost is None else float(relocation_cost)
+                    ),
+                    relocation_candidates=relocation_candidates,
+                    new_utility_units=new_utility_units,
+                    strategy=strategy,
+                    ceiling_candidates=ceiling_candidates,
+                    ceiling_relocations=ceiling_relocations,
+                    enhancement_factors=(
+                        None
+                        if enhancement_factors is None
+                        else {k: float(v) for k, v in enhancement_factors.items()}
+                    ),
+                    enhancement_cost=float(enhancement_cost),
+                    enhancement_area_cost=float(enhancement_area_cost),
+                    enhancement_pressure_drops=(
+                        None
+                        if enhancement_pressure_drops is None
+                        else {
+                            k: (str(stream), float(drop))
+                            for k, (stream, drop) in enhancement_pressure_drops.items()
+                        }
+                    ),
+                    pressure_drop_allowances=(
+                        None
+                        if pressure_drop_allowances is None
+                        else {k: float(v) for k, v in pressure_drop_allowances.items()}
+                    ),
+                ),
+            )
+        for zone in walk_zone_tree(isolated._master_zone):
+            zone.config = stored_configs[zone.address]
+        commit_problem(self._problem, isolated)
+        return result
 
     def _only_utility(self, kind: str) -> str:
         data = self._problem._validated_data

@@ -114,6 +114,7 @@ class InternalHeatExchangerNetworkProblem:
         evolution_max_parallel: int = 1,
         evolution_no_improvement_patience: int | None = None,
         evolution_beam_width: int = 4,
+        evolution_solved_topologies: dict | None = None,
         model_factories: Mapping[str, Any] | None = None,
     ) -> Any:
         """Load, solve, and return the private solved model for this task."""
@@ -146,6 +147,7 @@ class InternalHeatExchangerNetworkProblem:
                     max_parallel=evolution_max_parallel,
                     no_improvement_patience=evolution_no_improvement_patience,
                     beam_width=evolution_beam_width,
+                    solved_topologies=evolution_solved_topologies,
                 )
                 if evolved is not None:
                     self.case = evolved
@@ -168,15 +170,22 @@ class InternalHeatExchangerNetworkProblem:
     def extract_network(self, *, run_id: str) -> HeatExchangerNetwork:
         """Convert the solved private case into an OpenPinch network result."""
 
+        return self.extract_candidate_network(self.case, run_id=run_id)
+
+    def extract_candidate_network(
+        self, candidate: Any, *, run_id: str
+    ) -> HeatExchangerNetwork:
+        """Convert one solved model of this task, such as a search candidate."""
+
         return extract_heat_exchanger_network(
-            self.case,
+            candidate,
             self.solver_arrays,
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self._result_method(),
             dt_cont_multiplier=self.dt_cont_multiplier,
             stage_count=getattr(
-                self.case, "stages", getattr(self.case, "S", self.stages)
+                candidate, "stages", getattr(candidate, "S", self.stages)
             ),
         )
 
@@ -571,19 +580,39 @@ class InternalHeatExchangerNetworkProblem:
         from ..reporting.ranking import network_structure_signature
 
         limit = self.heuristic_network_limit
-        report: dict[str, Any] = {"proposed": {}, "realised": {}}
+        report: dict[str, Any] = {
+            "proposed": {},
+            "realised": {},
+            "repeated_sides": {"above": 0, "below": 0},
+        }
         sides = {}
+        # Repeats of each realised side, by identity: stand-ins for a
+        # pairing of that side that fails.
+        alternates: dict[int, list] = {}
         for name in ("above", "below"):
             template = getattr(self, name)
             if not template.side_required:
                 sides[name] = [template]
                 continue
             proposals = propose_side_topologies(pinch_side(template), limit=limit)
-            realised = [
-                side
-                for rank, proposal in enumerate(proposals)
-                if (side := self._realise_side(name, proposal, rank)) is not None
-            ]
+            realised = []
+            first_by_topology: dict[tuple, Any] = {}
+            for rank, proposal in enumerate(proposals):
+                side = self._realise_side(name, proposal, rank)
+                if side is None:
+                    continue
+                # Proposals often realise the same side network, and every
+                # pairing of a repeat would amalgamate into a repeated
+                # network: pair the first. A repeat may differ in duties, so
+                # it stands in only where the first's pairing fails.
+                topology = _side_topology(side)
+                if topology in first_by_topology:
+                    alternates[id(first_by_topology[topology])].append(side)
+                    report["repeated_sides"][name] += 1
+                    continue
+                first_by_topology[topology] = side
+                alternates[id(side)] = []
+                realised.append(side)
             report["proposed"][name] = len(proposals)
             report["realised"][name] = len(realised)
             sides[name] = realised
@@ -597,8 +626,8 @@ class InternalHeatExchangerNetworkProblem:
         for (_a, above), (_b, below) in pairs:
             if len(networks) >= limit:
                 break
-            variant = self._pdm_variant(above, below)
-            if variant is None or not variant.case.verify()[0]:
+            variant = self._verified_heuristic_variant(above, below, alternates)
+            if variant is None:
                 failed += 1
                 continue
             signature = network_structure_signature(
@@ -611,7 +640,10 @@ class InternalHeatExchangerNetworkProblem:
             networks.append(variant)
         # Results live on the model variables: drop every side's run directory,
         # and the unsolved templates' that the realised sides replace.
-        for side in sides["above"] + sides["below"] + [self.above, self.below]:
+        repeats = [side for group in alternates.values() for side in group]
+        for side in (
+            sides["above"] + sides["below"] + repeats + [self.above, self.below]
+        ):
             _cleanup_model(side)
         report.update(
             pairs=len(pairs), failed=failed, repeated=repeated, networks=len(networks)
@@ -625,6 +657,23 @@ class InternalHeatExchangerNetworkProblem:
         first, *rest = networks
         self.above, self.below, self.case = first.above, first.below, first.case
         self.pdm_variants = rest
+
+    def _verified_heuristic_variant(self, above, below, alternates):
+        """Amalgamate a side pair, or failing that a pair of their repeats.
+
+        Repeats share a side's matches but may differ in duties, so one may
+        amalgamate where the side does not. They cost nothing until a pairing
+        fails.
+        """
+
+        for stand_in_above, stand_in_below in product(
+            [above, *alternates.get(id(above), [])],
+            [below, *alternates.get(id(below), [])],
+        ):
+            variant = self._pdm_variant(stand_in_above, stand_in_below)
+            if variant is not None and variant.case.verify()[0]:
+                return variant
+        return None
 
     def _realise_side(self, name: str, proposal, rank: int):
         """Solve one side proposal, or return ``None`` if it cannot be."""
@@ -656,6 +705,11 @@ class InternalHeatExchangerNetworkProblem:
                             }
                         ),
                         "stage_selection": [stages, stages],
+                        "solver_options": _with_time_limit(
+                            self.args["solver"],
+                            self.args.get("solver_options"),
+                            seconds=backend.HEURISTIC_SIDE_TIME_LIMIT,
+                        ),
                         "z_restriction": proposal.z_restriction(
                             hot_count=template.I,
                             cold_count=template.J,
@@ -676,7 +730,8 @@ class InternalHeatExchangerNetworkProblem:
         # A proposal the side model cannot solve is dropped by design.
         side.failure_log_level = logging.DEBUG
         side.optimise(print_output=False)
-        if side.mSuccess != 1:
+        # A side stopped at its time limit may miss its minimum utility.
+        if side.mSuccess != 1 or not side.solver_run.converged:
             _cleanup_model(side)
             return None
         # The amalgamated network is built with the above side's restriction,
@@ -928,8 +983,8 @@ def _start_from_side(sparse, side) -> None:
     """
 
     for target, source in zip(
-        sparse.m.model.variables.values(),
-        side.m.model.variables.values(),
+        sparse.m.variables,
+        side.m.variables,
         strict=True,
     ):
         target.set_value(source.value, skip_validation=True)
@@ -940,6 +995,9 @@ def _start_from_side(sparse, side) -> None:
             binary = getattr(sparse, grid)
             for position in index:
                 binary = binary[position]
+            # A disallowed match's binary is the plain number 0.0 already.
+            if binary.__class__ is float:
+                continue
             if not binary.fixed and (binary.value or 0.0) < 0.5:
                 binary.fix(0)
     sparse.m.warm_start = True
@@ -951,7 +1009,8 @@ def _with_time_limit(
     """The PDM solver options with a time limit added.
 
     The fewest-units limit applies to every fewest-units and minimum-unit
-    solve; the primary sides take ``backend.PDM_TIME_LIMIT``.
+    solve; the primary sides take ``backend.PDM_TIME_LIMIT`` and heuristic
+    side proposals ``backend.HEURISTIC_SIDE_TIME_LIMIT``.
 
     A limit the user set is kept, as are options given as option lines.
     """
@@ -985,6 +1044,39 @@ def _peak_recovery_duties(case) -> list:
         ]
         for i in range(case.I)
     ]
+
+
+def _side_topology(side) -> tuple:
+    """A solved side's network: its recovery matches, numbered over the
+    stages that carry recovery, the heaters and coolers it uses, and
+    whether it leaves a stage empty.
+
+    Stage reduction re-solves only a pairing with an empty stage, which can
+    rebalance duties into another network, so a side with an empty stage
+    does not repeat one without.
+    """
+
+    peak = _peak_recovery_duties(side)
+    used = [
+        k
+        for k in range(side.S)
+        if any(peak[i][j][k] > side.tol for i in range(side.I) for j in range(side.J))
+    ]
+    matches = tuple(
+        (i, j, position)
+        for position, k in enumerate(used)
+        for i in range(side.I)
+        for j in range(side.J)
+        if peak[i][j][k] > side.tol
+    )
+    heaters = _used_in_any_period(side, "Q_h")
+    coolers = _used_in_any_period(side, "Q_c")
+    return (
+        matches,
+        tuple(map(tuple, heaters)),
+        tuple(map(tuple, coolers)),
+        len(used) < side.S,
+    )
 
 
 def _used_in_any_period(case, name: str) -> list[list[int]]:

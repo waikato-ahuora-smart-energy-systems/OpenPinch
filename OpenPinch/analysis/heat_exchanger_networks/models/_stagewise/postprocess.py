@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 
 from .._base import alpha as _alpha
-from .._base import approach as _approach
 from .._base import area as _area
+from .._base import piecewise as _piecewise
 from .._base.costing import set_period_totals_and_costs
 from .._base.execution import _value
 
@@ -23,10 +23,7 @@ def _get_multiperiod_post_process(owner) -> None:
     q_r = [
         [
             [
-                [
-                    owner._active_binary_value(owner.Q_r_by_period[n][i][j][k])
-                    for k in range(owner.S)
-                ]
+                [_value(owner.Q_r_by_period[n][i][j][k]) for k in range(owner.S)]
                 for j in range(owner.J)
             ]
             for i in range(owner.I)
@@ -63,44 +60,22 @@ def _get_multiperiod_post_process(owner) -> None:
     owner.n_cu_units = sum(flag[0] for row in owner.z_cu for flag in row)
     owner.n_units = owner.n_recovery_units + owner.n_hu_units + owner.n_cu_units
 
+    # An inactive match has no log-mean, so its approaches are not read: on
+    # a large network nearly every slot is inactive.
     owner.LMTD_r_by_period = [
         [
             [
                 [
-                    _area._post_process_lmtd(
-                        owner,
-                        owner._active_binary_value(owner.theta_1_by_period[n][i][j][k]),
-                        owner._active_binary_value(owner.theta_2_by_period[n][i][j][k]),
-                        _value(owner.z[i][j][k]),
-                        formula_allowed=(
-                            abs(
-                                owner._active_binary_value(
-                                    owner.theta_1_by_period[n][i][j][k]
-                                )
-                                - owner._active_binary_value(
-                                    owner.theta_2_by_period[n][i][j][k]
-                                )
-                            )
-                            > owner.tol
-                            and abs(
-                                owner._active_binary_value(
-                                    owner.theta_1_by_period[n][i][j][k]
-                                )
-                                - _approach._recovery_approach_temperature(
-                                    owner, i, j, n
-                                )
-                            )
-                            >= owner.tol
-                            and abs(
-                                owner._active_binary_value(
-                                    owner.theta_2_by_period[n][i][j][k]
-                                )
-                                - _approach._recovery_approach_temperature(
-                                    owner, i, j, n
-                                )
-                            )
-                            >= owner.tol
-                        ),
+                    (
+                        _area._post_process_lmtd(
+                            owner,
+                            _value(owner.theta_1_by_period[n][i][j][k]),
+                            _value(owner.theta_2_by_period[n][i][j][k]),
+                            _value(owner.z[i][j][k]),
+                            formula_allowed=False,
+                        )
+                        if _value(owner.z[i][j][k]) > owner.tol
+                        else 0.0
                     )
                     for k in range(owner.S)
                 ]
@@ -156,34 +131,40 @@ def _get_multiperiod_post_process(owner) -> None:
         [[None for _k in range(owner.S)] for _j in range(owner.J)]
         for _i in range(owner.I)
     ]
+    # A temperature depends on its stream and stage boundary only, so each is
+    # read once rather than once per partner; T_h and T_c are period 0's.
+    hot_temperatures = [[_value(t) for t in row] for row in owner.T_h_by_period[0]]
+    cold_temperatures = [[_value(t) for t in row] for row in owner.T_c_by_period[0]]
+    hot_segmented = [
+        _piecewise._solver_parent_is_segmented(owner, "hot", i) for i in range(owner.I)
+    ]
+    cold_segmented = [
+        _piecewise._solver_parent_is_segmented(owner, "cold", j) for j in range(owner.J)
+    ]
     for k in range(owner.S):
         for j in range(owner.J):
             for i in range(owner.I):
-                driving_force = owner._active_binary_value(
-                    owner.T_h[i][k]
-                ) - owner._active_binary_value(owner.T_c[j][k + 1])
+                driving_force = hot_temperatures[i][k] - cold_temperatures[j][k + 1]
                 if q_r[0][i][j][k] > 0.0 and driving_force > 0.0:
                     owner.dqda[i][j][k] = (
-                        owner._active_binary_value(owner.theta_1[i][j][k])
-                        * owner._active_binary_value(owner.theta_2[i][j][k])
+                        _value(owner.theta_1[i][j][k])
+                        * _value(owner.theta_2[i][j][k])
                         * owner.U_r[i][j]
                     ) / driving_force
                 elif driving_force > 0.0:
                     owner.dqda[i][j][k] = owner.U_r[i][j] * driving_force
                 else:
                     owner.dqda[i][j][k] = 0.0
+                if not (hot_segmented[i] or cold_segmented[j]):
+                    continue
                 exact_dqda = _area._segment_exact_dqda(
                     owner,
                     period_index=0,
                     hot_parent_index=i,
                     cold_parent_index=j,
                     duty=float(q_r[0][i][j][k]),
-                    hot_inlet_temperature=owner._active_binary_value(
-                        owner.T_h_by_period[0][i][k]
-                    ),
-                    cold_inlet_temperature=owner._active_binary_value(
-                        owner.T_c_by_period[0][j][k + 1]
-                    ),
+                    hot_inlet_temperature=hot_temperatures[i][k],
+                    cold_inlet_temperature=cold_temperatures[j][k + 1],
                 )
                 if exact_dqda is not None:
                     owner.dqda[i][j][k] = exact_dqda
@@ -194,21 +175,20 @@ def _get_multiperiod_post_process(owner) -> None:
         [[None for _k in range(owner.S)] for _j in range(owner.J)]
         for _i in range(owner.I)
     ]
+    utility_price = _area.recovered_utility_price(owner)
     for k in range(owner.S):
         for j in range(owner.J):
             for i in range(owner.I):
                 if owner.area_r[i][j][k] > 0.0:
-                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * (
-                        _area.recovered_utility_price(owner)
-                    ) - (
+                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * utility_price - (
                         owner.A_coeff[0]
                         * owner.A_exp[0]
                         * owner.area_r[i][j][k] ** (owner.A_exp[0] - 1)
                     )
                 else:
-                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * (
-                        _area.recovered_utility_price(owner)
-                    ) - (owner.A_coeff[0] * owner.A_exp[0])
+                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * utility_price - (
+                        owner.A_coeff[0] * owner.A_exp[0]
+                    )
     owner.alpha_dqda = [
         [
             [

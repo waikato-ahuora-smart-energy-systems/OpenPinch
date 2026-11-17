@@ -594,7 +594,9 @@ def _check_segment_contribution_areas(
         design_area = exchanger.segment_design_area
         if design_area is None:
             continue
-        if not _close(
+        # As for single-segment exchangers, spare area (an installed unit
+        # running below its area) is fine; only too little fails.
+        if exchanger.area + _AREA_ABS_TOL < design_area and not _close(
             design_area,
             exchanger.area,
             rel_tol=_AREA_REL_TOL,
@@ -602,7 +604,7 @@ def _check_segment_contribution_areas(
         ):
             failures.append(
                 f"{exchanger.exchanger_id or exchanger.kind.value} area "
-                f"{exchanger.area:.6g} does not match maximum period-total "
+                f"{exchanger.area:.6g} is below maximum period-total "
                 f"segment area {design_area:.6g}"
             )
     return failures

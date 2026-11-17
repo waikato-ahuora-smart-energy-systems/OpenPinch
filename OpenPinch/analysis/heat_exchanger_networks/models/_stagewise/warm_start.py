@@ -290,10 +290,14 @@ def _set_multiperiod_initial_values(owner, init_solution) -> None:
     for k in range(owner.S):
         for j in range(owner.J):
             for i in range(owner.I):
+                # A match the owner disallows (one an evolution move removes)
+                # is off, whatever the source had.
                 _execution._set_value(
                     owner,
                     owner.z[i][j][k],
-                    owner._active_binary_value(init_solution.z[i][j][k]),
+                    owner._active_binary_value(init_solution.z[i][j][k])
+                    if owner.z_allowed[i][j][k] > 0
+                    else 0,
                 )
     for target, source in (
         (owner.z_cu, init_solution.z_cu),

@@ -41,7 +41,6 @@ def _utility_cost_expression(
     heat_duty,
     *,
     utility: int,
-    name: str,
 ):
     """Return the flat or exact piecewise cost expression of one utility."""
     price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
@@ -67,13 +66,11 @@ def _utility_cost_expression(
         value=0.0,
         lb=0.0,
         ub=profile.total_duty,
-        name=f"{name}_duty",
     )
     cost = model.m.Var(
         value=0.0,
         lb=0.0,
         ub=float(profile.cumulative_costs[-1]),
-        name=f"{name}_cost",
     )
     model.m.Equation(coordinate == heat_duty)
     _register_piecewise_mapping(
@@ -83,7 +80,6 @@ def _utility_cost_expression(
             coordinate,
             cost,
             profile,
-            name=name,
             integer_capable=model.solver in backend.INTEGER_SOLVERS,
         ),
     )
@@ -191,13 +187,12 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
             for k in range(model.K):
                 initial_q = profile.total_duty * k / max(model.S, 1)
                 coordinate = (
-                    model.m.Param(value=0.0, name=f"Qcoord_H{i}_B0_period{n}")
+                    model.m.Param(value=0.0)
                     if k == 0
                     else model.m.Var(
                         value=initial_q,
                         lb=0.0,
                         ub=profile.total_duty,
-                        name=f"Qcoord_H{i}_B{k}_period{n}",
                     )
                 )
                 model.Q_coordinate_h_by_period[n][i][k] = coordinate
@@ -208,7 +203,6 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
                         coordinate,
                         model.T_h_by_period[n][i][k],
                         profile,
-                        name=f"TQ_H{i}_B{k}_period{n}",
                         integer_capable=integer_capable,
                         initial_segment=profile.segment_index_at_heat(initial_q),
                     ),
@@ -240,13 +234,12 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
             for k in range(model.K):
                 initial_q = profile.total_duty * (model.S - k) / max(model.S, 1)
                 coordinate = (
-                    model.m.Param(value=0.0, name=f"Qcoord_C{j}_B{model.S}_period{n}")
+                    model.m.Param(value=0.0)
                     if k == model.S
                     else model.m.Var(
                         value=initial_q,
                         lb=0.0,
                         ub=profile.total_duty,
-                        name=f"Qcoord_C{j}_B{k}_period{n}",
                     )
                 )
                 model.Q_coordinate_c_by_period[n][j][k] = coordinate
@@ -257,7 +250,6 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
                         coordinate,
                         model.T_c_by_period[n][j][k],
                         profile,
-                        name=f"TQ_C{j}_B{k}_period{n}",
                         integer_capable=integer_capable,
                         initial_segment=profile.segment_index_at_heat(initial_q),
                     ),
@@ -349,7 +341,6 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                 )
                 inlet_by_utility.append(float(profile.temperature_contributions[0]))
                 for match_index, load in enumerate(loads):
-                    tag = f"{side}_utility{u}_M{match_index}_period{n}"
                     matched_duty = (
                         model.Qtot_sc_period[n][match_index]
                         if side == "hot"
@@ -360,7 +351,6 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                         value=initial_duty,
                         lb=0.0,
                         ub=profile.total_duty,
-                        name=f"Qcoord_{tag}",
                     )
                     model.m.Equation(coordinate == load[u])
                     solved_outlet = model.m.Var(
@@ -377,14 +367,12 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                                 profile.temperatures_out.max(),
                             )
                         ),
-                        name=f"T_out_{tag}",
                     )
                     contribution_values = profile.temperature_contributions
                     outlet_contribution = model.m.Var(
                         value=profile.temperature_contribution_at_heat(initial_duty),
                         lb=float(contribution_values.min()),
                         ub=float(contribution_values.max()),
-                        name=f"dTcont_out_{tag}",
                     )
                     temperature_segment = profile.segment_index_at_heat(initial_duty)
                     contribution_segment = profile.contribution_index_at_heat(
@@ -397,7 +385,6 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                             coordinate,
                             solved_outlet,
                             profile,
-                            name=f"TQ_{tag}",
                             integer_capable=model.solver in backend.INTEGER_SOLVERS,
                             initial_segment=temperature_segment,
                         ),
@@ -409,7 +396,6 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                             coordinate,
                             outlet_contribution,
                             profile,
-                            name=f"dTQ_{tag}",
                             initial_segment=contribution_segment,
                         ),
                     )
@@ -550,7 +536,6 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                             value=hot_profile.total_duty * (k + 1) / max(model.S, 1),
                             lb=0.0,
                             ub=hot_profile.total_duty,
-                            name=f"Qcoord_H{i}_out_C{j}_S{k}_period{n}",
                         )
                         model.Q_coordinate_h_out_x_by_period[n][i][j][k] = q_out
                         model.m.Equation(
@@ -564,7 +549,6 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                                 q_out,
                                 model.T_h_out_x_by_period[n][i][j][k],
                                 hot_profile,
-                                name=f"TQ_H{i}_out_C{j}_S{k}_period{n}",
                                 integer_capable=integer_capable,
                                 initial_segment=hot_profile.segment_index_at_heat(
                                     hot_profile.total_duty * (k + 1) / max(model.S, 1)
@@ -579,7 +563,6 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                             / max(model.S, 1),
                             lb=0.0,
                             ub=cold_profile.total_duty,
-                            name=f"Qcoord_C{j}_out_H{i}_S{k}_period{n}",
                         )
                         model.Q_coordinate_c_out_y_by_period[n][j][i][k] = q_out
                         model.m.Equation(
@@ -593,7 +576,6 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                                 q_out,
                                 model.T_c_out_y_by_period[n][j][i][k],
                                 cold_profile,
-                                name=f"TQ_C{j}_out_H{i}_S{k}_period{n}",
                                 integer_capable=integer_capable,
                                 initial_segment=cold_profile.segment_index_at_heat(
                                     cold_profile.total_duty

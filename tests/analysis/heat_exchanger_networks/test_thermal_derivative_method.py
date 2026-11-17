@@ -202,11 +202,14 @@ class _RecordingExecutor:
                 "max_parallel": max_parallel,
             }
         )
+        # A network enters the result only with a total annual cost.
         return tuple(
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=task,
                 status="success",
-                network=_seed_network(method=_method_value(task.method)),
+                network=_seed_network(method=_method_value(task.method)).model_copy(
+                    update={"total_annual_cost": float(index + 1)}
+                ),
                 objective_value=float(index + 1),
                 solver_status="ok",
             )

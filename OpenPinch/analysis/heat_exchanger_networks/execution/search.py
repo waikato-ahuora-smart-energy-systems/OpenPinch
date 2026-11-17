@@ -4,12 +4,12 @@
 ``HENS_SEARCH_DEPTH`` sets which stages run and how hard each searches:
 
 * 0: heuristic pinch design only, no evolution.
-* 1: heuristic pinch design, then network evolution.
+* 1: heuristic pinch design, then network evolution two branches wide.
 * 2: heuristic and MILP pinch design; MILP networks go through the thermal
   derivative method, heuristic networks straight to evolution.
-* 3: as 2 with more heuristic networks, every MILP network also straight to
-  evolution, and wider evolution.
-* 4: as 3, wider still.
+* 3: as 2 with more heuristic networks seeding evolution and every MILP
+  network also straight to evolution.
+* 4: as 3 with still more seeds and wider evolution.
 
 An option set explicitly overrides the value its level gives.
 """
@@ -42,12 +42,12 @@ class DepthLevel:
 
 
 DEPTH_LEVELS: dict[int, DepthLevel] = {
-    0: DepthLevel(False, 10, False, 1),
-    1: DepthLevel(True, 10, False, 1),
-    2: DepthLevel(True, 10, True, 1, thermal_derivative=True),
+    0: DepthLevel(False, 50, False, 1),
+    1: DepthLevel(True, 50, False, 2),
+    2: DepthLevel(True, 50, True, 2, thermal_derivative=True),
     3: DepthLevel(
         True,
-        20,
+        50,
         True,
         2,
         thermal_derivative=True,

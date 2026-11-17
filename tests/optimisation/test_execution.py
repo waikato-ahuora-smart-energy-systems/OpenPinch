@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.machinery
 import logging
 import multiprocessing
 import os
@@ -9,6 +10,8 @@ import sys
 import threading
 import time
 import types
+import zipfile
+import zipimport
 from concurrent.futures import (
     CancelledError,
     Future,
@@ -306,6 +309,84 @@ def test_guarded_main_module_uses_worker_processes(
     assert execution._pool_worker_count(2, 2) == 2
 
 
+def _main_module(monkeypatch, **attributes):
+    main = types.ModuleType("__main__")
+    for name, value in attributes.items():
+        setattr(main, name, value)
+    monkeypatch.setitem(sys.modules, "__main__", main)
+    monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "spawn")
+
+
+@pytest.mark.parametrize("source", ["<stdin>", "<string>"])
+def test_main_module_without_a_source_file_runs_serially_with_a_warning(
+    native_platform, monkeypatch, caplog, source
+):
+    _main_module(monkeypatch, __file__=source)
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        xs, fs = execution._collect_candidates_in_parallel(
+            _record_run, n_runs=2, pool_executor_cls=_ForbiddenPool
+        )
+
+    assert fs.tolist() == [0.0, 1.0]
+    assert source in caplog.text
+
+
+def test_main_module_without_a_file_attribute_uses_worker_processes(
+    native_platform, monkeypatch
+):
+    # Jupyter kernels and ``python -c`` give __main__ no __file__.
+    _main_module(monkeypatch)
+    assert execution._pool_worker_count(2, 2) == 2
+
+
+def test_main_module_imported_by_name_uses_worker_processes(
+    native_platform, monkeypatch, tmp_path
+):
+    # A zipapp's __main__ has no file on disk, but workers import it by its
+    # spec name instead of running its path.
+    archive = tmp_path / "app.pyz"
+    archive.write_bytes(b"")
+    _main_module(
+        monkeypatch,
+        __file__=str(archive / "__main__.py"),
+        __spec__=importlib.machinery.ModuleSpec("__main__", None),
+    )
+    assert execution._pool_worker_count(2, 2) == 2
+
+
+def _main_module_in_zip(monkeypatch, tmp_path, source):
+    # ``python -m mod`` with ``mod`` inside a zip on sys.path: workers import
+    # ``mod`` by name as ``__mp_main__``, rerunning its top-level code.
+    archive = tmp_path / "modules.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("mod.py", source)
+    spec = zipimport.zipimporter(str(archive)).find_spec("mod")
+    _main_module(monkeypatch, __file__=spec.origin, __spec__=spec)
+
+
+def test_unguarded_named_main_module_in_a_zip_runs_serially(
+    native_platform, monkeypatch, tmp_path, caplog
+):
+    _main_module_in_zip(monkeypatch, tmp_path, "import OpenPinch\nrun_placement()\n")
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        assert execution._pool_worker_count(2, 2) == 1
+
+    assert 'if __name__ == "__main__":' in caplog.text
+
+
+def test_guarded_named_main_module_in_a_zip_uses_worker_processes(
+    native_platform, monkeypatch, tmp_path
+):
+    _main_module_in_zip(
+        monkeypatch,
+        tmp_path,
+        'import OpenPinch\n\nif __name__ == "__main__":\n    run_placement()\n',
+    )
+    assert execution._pool_worker_count(2, 2) == 2
+
+
 def test_search_pool_is_capped_at_the_cpu_count(native_platform, monkeypatch):
     monkeypatch.setattr(execution.os, "cpu_count", lambda: 2)
     started = []
@@ -331,7 +412,7 @@ needs_threads = pytest.mark.skipif(
 def importing_workers(native_platform, monkeypatch):
     """Use a start method whose workers import OpenPinch before any task."""
     monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "spawn")
-    monkeypatch.setattr(execution, "_main_module_reruns_in_workers", lambda: False)
+    monkeypatch.setattr(execution, "_main_module_blocks_workers", lambda: None)
 
 
 @needs_threads

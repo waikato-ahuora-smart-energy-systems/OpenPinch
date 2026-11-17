@@ -526,14 +526,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Network evolution add branches", None,
         (
             "Match-adding candidates explored per network evolution step. None "
-            "uses the search depth's: 1 up to depth 2, then 2 and 3."
+            "uses the search depth's: 2 up to depth 3, then 3."
         ),
     ),
     "HENS_EVM_N_RM_BRANCHES": FieldText(
         "Network evolution remove branches", None,
         (
             "Match-removing candidates explored per network evolution step. None "
-            "uses the search depth's: 1 up to depth 2, then 2 and 3."
+            "uses the search depth's: 2 up to depth 3, then 3."
         ),
     ),
     "HENS_EVM_BEAM_WIDTH": FieldText(
