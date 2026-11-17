@@ -1539,3 +1539,26 @@ def test_adopting_a_network_with_an_added_match_opens_its_slots(
         slot = grid[1][0][1]
         _set_value(model, slot, 0.25)
         assert slot.value == pytest.approx(0.25)
+
+
+def test_a_multiperiod_warm_start_leaves_a_removed_match_binary_at_zero(
+    monkeypatch,
+):
+    # Evolution's minus move warm-starts the child from a parent that still
+    # has the match on; the child's binary for it is the plain number 0.0.
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
+        warm_start,
+    )
+
+    parent = _built_two_stage_model(monkeypatch)
+    for row in parent.z:
+        for binaries in row:
+            for binary in binaries:
+                binary.set_value(1)
+    z_allowed = [[[1, 1], [1, 1]], [[1, 0], [1, 1]]]
+    child = _built_two_stage_model(monkeypatch, z_restriction=[z_allowed, None, None])
+
+    warm_start._set_multiperiod_initial_values(child, parent)
+
+    assert child.z[1][0][1] == 0.0
+    assert child.z[0][0][0].value == pytest.approx(1.0)
