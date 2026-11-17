@@ -109,6 +109,12 @@ Heat exchanger network synthesis
   variable's value is read before asking what the object is, and a recovery
   match's binary is read once rather than once per period. Extracted
   networks are unchanged.
+- The amalgamated pinch design network is built without constraints or an
+  objective. It holds the above- and below-pinch sides' solved values and is
+  only read, never solved, so a values-only model (``values_only=True``) has
+  the same variables and parameters and refuses to be solved. On the pulp
+  mill sample case a design takes about 107 s of CPU time instead of 128 s,
+  with the same network.
 
 0.9.1 (2026-11-16)
 ------------------

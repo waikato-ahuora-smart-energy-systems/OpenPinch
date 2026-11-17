@@ -3577,6 +3577,23 @@ def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() 
     assert amalgamated.z_allowed[0][0] == [1, 1]
 
 
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
+def test_the_amalgamated_network_holds_values_only() -> None:
+    # The amalgamated network is read, never solved: building its constraints
+    # and objective was about a quarter of a pulp mill design.
+    pyo = pytest.importorskip("pyomo.environ")
+    driver = _pdm_amalgamation_driver()
+
+    amalgamated = driver.amalgamate_networks(
+        above_case=_pdm_side_result(hot_utility_target=1.0),
+        below_case=_pdm_side_result(cold_utility_target=1.0),
+    )
+
+    assert amalgamated.values_only
+    assert list(amalgamated.m.model.component_data_objects(pyo.Constraint)) == []
+
+
 def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch):
     # Couenne is an optional extra; SCIP comes with the synthesis extra and
     # also solves a pinch design side that is not linear.

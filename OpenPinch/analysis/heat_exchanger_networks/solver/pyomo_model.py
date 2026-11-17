@@ -44,8 +44,11 @@ class PyomoModel:
     # class, not the instance, so a model still pickles into a worker.
     _pyo: Any = None
 
-    def __init__(self) -> None:
+    def __init__(self, *, constraints: bool = True) -> None:
         self._path: str | None = None
+        # Without constraints the model only holds values: Equation and the
+        # objective are not added, so it can never be solved.
+        self.adds_constraints = constraints
         pyo = PyomoModel._pyo = _pyomo()
         self.model = pyo.ConcreteModel()
         self.model.variables = pyo.VarList()
@@ -101,6 +104,8 @@ class PyomoModel:
         self._parameters_left = size
 
     def Equation(self, expression: Any) -> Any:
+        if not self.adds_constraints:
+            return None
         return self.model.constraints.add(expression)
 
     def Equations(self, expressions: Iterable[Any]) -> list[Any]:
@@ -141,6 +146,8 @@ class PyomoModel:
         )
 
     def _set_objective(self, expression: Any, *, sense: Any) -> None:
+        if not self.adds_constraints:
+            return
         if self.objective is not None:
             raise ValueError(
                 "A Pyomo HEN model has exactly one objective; combine the "

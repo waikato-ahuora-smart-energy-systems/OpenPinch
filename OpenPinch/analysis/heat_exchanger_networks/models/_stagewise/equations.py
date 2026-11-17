@@ -277,11 +277,14 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 for u in range(owner.NHU)
             ]
 
-    _approach._set_multiperiod_utility_approach_equations(owner)
+    # The approach builders add constraints only; a values-only model skips
+    # them. The non-isothermal one also creates the branch variables.
+    if not owner.values_only:
+        _approach._set_multiperiod_utility_approach_equations(owner)
 
     if owner.non_isothermal_model:
         _set_multiperiod_non_isothermal_equations(owner)
-    else:
+    elif not owner.values_only:
         _set_multiperiod_isothermal_approach_equations(owner)
 
     owner.dqda = []
