@@ -516,3 +516,40 @@ def test_the_structure_search_ranks_every_relocation_by_its_ceiling(
         return ranked.count("relocation")
 
     assert relocations_ranked(1) == relocations_ranked(1_000) > 1
+
+
+def test_hens_max_parallel_ranks_ceilings_on_threads_with_the_same_result(
+    fake_solver, monkeypatch
+):
+    import threading
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    threads = set()
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        threads.add(threading.current_thread().name)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+
+    def run(max_parallel: int):
+        case = json.loads(read_sample_case(CASE))
+        case["options"]["HENS_MAX_PARALLEL"] = max_parallel
+        result = search.run_retrofit_search(
+            PinchProblem(case),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=2, relocation_cost=5_000.0, **COSTS
+            ),
+        )
+        return result.evaluated_designs, [
+            (d.hot_utility, d.net_annual_benefit) for d in result.frontier
+        ]
+
+    serial = run(1)
+    assert threads == {threading.main_thread().name}
+    threads.clear()
+    assert run(4) == serial
+    assert threading.main_thread().name not in threads

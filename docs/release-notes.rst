@@ -30,7 +30,7 @@ Heat exchanger network synthesis
   utility they could cut at first order. With ``new_utility_units=True`` a
   change may come with the new end heater or cooler that frees the units it
   needs. ``max_added_area_fraction`` caps the area added to an existing
-  exchanger. Every design is checked as optimised duties are (approaches,
+  exchanger. ``HENS_MAX_PARALLEL`` runs the ceiling ranking on threads. Every design is checked as optimised duties are (approaches,
   heat balances, areas). The result's ``frontier`` gives the best design
   for each number of structural changes with savings, capital, payback and
   net annual benefit, and marks dominated ones; ``strategy="stepwise"``

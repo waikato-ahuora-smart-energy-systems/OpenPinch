@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 import sys
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 
 from ....contracts.synthesis.retrofit import (
@@ -22,6 +23,7 @@ from ....contracts.synthesis.retrofit import (
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ...economics import compute_capital_recovery_factor
+from ...parallelism import supported_workers
 from ..context import ensure_target_results
 from ..duty_optimisation import (
     DEFAULT_FEASIBILITY_APPROACH,
@@ -398,6 +400,7 @@ class _Evaluator:
         self.solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")
         self.solver_options = stage_solver_options(hens, "evm", self.solver)
         self.tol = float(hens.solve_tolerance)
+        self.max_parallel = supported_workers(max(1, int(hens.max_parallel)))
         self.names = _existing_names(self.arrays.axis_maps, existing)
         self.ends = {
             self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
@@ -525,9 +528,20 @@ class _Evaluator:
         ``new_match_candidates`` states whose structures reach the lowest
         utility cost with unlimited area, best first. Separate quotas keep
         many relocations from crowding out the new matches, and the other
-        way round."""
+        way round. With ``HENS_MAX_PARALLEL`` above 1 the ceilings are
+        solved on that many threads (each solve is an Ipopt subprocess); the
+        ranking is the same either way."""
 
-        ceilings = [(self.ceiling(state), n, state) for n, state in enumerate(states)]
+        self.evaluations += len(states)
+        if self.max_parallel > 1 and len(states) > 1:
+            workers = min(self.max_parallel, len(states))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                costs = list(pool.map(self.ceiling, states))
+        else:
+            costs = [self.ceiling(state) for state in states]
+        ceilings = [
+            (cost, n, state) for n, (cost, state) in enumerate(zip(costs, states))
+        ]
         ranked = sorted(
             (item for item in ceilings if item[0] is not None),
             key=lambda item: (item[0], item[1]),
@@ -548,7 +562,6 @@ class _Evaluator:
 
         from ..models.fixed_structure import FixedStructureModel
 
-        self.evaluations += 1
         request = build_duty_optimisation_request(
             state.network,
             objective="cost",

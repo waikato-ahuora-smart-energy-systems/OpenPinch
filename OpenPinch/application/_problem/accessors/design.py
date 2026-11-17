@@ -984,7 +984,9 @@ class _DesignAccessor:
         every existing exchanger free to grow, and an exchanger keeps added
         area of at least 1 % of its installed area, as an area addition, so
         the frontier counts structural changes. "stepwise" instead makes one
-        modification per step, an area addition being one.
+        modification per step, an area addition being one. With
+        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 the ceiling solves run
+        on that many threads; the result is the same.
 
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design for each number of modifications (0 is the existing
