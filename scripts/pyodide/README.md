@@ -22,9 +22,10 @@ only to supply the tests. It is driven by the Pyodide lane of `.github/workflows
   run raises `SystemExit` naming the missing pins [run_tests.mjs:runPythonAsync].
 - Pins are installed with the same list as constraints, so transitive dependencies also stay at
   their pins [run_tests.mjs:runPythonAsync].
-- A failed PyPI metadata fetch ("Can't fetch metadata", intermittent on CI runners) is retried,
-  up to four attempts with 5, 10 and 15 s between them; any other install error fails the run
-  at once [run_tests.mjs:runPythonAsync].
+- A failed PyPI fetch, of metadata ("Can't fetch metadata") or of a wheel
+  (`pyodide.http.AbortError: fetch failed`), both intermittent on CI runners, is retried, up to
+  four attempts with 5, 10 and 15 s between them; any other install error fails the run at once
+  [run_tests.mjs:runPythonAsync].
 - The wheel is installed with `deps=False`; numpy, scipy, pandas, pydantic, coolprop and pyyaml
   come from Pyodide's own builds [run_tests.mjs:loadPackage].
 - Tests import the installed wheel, not the checkout: `sys.path` drops `""` and `/work`, appends
