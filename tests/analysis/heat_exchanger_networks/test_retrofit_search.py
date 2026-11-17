@@ -878,3 +878,24 @@ def test_competing_inserts_are_chosen_by_their_return_per_unit_of_pressure_drop(
         if m.kind == "enhancement"
     ]
     assert enhanced == ["E2"]
+
+
+def test_an_insert_is_rejected_once_a_relocation_takes_its_stream_away():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
+        NewMatch,
+        apply_relocation,
+    )
+
+    # E4 (H2-C2) has its insert on C2; moved to H2-C1 it no longer serves
+    # C2, so its insert's pressure drop has no stream to be checked against.
+    settings = search.RetrofitSettings(
+        enhancement_factors={"E4": 1.3},
+        enhancement_pressure_drops={"E4": ("C2", 5.0)},
+        pressure_drop_allowances={"C2": 30.0},
+    )
+    network = _existing_network()
+    moved = apply_relocation(network, "E4", NewMatch("H2", "C1", 1, False))
+
+    assert search._within_pressure_drop({"E4"}, settings, network)
+    assert not search._within_pressure_drop({"E4"}, settings, moved)

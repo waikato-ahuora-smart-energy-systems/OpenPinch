@@ -285,7 +285,9 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         if (
             exchanger_id in factors
             and exchanger_id not in state.enhanced
-            and _within_pressure_drop(state.enhanced | {exchanger_id}, settings)
+            and _within_pressure_drop(
+                state.enhanced | {exchanger_id}, settings, state.network
+            )
         ):
             yield replace(
                 state,
@@ -305,16 +307,26 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             )
 
 
-def _within_pressure_drop(enhanced, settings: RetrofitSettings) -> bool:
+def _within_pressure_drop(
+    enhanced, settings: RetrofitSettings, network: HeatExchangerNetwork
+) -> bool:
     """Whether the inserts of ``enhanced`` fit every stream's pressure
-    drop allowance (a stream without one takes any)."""
+    drop allowance (a stream without one takes any) in ``network``. An
+    insert whose stream its exchanger no longer serves (a relocation took
+    it away) never fits."""
 
     drops = settings.enhancement_pressure_drops or {}
     allowances = settings.pressure_drop_allowances or {}
+    served = {
+        e.exchanger_id: {str(e.source_stream), str(e.sink_stream)}
+        for e in network.exchangers
+    }
     added: dict[str, float] = {}
     for unit in enhanced:
         if unit in drops:
             stream, drop = drops[unit]
+            if stream not in served.get(unit, ()):
+                return False
             added[stream] = added.get(stream, 0.0) + float(drop)
     return all(
         total <= float(allowances[stream]) + 1e-9
@@ -735,7 +747,7 @@ class _Evaluator:
             ),
             key=lambda unit: -self._insert_return(unit, sized.added.get(unit, 0.0)),
         ):
-            if _within_pressure_drop(enhance | {unit}, self.settings):
+            if _within_pressure_drop(enhance | {unit}, self.settings, state.network):
                 enhance = enhance | {unit}
         if not enhance:
             return sized
