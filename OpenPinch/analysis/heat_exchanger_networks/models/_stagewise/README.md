@@ -8,7 +8,7 @@ Private helper modules for `StageWiseModel` (`../stagewise.py`), which delegates
 - `set_stage_wise_superstructure`, `set_dqda_equations` (`equations.py`): variables, balances, approach constraints, isothermal or non-isothermal mixing, minimum dQ/dA. Parent also calls `_set_multiperiod_stage_wise_superstructure`.
 - `set_obj` (`objectives.py`): objective for each supported goal, including total-cost forms.
 - `set_initial_values_for_variables` (`warm_start.py`): copies a solved model's values into another, then switches on the relaxed model's idle-safe heaters and coolers (`_base/approach.py:switch_on_idle_safe_utilities`).
-- `get_post_process`, `get_lowest_benefit_HX`, `get_lowest_benefit_HX_candidates`, `get_max_benefit_HX`, `get_max_benefit_HX_candidates` (`postprocess.py`): result extraction, dQ/dA, dTAC/dA, alpha, and ranked remove or add candidates. Parent also calls `_get_multiperiod_post_process`.
+- `get_post_process`, `get_lowest_benefit_HX`, `get_lowest_benefit_HX_candidates`, `get_max_benefit_HX`, `get_max_benefit_HX_candidates` (`postprocess.py`): result extraction, dQ/dA, alpha, and ranked remove or add candidates. Parent also calls `_get_multiperiod_post_process`.
 - `verify` (`verification.py`): temperature, cost, area and network-feasibility checks; returns `(ok, reasons)`. `_value` (from `_base.execution`) reads plain numbers, `[value]` lists and Pyomo components.
 - `get_net_benefit_evolution`, `get_n_minus_one_evolution`, `get_n_plus_one_evolution` (`evolution.py`): topology evolution. Parent also calls `_active_binary_value`.
 - `reporting_improvements(callback)` (`evolution.py`): context manager; searches run inside it pass each candidate that improves on the search's best to `callback`.
@@ -38,7 +38,7 @@ Private helper modules for `StageWiseModel` (`../stagewise.py`), which delegates
 - Each evolution candidate is warm-started from its parent's solution, and the add or remove move is then applied over those values. [evolution.py:_build_and_solve_evolution]
 - `get_net_benefit_evolution` ends by calling `owner.cleanup()` on both search paths (only the early return when `owner.mSuccess != 1` skips it), and `_update_with_best_model` first turns the owner's plain-number slots of each match the adopted network adds into parameters holding the same numbers, then overwrites the owner's variables, `z_allowed`, alpha, cost attributes and `solver_run`, then re-runs post-processing. The solver's own cost lists (`hu_cost_solver_by_period`, `cu_cost_solver_by_period`, `recovery_area_cost_filtered`) are adopted as solved floats, not expressions on the candidate's model. [evolution.py:get_net_benefit_evolution] [evolution.py:_update_with_best_model] [evolution.py:_open_added_match_slots]
 - `verify` lazily imports and runs `extract_heat_exchanger_network` and `verify_network_feasibility`. [verification.py:_check_network_feasibility]
-- Post-processing runs the post-optimisation alpha solve via `get_alpha_values`. [postprocess.py:_get_multiperiod_post_process]
+- Post-processing leaves the post-optimisation alpha solve (`get_alpha_values`) and alpha-weighted dQ/dA (`alpha_dqda`) pending; the first remove or add ranking of the model solves them, once, and `_update_with_best_model` solves them for the adopted candidate before copying its alpha. [postprocess.py:_solve_ranking_alpha] [evolution.py:_update_with_best_model]
 - Evolution and verification log mostly at debug level; exceptions in a candidate solve are caught and logged. [evolution.py:_solve_evolution_candidate]
 
 ## Verification

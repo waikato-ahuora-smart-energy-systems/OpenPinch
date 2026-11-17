@@ -3781,5 +3781,6 @@ def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
 
     model.get_post_process()
 
-    assert len(price_calls) == 1
+    # Never per cell: the unused dTAC/dA grid that read it is gone.
+    assert len(price_calls) <= 1
     assert approach_calls == []

@@ -17,6 +17,7 @@ from ....parallelism import supported_workers
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base.execution import _assign_value
+from .postprocess import _solve_ranking_alpha
 from .verification import _value
 
 logger = logging.getLogger(__name__)
@@ -606,8 +607,10 @@ def _update_with_best_model(owner, best_model) -> None:
                 ", ".join(reasons),
             )
             return
-    # An empty alpha (failed post-optimisation solve) is re-solved for the
-    # adopted topology by get_post_process below.
+    # Alpha is solved only for ranking, so the candidate's is solved here from
+    # its own values; an empty alpha (failed solve) is solved again for the
+    # adopted topology when it is next ranked.
+    _solve_ranking_alpha(best_model)
     owner.alpha = (
         build_index_grid(
             lambda i, j, k: best_model.alpha[i][j][k],
