@@ -648,9 +648,21 @@ class _Evaluator:
                     list(config.hpr.normalised_refrigerants), **self.cycle_settings
                 )
             )
-            self.heat_pumps = heat_pump_candidates(
-                self.ends, approach=settings.approach, rating=rating
-            )
+            # A pump whose condenser or evaporator would take a name the
+            # problem already uses is left out, so that name keeps resolving
+            # to the problem's own stream or utility.
+            taken = [str(key) for axis in axes.values() for key in axis]
+            self.heat_pumps = [
+                candidate
+                for candidate in heat_pump_candidates(
+                    self.ends, approach=settings.approach, rating=rating
+                )
+                if not any(
+                    key == name or key.endswith("." + name)
+                    for name in (condenser_name(candidate), evaporator_name(candidate))
+                    for key in taken
+                )
+            ]
             price_scale, _capital = annual_cost_scales(config.costing)
             self.arrays = with_heat_pump_utilities(
                 self.arrays,
