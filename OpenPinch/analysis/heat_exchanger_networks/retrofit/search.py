@@ -55,6 +55,8 @@ _BINDING_SHARE = 0.99
 # The structure strategy keeps a unit's added area only from this share of
 # its installed area, and at least this many m2.
 _MIN_KEPT_SHARE = 0.01
+# Area value ($/y per m2) below which more area on a unit is worth nothing.
+_MIN_AREA_VALUE = 1e-3
 _MIN_KEPT_AREA = 1.0
 STRATEGIES = ("stepwise", "structure")
 
@@ -479,14 +481,33 @@ class _Evaluator:
                 return None
             results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
+            values = getattr(model, "area_values", None)
+            worth = (
+                None
+                if values is None
+                else {
+                    exchanger_id: values.get(slot, 0.0)
+                    for slot, exchanger_id in zip(structure.slots, ids)
+                }
+            )
+            # Units at their cap, most valuable area first; with duals, only
+            # those where more area is worth something.
             binding = tuple(
-                exchanger_id
-                for exchanger_id in ids
-                if exchanger_id in self.existing
-                and exchanger_id not in state.enlarged
-                and results[exchanger_id].active
-                and max(p.required_area for p in results[exchanger_id].periods)
-                >= _BINDING_SHARE * widen * results[exchanger_id].area
+                sorted(
+                    (
+                        exchanger_id
+                        for exchanger_id in ids
+                        if exchanger_id in self.existing
+                        and exchanger_id not in state.enlarged
+                        and results[exchanger_id].active
+                        and max(p.required_area for p in results[exchanger_id].periods)
+                        >= _BINDING_SHARE * widen * results[exchanger_id].area
+                        and (worth is None or worth[exchanger_id] > _MIN_AREA_VALUE)
+                    ),
+                    key=lambda exchanger_id: (
+                        0.0 if worth is None else -worth[exchanger_id]
+                    ),
+                )
             )
             metrics = solved.summary_metrics
             utility_cost = float(model.utility_cost_value)

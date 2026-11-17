@@ -68,6 +68,7 @@ class _Backend:
         self.cleaned = 0
         self.solved = 0
         self.goals: dict[str, set[str]] = {}
+        self.area_values = lambda spec: None
 
 
 @pytest.fixture
@@ -95,6 +96,7 @@ def fake_solver(monkeypatch) -> _Backend:
             self.utility_cost_value = (
                 1_000_000.0 - 100_000.0 * len(spec.recovery) - 20_000.0 * enlarged
             )
+            self.area_values = backend.area_values(spec)
             self.mSuccess = 0 if backend.fail(spec) else 1
 
         def cleanup(self) -> None:
@@ -615,3 +617,34 @@ def test_hens_max_parallel_solves_each_step_on_threads_with_the_same_result(
     assert run(4) == serial
     if supported_workers(4) > 1:
         assert threading.main_thread().name not in threads
+
+
+def test_the_stepwise_search_adds_area_only_where_more_area_is_worth_something(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Every installed unit is at its cap on the fake, but the solver's
+    # duals say only the first recovery unit's area is worth anything.
+    fake_solver.area_values = lambda spec: {
+        **{("recovery", r): 0.0 for r in spec.recovery_areas},
+        **{("utility", e): 0.0 for e in spec.utility_areas},
+        ("recovery", min(spec.recovery_areas)): 50.0,
+    }
+    tried = []
+    evaluate = search._Evaluator.evaluate
+
+    def spy(self, state):
+        if state.moves and state.moves[-1].kind == "area_addition":
+            tried.append(state.moves[-1].exchanger_id)
+        return evaluate(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "evaluate", spy)
+
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=1, strategy="stepwise", **COSTS),
+    )
+
+    assert len(tried) == 1

@@ -574,8 +574,13 @@ A design no better than one with fewer changes is marked ``dominated``.
 
 ``strategy="stepwise"`` instead makes one modification per step, an area
 addition on an exchanger whose duty its area limits being one, and solves
-every screened change without a ceiling ranking. It was the first version of
-the method and finds less on both validation cases below.
+every screened change without a ceiling ranking. With Ipopt, whose duals
+give each exchanger's area value (what one more m2 would save), it tries
+added area only where that value is above zero, most valuable first; on the
+validation cases this skips one to three solves and leaves the frontier
+unchanged, as almost every exchanger at its area limit is worth enlarging.
+It was the first version of the method and finds less on both validation
+cases below.
 
 Each design lists its ``modifications`` (``"new_match"``,
 ``"area_addition"`` or ``"relocation"``, the exchanger, the added area, fixed and area cost, and
