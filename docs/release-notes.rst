@@ -4,9 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
-Heat exchanger networks
-~~~~~~~~~~~~~~~~~~~~~~~
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Faster ``design.heat_exchanger_network`` with an overdesign margin or on
+  a ``"median"`` or ``"period"`` design basis: a network the search offers
+  again from another task is fitted and rated once, not each time. On the
+  four-stream Yee and Grossmann case at 10% overdesign this rates 23
+  networks rather than 60.
 - ``design.retrofit`` takes ``repiping_cost`` ($ per stream): each new
   match, relocation and new end heater or cooler also costs that for every
   stream whose piping it changes, and each modification reports those
