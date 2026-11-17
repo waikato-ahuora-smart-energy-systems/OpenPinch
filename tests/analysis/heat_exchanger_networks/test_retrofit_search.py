@@ -2,7 +2,7 @@
 
 The fake keeps the real request building, structure and screen, and stands
 in for the NLP only: a design's utility cost falls by $100,000/y per
-recovery match and $20,000/y per enlarged unit, every installed unit needs
+recovery match and $20,000/y per enlarged or enhanced unit, every installed unit needs
 its whole widened area (so it is at its cap), and every new unit gets 25 m2.
 """
 
@@ -93,8 +93,11 @@ def fake_solver(monkeypatch) -> _Backend:
             backend.solved += 1
             spec = self.spec
             enlarged = len(spec.enlargeable_recovery) + len(spec.enlargeable_utilities)
+            enhanced = len(spec.enhanced_recovery) + len(spec.enhanced_utilities)
             self.utility_cost_value = (
-                1_000_000.0 - 100_000.0 * len(spec.recovery) - 20_000.0 * enlarged
+                1_000_000.0
+                - 100_000.0 * len(spec.recovery)
+                - 20_000.0 * (enlarged + enhanced)
             )
             self.area_values = backend.area_values(spec)
             self.mSuccess = 0 if backend.fail(spec) else 1
@@ -648,3 +651,63 @@ def test_the_stepwise_search_adds_area_only_where_more_area_is_worth_something(
     )
 
     assert len(tried) == 1
+
+
+def test_the_stepwise_search_can_enhance_an_existing_unit_at_its_cap(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Area additions and new units are priced out, so the best first step
+    # is enhancing E3, the only unit with an enhancement factor.
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            strategy="stepwise",
+            new_unit_cost=1e9,
+            area_addition_cost=1e9,
+            split_cost=1e4,
+            enhancement_factors={"E3": 1.3},
+            enhancement_cost=500.0,
+            enhancement_area_cost=10.0,
+        ),
+    )
+
+    (step,) = result.frontier[1].modifications
+    assert step.kind == "enhancement"
+    assert step.exchanger_id == "E3"
+    assert step.added_area == 0.0
+    # The paper's insert cost: $500 plus $10 per m2 of the unit's area.
+    assert step.fixed_cost == pytest.approx(500.0 + 10.0 * 1008.5)
+    assert step.area_cost == 0.0
+    assert result.frontier[1].annual_savings == pytest.approx(20_000.0)
+
+
+def test_an_enhanced_unit_is_verified_at_its_enhanced_capacity(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Verification sizes each unit at the base heat transfer coefficient,
+    # so an enhanced unit must be judged as its widened area times the
+    # factor, as the model rates it.
+    verified = []
+
+    def record(network):
+        areas = {e.exchanger_id: e.area for e in network.exchangers}
+        verified.append(areas["E3"])
+        return ()
+
+    fake_solver.reject = record
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            strategy="stepwise",
+            area_tolerance=0.02,
+            enhancement_factors={"E3": 1.3},
+            **COSTS,
+        ),
+    )
+
+    assert verified[0] == pytest.approx(1008.5 * 1.02)
+    assert pytest.approx(1008.5 * 1.02 * 1.3) in verified

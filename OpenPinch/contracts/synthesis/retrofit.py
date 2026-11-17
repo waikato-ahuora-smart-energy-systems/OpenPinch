@@ -27,7 +27,7 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["new_match", "area_addition", "relocation"]
+    kind: Literal["new_match", "area_addition", "relocation", "enhancement"]
     exchanger_id: str
     added_area: float = 0.0
     fixed_cost: float = 0.0
