@@ -108,6 +108,22 @@ class PyomoModel:
             return None
         return self.model.constraints.add(expression)
 
+    def import_duals(self) -> None:
+        """Ask the solver for constraint duals (an imported ``dual``
+        suffix); solvers that report none leave them unset."""
+
+        if getattr(self.model, "dual", None) is None:
+            self.model.dual = self._pyo.Suffix(direction=self._pyo.Suffix.IMPORT)
+
+    def dual(self, constraint: Any) -> float | None:
+        """``constraint``'s dual from the last solve, or ``None`` if duals
+        were not imported or the solver reported none."""
+
+        duals = getattr(self.model, "dual", None)
+        if duals is None or constraint not in duals:
+            return None
+        return float(duals[constraint])
+
     def Equations(self, expressions: Iterable[Any]) -> list[Any]:
         return [self.Equation(expression) for expression in expressions]
 
