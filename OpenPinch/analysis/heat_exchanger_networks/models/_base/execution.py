@@ -25,12 +25,12 @@ def optimise(model, print_output: bool) -> None:
     the solved values onto the model's variables by then.
     """
 
-    if getattr(model, "values_only", False):
-        raise RuntimeError(
-            f"{model.name} is a values-only model: it has no constraints or "
-            "objective and cannot be solved."
-        )
     try:
+        if getattr(model, "values_only", False):
+            raise RuntimeError(
+                f"{model.name} is a values-only model: it has no constraints or "
+                "objective and cannot be solved."
+            )
         _solve_and_post_process(model, print_output)
     finally:
         cleanup_model(model)

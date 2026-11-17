@@ -1475,3 +1475,20 @@ def test_a_values_only_model_cannot_be_solved(monkeypatch):
 
     with pytest.raises(RuntimeError, match="values-only"):
         model.optimise(print_output=False)
+
+
+def test_refusing_a_values_only_solve_still_removes_its_run_directory(monkeypatch):
+    # optimise always removes the model's run directory, which Couenne and
+    # Ipopt configuration create for their option file.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        execution as base_execution,
+    )
+
+    model = _built_two_stage_model(monkeypatch, values_only=True)
+    cleaned = []
+    monkeypatch.setattr(base_execution, "cleanup_model", cleaned.append)
+
+    with pytest.raises(RuntimeError, match="values-only"):
+        model.optimise(print_output=False)
+
+    assert cleaned == [model]

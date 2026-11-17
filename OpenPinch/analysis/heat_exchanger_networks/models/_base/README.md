@@ -35,7 +35,7 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 ## Side Effects
 - Checks the Pyomo solver (binary first, then Pyomo) and creates a native `PyomoModel`. [execution.py:setup_model]
 - `optimise` always removes the model's run directory afterwards; `cleanup_model` is safe to repeat. [execution.py:optimise] [execution.py:cleanup_model]
-- A values-only model (`values_only` true) gets a `PyomoModel` without constraints, and `optimise` raises `RuntimeError` for it rather than solving a model with no constraints. [execution.py:setup_model] [execution.py:optimise]
+- A values-only model (`values_only` true) gets a `PyomoModel` without constraints, and `optimise` raises `RuntimeError` for it rather than solving a model with no constraints, still removing its run directory. [execution.py:setup_model] [execution.py:optimise]
 - A solve that stopped before converging (`solver_run.converged` false) keeps `mSuccess` and its values, but is logged as a warning (`[Unconverged]`) rather than `[Success]`. [execution.py:_solve_and_post_process]
 - A failed solve sets `mSuccess` to 0 and is logged at ERROR, or at the model's `failure_log_level` when a caller that expects failures (heuristic proposals, the minimum-unit search) sets one. A passing status with no objective value is a failure (`solver returned no objective value`). [execution.py:_solve_and_post_process]
 - `get_alpha_values` writes the flow-fraction grids onto the model as NumPy arrays (`P_h`, `P_c`, `beta_h`, `beta_c` over (hot, cold, stage); `z_j` over (hot, stage); `z_i` over (cold, stage)) and `alpha` as a `[value]` grid. [alpha.py:get_alpha_values] [alpha.py:_set_postoptimisation_flow_fractions]
