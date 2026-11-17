@@ -4,14 +4,16 @@ Derived from the network evolution method: each depth adds one
 modification (a new match or added area on an existing unit) to every
 network in a beam, solves each new structure once with the fixed-structure
 model's "retrofit" goal, and keeps the best. The best design at each depth
-makes the frontier over the number of modifications.
+makes the frontier over the number of steps.
 """
 
 from __future__ import annotations
 
 import math
 import sys
-from dataclasses import dataclass, replace
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field, replace
 
 from ....contracts.synthesis.retrofit import (
     HeatExchangerNetworkRetrofitDesign,
@@ -21,6 +23,7 @@ from ....contracts.synthesis.retrofit import (
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ...economics import compute_capital_recovery_factor
+from ...parallelism import supported_workers
 from ..context import ensure_target_results
 from ..duty_optimisation import (
     DEFAULT_FEASIBILITY_APPROACH,
@@ -48,6 +51,11 @@ from .moves import (
 _MIN_ADDED_AREA = 1e-3
 # An existing unit needing this share of its widened area is at its cap.
 _BINDING_SHARE = 0.99
+# The structure strategy keeps a unit's added area only from this share of
+# its installed area, and at least this many m2.
+_MIN_KEPT_SHARE = 0.01
+_MIN_KEPT_AREA = 1.0
+STRATEGIES = ("stepwise", "structure")
 
 
 @dataclass(frozen=True)
@@ -65,10 +73,19 @@ class RetrofitSettings:
     match splits) add to the area cost (the ``COSTING_HX_AREA_*`` law on the
     added area). ``relocation_cost`` ($ per existing recovery exchanger moved
     to another match or position, plus ``split_cost`` per new split) enables
-    relocation moves (``relocation_candidates`` tried from each design);
+    relocation moves (all ranked by ceiling in the structure search, the
+    ``relocation_candidates`` best scored in the stepwise one);
     ``None`` leaves them out. ``new_utility_units`` also tries each new match
     and relocation with each new end heater or cooler the network lacks, in
     the same step, priced as one more new unit.
+
+    ``strategy`` "structure" (the default) makes one structural change per step
+    (new match, relocation, paired utility): ``ceiling_candidates`` screened
+    changes are ranked by the utility cost their structure reaches with
+    unlimited area, the ``new_match_candidates`` best are solved with every
+    existing exchanger free to grow, and a unit keeps added area of at least
+    1 % of its installed area (1 m2 or more). "stepwise" makes one
+    modification per step, an area addition being one.
     """
 
     max_modifications: int = 3
@@ -83,6 +100,8 @@ class RetrofitSettings:
     relocation_cost: float | None = None
     relocation_candidates: int = 8
     new_utility_units: bool = False
+    strategy: str = "structure"
+    ceiling_candidates: int = 12
 
 
 @dataclass(frozen=True)
@@ -107,6 +126,7 @@ class _Evaluated:
     design: HeatExchangerNetworkRetrofitDesign
     solved: HeatExchangerNetwork
     binding: tuple[str, ...]
+    added: dict[str, float] = field(default_factory=dict)
 
 
 def run_retrofit_search(
@@ -119,6 +139,10 @@ def run_retrofit_search(
     be None or finite and non-negative.
     """
 
+    if settings.strategy not in STRATEGIES:
+        raise ValueError(
+            f"strategy must be one of {STRATEGIES}; got {settings.strategy!r}."
+        )
     fraction = settings.max_added_area_fraction
     if fraction is not None and not (math.isfinite(fraction) and fraction >= 0.0):
         raise ValueError(
@@ -153,15 +177,25 @@ def run_retrofit_search(
     frontier = [base.design]
     beam = [base]
     seen = {_signature(base.state, evaluator.existing)}
+    structural = settings.strategy == "structure"
     for _depth in range(max(0, int(settings.max_modifications))):
         children = []
         for parent in beam:
+            states = []
             for state in _children(parent, settings, evaluator):
+                if structural:
+                    state = _structure_only(state)
                 signature = _signature(state, evaluator.existing)
                 if signature in seen:
                     continue
                 seen.add(signature)
-                evaluated = evaluator.evaluate(state)
+                states.append(state)
+            if structural:
+                states = evaluator.best_ceilings(states)
+            for state in states:
+                evaluated = (
+                    evaluator.sized(state) if structural else evaluator.evaluate(state)
+                )
                 if evaluated is not None:
                     children.append(evaluated)
         if not children:
@@ -183,7 +217,10 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
     each new end utility exchanger the network lacks."""
 
     state = parent.state
-    for exchanger_id in parent.binding:
+    structural = settings.strategy == "structure"
+    if structural:
+        settings = replace(settings, new_match_candidates=settings.ceiling_candidates)
+    for exchanger_id in () if structural else parent.binding:
         yield replace(
             state,
             enlarged=state.enlarged | {exchanger_id},
@@ -234,12 +271,16 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
 
 
 def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
-    """The ``relocation_candidates`` most promising relocations from ``parent``.
+    """The relocations from ``parent``, most promising first.
 
     Each existing recovery unit not yet moved may go to any screened match
     that shares one of its streams (its own pair elsewhere is a repiping).
     A move scores the match's potential less the unit's present duty, the
-    heat it gives up; positive scores are kept, best first.
+    heat it gives up, best first. The stepwise search keeps the
+    ``relocation_candidates`` best positive scores; the structure search
+    keeps every move, as the ceiling ranking judges a move by what its whole
+    structure can reach and the score barely tracks that. A unit that is the
+    only exchanger on one of its streams stays on that stream.
     """
 
     solved = parent.solved
@@ -251,6 +292,11 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
         and e.exchanger_id in existing
         and e.exchanger_id not in moved
     }
+    served = Counter(
+        stream
+        for e in parent.state.network.exchangers
+        for stream in (e.source_stream, e.sink_stream)
+    )
     # Every screened match, not just the best few.
     pool = screen_new_matches(
         solved, ends, approach=settings.approach, limit=sys.maxsize
@@ -259,11 +305,16 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     for match in pool:
         potential = match_potential(solved, ends, match, approach=settings.approach)
         for unit, (hot, cold, duty) in duties.items():
-            if match.hot == hot or match.cold == cold:
+            stranded = (match.hot != hot and served[hot] == 1) or (
+                match.cold != cold and served[cold] == 1
+            )
+            if (match.hot == hot or match.cold == cold) and not stranded:
                 score = potential - duty
-                if score > 0.0:
+                if score > 0.0 or settings.strategy == "structure":
                     scored.append((score, unit, match))
     scored.sort(key=lambda item: -item[0])
+    if settings.strategy == "structure":
+        return [(unit, match) for _score, unit, match in scored]
     limit = max(0, int(settings.relocation_candidates))
     return [(unit, match) for _score, unit, match in scored[:limit]]
 
@@ -294,6 +345,17 @@ def _new_id(network: HeatExchangerNetwork, match: NewMatch) -> str:
         n += 1
         exchanger_id = f"{stem}:{n}"
     return exchanger_id
+
+
+def _structure_only(state: _State) -> _State:
+    """``state`` without its area additions: the structure strategy sizes
+    area afresh for every structure."""
+
+    return replace(
+        state,
+        enlarged=frozenset(),
+        moves=tuple(m for m in state.moves if m.kind != "area_addition"),
+    )
 
 
 def _signature(state: _State, existing):
@@ -338,6 +400,7 @@ class _Evaluator:
         self.solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")
         self.solver_options = stage_solver_options(hens, "evm", self.solver)
         self.tol = float(hens.solve_tolerance)
+        self.max_parallel = supported_workers(max(1, int(hens.max_parallel)))
         self.names = _existing_names(self.arrays.axis_maps, existing)
         self.ends = {
             self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
@@ -453,9 +516,103 @@ class _Evaluator:
                 net_annual_benefit=savings - annualised,
                 payback_years=capital / savings if savings > 0.0 else None,
             )
-            return _Evaluated(state, design, _with_names(solved, self.names), binding)
+            added = {i: float(r.added_area) for i, r in results.items()}
+            return _Evaluated(
+                state, design, _with_names(solved, self.names), binding, added
+            )
         finally:
             model.cleanup()
+
+    def best_ceilings(self, states: list[_State]) -> list[_State]:
+        """For each kind of change (new match, relocation), the
+        ``new_match_candidates`` states whose structures reach the lowest
+        utility cost with unlimited area, best first. Separate quotas keep
+        many relocations from crowding out the new matches, and the other
+        way round. With ``HENS_MAX_PARALLEL`` above 1 the ceilings are
+        solved on that many threads (each solve is an Ipopt subprocess); the
+        ranking is the same either way."""
+
+        self.evaluations += len(states)
+        if self.max_parallel > 1 and len(states) > 1:
+            workers = min(self.max_parallel, len(states))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                costs = list(pool.map(self.ceiling, states))
+        else:
+            costs = [self.ceiling(state) for state in states]
+        ceilings = [
+            (cost, n, state) for n, (cost, state) in enumerate(zip(costs, states))
+        ]
+        ranked = sorted(
+            (item for item in ceilings if item[0] is not None),
+            key=lambda item: (item[0], item[1]),
+        )
+        limit = max(0, int(self.settings.new_match_candidates))
+        kept: dict[str, int] = {}
+        best = []
+        for _cost, _n, state in ranked:
+            kind = state.moves[-1].kind
+            if kept.get(kind, 0) < limit:
+                kept[kind] = kept.get(kind, 0) + 1
+                best.append(state)
+        return best
+
+    def ceiling(self, state: _State) -> float | None:
+        """The utility cost ($/y) ``state``'s structure reaches with
+        unlimited area (its network pinch); ``None`` if the solve fails."""
+
+        from ..models.fixed_structure import FixedStructureModel
+
+        request = build_duty_optimisation_request(
+            state.network,
+            objective="cost",
+            min_approach_temperature=self.settings.approach,
+        )
+        structure = fixed_network_structure(request, self.arrays.axis_maps)
+        model = FixedStructureModel(
+            name="retrofit-ceiling",
+            solver=self.solver,
+            solver_arrays=self.arrays,
+            spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
+            minimisation_goal="utility cost",
+            default_approach=self.settings.approach,
+            tol=self.tol,
+            solver_options=dict(self.solver_options),
+        )
+        try:
+            model.optimise(print_output=False)
+            if getattr(model, "mSuccess", 0) != 1:
+                return None
+            return float(model.utility_cost_value)
+        finally:
+            model.cleanup()
+
+    def sized(self, state: _State) -> _Evaluated | None:
+        """``state``'s structure with its added area sized: solved with every
+        existing unit free to grow, then again with only the units whose
+        added area is worth keeping, each an area addition."""
+
+        free = self.evaluate(replace(state, enlarged=frozenset(self.installed)))
+        if free is None:
+            return self.evaluate(state)
+        keep = tuple(
+            sorted(
+                unit
+                for unit, added in free.added.items()
+                if unit in self.installed
+                and added >= max(_MIN_KEPT_AREA, _MIN_KEPT_SHARE * self.installed[unit])
+            )
+        )
+        if not keep:
+            return self.evaluate(state)
+        sized = self.evaluate(
+            replace(
+                state,
+                enlarged=frozenset(keep),
+                moves=state.moves
+                + tuple(_Move("area_addition", unit) for unit in keep),
+            )
+        )
+        return sized if sized is not None else self.evaluate(state)
 
     def _widened(self, network: HeatExchangerNetwork) -> HeatExchangerNetwork:
         """``network`` with each existing unit's installed area widened by

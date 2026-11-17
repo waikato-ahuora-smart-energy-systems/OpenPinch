@@ -67,6 +67,7 @@ class _Backend:
         self.reject = lambda network: ()
         self.cleaned = 0
         self.solved = 0
+        self.goals: dict[str, set[str]] = {}
 
 
 @pytest.fixture
@@ -83,8 +84,9 @@ def fake_solver(monkeypatch) -> _Backend:
     ExchangerPeriodResult = fixed_structure.ExchangerPeriodResult
 
     class FakeModel:
-        def __init__(self, *, spec, **_settings) -> None:
+        def __init__(self, *, spec, name, minimisation_goal, **_settings) -> None:
             self.spec = spec
+            backend.goals.setdefault(name, set()).add(minimisation_goal)
 
         def optimise(self, print_output: bool) -> None:
             backend.solved += 1
@@ -246,12 +248,48 @@ def test_designs_that_fail_to_solve_or_verify_stay_off_the_frontier(fake_solver)
     result = run_retrofit_search(
         _problem(),
         _existing_network(),
-        RetrofitSettings(max_modifications=2, new_match_candidates=4, **COSTS),
+        RetrofitSettings(
+            strategy="stepwise", max_modifications=2, new_match_candidates=4, **COSTS
+        ),
     )
 
     kinds = {m.kind for d in result.frontier for m in d.modifications}
     assert kinds == {"area_addition"}
     assert result.evaluated_designs > len(result.frontier)
+
+
+def test_a_relocation_never_leaves_a_stream_without_an_exchanger(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # Without its cooler E6, H2 is served by E4 alone: moving E4 to a match
+    # without H2 would leave H2 with no exchanger, which is no network.
+    network = _existing_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(e for e in network.exchangers if e.exchanger_id != "E6")
+        }
+    )
+
+    result = run_retrofit_search(
+        _problem(),
+        network,
+        RetrofitSettings(
+            max_modifications=1,
+            beam_width=50,
+            new_match_candidates=0,
+            relocation_cost=5_000.0,
+            relocation_candidates=100,
+            **COSTS,
+        ),
+    )
+
+    assert result.evaluated_designs > 1
+    for design in result.frontier:
+        e4 = next(e for e in design.network.exchangers if e.exchanger_id == "E4")
+        assert e4.source_stream.endswith("H2")
 
 
 def test_design_retrofit_runs_the_search_from_a_mapping(fake_solver):
@@ -300,3 +338,240 @@ def test_design_retrofit_runs_the_search_from_a_mapping(fake_solver):
     assert match.fixed_cost >= 34_600.0
     # The search runs on a snapshot under a temporary configuration.
     assert dict(problem.config) == stored
+
+
+INSTALLED = {
+    "E1": 609.7,
+    "E2": 579.2,
+    "E3": 1008.5,
+    "E4": 117.96,
+    "E5": 787.5,
+    "E6": 104.6,
+    "E7": 246.75,
+}
+
+
+def test_the_structure_strategy_steps_by_structure_and_sizes_area(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            strategy="structure",
+            max_modifications=2,
+            new_match_candidates=2,
+            **COSTS,
+        ),
+    )
+
+    assert len(result.frontier) == 3
+    for depth, design in enumerate(result.frontier):
+        structural = [m for m in design.modifications if m.kind != "area_addition"]
+        assert len(structural) == depth
+    additions = [
+        m
+        for design in result.frontier[1:]
+        for m in design.modifications
+        if m.kind == "area_addition"
+    ]
+    # Every existing unit may grow on the fake; a unit keeps its added area
+    # only when it is at least 1 % of its installed area (E3's 10 m2 on
+    # 1,008.5 m2 is not), and each pays the area-addition cost once.
+    assert additions
+    for m in additions:
+        assert m.added_area >= 0.01 * INSTALLED[m.exchanger_id]
+        assert m.fixed_cost == pytest.approx(COSTS["area_addition_cost"])
+        assert m.area_cost == pytest.approx(AREA_COST * m.added_area)
+    assert "E3" not in {m.exchanger_id for m in additions}
+
+
+def test_design_retrofit_takes_the_search_strategy(fake_solver):
+    problem = _problem()
+
+    result = problem.design.retrofit(
+        _existing_network(),
+        strategy="structure",
+        ceiling_candidates=3,
+        max_modifications=1,
+        new_match_candidates=1,
+    )
+
+    (design,) = result.frontier[1:]
+    assert [m.kind for m in design.modifications if m.kind != "area_addition"] == [
+        "new_match"
+    ]
+    with pytest.raises(ValueError, match="strategy"):
+        problem.design.retrofit(_existing_network(), strategy="greedy")
+
+
+def test_design_retrofit_steps_by_structure_by_default(fake_solver):
+    result = _problem().design.retrofit(
+        _existing_network(), max_modifications=2, new_match_candidates=2
+    )
+
+    for depth, design in enumerate(result.frontier):
+        structural = [m for m in design.modifications if m.kind != "area_addition"]
+        assert len(structural) == depth
+    assert any(
+        m.kind == "area_addition" for d in result.frontier for m in d.modifications
+    )
+
+
+def test_the_ceiling_ranks_relocations_that_give_up_more_than_they_gain(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # Every relocation now scores below zero: the move gives up more duty
+    # than its new position's potential. The stepwise search drops such
+    # moves; the structure search lets the ceiling judge them.
+    monkeypatch.setattr(search, "match_potential", lambda *args, **kwargs: 0.0)
+    ranked = []
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        ranked.append(state.moves[-1].kind)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=1,
+            relocation_cost=5_000.0,
+            **COSTS,
+        ),
+    )
+
+    assert ranked.count("relocation") > 0
+
+
+def test_relocations_and_new_matches_each_get_their_best_solved(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # On the fake a new match always has the lower ceiling (one more
+    # recovery match), so one shared quota would solve new matches only.
+    solved = []
+    sized = search._Evaluator.sized
+
+    def spy(self, state):
+        solved.append(state.moves[-1].kind)
+        return sized(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "sized", spy)
+
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=2,
+            relocation_cost=5_000.0,
+            relocation_candidates=4,
+            **COSTS,
+        ),
+    )
+
+    assert solved.count("new_match") == 2
+    assert solved.count("relocation") == 2
+
+
+def test_the_structure_search_ranks_every_relocation_by_its_ceiling(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # The pre-score barely tracks the ceiling (the Smith case's best move
+    # scores 127th of 395), so the structure search caps nothing before
+    # the ceiling ranking: relocation_candidates bounds the stepwise search.
+    ranked = []
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        ranked.append(state.moves[-1].kind)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+
+    def relocations_ranked(candidates: int) -> int:
+        ranked.clear()
+        search.run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=1,
+                new_match_candidates=1,
+                relocation_cost=5_000.0,
+                relocation_candidates=candidates,
+                **COSTS,
+            ),
+        )
+        return ranked.count("relocation")
+
+    assert relocations_ranked(1) == relocations_ranked(1_000) > 1
+
+
+def test_hens_max_parallel_ranks_ceilings_on_threads_with_the_same_result(
+    fake_solver, monkeypatch
+):
+    import threading
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+    from OpenPinch.analysis.parallelism import supported_workers
+
+    threads = set()
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        threads.add(threading.current_thread().name)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+
+    def run(max_parallel: int):
+        case = json.loads(read_sample_case(CASE))
+        case["options"]["HENS_MAX_PARALLEL"] = max_parallel
+        result = search.run_retrofit_search(
+            PinchProblem(case),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=2, relocation_cost=5_000.0, **COSTS
+            ),
+        )
+        return result.evaluated_designs, [
+            (d.hot_utility, d.net_annual_benefit) for d in result.frontier
+        ]
+
+    serial = run(1)
+    assert threads == {threading.main_thread().name}
+    threads.clear()
+    assert run(4) == serial
+    # Pyodide cannot start threads, so the search stays serial there.
+    if supported_workers(4) > 1:
+        assert threading.main_thread().name not in threads
+    else:
+        assert threads == {threading.main_thread().name}
+
+
+def test_the_ceiling_minimises_utility_cost_not_duty(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # The ranking reads the ceiling's utility cost, so the ceiling must
+    # minimise it: with several utilities at different prices, minimising
+    # duty leaves the split between them arbitrary.
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=1, **COSTS),
+    )
+
+    assert fake_solver.goals["retrofit-ceiling"] == {"utility cost"}

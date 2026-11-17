@@ -50,7 +50,7 @@ class HeatExchangerNetworkRetrofitDesign(BaseModel):
     ``capital_cost`` is the installed cost of the modifications in $ and
     ``payback_years`` is capital over savings (``None`` without savings).
     ``dominated`` marks a design no better in net annual benefit than one
-    with fewer modifications.
+    from an earlier search step.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -73,10 +73,13 @@ class HeatExchangerNetworkRetrofitDesign(BaseModel):
 
 
 class HeatExchangerNetworkRetrofitResult(BaseModel):
-    """Retrofit search result: the best design for each modification count.
+    """Retrofit search result: the best design for each number of steps.
 
-    ``frontier[n]`` is the design with ``n`` modifications that the search
-    found best by net annual benefit; ``frontier[0]`` is the existing network.
+    ``frontier[n]`` is the design after ``n`` steps that the search found
+    best by net annual benefit; ``frontier[0]`` is the existing network. A
+    step is one structural change with the area additions it keeps (the
+    structure strategy) or one modification (the stepwise strategy), so
+    ``modification_count`` can exceed ``n``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -86,10 +89,11 @@ class HeatExchangerNetworkRetrofitResult(BaseModel):
 
     @property
     def selected(self) -> HeatExchangerNetworkRetrofitDesign:
-        """The design with the best net annual benefit, fewest modifications
-        on a tie."""
+        """The design with the best net annual benefit, fewest steps on a
+        tie."""
 
-        return max(
-            self.frontier,
-            key=lambda d: (d.net_annual_benefit, -d.modification_count),
+        best = max(
+            range(len(self.frontier)),
+            key=lambda n: (self.frontier[n].net_annual_benefit, -n),
         )
+        return self.frontier[best]

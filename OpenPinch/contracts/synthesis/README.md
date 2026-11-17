@@ -29,7 +29,7 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - Method output `objective_value` and result `objective_values` are finite and non-negative; `stage_count` is positive on the method input and the result [method.py:HeatExchangerNetworkSynthesisMethodOutput, result.py:HeatExchangerNetworkSynthesisResult].
 - Topology restriction `stage` is positive and `duty` non-negative and finite [topology.py:HeatExchangerNetworkTopologyRestriction].
 - Models forbid extra fields and validate on assignment, except the view models, which are frozen [view.py:_ViewModel], and the retrofit models, which forbid extra fields only [retrofit.py].
-- A retrofit result has at least one design; `selected` is the design with the best net annual benefit, the fewer modifications on a tie [retrofit.py:HeatExchangerNetworkRetrofitResult.selected].
+- A retrofit result has at least one design; `frontier[n]` is the best design after `n` search steps, and `selected` the design with the best net annual benefit, the fewest steps on a tie (a structural step can keep several area additions, so `modification_count` can exceed `n`) [retrofit.py:HeatExchangerNetworkRetrofitResult.selected].
 - By convention, layouts built by `presentation/network_grid/layout.py` list recovery, then heater, then cooler matches; the model does not enforce the order, and drawing positions are left to the client [view.py:HeatExchangerNetworkGridLayout].
 
 ## Side Effects

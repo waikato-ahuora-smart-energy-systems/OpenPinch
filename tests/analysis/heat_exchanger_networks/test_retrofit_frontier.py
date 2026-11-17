@@ -50,3 +50,21 @@ def test_the_selected_design_has_the_best_net_benefit_with_fewest_modifications(
     )
 
     assert result.selected.modification_count == 1
+
+
+def test_dominance_follows_frontier_steps_not_modification_records():
+    # In the structure search frontier[n] is n structural changes, each
+    # with any area additions it keeps: step 1 here carries three records,
+    # step 2 one. Step 2 earns less than step 1 does, so it is dominated;
+    # step 1 is not, though step 2 has fewer records.
+    frontier = mark_dominated([_design(0, 0.0), _design(3, 500.0), _design(1, 400.0)])
+
+    assert [d.dominated for d in frontier] == [False, False, True]
+
+
+def test_the_selected_design_breaks_ties_by_fewest_steps():
+    result = HeatExchangerNetworkRetrofitResult(
+        frontier=(_design(0, 0.0), _design(3, 500.0), _design(1, 500.0))
+    )
+
+    assert result.selected is result.frontier[1]

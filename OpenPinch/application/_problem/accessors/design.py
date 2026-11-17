@@ -1049,6 +1049,8 @@ class _DesignAccessor:
         relocation_cost: float | None = None,
         relocation_candidates: int = 8,
         new_utility_units: bool = False,
+        strategy: str = "structure",
+        ceiling_candidates: int = 12,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1069,12 +1071,12 @@ class _DesignAccessor:
             }
 
         Every exchanger needs its installed area. The existing network is
-        rated at its areas (widened by ``area_tolerance``), then modified one
-        step at a time, up to ``max_modifications``: more area on an existing
-        exchanger whose duty its area limits, or a new match (screened by the
-        heat it could recover where it sits). Each step keeps the
-        ``beam_width`` designs with the best net annual benefit and tries
-        ``new_match_candidates`` new matches from each.
+        rated at its areas (widened by ``area_tolerance``), then changed one
+        structural step at a time, up to ``max_modifications``: a new match
+        (screened by the utility it could cut where it sits) or, optionally,
+        a relocated exchanger, with the added area each structure needs
+        sized in the same solve. Each step keeps the ``beam_width`` designs
+        with the best net annual benefit.
 
         Added area costs ``COSTING_HX_AREA_COEFF * area **
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
@@ -1086,19 +1088,33 @@ class _DesignAccessor:
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
         split) a step may also move an existing recovery exchanger, with its
         installed area, to a screened match that shares one of its streams
-        (None, the default: no relocations); ``relocation_candidates`` are
-        tried from each design, ranked by the match's heat potential less the
-        unit's present duty. With ``new_utility_units`` each new match and
+        (None, the default: no relocations). The default search ranks every
+        such move by its ceiling; the stepwise search tries the
+        ``relocation_candidates`` with the most heat potential at the match
+        less the unit's present duty. With ``new_utility_units`` each new match and
         relocation is also tried together with a new end heater or cooler on
         a stream that has none, which can free the units a move needs; the
         pair is one modification, costing one more ``new_unit_cost`` and the
         utility exchanger's area.
 
+        ``strategy`` "structure" (the default) makes one structural change
+        per step: ``ceiling_candidates`` screened changes are ranked
+        by the utility cost their structure reaches with unlimited area (its
+        network pinch), the ``new_match_candidates`` best are solved with
+        every existing exchanger free to grow, and an exchanger keeps added
+        area of at least 1 % of its installed area, as an area addition, so
+        the frontier counts structural changes. "stepwise" instead makes one
+        modification per step, an area addition being one. With
+        ``HENS_MAX_PARALLEL`` (in ``options``) above 1 the ceiling solves run
+        on that many threads; the result is the same.
+
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
-        the best design for each number of modifications (0 is the existing
-        network) with its savings, capital, payback and modifications, and
-        ``selected`` the one with the best net annual benefit. The problem's
-        cached design is not changed. Requires the optional synthesis
+        the best design after each number of steps (0 is the existing
+        network; a step is a structural change with the area additions it
+        keeps, or with "stepwise" one modification) with its savings,
+        capital, payback and modifications, and ``selected`` the one with
+        the best net annual benefit. The problem's cached design is not
+        changed. Requires the optional synthesis
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
@@ -1150,6 +1166,8 @@ class _DesignAccessor:
                     ),
                     relocation_candidates=relocation_candidates,
                     new_utility_units=new_utility_units,
+                    strategy=strategy,
+                    ceiling_candidates=ceiling_candidates,
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

@@ -36,28 +36,29 @@ Heat exchanger network synthesis
   longer, since each network costs a fit and, with a margin, its ratings.
 - New ``design.retrofit(existing, ...)`` finds cost-effective modifications
   of an existing network. The existing network, with every exchanger's
-  installed area, is rated, then modified one step at a time, as in network
-  evolution: more area on an exchanger its area limits, or a new match
-  (joining a stage or in a new one). Each candidate is solved on the
-  fixed-structure model with a new ``"retrofit"`` goal (existing area sunk,
-  added area and fixed costs for new units, added area and splits). The
-  result's ``frontier`` gives the best design for each number of
-  modifications with savings, capital, payback and net annual benefit, and
-  marks dominated ones. ``max_added_area_fraction`` caps the area added to
-  an existing exchanger (for example 0.2 for at most 20 % more), and with
-  ``relocation_cost`` a step may move an existing recovery exchanger, with
-  its installed area, to another match or position (relocation and
-  repiping). With ``new_utility_units=True`` new matches and relocations
-  are also tried with a new end heater or cooler that frees the units they
-  need, priced together as one modification. New matches are screened by
-  the utility they could cut at first order (heat potential capped by the
-  hot stream's cooling and the cold stream's heating). Every design is
-  checked as optimised duties are (approaches, heat balances, areas) and
-  dropped if it fails. Network mappings for ``optimise_duties`` and
-  ``retrofit`` now take entries as mappings with ``area`` and ``id``. Tested
-  on the Ciric and Floudas (1989) retrofit case, packaged as
-  ``Five-stream-Ciric-and-Floudas-1989.json`` and demonstrated in notebook
-  16; see "Retrofit of an Existing Network" in the HEN synthesis guide.
+  installed area, is rated, then changed one structural step at a time, as
+  in network evolution: a new match (joining a stage or in a new one) or,
+  with ``relocation_cost``, an existing recovery exchanger moved with its
+  area to another match or position. Following the network pinch approach
+  of Smith's group, candidate changes are ranked by the utility their
+  structure reaches with unlimited area, and the best are solved on the
+  fixed-structure model with a new ``"retrofit"`` goal that also sizes the
+  added area each structure needs (existing area sunk; added area, new
+  units, area additions and splits priced). New matches are screened by the
+  utility they could cut at first order. With ``new_utility_units=True`` a
+  change may come with the new end heater or cooler that frees the units it
+  needs. ``max_added_area_fraction`` caps the area added to an existing
+  exchanger. ``HENS_MAX_PARALLEL`` runs the ceiling ranking on threads. Every design is checked as optimised duties are (approaches,
+  heat balances, areas). The result's ``frontier`` gives the best design
+  for each number of structural changes with savings, capital, payback and
+  net annual benefit, and marks dominated ones; ``strategy="stepwise"``
+  instead counts each area addition as a step. Network mappings for
+  ``optimise_duties`` and ``retrofit`` now take entries as mappings with
+  ``area`` and ``id``. Demonstrated in notebook 16 on the Ciric and Floudas
+  (1989) case, now packaged as ``Five-stream-Ciric-and-Floudas-1989.json``,
+  and checked against Akpomiemie and Smith's (2018) crude preheat train,
+  whose published retrofit targets it reproduces; see "Retrofit of an
+  Existing Network" in the HEN synthesis guide.
 - The heuristic pinch design method realises networks faster: side
   proposals that solve to a side network already found are not paired,
   since each pairing would repeat a network; they stand in only for a
