@@ -79,32 +79,32 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
+    # An approach depends on the period and the pair, not the stage, so each
+    # is looked up once for both theta grids.
+    approaches = [
+        [
+            [
+                _approach._recovery_approach_temperature(owner, i, j, n)
+                for j in range(owner.J)
+            ]
+            for i in range(owner.I)
+        ]
+        for n in range(owner.N_periods)
+    ]
     owner.theta_1_by_period = [
         [
             [
                 [
                     (
                         owner.m.Var(
-                            value=_approach._recovery_approach_temperature(
-                                owner,
-                                i,
-                                j,
-                                n,
-                            ),
+                            value=approaches[n][i][j],
                             ub=abs(
                                 owner.T_h_in_period[n][i] - owner.T_c_in_period[n][j]
                             ),
-                            lb=_approach._recovery_approach_temperature(
-                                owner,
-                                i,
-                                j,
-                                n,
-                            ),
+                            lb=approaches[n][i][j],
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else float(
-                            _approach._recovery_approach_temperature(owner, i, j, n),
-                        )
+                        else approaches[n][i][j]
                     )
                     for k in range(owner.S)
                 ]
@@ -120,26 +120,14 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 [
                     (
                         owner.m.Var(
-                            value=_approach._recovery_approach_temperature(
-                                owner,
-                                i,
-                                j,
-                                n,
-                            ),
+                            value=approaches[n][i][j],
                             ub=abs(
                                 owner.T_h_in_period[n][i] - owner.T_c_in_period[n][j]
                             ),
-                            lb=_approach._recovery_approach_temperature(
-                                owner,
-                                i,
-                                j,
-                                n,
-                            ),
+                            lb=approaches[n][i][j],
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else float(
-                            _approach._recovery_approach_temperature(owner, i, j, n),
-                        )
+                        else approaches[n][i][j]
                     )
                     for k in range(owner.S)
                 ]
@@ -160,62 +148,65 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
 
     _piecewise._set_piecewise_stage_heat_coordinates(owner)
 
-    for n in range(owner.N_periods):
-        owner.m.Equations(
-            [
-                owner.Qtot_sh_period[n][i]
-                - owner.m.sum(
-                    [
-                        owner.Q_r_by_period[n][i][j][k]
-                        for k in range(owner.S)
-                        for j in range(owner.J)
-                    ]
-                )
-                - sum(owner.Q_c_by_period[n][i])
-                == 0.0
-                for i in range(owner.I)
-            ]
-        )
-        owner.m.Equations(
-            [
-                owner.Qtot_sc_period[n][j]
-                - owner.m.sum(
-                    [
-                        owner.Q_r_by_period[n][i][j][k]
-                        for k in range(owner.S)
-                        for i in range(owner.I)
-                    ]
-                )
-                - sum(owner.Q_h_by_period[n][j])
-                == 0.0
-                for j in range(owner.J)
-            ]
-        )
-        owner.m.Equations(
-            [
-                (owner.T_h_by_period[n][i][k + 1] - owner.T_h_by_period[n][i][k])
-                * owner.f_h_period[n][i]
-                + sum(owner.Q_r_by_period[n][i][j][k] for j in range(owner.J))
-                == 0
-                for k in range(owner.S)
-                for i in range(owner.I)
-                if not _piecewise._hot_parent_segmented(owner, i)
-            ]
-        )
-        owner.m.Equations(
-            [
-                (owner.T_c_by_period[n][j][k + 1] - owner.T_c_by_period[n][j][k])
-                * owner.f_c_period[n][j]
-                + sum(owner.Q_r_by_period[n][i][j][k] for i in range(owner.I))
-                == 0
-                for k in range(owner.S)
-                for j in range(owner.J)
-                if not _piecewise._cold_parent_segmented(owner, j)
-            ]
-        )
+    # A values-only model keeps no constraints, so their expressions are
+    # not built.
+    if not owner.values_only:
+        for n in range(owner.N_periods):
+            owner.m.Equations(
+                [
+                    owner.Qtot_sh_period[n][i]
+                    - owner.m.sum(
+                        [
+                            owner.Q_r_by_period[n][i][j][k]
+                            for k in range(owner.S)
+                            for j in range(owner.J)
+                        ]
+                    )
+                    - sum(owner.Q_c_by_period[n][i])
+                    == 0.0
+                    for i in range(owner.I)
+                ]
+            )
+            owner.m.Equations(
+                [
+                    owner.Qtot_sc_period[n][j]
+                    - owner.m.sum(
+                        [
+                            owner.Q_r_by_period[n][i][j][k]
+                            for k in range(owner.S)
+                            for i in range(owner.I)
+                        ]
+                    )
+                    - sum(owner.Q_h_by_period[n][j])
+                    == 0.0
+                    for j in range(owner.J)
+                ]
+            )
+            owner.m.Equations(
+                [
+                    (owner.T_h_by_period[n][i][k + 1] - owner.T_h_by_period[n][i][k])
+                    * owner.f_h_period[n][i]
+                    + sum(owner.Q_r_by_period[n][i][j][k] for j in range(owner.J))
+                    == 0
+                    for k in range(owner.S)
+                    for i in range(owner.I)
+                    if not _piecewise._hot_parent_segmented(owner, i)
+                ]
+            )
+            owner.m.Equations(
+                [
+                    (owner.T_c_by_period[n][j][k + 1] - owner.T_c_by_period[n][j][k])
+                    * owner.f_c_period[n][j]
+                    + sum(owner.Q_r_by_period[n][i][j][k] for i in range(owner.I))
+                    == 0
+                    for k in range(owner.S)
+                    for j in range(owner.J)
+                    if not _piecewise._cold_parent_segmented(owner, j)
+                ]
+            )
 
     create_match_binaries(owner)
-    if owner.integers:
+    if owner.integers and not owner.values_only:
         for n in range(owner.N_periods):
             _ = [
                 (
@@ -431,6 +422,8 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
 
     _piecewise._set_piecewise_match_outlet_equations(owner)
 
+    if owner.values_only:
+        return
     for n in range(owner.N_periods):
         _ = [
             (
