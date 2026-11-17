@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.9.3 (2026-11-18)
+------------------
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
