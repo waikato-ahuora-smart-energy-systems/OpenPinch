@@ -12,7 +12,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 - `quantify_heat_exchanger_network_controllability` (`controllability.py`): 0 to 1 steady-state controllability score for a solved `HeatExchangerNetwork`, from an interaction matrix derived from exchanger duties.
 - `PreparedProblem`, `SynthesisProblem` (`prepared_problem.py`): structural protocols for the problem state analysis code reads.
 - `WorkflowContractError` (`errors.py`): raised when a synthesis workflow breaks its task contract or no task outcome succeeds.
-- `build_index_grid`, `ordered_mapping_keys` (`indexing.py`): nested index grids and index-ordered mapping keys.
+- `build_index_grid`, `ordered_mapping_keys` (`indexing.py`): nested index grids, built in row-major order with one call per cell, and index-ordered mapping keys.
 - Subdirectories:
   - [execution](./execution/README.md): settings, search levels, executors and task-builder helpers.
   - [extraction](./extraction/README.md): solved model to domain network.

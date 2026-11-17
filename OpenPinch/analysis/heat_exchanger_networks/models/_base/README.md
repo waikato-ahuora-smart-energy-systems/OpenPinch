@@ -27,8 +27,8 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 - Capital cost is `unit_cost * n_units` plus power-law area terms for recovery, heaters and coolers. [costing.py:set_period_totals_and_costs]
 - With a solver in `backend.INTEGER_SOLVERS` (`couenne`, `highs`, `scip`, `mindtpy`) segment temperature and price profiles use interval binaries; with the others they use relaxed selectors that the solve loop updates. Approach-contribution profiles always use relaxed selectors. [piecewise.py:_set_piecewise_stage_heat_coordinates, _utility_cost_expression]
 - Piecewise solves repeat up to eight times until active segments stop changing; failure to stabilise, or a negative objective, marks the solve failed. [execution.py:_solve_and_post_process]
-- `_set_value` clamps to variable bounds; a parameter (a fixed `PyomoModel` variable) takes the value unclamped. [execution.py:_set_value]
-- `_assign_value` writes a value unclamped onto a Pyomo variable or parameter; warm starts, amalgamation, evolution moves and stage reduction write values only through it or `_set_value`. [execution.py:_assign_value]
+- `_set_value` clamps to variable bounds; a parameter (a fixed `PyomoModel` variable) takes the value unclamped and stays fixed, without Pyomo's domain and bound check. [execution.py:_set_value]
+- `_assign_value` writes a value unclamped and unvalidated onto a Pyomo variable or parameter, leaving a parameter fixed; warm starts, amalgamation, evolution moves and stage reduction write values only through it or `_set_value`. [execution.py:_assign_value]
 - The solve loop calls `solve_pyomo_model` and judges success, a negative objective and the logged objective from the `SolverRun` status and objective value. [execution.py:_solve_and_post_process]
 - A relaxed match (a fixed parameter) whose fixed end misses its approach forces the unit's duty to zero. [approach.py:_set_terminal_approach_equations, _is_parameter]
 
