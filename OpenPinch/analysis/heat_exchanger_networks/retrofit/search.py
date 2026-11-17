@@ -4,7 +4,7 @@ Derived from the network evolution method: each depth adds one
 modification (a new match or added area on an existing unit) to every
 network in a beam, solves each new structure once with the fixed-structure
 model's "retrofit" goal, and keeps the best. The best design at each depth
-makes the frontier over the number of modifications.
+makes the frontier over the number of steps.
 """
 
 from __future__ import annotations

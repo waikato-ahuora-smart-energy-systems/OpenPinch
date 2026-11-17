@@ -462,8 +462,9 @@ runs it.
        area_addition_cost=8_650.0,
        split_cost=10_000.0,
    )
-   for design in result.frontier:
+   for step, design in enumerate(result.frontier):
        print(
+           step,
            design.modification_count,
            round(design.annual_savings),
            round(design.capital_cost),
