@@ -21,12 +21,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 value=owner.Q_max_period[n][i][j] / 3,
                 ub=owner.Q_max_period[n][i][j],
                 lb=0.0,
-                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
             )
             if owner.z_allowed[i][j][k] > 0
             else owner.m.Param(
                 value=0.0,
-                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
             )
         ),
         (owner.N_periods, owner.I, owner.J, owner.S),
@@ -38,12 +36,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 value=owner.T_h_in_period[n][i],
                 ub=owner.T_h_in_period[n][i],
                 lb=owner.T_h_out_period[n][i],
-                name=f"T_H{i}_at_B{k}_period{n}",
             )
             if k > 0 and owner.z_i_active[i] > 0
             else owner.m.Param(
                 value=owner.T_h_in_period[n][i],
-                name=f"T_H{i}_at_B{k}_period{n}",
             )
         ),
         (owner.N_periods, owner.I, owner.K),
@@ -54,12 +50,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 value=owner.T_c_in_period[n][j],
                 ub=owner.T_c_out_period[n][j],
                 lb=owner.T_c_in_period[n][j],
-                name=f"T_C{j}_at_B{k}_period{n}",
             )
             if k < owner.S and owner.z_j_active[j] > 0
             else owner.m.Param(
                 value=owner.T_c_in_period[n][j],
-                name=f"T_C{j}_at_B{k}_period{n}",
             )
         ),
         (owner.N_periods, owner.J, owner.K),
@@ -271,7 +265,6 @@ def _utility_cost(owner):
                     n,
                     sum(row[u] for row in grid),
                     utility=u,
-                    name=f"pdm_{side}_utility{u}_period_{n}",
                 )
                 for side, grid, count in (
                     ("hot", owner.Q_h_by_period[n], owner.NHU),

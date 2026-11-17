@@ -209,14 +209,29 @@ def _assign_value(variable: Any, value: Any) -> None:
 
     if isinstance(value, list | tuple):
         (value,) = value
+    if variable.__class__ is float:
+        _check_constant(variable, value)
+        return
     # A parameter stays fixed; neither it nor a variable is validated, since
     # the value is copied from a solved model.
     variable.set_value(value, skip_validation=True)
 
 
+def _check_constant(constant: float, value: Any) -> None:
+    """A disallowed match's slot is a plain number: it can only keep it."""
+
+    if value is not None and float(value) != constant:
+        raise ValueError(
+            f"Cannot set a disallowed match's constant {constant!r} to {value!r}."
+        )
+
+
 def _set_value(model, variable: Any, value: float) -> None:
     """Assign Pyomo values while preserving source bound-clamping behavior."""
 
+    if variable.__class__ is float:
+        _check_constant(variable, value)
+        return
     if getattr(variable, "is_variable_type", lambda: False)():
         # A PyomoModel variable, or a parameter (a fixed variable). A
         # parameter is fixed already and is an unbounded real, so Pyomo's

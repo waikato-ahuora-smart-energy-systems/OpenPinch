@@ -26,13 +26,9 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             value=owner.Q_max_period[n][i][j] / 3,
                             ub=owner.Q_max_period[n][i][j],
                             lb=0.0,
-                            name=(f"Q_H{i}_to_C{j}_at_S{k}_period{n}"),
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=0.0,
-                            name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
-                        )
+                        else 0.0
                     )
                     for k in range(owner.S)
                 ]
@@ -51,12 +47,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         value=owner.T_h_in_period[n][i],
                         ub=owner.T_h_in_period[n][i],
                         lb=owner.T_h_out_period[n][i],
-                        name=f"T_H{i}_at_B{k}_period{n}",
                     )
                     if k > 0
                     else owner.m.Param(
                         value=owner.T_h_in_period[n][i],
-                        name=f"T_H{i}_at_B{k}_period{n}",
                     )
                 )
                 for k in range(owner.K)
@@ -73,12 +67,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         value=owner.T_c_in_period[n][j],
                         ub=owner.T_c_out_period[n][j],
                         lb=owner.T_c_in_period[n][j],
-                        name=f"T_C{j}_at_B{k}_period{n}",
                     )
                     if k < owner.S
                     else owner.m.Param(
                         value=owner.T_c_in_period[n][j],
-                        name=f"T_C{j}_at_B{k}_period{n}",
                     )
                 )
                 for k in range(owner.K)
@@ -108,17 +100,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                                 j,
                                 n,
                             ),
-                            name=(f"approach_T1_H{i}_to_C{j}_at_S{k}_period{n}"),
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=_approach._recovery_approach_temperature(
-                                owner,
-                                i,
-                                j,
-                                n,
-                            ),
-                            name=(f"approach_T1_H{i}_to_C{j}_at_S{k}_period{n}"),
+                        else float(
+                            _approach._recovery_approach_temperature(owner, i, j, n),
                         )
                     )
                     for k in range(owner.S)
@@ -150,17 +135,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                                 j,
                                 n,
                             ),
-                            name=(f"approach_T2_H{i}_to_C{j}_at_S{k}_period{n}"),
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=_approach._recovery_approach_temperature(
-                                owner,
-                                i,
-                                j,
-                                n,
-                            ),
-                            name=(f"approach_T2_H{i}_to_C{j}_at_S{k}_period{n}"),
+                        else float(
+                            _approach._recovery_approach_temperature(owner, i, j, n),
                         )
                     )
                     for k in range(owner.S)
@@ -367,13 +345,9 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                             value=0.5,
                             ub=1.0,
                             lb=0.0,
-                            name=f"X_H{i}_to_C{j}_at_S{k}_period{n}",
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=0.0,
-                            name=f"X_H{i}_to_C{j}_at_S{k}_period{n}",
-                        )
+                        else 0.0
                     )
                     for k in range(owner.S)
                 ]
@@ -392,13 +366,9 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                             value=0.5,
                             ub=1.0,
                             lb=0.0,
-                            name=f"Y_C{j}_to_H{i}_at_S{k}_period{n}",
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=0.0,
-                            name=f"Y_C{j}_to_H{i}_at_S{k}_period{n}",
-                        )
+                        else 0.0
                     )
                     for k in range(owner.S)
                 ]
@@ -417,13 +387,11 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                             value=owner.T_h_in_period[n][i],
                             ub=owner.T_h_in_period[n][i],
                             lb=owner.T_h_out_period[n][i],
-                            name=f"Thout_x_H{i}_to_C{j}_at_S{k}_period{n}",
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=0,
-                            name=f"Tx_H{i}_to_C{j}_at_S{k}_period{n}",
-                        )
+                        # Warm start writes the stage outlet temperature
+                        # here: evolution starts an added match from it.
+                        else owner.m.Param(value=0)
                     )
                     for k in range(owner.S)
                 ]
@@ -442,13 +410,11 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                             value=owner.T_c_in_period[n][j],
                             ub=owner.T_c_out_period[n][j],
                             lb=owner.T_c_in_period[n][j],
-                            name=f"Tcout_y_C{j}_to_H{i}_at_S{k}_period{n}",
                         )
                         if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(
-                            value=0,
-                            name=f"Ty_C{j}_to_H{i}_at_S{k}_period{n}",
-                        )
+                        # Warm start writes the stage outlet temperature
+                        # here: evolution starts an added match from it.
+                        else owner.m.Param(value=0)
                     )
                     for k in range(owner.S)
                 ]
@@ -578,7 +544,6 @@ def set_dqda_equations(owner) -> None:
                     - owner.theta_1_by_period[n][i][j][k]
                     * owner.theta_2_by_period[n][i][j][k]
                     * owner.U_r_period[n][i][j],
-                    name=f"dqda_calc_H{i}_to_C{j}_at_S{k}_period{n}",
                 )
                 if owner.z_allowed[i][j][k] > 0
                 else None
@@ -608,7 +573,6 @@ def set_dqda_equations(owner) -> None:
             owner.m.Intermediate(
                 owner.min_dqda * (owner.T_h[i][k] - owner.T_c[j][k + 1])
                 - owner.theta_1[i][j][k] * owner.theta_2[i][j][k] * owner.U_r[i][j],
-                name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
             )
             if owner.z_allowed[i][j][k] > 0
             else None

@@ -165,6 +165,13 @@ Heat exchanger network synthesis
   mill sample case this saves about 20 s of CPU time per design (107 s
   instead of 128 s, measured before the index-grid change above), with the
   same network.
+- Building stage-wise models is cheaper. Variables come from preallocated
+  blocks, as parameters already did; model components are no longer given
+  names, which were never used; and a disallowed match's duty, approach
+  temperatures, binary and branch fractions are plain numbers instead of
+  fixed Pyomo parameters, which also makes loading a model into HiGHS
+  faster. On the pulp mill sample case a design takes about 85 s of CPU
+  time instead of 108 s, with the same network.
 
 0.9.1 (2026-11-16)
 ------------------
