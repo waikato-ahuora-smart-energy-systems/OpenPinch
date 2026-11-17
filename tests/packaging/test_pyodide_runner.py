@@ -39,3 +39,14 @@ def test_a_failed_install_prints_the_traceback_and_exits_1(tmp_path):
     # GitHub dropped the traceback that followed it.
     longest = max(len(line) for line in (run.stdout + run.stderr).splitlines())
     assert longest < GITHUB_LINE_LIMIT
+
+
+def test_the_pypi_install_retries_a_failed_metadata_fetch():
+    # On CI runners micropip's fetch of PyPI metadata fails now and then, on
+    # a different package each time; the install retries that error alone
+    # a few times before failing the run.
+    source = RUNNER.read_text(encoding="utf-8")
+
+    assert "Can't fetch metadata" in source
+    assert "for attempt in range(INSTALL_ATTEMPTS)" in source
+    assert "await asyncio.sleep(" in source

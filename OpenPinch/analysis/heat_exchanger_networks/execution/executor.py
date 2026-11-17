@@ -6,7 +6,7 @@ import contextvars
 import logging
 import multiprocessing
 import threading
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from functools import cached_property
@@ -204,7 +204,10 @@ class LocalSynthesisExecutor:
         """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``.
 
         Workers hand the networks their searches admit to this process, which
-        offers them to the run's records as they arrive.
+        offers them to the run's records as they arrive. Pooled results come
+        back as their tasks finish, not in input order, so a task's outcome
+        reaches the records without waiting for slower tasks before it; the
+        caller restores input order.
         """
         if pool is None:
             for worker_args in inputs:
@@ -213,10 +216,11 @@ class LocalSynthesisExecutor:
         if not recording_active():
             # Nothing listens: workers have nothing to hand off.
             with pool:
-                yield from pool.map(func, inputs)
+                yield from _as_completed(pool, func, inputs)
             return
         with self._handoff() as handoff, pool:
-            yield from pool.map(
+            yield from _as_completed(
+                pool,
                 _handed_off,
                 ((func, handoff, worker_args) for worker_args in inputs),
             )
@@ -575,6 +579,13 @@ def _solve_built_task(
 _CANDIDATE_SINK: ContextVar[Callable[[Any], None] | None] = ContextVar(
     "openpinch_hen_candidate_sink", default=None
 )
+
+
+def _as_completed(pool, func, inputs):
+    """``func`` over ``inputs`` in ``pool``, each result as its task finishes."""
+    futures = [pool.submit(func, worker_args) for worker_args in inputs]
+    for future in as_completed(futures):
+        yield future.result()
 
 
 def _handed_off(worker_args: tuple[Callable, Any, Any]):

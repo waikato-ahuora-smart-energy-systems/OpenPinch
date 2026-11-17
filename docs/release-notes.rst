@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.9.2 (2026-11-17)
+------------------
+
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -29,6 +32,9 @@ Heat exchanger network synthesis
   point, so a multi-period network OpenPinch designed rates again. The
   default search ranks at most ``ceiling_relocations`` (default 400)
   relocations per design; the 72-exchanger pulp mill offers 14,617.
+- Fixed: with ``HENS_MAX_PARALLEL`` above 1, each task's network enters a
+  ``HeatExchangerNetworkRecord`` as soon as its task finishes, not after
+  slower tasks submitted before it.
 - New ``HeatExchangerNetworkRecord``
   (``OpenPinch.analysis.heat_exchanger_networks.results.record``), passed as
   ``design.heat_exchanger_network(record=...)``: a thread-safe record that

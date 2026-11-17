@@ -51,9 +51,20 @@ pyodide.FS.mount(pyodide.FS.filesystems.NODEFS, { root: REPO }, '/work')
 pyodide.globals.set('PYTEST_ARGS', pyodide.toPy(pytestArgs))
 pyodide.globals.set('REQUIREMENTS', pyodide.toPy(requirements))
 const exitCode = await pyodide.runPythonAsync(`
-import os, sys, micropip
-# The constraints hold transitive dependencies to their pins as well.
-await micropip.install(list(REQUIREMENTS), constraints=list(REQUIREMENTS))
+import asyncio, os, sys, micropip
+# The constraints hold transitive dependencies to their pins as well. On CI
+# runners micropip's fetch of PyPI metadata fails now and then, on a
+# different package each time, so that error alone is retried.
+INSTALL_ATTEMPTS = 4
+for attempt in range(INSTALL_ATTEMPTS):
+    try:
+        await micropip.install(list(REQUIREMENTS), constraints=list(REQUIREMENTS))
+        break
+    except ValueError as error:
+        if "Can't fetch metadata" not in str(error) or attempt == INSTALL_ATTEMPTS - 1:
+            raise
+        print(f"micropip: {error} Retrying.", file=sys.stderr)
+        await asyncio.sleep(5 * (attempt + 1))
 pinned = {r.split("==")[0].lower() for r in REQUIREMENTS}
 unpinned = sorted(
     f"{name}=={pkg.version}"
