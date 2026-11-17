@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Extracting a network from a solved model is cheaper: plain numbers,
+  NumPy floats and ``[value]`` lists are read directly rather than through
+  Pyomo lookups and a caught ``TypeError``, and recovery extraction looks
+  up each period's duty grid and each match's row once rather than for
+  every stage. Under a profiler, a design on the pulp mill sample case
+  spends about 28 s in extraction instead of 34 s.
+
 0.9.3 (2026-11-18)
 ------------------
 
