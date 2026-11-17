@@ -922,3 +922,34 @@ def test_a_structure_the_model_cannot_build_is_dropped(fake_solver, strategy):
     assert not any(
         m.kind == "new_match" for d in result.frontier for m in d.modifications
     )
+
+
+def test_ceiling_relocations_caps_the_relocations_ranked_per_design(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # A large network can offer thousands of relocations (14,617 on the
+    # pulp mill); the structure search ranks at most ceiling_relocations
+    # of them per design, the best pre-scored first.
+    ranked = []
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        ranked.append(state.moves[-1].kind)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=1,
+            relocation_cost=5_000.0,
+            ceiling_relocations=2,
+            **COSTS,
+        ),
+    )
+
+    assert ranked.count("relocation") == 2

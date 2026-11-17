@@ -77,8 +77,9 @@ class RetrofitSettings:
     match splits) add to the area cost (the ``COSTING_HX_AREA_*`` law on the
     added area). ``relocation_cost`` ($ per existing recovery exchanger moved
     to another match or position, plus ``split_cost`` per new split) enables
-    relocation moves (all ranked by ceiling in the structure search, the
-    ``relocation_candidates`` best scored in the stepwise one);
+    relocation moves (in the structure search up to
+    ``ceiling_relocations`` per design, the best scored first, ranked by
+    ceiling; in the stepwise one the ``relocation_candidates`` best scored);
     ``None`` leaves them out. ``new_utility_units`` also tries each new match
     and relocation with each new end heater or cooler the network lacks, in
     the same step, priced as one more new unit. ``enhancement_factors``
@@ -114,6 +115,7 @@ class RetrofitSettings:
     new_utility_units: bool = False
     strategy: str = "structure"
     ceiling_candidates: int = 12
+    ceiling_relocations: int = 400
     enhancement_factors: Mapping[str, float] | None = None
     enhancement_cost: float = 0.0
     enhancement_area_cost: float = 0.0
@@ -374,8 +376,10 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     A move scores the match's potential less the unit's present duty, the
     heat it gives up, best first. The stepwise search keeps the
     ``relocation_candidates`` best positive scores; the structure search
-    keeps every move, as the ceiling ranking judges a move by what its whole
-    structure can reach and the score barely tracks that. A unit that is the
+    keeps up to ``ceiling_relocations`` moves whatever their score, as the
+    ceiling ranking judges a move by what its whole structure can reach and
+    the score barely tracks that; the cap bounds the ranking on large
+    networks. A unit that is the
     only exchanger on one of its streams stays on that stream.
     """
 
@@ -410,7 +414,8 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
                     scored.append((score, unit, match))
     scored.sort(key=lambda item: -item[0])
     if settings.strategy == "structure":
-        return [(unit, match) for _score, unit, match in scored]
+        cap = max(0, int(settings.ceiling_relocations))
+        return [(unit, match) for _score, unit, match in scored[:cap]]
     limit = max(0, int(settings.relocation_candidates))
     return [(unit, match) for _score, unit, match in scored[:limit]]
 
