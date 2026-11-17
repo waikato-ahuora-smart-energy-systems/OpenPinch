@@ -148,7 +148,8 @@ def run_retrofit_search(
 
     Every exchanger of ``existing`` needs its installed ``area``; a
     ``ValueError`` names those without one. ``max_added_area_fraction`` must
-    be None or finite and non-negative.
+    be None or finite and non-negative, and every id in
+    ``enhancement_factors`` must name an existing exchanger.
     """
 
     if settings.strategy not in STRATEGIES:
@@ -177,6 +178,13 @@ def run_retrofit_search(
         raise ValueError(
             "retrofit needs a unique id on every existing exchanger; "
             "repeated: " + ", ".join(duplicates) + "."
+        )
+    unknown = sorted(set(settings.enhancement_factors or {}).difference(ids))
+    if unknown:
+        raise ValueError(
+            "enhancement_factors names exchangers not in the existing network: "
+            + ", ".join(unknown)
+            + "."
         )
     ensure_target_results(problem, {}, None)
     evaluator = _Evaluator(problem, existing, settings)

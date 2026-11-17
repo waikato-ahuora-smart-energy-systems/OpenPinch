@@ -773,3 +773,18 @@ def test_a_unit_given_area_in_one_step_can_be_enhanced_in_the_next(
     )
 
     assert any(state.enlarged & state.enhanced for state in states)
+
+
+def test_enhancement_factors_for_unknown_exchangers_are_an_error(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    with pytest.raises(ValueError, match="enhancement_factors.*E9"):
+        search.run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            search.RetrofitSettings(
+                max_modifications=1,
+                enhancement_factors={"E1": 1.3, "E9": 1.2},
+                **COSTS,
+            ),
+        )
