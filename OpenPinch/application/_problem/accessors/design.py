@@ -991,9 +991,10 @@ class _DesignAccessor:
         Returns a ``HeatExchangerNetworkRetrofitResult``: ``frontier`` holds
         the best design after each number of steps (0 is the existing
         network; a step is a structural change with the area additions it
-        keeps, or with "stepwise" one modification) with its savings, capital, payback and modifications, and
-        ``selected`` the one with the best net annual benefit. The problem's
-        cached design is not changed. Requires the optional synthesis
+        keeps, or with "stepwise" one modification) with its savings,
+        capital, payback and modifications, and ``selected`` the one with
+        the best net annual benefit. The problem's cached design is not
+        changed. Requires the optional synthesis
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 

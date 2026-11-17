@@ -526,6 +526,7 @@ def test_hens_max_parallel_ranks_ceilings_on_threads_with_the_same_result(
     import threading
 
     from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+    from OpenPinch.analysis.parallelism import supported_workers
 
     threads = set()
     ceiling = search._Evaluator.ceiling
@@ -554,7 +555,11 @@ def test_hens_max_parallel_ranks_ceilings_on_threads_with_the_same_result(
     assert threads == {threading.main_thread().name}
     threads.clear()
     assert run(4) == serial
-    assert threading.main_thread().name not in threads
+    # Pyodide cannot start threads, so the search stays serial there.
+    if supported_workers(4) > 1:
+        assert threading.main_thread().name not in threads
+    else:
+        assert threads == {threading.main_thread().name}
 
 
 def test_the_ceiling_minimises_utility_cost_not_duty(fake_solver):
