@@ -7,6 +7,11 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Faster ``design.heat_exchanger_network`` with an overdesign margin or on
+  a ``"median"`` or ``"period"`` design basis: a network the search offers
+  again from another task is fitted and rated once, not each time. On the
+  four-stream Yee and Grossmann case at 10% overdesign this rates 23
+  networks rather than 60.
 - Post-processing a solved stage-wise model is cheaper: the alpha flow-on
   solve now runs only when evolution ranks the model's matches, so pinch
   design variants and evolution candidates that are never ranked skip it.
