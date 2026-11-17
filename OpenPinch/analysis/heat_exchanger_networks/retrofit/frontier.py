@@ -1,4 +1,4 @@
-"""Retrofit frontier over the number of modifications."""
+"""Retrofit frontier over the number of search steps."""
 
 from __future__ import annotations
 
@@ -10,18 +10,22 @@ from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitDesign
 def mark_dominated(
     designs: Sequence[HeatExchangerNetworkRetrofitDesign],
 ) -> tuple[HeatExchangerNetworkRetrofitDesign, ...]:
-    """``designs`` with dominated ones marked.
+    """``designs`` (one per search step, in order) with dominated ones
+    marked.
 
-    A design is dominated when one with fewer modifications has at least its
-    net annual benefit.
+    A design is dominated when one from an earlier step has at least its net
+    annual benefit. Steps, not modification records, count: a structural
+    step can keep several area additions.
     """
 
-    marked = []
-    for design in designs:
-        dominated = any(
-            other.modification_count < design.modification_count
-            and other.net_annual_benefit >= design.net_annual_benefit
-            for other in designs
+    return tuple(
+        design.model_copy(
+            update={
+                "dominated": any(
+                    earlier.net_annual_benefit >= design.net_annual_benefit
+                    for earlier in designs[:step]
+                )
+            }
         )
-        marked.append(design.model_copy(update={"dominated": dominated}))
-    return tuple(marked)
+        for step, design in enumerate(designs)
+    )

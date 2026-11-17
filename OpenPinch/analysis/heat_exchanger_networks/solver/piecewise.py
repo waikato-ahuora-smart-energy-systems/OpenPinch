@@ -372,7 +372,6 @@ def add_piecewise_temperature_mapping(
     temperature,
     profile: PiecewiseThermalProfile,
     *,
-    name: str,
     integer_capable: bool,
     initial_segment: int = 0,
 ):
@@ -390,7 +389,6 @@ def add_piecewise_temperature_mapping(
                 value=1.0 if index == 0 else 0.0,
                 lb=0.0,
                 ub=1.0,
-                name=f"{name}_lambda_{index}",
             )
             for index in range(len(q_points))
         ]
@@ -400,7 +398,6 @@ def add_piecewise_temperature_mapping(
                 lb=0,
                 ub=1,
                 integer=True,
-                name=f"{name}_interval_{index}",
             )
             for index in range(len(profile.duties))
         ]
@@ -422,9 +419,7 @@ def add_piecewise_temperature_mapping(
 
     active_segment = min(max(initial_segment, 0), len(profile.duties) - 1)
     selectors = [
-        model.Param(
-            value=1.0 if index == active_segment else 0.0, name=f"{name}_active_{index}"
-        )
+        model.Param(value=1.0 if index == active_segment else 0.0)
         for index in range(len(profile.duties))
     ]
     for index, selector in enumerate(selectors):
@@ -455,7 +450,6 @@ def add_piecewise_cost_mapping(
     cost,
     profile: PiecewiseThermalProfile,
     *,
-    name: str,
     integer_capable: bool,
     initial_segment: int = 0,
 ):
@@ -472,7 +466,6 @@ def add_piecewise_cost_mapping(
                 value=1.0 if index == 0 else 0.0,
                 lb=0.0,
                 ub=1.0,
-                name=f"{name}_lambda_{index}",
             )
             for index in range(len(q_points))
         ]
@@ -482,7 +475,6 @@ def add_piecewise_cost_mapping(
                 lb=0,
                 ub=1,
                 integer=True,
-                name=f"{name}_interval_{index}",
             )
             for index in range(len(profile.duties))
         ]
@@ -508,7 +500,6 @@ def add_piecewise_cost_mapping(
     selectors = [
         model.Param(
             value=1.0 if index == active_segment else 0.0,
-            name=f"{name}_active_{index}",
         )
         for index in range(len(profile.duties))
     ]
@@ -537,7 +528,6 @@ def add_piecewise_temperature_contribution_mapping(
     contribution,
     profile: PiecewiseThermalProfile,
     *,
-    name: str,
     initial_segment: int = 0,
 ):
     """Map duty to the traversed segment's approach contribution.
@@ -554,7 +544,6 @@ def add_piecewise_temperature_contribution_mapping(
     selectors = [
         model.Param(
             value=1.0 if index == active_segment else 0.0,
-            name=f"{name}_active_{index}",
         )
         for index in range(len(profile.duties))
     ]

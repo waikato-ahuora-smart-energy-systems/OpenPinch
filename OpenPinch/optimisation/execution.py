@@ -96,14 +96,19 @@ def _main_module_blocks_workers() -> str | None:
     repeats its whole run in every worker, and a main module read from
     stdin or a string (``__file__`` of ``"<stdin>"``) cannot be rerun at
     all. A main module with no ``__file__`` (Jupyter, ``python -c``) is not
-    rerun.
+    rerun. One with a spec name (``python -m``, a zipapp) is imported by
+    that name, so its path need not be a file: a ``__main__`` name is not
+    rerun, and any other is rerun from the source its loader gives.
     """
     if multiprocessing.get_start_method() == "fork":
         return None
-    path = getattr(sys.modules.get("__main__"), "__file__", None)
+    main = sys.modules.get("__main__")
+    path = getattr(main, "__file__", None)
     if not path:
         return None
-    if not Path(path).is_file():
+    spec = getattr(main, "__spec__", None)
+    name = getattr(spec, "name", None)
+    if name is None and not Path(path).is_file():
         return (
             f"worker processes cannot rerun the main module from {path!r}. "
             "Run the code from a script file or a notebook to use worker "
@@ -112,8 +117,20 @@ def _main_module_blocks_workers() -> str | None:
     if not str(path).endswith(".py"):
         return None
     try:
-        tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
+        source = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        # ``python -m mod`` from a zip: workers rerun ``mod`` by name.
+        if name is None or name == "__main__" or name.endswith(".__main__"):
+            return None
+        try:
+            source = spec.loader.get_source(name)
+        except (AttributeError, ImportError, OSError, UnicodeDecodeError):
+            return None
+        if source is None:
+            return None
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
         return None
     if any(_is_main_guard(node) for node in tree.body):
         return None

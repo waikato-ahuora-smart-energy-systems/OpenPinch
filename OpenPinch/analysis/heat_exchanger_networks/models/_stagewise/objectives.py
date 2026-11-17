@@ -55,7 +55,6 @@ def set_obj(owner) -> None:
                     "hot",
                     n,
                     _utility_totals(owner, "hot", n),
-                    name="hot_utility",
                 )
                 for n in range(owner.N_periods)
             ]
@@ -65,7 +64,6 @@ def set_obj(owner) -> None:
                     "cold",
                     n,
                     _utility_totals(owner, "cold", n),
-                    name="cold_utility",
                 )
                 for n in range(owner.N_periods)
             ]
@@ -120,10 +118,10 @@ def set_obj(owner) -> None:
         )
     elif owner.minimisation_goal == "utility costs":
         hot_cost = _utilities_cost_expression(
-            owner, "hot", 0, _utility_totals(owner, "hot", 0), name="hot_utility"
+            owner, "hot", 0, _utility_totals(owner, "hot", 0)
         )
         cold_cost = _utilities_cost_expression(
-            owner, "cold", 0, _utility_totals(owner, "cold", 0), name="cold_utility"
+            owner, "cold", 0, _utility_totals(owner, "cold", 0)
         )
         owner.m.Minimize(hot_cost + cold_cost)
     elif owner.minimisation_goal == "heat recovery":
@@ -157,12 +155,10 @@ def _utility_totals(owner, side: str, n: int) -> list:
     return [owner.m.sum([row[u] for row in grid]) for u in range(count)]
 
 
-def _utilities_cost_expression(owner, side: str, n: int, totals, *, name: str):
+def _utilities_cost_expression(owner, side: str, n: int, totals):
     """Return the summed cost expression of each utility's total duty."""
     return sum(
-        _piecewise._utility_cost_expression(
-            owner, side, n, total, utility=u, name=f"{name}{u}_period_{n}"
-        )
+        _piecewise._utility_cost_expression(owner, side, n, total, utility=u)
         for u, total in enumerate(totals)
     )
 
@@ -235,9 +231,7 @@ def _set_source_total_cost_objective(owner) -> None:
             "hot",
             0,
             _utility_totals(owner, "hot", 0),
-            name="hot_utility_total_cost",
         ),
-        name="Hot utility cost",
     )
     owner.cu_cost_total = owner.m.Intermediate(
         _utilities_cost_expression(
@@ -245,9 +239,7 @@ def _set_source_total_cost_objective(owner) -> None:
             "cold",
             0,
             _utility_totals(owner, "cold", 0),
-            name="cold_utility_total_cost",
         ),
-        name="Cold utility cost",
     )
     # Post-processing overwrites hu_cost_total and cu_cost_total with costs
     # recomputed from the duties; verify() checks the solver's own against them.
@@ -286,7 +278,6 @@ def _set_source_total_cost_objective(owner) -> None:
                         ** owner.A_exp[0]
                         for i in allowed_hots
                     ),
-                    name=f"Recovery HX area cost in stage {k} cold {j}",
                 )
 
     owner.hu_area_cost_total = owner.m.Intermediate(
@@ -311,7 +302,6 @@ def _set_source_total_cost_objective(owner) -> None:
             for u in range(owner.NHU)
             if owner.z_hu_allowed[j][u] > 0
         ),
-        name="Total hot utility HX area cost",
     )
     owner.cu_area_cost_total = owner.m.Intermediate(
         owner.cu_coeff[0]
@@ -335,14 +325,12 @@ def _set_source_total_cost_objective(owner) -> None:
             for u in range(owner.NCU)
             if owner.z_cu_allowed[i][u] > 0
         ),
-        name="Total cold utility HX area cost",
     )
 
     if owner.minimisation_goal == "total cost":
         owner.utility_unit_cost_total = owner.m.Intermediate(
             owner.hu_unit_cost[0] * sum(_utility_loads(owner.z_hu))
             + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu)),
-            name="Total utility base cost",
         )
         owner.recovery_unit_cost = [
             [0 for _j in range(owner.J)] for _k in range(owner.S)
@@ -351,7 +339,6 @@ def _set_source_total_cost_objective(owner) -> None:
             for j in range(owner.J):
                 owner.recovery_unit_cost[k][j] = owner.m.Intermediate(
                     owner.unit_cost[0] * sum(owner.z[i][j][k] for i in range(owner.I)),
-                    name=f"Total recovery base cost in stage {k} cold {j}",
                 )
         owner.m.Minimize(
             owner.hu_cost_total
@@ -392,9 +379,7 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
                 "hot",
                 n,
                 _utility_totals(owner, "hot", n),
-                name="hot_utility_total_cost",
             ),
-            name=f"Hot utility cost state {n}",
         )
         for n in range(owner.N_periods)
     ]
@@ -405,16 +390,13 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
                 "cold",
                 n,
                 _utility_totals(owner, "cold", n),
-                name="cold_utility_total_cost",
             ),
-            name=f"Cold utility cost state {n}",
         )
         for n in range(owner.N_periods)
     ]
     owner.operating_cost_by_state_expr = [
         owner.m.Intermediate(
             owner.hu_cost_total_by_period[n] + owner.cu_cost_total_by_period[n],
-            name=f"Operating cost state {n}",
         )
         for n in range(owner.N_periods)
     ]
@@ -437,12 +419,10 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
                     owner.m.Var(
                         value=0.0,
                         lb=0.0,
-                        name=f"area_H{i}_to_C{j}_at_S{k}",
                     )
                     if owner.z_allowed[i][j][k] > 0
                     else owner.m.Param(
                         value=0.0,
-                        name=f"area_H{i}_to_C{j}_at_S{k}",
                     )
                 )
                 for k in range(owner.S)
@@ -453,17 +433,17 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     ]
     owner.area_hu_shared = build_index_grid(
         lambda j, u: (
-            owner.m.Var(value=0.0, lb=0.0, name=f"area_HU{u}_to_C{j}")
+            owner.m.Var(value=0.0, lb=0.0)
             if owner.z_hu_allowed[j][u] > 0
-            else owner.m.Param(value=0.0, name=f"area_HU{u}_to_C{j}")
+            else owner.m.Param(value=0.0)
         ),
         (owner.J, owner.NHU),
     )
     owner.area_cu_shared = build_index_grid(
         lambda i, u: (
-            owner.m.Var(value=0.0, lb=0.0, name=f"area_H{i}_to_CU{u}")
+            owner.m.Var(value=0.0, lb=0.0)
             if owner.z_cu_allowed[i][u] > 0
-            else owner.m.Param(value=0.0, name=f"area_H{i}_to_CU{u}")
+            else owner.m.Param(value=0.0)
         ),
         (owner.I, owner.NCU),
     )
@@ -545,7 +525,6 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
             for j in range(owner.J)
             for i in range(owner.I)
         ),
-        name="Total recovery HX area cost",
     )
     owner.hu_area_cost_total = owner.m.Intermediate(
         owner.hu_coeff[0]
@@ -553,7 +532,6 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
             (area + _SHARED_AREA_OFFSET) ** owner.hu_exp[0]
             for area in _utility_loads(owner.area_hu_shared)
         ),
-        name="Total hot utility HX area cost",
     )
     owner.cu_area_cost_total = owner.m.Intermediate(
         owner.cu_coeff[0]
@@ -561,7 +539,6 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
             (area + _SHARED_AREA_OFFSET) ** owner.cu_exp[0]
             for area in _utility_loads(owner.area_cu_shared)
         ),
-        name="Total cold utility HX area cost",
     )
     owner.unit_cost_total = owner.m.Intermediate(
         owner.unit_cost[0]
@@ -571,12 +548,10 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
             for j in range(owner.J)
             for i in range(owner.I)
         ),
-        name="Total recovery base cost",
     )
     owner.utility_unit_cost_total = owner.m.Intermediate(
         owner.hu_unit_cost[0] * sum(_utility_loads(owner.z_hu))
         + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu)),
-        name="Total utility base cost",
     )
     owner.capital_cost_total = owner.m.Intermediate(
         owner.unit_cost_total
@@ -584,6 +559,5 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         + owner.recovery_area_cost_total
         + owner.hu_area_cost_total
         + owner.cu_area_cost_total,
-        name="Total shared capital cost",
     )
     owner.m.Minimize(owner.capital_cost_total + owner.weighted_operating_cost)

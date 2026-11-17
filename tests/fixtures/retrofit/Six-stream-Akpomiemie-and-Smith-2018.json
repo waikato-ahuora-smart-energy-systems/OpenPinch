@@ -1,0 +1,214 @@
+{
+ "options": {
+  "COSTING_ANNUAL_OP_TIME": 8760.0,
+  "COSTING_DISCOUNT_RATE": 0.0,
+  "COSTING_HX_AREA_COEFF": 300.0,
+  "COSTING_HX_AREA_EXP": 1.0,
+  "COSTING_HX_UNIT_COST": 4000.0,
+  "COSTING_SERVICE_LIFE": 1.0,
+  "HENS_LOG_LEVEL": "WARNING",
+  "HENS_SOLVER_EVM": "ipopt-pyomo",
+  "THERMAL_DT_CONT": 5.0
+ },
+ "streams": [
+  {
+   "heat_capacity_flowrate": {
+    "unit": "kW/delta_degC",
+    "value": 86.0
+   },
+   "heat_flow": {
+    "unit": "kW",
+    "value": 18490.0
+   },
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "H1",
+   "t_supply": {
+    "unit": "degC",
+    "value": 310.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 95.0
+   },
+   "zone": "Site/Process A"
+  },
+  {
+   "heat_capacity_flowrate": {
+    "unit": "kW/delta_degC",
+    "value": 21.4
+   },
+   "heat_flow": {
+    "unit": "kW",
+    "value": 3830.6
+   },
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "H2",
+   "t_supply": {
+    "unit": "degC",
+    "value": 299.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 120.0
+   },
+   "zone": "Site/Process A"
+  },
+  {
+   "heat_capacity_flowrate": {
+    "unit": "kW/delta_degC",
+    "value": 184.7
+   },
+   "heat_flow": {
+    "unit": "kW",
+    "value": 4248.1
+   },
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "H3",
+   "t_supply": {
+    "unit": "degC",
+    "value": 273.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 250.0
+   },
+   "zone": "Site/Process A"
+  },
+  {
+   "heat_capacity_flowrate": {
+    "unit": "kW/delta_degC",
+    "value": 23.5
+   },
+   "heat_flow": {
+    "unit": "kW",
+    "value": 3172.5
+   },
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "H4",
+   "t_supply": {
+    "unit": "degC",
+    "value": 230.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 95.0
+   },
+   "zone": "Site/Process A"
+  },
+  {
+   "heat_capacity_flowrate": {
+    "unit": "kW/delta_degC",
+    "value": 129.4
+   },
+   "heat_flow": {
+    "unit": "kW",
+    "value": 3623.2
+   },
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "H5",
+   "t_supply": {
+    "unit": "degC",
+    "value": 206.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 178.0
+   },
+   "zone": "Site/Process A"
+  },
+  {
+   "heat_capacity_flowrate": {
+    "unit": "kW/delta_degC",
+    "value": 143.91
+   },
+   "heat_flow": {
+    "unit": "kW",
+    "value": 44324.28
+   },
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "C1",
+   "t_supply": {
+    "unit": "degC",
+    "value": 52.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 360.0
+   },
+   "zone": "Site/Process A"
+  }
+ ],
+ "utilities": [
+  {
+   "heat_flow": null,
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "HU",
+   "price": {
+    "unit": "$/MWh",
+    "value": 45.6621
+   },
+   "t_supply": {
+    "unit": "degC",
+    "value": 500.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 300.0
+   },
+   "type": "Hot"
+  },
+  {
+   "heat_flow": null,
+   "htc": {
+    "unit": "kW/m^2/K",
+    "value": 0.5
+   },
+   "name": "CU",
+   "price": {
+    "unit": "$/MWh",
+    "value": 0.6279
+   },
+   "t_supply": {
+    "unit": "degC",
+    "value": 20.0
+   },
+   "t_target": {
+    "unit": "degC",
+    "value": 30.0
+   },
+   "type": "Cold"
+  }
+ ],
+ "zone_tree": {
+  "children": [
+   {
+    "children": null,
+    "name": "Process A",
+    "type": "Process Zone"
+   }
+  ],
+  "name": "Site",
+  "type": "Site"
+ }
+}

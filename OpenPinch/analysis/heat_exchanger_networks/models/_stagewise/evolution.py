@@ -6,8 +6,10 @@ import copy
 import hashlib
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -15,6 +17,7 @@ from ....parallelism import supported_workers
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base.execution import _assign_value
+from .postprocess import _solve_ranking_alpha
 from .verification import _value
 
 logger = logging.getLogger(__name__)
@@ -38,6 +41,31 @@ class _EvolutionBranchState:
     best_tac: float
     stale_depths: int = 0
     signature: tuple[tuple[int, int, int], ...] = ()
+
+
+_IMPROVEMENT_CALLBACK: ContextVar[Callable[[Any], None] | None] = ContextVar(
+    "openpinch_hen_evolution_improvement", default=None
+)
+
+
+@contextmanager
+def reporting_improvements(callback: Callable[[Any], None]) -> Iterator[None]:
+    """Pass each candidate that improves on its search's best to ``callback``.
+
+    Searches run in the enclosed block call it as they go, with the solved,
+    verified candidate model, in the order the search accepts them.
+    """
+    token = _IMPROVEMENT_CALLBACK.set(callback)
+    try:
+        yield
+    finally:
+        _IMPROVEMENT_CALLBACK.reset(token)
+
+
+def _report_improvement(candidate) -> None:
+    callback = _IMPROVEMENT_CALLBACK.get()
+    if callback is not None:
+        callback(candidate)
 
 
 def _stagewise_model_class():
@@ -160,6 +188,7 @@ def get_net_benefit_evolution(
             next_frontier.append(branch_period)
             if best_model is None or candidate.TAC < best_model.TAC:
                 best_model = candidate
+                _report_improvement(candidate)
         # Keep the best branches by TAC, ties broken on topology signature, so
         # the frontier never grows past the beam width.
         next_frontier.sort(
@@ -230,6 +259,7 @@ def _get_source_net_benefit_evolution(
             break
         if best_model is None or model.TAC < best_model.TAC:
             best_model = model
+            _report_improvement(model)
             logger.debug(
                 "New best model: %s found with TAC: %.6f",
                 model.name,
@@ -527,6 +557,43 @@ def _select_best_candidate(
     )
 
 
+def _open_added_match_slots(owner, z_allowed) -> None:
+    """Make the slots of matches ``z_allowed`` adds to ``owner`` writable.
+
+    A disallowed match's slots are plain numbers, which take no value; each
+    becomes a parameter holding the same number, so the adopted network's
+    values can be copied in.
+    """
+
+    def open_slot(row: list, k: int) -> None:
+        if row[k].__class__ is float:
+            row[k] = owner.m.Param(value=row[k])
+
+    added = [
+        (i, j, k)
+        for i in range(owner.I)
+        for j in range(owner.J)
+        for k in range(owner.S)
+        if z_allowed[i][j][k] > 0 and not owner.z_allowed[i][j][k] > 0
+    ]
+    if not added:
+        return
+    by_period = [
+        getattr(owner, name)
+        for name in ("Q_r_by_period", "theta_1_by_period", "theta_2_by_period")
+    ]
+    if owner.non_isothermal_model:
+        by_period.append(owner.X_by_period)
+    for i, j, k in added:
+        open_slot(owner.z[i][j], k)
+        for grid in by_period:
+            for period in grid:
+                open_slot(period[i][j], k)
+        if owner.non_isothermal_model:
+            for period in owner.Y_by_period:
+                open_slot(period[j][i], k)
+
+
 def _update_with_best_model(owner, best_model) -> None:
     """Adopt the selected evolved topology while retaining this model object."""
 
@@ -540,8 +607,10 @@ def _update_with_best_model(owner, best_model) -> None:
                 ", ".join(reasons),
             )
             return
-    # An empty alpha (failed post-optimisation solve) is re-solved for the
-    # adopted topology by get_post_process below.
+    # Alpha is solved only for ranking, so the candidate's is solved here from
+    # its own values; an empty alpha (failed solve) is solved again for the
+    # adopted topology when it is next ranked.
+    _solve_ranking_alpha(best_model)
     owner.alpha = (
         build_index_grid(
             lambda i, j, k: best_model.alpha[i][j][k],
@@ -550,6 +619,7 @@ def _update_with_best_model(owner, best_model) -> None:
         if len(best_model.alpha)
         else []
     )
+    _open_added_match_slots(owner, best_model.z_allowed)
     owner.z_allowed = build_index_grid(
         lambda i, j, k: best_model.z_allowed[i][j][k],
         (owner.I, owner.J, owner.S),

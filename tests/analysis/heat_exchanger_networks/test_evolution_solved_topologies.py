@@ -242,8 +242,12 @@ class _InProcessPool:
     def __exit__(self, *exc_info):
         return False
 
-    def map(self, func, inputs):
-        return map(func, inputs)
+    def submit(self, func, item):
+        from concurrent.futures import Future
+
+        future = Future()
+        future.set_result(func(item))
+        return future
 
 
 def test_tasks_in_worker_processes_get_no_store(monkeypatch):

@@ -26,6 +26,11 @@ def optimise(model, print_output: bool) -> None:
     """
 
     try:
+        if getattr(model, "values_only", False):
+            raise RuntimeError(
+                f"{model.name} is a values-only model: it has no constraints or "
+                "objective and cannot be solved."
+            )
         _solve_and_post_process(model, print_output)
     finally:
         cleanup_model(model)
@@ -149,7 +154,11 @@ def setup_model(model) -> None:
     """
 
     backend.require_solver_backend(model.solver)
-    model.m = PyomoModel()
+    model.m = (
+        PyomoModel(constraints=False)
+        if getattr(model, "values_only", False)
+        else PyomoModel()
+    )
     model.mSuccess: int = 0
     model.solver_run = backend.configure_pyomo_solver(
         model.m,
@@ -200,19 +209,35 @@ def _assign_value(variable: Any, value: Any) -> None:
 
     if isinstance(value, list | tuple):
         (value,) = value
-    if variable.fixed:
-        variable.fix(value)
-    else:
-        variable.set_value(value, skip_validation=True)
+    if variable.__class__ is float:
+        _check_constant(variable, value)
+        return
+    # A parameter stays fixed; neither it nor a variable is validated, since
+    # the value is copied from a solved model.
+    variable.set_value(value, skip_validation=True)
+
+
+def _check_constant(constant: float, value: Any) -> None:
+    """A disallowed match's slot is a plain number: it can only keep it."""
+
+    if value is not None and float(value) != constant:
+        raise ValueError(
+            f"Cannot set a disallowed match's constant {constant!r} to {value!r}."
+        )
 
 
 def _set_value(model, variable: Any, value: float) -> None:
     """Assign Pyomo values while preserving source bound-clamping behavior."""
 
+    if variable.__class__ is float:
+        _check_constant(variable, value)
+        return
     if getattr(variable, "is_variable_type", lambda: False)():
-        # A PyomoModel variable, or a parameter (a fixed variable).
+        # A PyomoModel variable, or a parameter (a fixed variable). A
+        # parameter is fixed already and is an unbounded real, so Pyomo's
+        # domain and bound check (what fix() would run) has nothing to find.
         if variable.fixed:
-            variable.fix(value)
+            variable.set_value(value, skip_validation=True)
             return
         if variable.lb is not None:
             value = max(variable.lb, value)

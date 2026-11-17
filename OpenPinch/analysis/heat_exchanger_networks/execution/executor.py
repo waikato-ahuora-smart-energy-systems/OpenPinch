@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import contextvars
 import logging
-from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
+import threading
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar
 from functools import cached_property
 from typing import Any, Callable, Protocol, Sequence
 
@@ -16,7 +21,9 @@ from ....domain.progress import emit as emit_progress
 from ....optimisation.execution import _main_module_blocks_workers
 from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
+from ..models._stagewise.evolution import reporting_improvements
 from ..models.problem import InternalHeatExchangerNetworkProblem
+from ..results.record import admit, recording_active
 from ..solver.arrays import (
     PreparedSolverArrays,
     nominal_approach_temperature,
@@ -60,6 +67,10 @@ class SynthesisExecutor(Protocol):
 class LocalSynthesisExecutor:
     """Internal executor for moved PDM/TDM/ESM model slices."""
 
+    # Offers each outcome to the run's records as it is solved, so the stage
+    # need not offer them again.
+    admits_outcomes = True
+
     def __init__(
         self,
         *,
@@ -67,11 +78,15 @@ class LocalSynthesisExecutor:
         evolution: bool = False,
         model_factories: dict[str, Any] | None = None,
         worker_pool_factory: Callable[[int], object] | None = None,
+        handoff_queue_factory: Callable[[], Any] | None = None,
     ) -> None:
         self.print_output = print_output
         self.evolution = evolution
         self.model_factories = model_factories
         self.worker_pool_factory = worker_pool_factory or _process_pool
+        # The queue workers hand admitted networks back on; by default a
+        # multiprocessing manager's queue, started with the pool.
+        self.handoff_queue_factory = handoff_queue_factory
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
         self.stage_order: list[HeatExchangerNetworkDesignMethod] = []
         self.problems_by_task_id: dict[str, InternalHeatExchangerNetworkProblem] = {}
@@ -185,15 +200,61 @@ class LocalSynthesisExecutor:
             logger.debug("Solving HEN tasks serially: %s", exc)
             return None
 
-    @staticmethod
-    def _run(pool, func, inputs):
-        """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``."""
+    def _run(self, pool, func, inputs):
+        """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``.
+
+        Workers hand the networks their searches admit to this process, which
+        offers them to the run's records as they arrive. Pooled results come
+        back as their tasks finish, not in input order, so a task's outcome
+        reaches the records without waiting for slower tasks before it; the
+        caller restores input order.
+        """
         if pool is None:
             for worker_args in inputs:
                 yield func(worker_args)
             return
-        with pool:
-            yield from pool.map(func, inputs)
+        if not recording_active():
+            # Nothing listens: workers have nothing to hand off.
+            with pool:
+                yield from _as_completed(pool, func, inputs)
+            return
+        with self._handoff() as handoff, pool:
+            yield from _as_completed(
+                pool,
+                _handed_off,
+                ((func, handoff, worker_args) for worker_args in inputs),
+            )
+
+    @contextmanager
+    def _handoff(self):
+        """A queue workers put outcomes on; a thread here admits them."""
+        with ExitStack() as stack:
+            if self.handoff_queue_factory is None:
+                manager = stack.enter_context(multiprocessing.Manager())
+                handoff = manager.Queue()
+            else:
+                handoff = self.handoff_queue_factory()
+            errors: list[BaseException] = []
+
+            def drain() -> None:
+                while (outcome := handoff.get()) is not None:
+                    try:
+                        admit(outcome)
+                    except BaseException as error:
+                        errors.append(error)
+
+            # The drain thread sees the caller's records.
+            thread = threading.Thread(
+                target=contextvars.copy_context().run, args=(drain,), daemon=True
+            )
+            thread.start()
+            try:
+                yield handoff
+            finally:
+                handoff.put(None)
+                thread.join()
+            if errors:
+                raise errors[0]
 
     def _reported(
         self,
@@ -206,6 +267,7 @@ class LocalSynthesisExecutor:
         for result in solved_results:
             collected.append(result)
             outcome = result[1]
+            admit(outcome)
             if outcome.status == "success" and outcome.objective_value is not None:
                 if self.best_objective is None:
                     self.best_objective = outcome.objective_value
@@ -311,6 +373,7 @@ class LocalSynthesisExecutor:
                 )
                 continue
             self._record(variant_task, outcome, variant, outcomes)
+            admit(outcome)
         return outcomes
 
     def _build_problem(
@@ -490,7 +553,10 @@ def _solve_built_task(
                     "evolution_beam_width": evolution_options.get("beam_width", 4),
                 }
             )
-        solved = internal_problem.get_solution(**solve_kwargs)
+        with reporting_improvements(
+            lambda candidate: _hand_off_candidate(task, internal_problem, candidate)
+        ):
+            solved = internal_problem.get_solution(**solve_kwargs)
         if solved is None or getattr(solved, "mSuccess", 0) != 1:
             reason = getattr(
                 internal_problem,
@@ -507,6 +573,58 @@ def _solve_built_task(
             exc_info=True,
         )
         return task, _failed_task_outcome(task, str(exc)), None
+
+
+# Where a worker sends the outcomes it admits; unset, they are admitted here.
+_CANDIDATE_SINK: ContextVar[Callable[[Any], None] | None] = ContextVar(
+    "openpinch_hen_candidate_sink", default=None
+)
+
+
+def _as_completed(pool, func, inputs):
+    """``func`` over ``inputs`` in ``pool``, each result as its task finishes."""
+    futures = [pool.submit(func, worker_args) for worker_args in inputs]
+    for future in as_completed(futures):
+        yield future.result()
+
+
+def _handed_off(worker_args: tuple[Callable, Any, Any]):
+    """Run ``func`` in a worker, sending its admitted outcomes to ``handoff``."""
+    func, handoff, inner_args = worker_args
+    token = _CANDIDATE_SINK.set(handoff.put)
+    try:
+        return func(inner_args)
+    finally:
+        _CANDIDATE_SINK.reset(token)
+
+
+def _hand_off_candidate(
+    task: HeatExchangerNetworkSynthesisTask,
+    internal_problem: InternalHeatExchangerNetworkProblem,
+    candidate: Any,
+) -> None:
+    """Offer one improved search candidate to the run's records."""
+    try:
+        network = internal_problem.extract_candidate_network(
+            candidate, run_id=task.run_id
+        )
+    except (ValueError, WorkflowContractError) as exc:
+        logger.warning("Evolution candidate of %s dropped: %s", task.task_id, exc)
+        return
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task,
+        status="success",
+        network=network,
+        objective_value=network.total_annual_cost,
+        solver_status=str(
+            getattr(getattr(candidate, "solver_run", None), "status", "success")
+        ),
+    )
+    sink = _CANDIDATE_SINK.get()
+    if sink is None:
+        admit(outcome)
+    else:
+        sink(outcome)
 
 
 def _solved_outcome(

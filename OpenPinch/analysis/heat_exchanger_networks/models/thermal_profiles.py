@@ -135,6 +135,37 @@ class ThermalProfile:
         return float(sum(self.duties))
 
     @property
+    def rounded_total(self) -> float:
+        """Heat between supply and target as the solver's rounded
+        ``heat(T)`` measures it. Rounding each boundary shifts the ends a
+        little: where heat capacity falls along the stream the span is
+        slightly more than ``total``, so a duty bound needs it."""
+
+        def rounded(temperature: float) -> float:
+            value = self.cp[0] * self._distance(self.supply, temperature)
+            for k in range(1, len(self.cp)):
+                step = self.cp[k] - self.cp[k - 1]
+                distance = self._distance(self.t_in[k], temperature)
+                value += (
+                    step
+                    * 0.5
+                    * (
+                        distance
+                        + (distance * distance + SMOOTHING_K * SMOOTHING_K) ** 0.5
+                    )
+                )
+            return value
+
+        return float(rounded(self.target) - rounded(self.supply))
+
+    @property
+    def duty_bound(self) -> float:
+        """Upper bound for a duty on this stream: its total, or the rounded
+        span the solver's balances use where that is larger."""
+
+        return max(self.total, self.rounded_total)
+
+    @property
     def lowest(self) -> float:
         return min(self.supply, self.target)
 

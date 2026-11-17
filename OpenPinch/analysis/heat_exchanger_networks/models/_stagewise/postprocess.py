@@ -168,37 +168,9 @@ def _get_multiperiod_post_process(owner) -> None:
                 )
                 if exact_dqda is not None:
                     owner.dqda[i][j][k] = exact_dqda
-    alpha = owner.get_alpha_values()
-    # A failed alpha solve is not cached; rank with neutral alpha instead.
-    owner.alpha = alpha if alpha is not None else []
-    owner.dtacda = [
-        [[None for _k in range(owner.S)] for _j in range(owner.J)]
-        for _i in range(owner.I)
-    ]
-    utility_price = _area.recovered_utility_price(owner)
-    for k in range(owner.S):
-        for j in range(owner.J):
-            for i in range(owner.I):
-                if owner.area_r[i][j][k] > 0.0:
-                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * utility_price - (
-                        owner.A_coeff[0]
-                        * owner.A_exp[0]
-                        * owner.area_r[i][j][k] ** (owner.A_exp[0] - 1)
-                    )
-                else:
-                    owner.dtacda[i][j][k] = owner.dqda[i][j][k] * utility_price - (
-                        owner.A_coeff[0] * owner.A_exp[0]
-                    )
-    owner.alpha_dqda = [
-        [
-            [
-                _alpha.alpha_value(owner, i, j, k) * owner.dqda[i][j][k]
-                for k in range(owner.S)
-            ]
-            for j in range(owner.J)
-        ]
-        for i in range(owner.I)
-    ]
+    # Only benefit ranking reads alpha, and most solved models are never
+    # ranked, so the alpha solve waits for _solve_ranking_alpha.
+    owner._ranking_alpha_pending = True
 
     owner.TAC_model = owner.solver_run.objective_value
     owner.TAC = owner.capital_cost_value + owner.weighted_operating_cost_value
@@ -210,8 +182,31 @@ def get_lowest_benefit_HX(owner) -> list[list[int]]:
     return owner.get_lowest_benefit_HX_candidates(1)
 
 
+def _solve_ranking_alpha(owner) -> None:
+    """Solve alpha and alpha-weighted dQ/dA once, when a ranking first needs them."""
+
+    if not getattr(owner, "_ranking_alpha_pending", False):
+        return
+    owner._ranking_alpha_pending = False
+    alpha = owner.get_alpha_values()
+    # A failed alpha solve is not cached; rank with neutral alpha instead.
+    owner.alpha = alpha if alpha is not None else []
+    owner.alpha_dqda = [
+        [
+            [
+                _alpha.alpha_value(owner, i, j, k) * owner.dqda[i][j][k]
+                for k in range(owner.S)
+            ]
+            for j in range(owner.J)
+        ]
+        for i in range(owner.I)
+    ]
+
+
 def get_lowest_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
     """Return active exchangers sorted by ascending source net benefit."""
+
+    _solve_ranking_alpha(owner)
 
     owner.net_benefit = np.array(
         [
@@ -249,6 +244,8 @@ def get_max_benefit_HX(owner) -> list[list[int]]:
 
 def get_max_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
     """Return inactive feasible exchangers sorted by descending alpha-dQ/dA."""
+
+    _solve_ranking_alpha(owner)
 
     owner.net_benefit = np.array(
         [

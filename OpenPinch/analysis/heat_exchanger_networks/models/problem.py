@@ -170,15 +170,22 @@ class InternalHeatExchangerNetworkProblem:
     def extract_network(self, *, run_id: str) -> HeatExchangerNetwork:
         """Convert the solved private case into an OpenPinch network result."""
 
+        return self.extract_candidate_network(self.case, run_id=run_id)
+
+    def extract_candidate_network(
+        self, candidate: Any, *, run_id: str
+    ) -> HeatExchangerNetwork:
+        """Convert one solved model of this task, such as a search candidate."""
+
         return extract_heat_exchanger_network(
-            self.case,
+            candidate,
             self.solver_arrays,
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self._result_method(),
             dt_cont_multiplier=self.dt_cont_multiplier,
             stage_count=getattr(
-                self.case, "stages", getattr(self.case, "S", self.stages)
+                candidate, "stages", getattr(candidate, "S", self.stages)
             ),
         )
 
@@ -698,6 +705,11 @@ class InternalHeatExchangerNetworkProblem:
                             }
                         ),
                         "stage_selection": [stages, stages],
+                        "solver_options": _with_time_limit(
+                            self.args["solver"],
+                            self.args.get("solver_options"),
+                            seconds=backend.HEURISTIC_SIDE_TIME_LIMIT,
+                        ),
                         "z_restriction": proposal.z_restriction(
                             hot_count=template.I,
                             cold_count=template.J,
@@ -718,7 +730,8 @@ class InternalHeatExchangerNetworkProblem:
         # A proposal the side model cannot solve is dropped by design.
         side.failure_log_level = logging.DEBUG
         side.optimise(print_output=False)
-        if side.mSuccess != 1:
+        # A side stopped at its time limit may miss its minimum utility.
+        if side.mSuccess != 1 or not side.solver_run.converged:
             _cleanup_model(side)
             return None
         # The amalgamated network is built with the above side's restriction,
@@ -970,8 +983,8 @@ def _start_from_side(sparse, side) -> None:
     """
 
     for target, source in zip(
-        sparse.m.model.variables.values(),
-        side.m.model.variables.values(),
+        sparse.m.variables,
+        side.m.variables,
         strict=True,
     ):
         target.set_value(source.value, skip_validation=True)
@@ -982,6 +995,9 @@ def _start_from_side(sparse, side) -> None:
             binary = getattr(sparse, grid)
             for position in index:
                 binary = binary[position]
+            # A disallowed match's binary is the plain number 0.0 already.
+            if binary.__class__ is float:
+                continue
             if not binary.fixed and (binary.value or 0.0) < 0.5:
                 binary.fix(0)
     sparse.m.warm_start = True
@@ -993,7 +1009,8 @@ def _with_time_limit(
     """The PDM solver options with a time limit added.
 
     The fewest-units limit applies to every fewest-units and minimum-unit
-    solve; the primary sides take ``backend.PDM_TIME_LIMIT``.
+    solve; the primary sides take ``backend.PDM_TIME_LIMIT`` and heuristic
+    side proposals ``backend.HEURISTIC_SIDE_TIME_LIMIT``.
 
     A limit the user set is kept, as are options given as option lines.
     """
@@ -1031,7 +1048,13 @@ def _peak_recovery_duties(case) -> list:
 
 def _side_topology(side) -> tuple:
     """A solved side's network: its recovery matches, numbered over the
-    stages that carry recovery, and the heaters and coolers it uses."""
+    stages that carry recovery, the heaters and coolers it uses, and
+    whether it leaves a stage empty.
+
+    Stage reduction re-solves only a pairing with an empty stage, which can
+    rebalance duties into another network, so a side with an empty stage
+    does not repeat one without.
+    """
 
     peak = _peak_recovery_duties(side)
     used = [
@@ -1052,6 +1075,7 @@ def _side_topology(side) -> tuple:
         matches,
         tuple(map(tuple, heaters)),
         tuple(map(tuple, coolers)),
+        len(used) < side.S,
     )
 
 

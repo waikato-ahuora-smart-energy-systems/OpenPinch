@@ -90,8 +90,12 @@ class _InProcessPool:
     def __exit__(self, *exc_info):
         return False
 
-    def map(self, function, items):
-        return map(function, items)
+    def submit(self, function, item):
+        from concurrent.futures import Future
+
+        future = Future()
+        future.set_result(function(item))
+        return future
 
 
 def test_parallel_synthesis_reports_each_task_and_keeps_task_order(stub_solves):

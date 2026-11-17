@@ -14,12 +14,12 @@ from typing import Any
 
 from .dependencies import require_synthesis_dependency
 
-# Parameters are handed out from dense blocks of fixed variables: allocating
-# a block at once is about three times faster than one VarList entry at a
-# time. Blocks double in size so small models stay small; unused entries
-# appear in no constraint, so solvers never see them.
-_FIRST_PARAMETER_BLOCK = 64
-_LARGEST_PARAMETER_BLOCK = 8192
+# Variables and parameters (fixed variables) are handed out from dense
+# blocks: allocating a block at once is about three times faster than one
+# VarList entry at a time. Blocks double in size so small models stay small;
+# unused entries appear in no constraint, so solvers never see them.
+_FIRST_BLOCK = 64
+_LARGEST_BLOCK = 8192
 
 
 def _pyomo() -> Any:
@@ -34,9 +34,9 @@ class PyomoModel:
     """A Pyomo ``ConcreteModel`` with exactly one objective.
 
     Parameters are fixed variables, so a solve substitutes their values and a
-    parameter can be changed between solves. Names are accepted for
-    signature compatibility and not used: variables live in one list and
-    parameters in preallocated blocks.
+    parameter can be changed between solves. Variables and parameters come
+    from preallocated blocks; ``variables`` lists the variables handed out,
+    in order.
     ``_path`` is a run directory, created only to hold a solver option file.
     """
 
@@ -44,11 +44,16 @@ class PyomoModel:
     # class, not the instance, so a model still pickles into a worker.
     _pyo: Any = None
 
-    def __init__(self) -> None:
+    def __init__(self, *, constraints: bool = True) -> None:
         self._path: str | None = None
+        # Without constraints the model only holds values: Equation and the
+        # objective are not added, so it can never be solved.
+        self.adds_constraints = constraints
         pyo = PyomoModel._pyo = _pyomo()
         self.model = pyo.ConcreteModel()
-        self.model.variables = pyo.VarList()
+        self.variables: list[Any] = []
+        self._variable_blocks: list[Any] = []
+        self._variables_left = 0
         self._parameter_blocks: list[Any] = []
         self._parameters_left = 0
         self.model.constraints = pyo.ConstraintList()
@@ -62,10 +67,14 @@ class PyomoModel:
         lb: float | None = None,
         ub: float | None = None,
         integer: bool = False,
-        name: str | None = None,
     ) -> Any:
-        variable = self.model.variables.add()
-        # A VarList entry is real already; setting the domain costs a set
+        if self._variables_left == 0:
+            self._free_variables = self._add_block(self._variable_blocks, "variables")
+            self._variables_left = len(self._free_variables)
+        variable = self._free_variables[-self._variables_left]
+        self._variables_left -= 1
+        self.variables.append(variable)
+        # A block entry is real already; setting the domain costs a set
         # lookup, so it is set only for integers.
         if integer:
             variable.domain = self._pyo.Integers
@@ -74,9 +83,12 @@ class PyomoModel:
         variable.set_value(value, skip_validation=True)
         return variable
 
-    def Param(self, value: float = 0.0, name: str | None = None) -> Any:
+    def Param(self, value: float = 0.0) -> Any:
         if self._parameters_left == 0:
-            self._add_parameter_block()
+            self._free_parameters = self._add_block(
+                self._parameter_blocks, "parameters"
+            )
+            self._parameters_left = len(self._free_parameters)
         parameter = self._free_parameters[-self._parameters_left]
         self._parameters_left -= 1
         # The block is fixed already; a parameter is a real number with no
@@ -84,29 +96,48 @@ class PyomoModel:
         parameter.set_value(value, skip_validation=True)
         return parameter
 
-    def _add_parameter_block(self) -> None:
-        pyo = self._pyo
+    def _add_block(self, blocks: list[Any], kind: str) -> list[Any]:
+        """Add the next block of ``kind`` and return its entries.
+
+        Parameter blocks are fixed as a whole when allocated.
+        """
+
         size = min(
-            _LARGEST_PARAMETER_BLOCK,
-            max(
-                _FIRST_PARAMETER_BLOCK,
-                sum(len(block) for block in self._parameter_blocks),
-            ),
+            _LARGEST_BLOCK,
+            max(_FIRST_BLOCK, sum(len(block) for block in blocks)),
         )
-        block = pyo.Var(range(size), dense=True)
-        self.model.add_component(f"parameters_{len(self._parameter_blocks)}", block)
-        block.fix()
-        self._parameter_blocks.append(block)
-        self._free_parameters = list(block.values())
-        self._parameters_left = size
+        block = self._pyo.Var(range(size), dense=True)
+        self.model.add_component(f"{kind}_{len(blocks)}", block)
+        if kind == "parameters":
+            block.fix()
+        blocks.append(block)
+        return list(block.values())
 
     def Equation(self, expression: Any) -> Any:
+        if not self.adds_constraints:
+            return None
         return self.model.constraints.add(expression)
+
+    def import_duals(self) -> None:
+        """Ask the solver for constraint duals (an imported ``dual``
+        suffix); solvers that report none leave them unset."""
+
+        if getattr(self.model, "dual", None) is None:
+            self.model.dual = self._pyo.Suffix(direction=self._pyo.Suffix.IMPORT)
+
+    def dual(self, constraint: Any) -> float | None:
+        """``constraint``'s dual from the last solve, or ``None`` if duals
+        were not imported or the solver reported none."""
+
+        duals = getattr(self.model, "dual", None)
+        if duals is None or constraint not in duals:
+            return None
+        return float(duals[constraint])
 
     def Equations(self, expressions: Iterable[Any]) -> list[Any]:
         return [self.Equation(expression) for expression in expressions]
 
-    def Intermediate(self, expression: Any, name: str | None = None) -> Any:
+    def Intermediate(self, expression: Any) -> Any:
         return expression
 
     def sum(self, values: Iterable[Any]) -> Any:
@@ -141,6 +172,8 @@ class PyomoModel:
         )
 
     def _set_objective(self, expression: Any, *, sense: Any) -> None:
+        if not self.adds_constraints:
+            return
         if self.objective is not None:
             raise ValueError(
                 "A Pyomo HEN model has exactly one objective; combine the "

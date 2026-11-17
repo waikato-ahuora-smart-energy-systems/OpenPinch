@@ -28,6 +28,9 @@ prices with a free flow scale.
 Objectives (all multi-period aware, weighted by period weights):
 
 * ``"total utility"``: minimise utility duty;
+* ``"utility cost"``: minimise operating cost with no area model, so each
+  utility's price (segment prices for a segmented utility) decides which
+  carries the load;
 * ``"total area"``: minimise the sum of common exchanger areas. Each exchanger
   has one area shared by all periods; in every period it must provide at
   least the area that period needs (bypass covers any surplus);
@@ -56,7 +59,7 @@ from .base import BaseHeatExchangerNetworkModel
 from .thermal_profiles import ThermalProfile, smooth_clip
 
 FIXED_STRUCTURE_GOALS = frozenset(
-    {"total utility", "total area", "total cost", "rating", "retrofit"}
+    {"total utility", "utility cost", "total area", "total cost", "rating", "retrofit"}
 )
 HEATER = "hot"
 COOLER = "cold"
@@ -121,6 +124,15 @@ class FixedStructureSpec:
     # Caps an enlargeable unit's added area at this fraction of its installed
     # area; None leaves it uncapped.
     max_added_area_fraction: float | None = None
+    # Existing units the "retrofit" goal treats as enhanced (tube inserts,
+    # for example), by solver index: each multiplies the unit's heat
+    # transfer coefficient, so its capacity, by the factor.
+    enhanced_recovery: Mapping[int, float] = field(default_factory=dict)
+    enhanced_utilities: Mapping[int, float] = field(default_factory=dict)
+    # Heat pumps, each (evaporator, condenser, COP): two utility exchangers,
+    # by index in ``utilities``, whose duties the COP links in every period
+    # (the condenser delivers the evaporator's heat plus the work).
+    heat_pumps: tuple[tuple[int, int, float], ...] = ()
 
 
 @dataclass
@@ -228,22 +240,22 @@ class FixedStructureModel(BaseHeatExchangerNetworkModel):
     # -- solver primitives (overridden in tests) --------------------------
 
     def _var(self, name: str, value: float, lb: float | None, ub: float | None):
-        return self.m.Var(value=value, lb=lb, ub=ub, name=name)
+        return self.m.Var(value=value, lb=lb, ub=ub)
 
     def _param(self, name: str, value: float):
-        return self.m.Param(value=value, name=name)
+        return self.m.Param(value=value)
 
     def _equal(self, lhs, rhs) -> None:
         self.m.Equation(lhs == rhs)
 
-    def _at_least(self, lhs, rhs) -> None:
-        self.m.Equation(lhs >= rhs)
+    def _at_least(self, lhs, rhs):
+        return self.m.Equation(lhs >= rhs)
 
     def _minimise(self, expression) -> None:
         self.m.Minimize(expression)
 
     def _intermediate(self, expression, name: str):
-        return self.m.Intermediate(expression, name=name)
+        return self.m.Intermediate(expression)
 
 
 # -- preprocessing ------------------------------------------------------------
@@ -746,7 +758,13 @@ def _q_reach(owner, n: int, r: int, match: RecoveryMatch) -> float:
 
 
 def _q_max(owner, n: int, match: RecoveryMatch) -> float:
-    return max(0.0, min(owner.hot_load[n][match.hot], owner.cold_load[n][match.cold]))
+    return max(
+        0.0,
+        min(
+            owner.hot_profiles[n][match.hot].duty_bound,
+            owner.cold_profiles[n][match.cold].duty_bound,
+        ),
+    )
 
 
 # -- equations ----------------------------------------------------------------
@@ -781,6 +799,11 @@ def build_fixed_structure_equations(owner) -> None:
         _recovery_equations(owner, n, start)
         _utility_equations(owner, n, start)
         _utility_caps(owner, n)
+        for evaporator, condenser, cop in owner.spec.heat_pumps:
+            owner._equal(
+                owner.q_u[n][condenser] * (float(cop) - 1.0),
+                owner.q_u[n][evaporator] * float(cop),
+            )
     if owner.minimisation_goal in {"total area", "total cost"}:
         _common_areas(owner)
     elif owner.minimisation_goal == "rating":
@@ -813,7 +836,7 @@ def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
                 f"qu{e}p{n}",
                 start["q_u"][e],
                 0.0,
-                stream_profile(owner, n, m).total,
+                stream_profile(owner, n, m).duty_bound,
             )
             for e, m in enumerate(spec.utilities)
         ]
@@ -1245,17 +1268,22 @@ def _design_factor(point, coefficient: float) -> float:
     return exact_lmtd(theta_1, theta_2) / chen
 
 
-def _cap_installed(owner, capacity, design, duties, coefficients, thetas) -> None:
-    """The unit's duty in every period fits ``capacity`` (an area)."""
+def _cap_installed(owner, capacity, design, duties, coefficients, thetas) -> list:
+    """The unit's duty in every period fits ``capacity`` (an area).
 
+    Returns each period's cap with its slope in area, as ``(constraint,
+    factor, thetas)``: the cap's left side grows by ``factor *
+    chen_lmtd(*thetas)`` per m2.
+    """
+
+    caps = []
     for n in range(owner.N_periods):
-        owner._at_least(
-            capacity
-            * _design_factor(design.get(n), coefficients[n])
-            * coefficients[n]
-            * chen_lmtd(*thetas[n]),
-            duties[n],
+        factor = _design_factor(design.get(n), coefficients[n]) * coefficients[n]
+        constraint = owner._at_least(
+            capacity * factor * chen_lmtd(*thetas[n]), duties[n]
         )
+        caps.append((constraint, factor, thetas[n]))
+    return caps
 
 
 def _common_areas(owner) -> None:
@@ -1305,6 +1333,10 @@ def _retrofit_areas(owner) -> None:
 
     widen = 1.0 + float(owner.spec.area_tolerance)
     fraction = owner.spec.max_added_area_fraction
+    owner.area_caps = {}
+    owner.rating_terms = {}
+    if hasattr(owner.m, "import_duals"):
+        owner.m.import_duals()
 
     def unit(side, tag, index, areas, points, enlargeable):
         terms = _unit_terms(owner, side, index)
@@ -1316,7 +1348,29 @@ def _retrofit_areas(owner) -> None:
         added = (
             owner._var(f"d{tag}{index}", 0.0, 0.0, cap) if index in enlargeable else 0.0
         )
-        _cap_installed(owner, installed * widen + added, points.get(index, {}), *terms)
+        enhancement = float(
+            (
+                owner.spec.enhanced_recovery
+                if side == "recovery"
+                else owner.spec.enhanced_utilities
+            ).get(index, 1.0)
+        )
+        caps = _cap_installed(
+            owner,
+            (installed * widen + added) * enhancement,
+            points.get(index, {}),
+            *terms,
+        )
+        # Per period, the cap's factor per m2 (design calibration times U)
+        # and end approaches, to compare with verification's sizing.
+        owner.rating_terms[(side, index)] = [
+            (factor, thetas) for _constraint, factor, thetas in caps
+        ]
+        # The value of installed area counts its widening and enhancement.
+        owner.area_caps[(side, index)] = [
+            (constraint, factor * widen * enhancement, thetas)
+            for constraint, factor, thetas in caps
+        ]
         return installed, added
 
     spec = owner.spec
@@ -1364,7 +1418,7 @@ def set_fixed_structure_objective(owner) -> None:
         )
     elif goal == "total area":
         owner.objective_expression = _sum(list(owner.area_r) + list(owner.area_u))
-    elif goal == "rating":
+    elif goal in {"rating", "utility cost"}:
         owner.objective_expression = operating_cost_expression(owner)
     elif goal == "retrofit":
         owner.objective_expression = operating_cost_expression(
@@ -1696,6 +1750,8 @@ def post_process_fixed_structure(owner) -> None:
         result.area for result in owner.recovery_results + owner.utility_results
     )
     if owner.minimisation_goal == "retrofit":
+        owner.area_values = _area_values(owner)
+        owner.rating_allowances = _rating_allowances(owner)
         owner.retrofit_capital_value = float(
             sum(
                 _added_area_costs(
@@ -1705,6 +1761,55 @@ def post_process_fixed_structure(owner) -> None:
                 )
             )
         )
+
+
+def _area_values(owner) -> dict[tuple[str, int], float] | None:
+    """Each installed unit's area value, keyed ``(side, index)``: what
+    one more m2 of installed area would save in the objective ($/y per m2),
+    the sum over periods of its cap's dual times the cap's slope in area.
+    ``None`` when the solver reported no duals."""
+
+    read = getattr(owner.m, "dual", None)
+    if read is None:
+        return None
+    values = {}
+    for key, caps in owner.area_caps.items():
+        total = 0.0
+        for constraint, factor, thetas in caps:
+            dual = read(constraint)
+            if dual is None:
+                return None
+            theta_1, theta_2 = (max(_numeric(t), 1e-6) for t in thetas)
+            total += abs(dual) * float(factor) * chen_lmtd(theta_1, theta_2)
+        values[key] = total
+    return values
+
+
+def _rating_allowances(owner) -> dict[tuple[str, int], float]:
+    """How much more area verification needs than the model's cap for each
+    installed unit, keyed ``(side, index)``: the largest, over its active
+    periods, of the required area verification sizes (exact LMTD, or summed
+    slice areas) over the area the cap needs at that duty (duty over the
+    cap's factor and Chen LMTD), at least 1. Off its design point the cap's
+    calibration and Chen's LMTD let an installed area carry more duty than
+    exact sizing allows."""
+
+    allowances = {}
+    for (side, index), terms in owner.rating_terms.items():
+        results = (
+            owner.recovery_results if side == "recovery" else owner.utility_results
+        )
+        worst = 1.0
+        for (factor, _thetas), period in zip(
+            terms, results[index].periods, strict=True
+        ):
+            if not period.active or period.duty <= 0.0:
+                continue
+            theta_1, theta_2 = (max(float(t), 1e-6) for t in period.approach)
+            capped = period.duty / (float(factor) * chen_lmtd(theta_1, theta_2))
+            worst = max(worst, period.required_area / capped)
+        allowances[(side, index)] = worst
+    return allowances
 
 
 def _reported_area(

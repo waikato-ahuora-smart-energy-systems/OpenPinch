@@ -589,6 +589,39 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._get_active_stages(case) == [0, 2]
 
 
+def test_a_search_candidate_is_extracted_with_the_tasks_arrays_and_labels(
+    monkeypatch,
+) -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as module
+
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "extract_heat_exchanger_network",
+        lambda model, arrays, **kwargs: calls.append((model, arrays, kwargs)),
+    )
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=_solver_arrays(),
+        framework="ESM",
+        dt_cont_multiplier=1.5,
+        synthesis_task_id="evm-task",
+    )
+    candidate = SimpleNamespace(S=3)
+
+    problem.extract_candidate_network(candidate, run_id="run")
+
+    ((model, arrays, kwargs),) = calls
+    assert model is candidate
+    assert arrays is problem.solver_arrays
+    assert kwargs == {
+        "run_id": "run",
+        "task_id": "evm-task",
+        "method": "ESM",
+        "dt_cont_multiplier": 1.5,
+        "stage_count": 3,
+    }
+
+
 def test_stage_reduction_keeps_all_stages_when_nothing_is_recovered() -> None:
     problem = InternalHeatExchangerNetworkProblem(solver_arrays=_solver_arrays())
     case = _StageReductionCase(stage_duties=[0.0, 0.0, 0.0, 0.0])
@@ -730,6 +763,71 @@ def test_stagewise_evolution_branch_frontier_selects_best_global_tac(
         "1-b1-plus1",
     ]
     assert model.updated_with == "plus-branch-best"
+
+
+def test_branched_evolution_reports_each_candidate_that_improves_its_best(
+    monkeypatch,
+) -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+    tacs = {
+        "0-b0-minus1": 120.0,
+        "0-b0-minus2": 80.0,
+        "0-b0-plus1": 90.0,
+        "0-b0-plus2": 110.0,
+    }
+
+    def solve(**kwargs):
+        label = kwargs["branch_label"]
+        z = kwargs.get("z_allowed_removed", kwargs.get("z_allowed_added"))
+        return _BranchEvolutionCase(
+            name=label,
+            tac=tacs.get(label, 70.0),
+            z=z,
+            add_candidates=((0, 0, 3),) if label == "0-b0-plus1" else (),
+        )
+
+    _patch_evolution_children(monkeypatch, minus=solve, plus=solve)
+    reported: list[str] = []
+
+    with stagewise_evolution.reporting_improvements(
+        lambda candidate: reported.append(candidate.name)
+    ):
+        model.get_net_benefit_evolution(
+            print_output=False, max_depth=2, n_ad_branches=2, n_rm_branches=2
+        )
+
+    # The root costs 100: minus2 (80) improves on it and 1-b1-plus1 (70) on
+    # that; plus1 (90) is cheaper than the root but not than minus2.
+    assert reported == ["0-b0-minus2", "1-b1-plus1"]
+
+
+def test_single_path_evolution_reports_each_improvement(monkeypatch) -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+
+    def solve(name, tac):
+        return lambda **kwargs: _BranchEvolutionCase(
+            name=name,
+            tac=tac,
+            z=kwargs.get("z_allowed_removed", kwargs.get("z_allowed_added")),
+        )
+
+    _patch_evolution_children(
+        monkeypatch, minus=solve("minus", 90.0), plus=solve("plus", 95.0)
+    )
+    reported: list[str] = []
+
+    with stagewise_evolution.reporting_improvements(
+        lambda candidate: reported.append(candidate.name)
+    ):
+        model.get_net_benefit_evolution(print_output=False, max_depth=1)
+
+    assert reported == ["minus"]
 
 
 def test_stagewise_evolution_failed_child_does_not_stop_siblings(monkeypatch) -> None:
@@ -1325,15 +1423,20 @@ def test_local_executor_uses_worker_pool_for_prebuilt_tasks(monkeypatch) -> None
             self.worker_count = worker_count
 
         def __enter__(self):
+            self.submitted = 0
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            pool_calls.append((self.worker_count, self.submitted))
             return False
 
-        def map(self, func, iterable):
-            args = tuple(iterable)
-            pool_calls.append((self.worker_count, len(args)))
-            return tuple(func(item) for item in args)
+        def submit(self, func, item):
+            from concurrent.futures import Future
+
+            self.submitted += 1
+            future = Future()
+            future.set_result(func(item))
+            return future
 
     class SuccessfulInternalProblem:
         case = SimpleNamespace(solver_run=SimpleNamespace(status="ok"))
@@ -3577,6 +3680,23 @@ def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() 
     assert amalgamated.z_allowed[0][0] == [1, 1]
 
 
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
+def test_the_amalgamated_network_holds_values_only() -> None:
+    # The amalgamated network is read, never solved: building its constraints
+    # and objective was about a quarter of a pulp mill design.
+    pyo = pytest.importorskip("pyomo.environ")
+    driver = _pdm_amalgamation_driver()
+
+    amalgamated = driver.amalgamate_networks(
+        above_case=_pdm_side_result(hot_utility_target=1.0),
+        below_case=_pdm_side_result(cold_utility_target=1.0),
+    )
+
+    assert amalgamated.values_only
+    assert list(amalgamated.m.model.component_data_objects(pyo.Constraint)) == []
+
+
 def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch):
     # Couenne is an optional extra; SCIP comes with the synthesis extra and
     # also solves a pinch design side that is not linear.
@@ -3661,5 +3781,6 @@ def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
 
     model.get_post_process()
 
-    assert len(price_calls) == 1
+    # Never per cell: the unused dTAC/dA grid that read it is gone.
+    assert len(price_calls) <= 1
     assert approach_calls == []

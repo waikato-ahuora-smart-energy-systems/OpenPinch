@@ -38,6 +38,9 @@ def amalgamate_networks(
         integers=True,
         tol=1e-3,
         solver_options=owner.solver_options,
+        # The amalgamated network holds the sides' solved values and is read,
+        # never solved: no constraints or objective are built.
+        values_only=True,
     )
     if (above_required and above_case.mSuccess == 0) or (
         below_required and below_case.mSuccess == 0

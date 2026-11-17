@@ -9,6 +9,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+    alpha as base_alpha,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import (
+    _set_value,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     evolution as stagewise_evolution,
 )
@@ -48,8 +54,8 @@ class _ObjectiveModel:
     def Maximize(self, expression):
         self.maximised.append(expression)
 
-    def Intermediate(self, expression, *, name: str | None = None):
-        self.intermediates.append((name, expression))
+    def Intermediate(self, expression):
+        self.intermediates.append(expression)
         return expression
 
     def Equation(self, expression):
@@ -77,6 +83,7 @@ class _FloatOnly:
 def test_stagewise_setup_preserves_solver_construction_order():
     model = StageWiseModel.__new__(StageWiseModel)
     model.framework = "TDM"
+    model.values_only = False
     calls = []
     ordered_steps = (
         "set_blank_input_parameters",
@@ -573,7 +580,7 @@ def test_stagewise_single_period_dqda_equations_use_recovery_stage_grid():
     assert model.min_dqda_int[0][0][0] == pytest.approx(2.0)
     assert model.min_dqda_int[0][0][1] is None
     assert model.min_dQ_dA_eqn[1] is None
-    assert model.m.intermediates[0][0] == "dqda_calc_H0_to_C0_at_S0"
+    assert len(model.m.intermediates) == 1
 
 
 def test_stagewise_multiperiod_dqda_equations_use_period_recovery_stage_grid():
@@ -601,10 +608,7 @@ def test_stagewise_multiperiod_dqda_equations_use_period_recovery_stage_grid():
     assert model.min_dqda_int[1][0][0][1] is None
     assert model.min_dQ_dA_eqn[1] is None
     assert model.min_dQ_dA_eqn[3] is None
-    assert [name for name, _ in model.m.intermediates] == [
-        "dqda_calc_H0_to_C0_at_S0_period0",
-        "dqda_calc_H0_to_C0_at_S0_period1",
-    ]
+    assert len(model.m.intermediates) == 2
 
 
 def test_stagewise_single_period_initial_values_cover_inactive_utilities_and_noniso():
@@ -907,6 +911,7 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
     target.I = 1
     target.J = 1
     target.S = 1
+    target.z_allowed = [[[1]]]
     calls = []
     target.set_initial_values_for_variables = lambda best: calls.append(
         ("initial", None)
@@ -1038,6 +1043,7 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     target.I = 1
     target.J = 1
     target.S = 1
+    target.z_allowed = [[[1]]]
     target.alpha = [[[[0.5]]]]
     target.set_initial_values_for_variables = lambda best: None
     target.get_post_process = lambda: None
@@ -1057,6 +1063,39 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     assert target.alpha == []
 
 
+def test_update_with_best_model_adopts_the_candidates_own_alpha():
+    # A candidate's alpha is solved only when it is ranked, so an unranked
+    # winner has none yet: the owner takes the alpha solved from the
+    # candidate's values, not one solved later from its own.
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.z_allowed = [[[1]]]
+    target.alpha = []
+    target.set_initial_values_for_variables = lambda best: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        _ranking_alpha_pending=True,
+        get_alpha_values=lambda: [[[[0.25]]]],
+        I=1,
+        J=1,
+        S=1,
+        dqda=[[[2.0]]],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+    )
+
+    _update_with_best_model(target, best)
+
+    assert target.alpha == [[[[0.25]]]]
+
+
 def test_update_with_best_model_keeps_solved_cost_values_not_expressions():
     # Copying a Pyomo expression copies the whole model behind it; verify()
     # only reads the solved values, so those are what the owner keeps.
@@ -1067,6 +1106,7 @@ def test_update_with_best_model_keeps_solved_cost_values_not_expressions():
     target.I = 1
     target.J = 1
     target.S = 1
+    target.z_allowed = [[[1]]]
     target.set_initial_values_for_variables = lambda best: None
     target.get_post_process = lambda: None
     best = SimpleNamespace(
@@ -1111,6 +1151,7 @@ def test_update_with_best_model_adopts_the_solver_run():
     target.I = 1
     target.J = 1
     target.S = 1
+    target.z_allowed = [[[1]]]
     target.solver_run = SimpleNamespace(converged=False)
     target.set_initial_values_for_variables = lambda best: None
     target.get_post_process = lambda: None
@@ -1360,7 +1401,7 @@ class _UnreadValue:
         raise AssertionError("an inactive match's approach was read")
 
 
-def _built_two_stage_model(monkeypatch) -> StageWiseModel:
+def _built_two_stage_model(monkeypatch, **options) -> StageWiseModel:
     """The four-stream case built, not solved: two hot and two cold streams.
 
     Nothing is solved, so no solver executable is needed.
@@ -1384,12 +1425,11 @@ def _built_two_stage_model(monkeypatch) -> StageWiseModel:
         solver_arrays=problem_to_solver_arrays(problem, 10.0),
         stages=2,
         dTmin=10.0,
-        z_restriction=None,
         min_dqda=0.0,
         minimisation_goal="total cost",
-        non_isothermal_model=False,
         integers=True,
         tol=1e-6,
+        **{"non_isothermal_model": False, "z_restriction": None, **options},
     )
     model.solver_run = SimpleNamespace(objective_value=1.0)
     return model
@@ -1440,3 +1480,195 @@ def test_post_process_reads_each_stream_temperature_once(monkeypatch):
     # Once for dQ/dA, once for the alpha solve and at most twice for heater
     # and cooler areas; it was twice per partner in every stage.
     assert max(value.reads for value in counted) <= 4
+
+
+def test_post_process_leaves_the_alpha_solve_to_benefit_ranking(monkeypatch):
+    # Only evolution's benefit ranking reads alpha, and most solved models
+    # (pinch design variants, rejected evolution candidates) are never
+    # ranked: the alpha solve was over half of pulp mill post-processing.
+    model = _built_two_stage_model(monkeypatch)
+    solves = []
+    solve = base_alpha._solve_flow_on_system
+    monkeypatch.setattr(
+        base_alpha,
+        "_solve_flow_on_system",
+        lambda owner: solves.append(owner) or solve(owner),
+    )
+
+    model._get_multiperiod_post_process()
+    assert solves == []
+
+    model.get_max_benefit_HX_candidates(1)
+    model.get_lowest_benefit_HX_candidates(1)
+    assert solves == [model]
+
+
+def test_a_build_looks_up_each_recovery_approach_once_per_step(monkeypatch):
+    # The approach depends on the period and the pair, not the stage, but the
+    # theta grids looked it up four times per stage slot: about 1 s of each
+    # pulp mill design's amalgamated builds alone.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        approach as base_approach,
+    )
+
+    lookups = []
+    approach = base_approach._recovery_approach_temperature
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda owner, *pair: lookups.append(pair) or approach(owner, *pair),
+    )
+
+    _built_two_stage_model(monkeypatch)
+
+    # Once each for the duty bounds, the big-M bounds and the theta grids,
+    # whatever the number of stages.
+    assert max(lookups.count(pair) for pair in lookups) == 3
+
+
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_a_values_only_model_has_the_same_variables_and_no_constraints(
+    monkeypatch, non_isothermal_model
+):
+    # An amalgamated pinch design network only holds the sides' solved
+    # values: building its constraints and objective was about a quarter of
+    # a pulp mill design and nothing read them.
+    pyo = pytest.importorskip("pyomo.environ")
+
+    full = _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model
+    )
+    values_only = _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model, values_only=True
+    )
+
+    def numbers(model):
+        return [
+            (variable.value, variable.lb, variable.ub, variable.fixed)
+            for variable in model.m.model.component_data_objects(pyo.Var)
+        ]
+
+    assert numbers(values_only) == numbers(full)
+    assert list(values_only.m.model.component_data_objects(pyo.Constraint)) == []
+    assert values_only.m.objective is None
+
+
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_a_values_only_model_builds_no_constraint_expressions(
+    monkeypatch, non_isothermal_model
+):
+    # A values-only model keeps no constraints, so building their expressions
+    # only to drop them was most of building an amalgamated network.
+    from OpenPinch.analysis.heat_exchanger_networks.solver.pyomo_model import (
+        PyomoModel,
+    )
+
+    built = []
+    for name in ("Equation", "Equations"):
+        method = getattr(PyomoModel, name)
+        monkeypatch.setattr(
+            PyomoModel,
+            name,
+            lambda self, expressions, method=method: (
+                built.append(self) if not self.adds_constraints else None,
+                method(self, expressions),
+            )[1],
+        )
+
+    _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model, values_only=True
+    )
+
+    assert built == []
+
+
+def test_a_values_only_model_cannot_be_solved(monkeypatch):
+    # With no constraints, a solver would return any values in the bounds.
+    model = _built_two_stage_model(monkeypatch, values_only=True)
+
+    with pytest.raises(RuntimeError, match="values-only"):
+        model.optimise(print_output=False)
+
+
+def test_refusing_a_values_only_solve_still_removes_its_run_directory(monkeypatch):
+    # optimise always removes the model's run directory, which Couenne and
+    # Ipopt configuration create for their option file.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        execution as base_execution,
+    )
+
+    model = _built_two_stage_model(monkeypatch, values_only=True)
+    cleaned = []
+    monkeypatch.setattr(base_execution, "cleanup_model", cleaned.append)
+
+    with pytest.raises(RuntimeError, match="values-only"):
+        model.optimise(print_output=False)
+
+    assert cleaned == [model]
+
+
+def test_a_disallowed_match_slot_holds_plain_numbers(monkeypatch):
+    # Disallowed slots were fixed Pyomo parameters: about 14 million per
+    # pulp mill design, each costly to build and to hand to HiGHS.
+    z_allowed = [[[1, 1], [1, 1]], [[1, 0], [1, 1]]]
+    model = _built_two_stage_model(monkeypatch, z_restriction=[z_allowed, None, None])
+
+    slot = (1, 0, 1)
+    for grid in (model.Q_r, model.theta_1, model.theta_2, model.z):
+        i, j, k = slot
+        assert grid[i][j][k].__class__ is float
+        assert hasattr(grid[0][0][0], "is_variable_type")
+    i, j, k = slot
+    assert model.Q_r[i][j][k] == 0.0
+    assert model.z[i][j][k] == 0.0
+    assert model.theta_1[i][j][k] == pytest.approx(model.theta_1_by_period[0][i][j][k])
+
+
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_adopting_a_network_with_an_added_match_opens_its_slots(
+    monkeypatch, non_isothermal_model
+):
+    # A disallowed match's slots are plain numbers. Evolution adopts a
+    # network that may add the match and then copies its values in, so the
+    # slots must take them.
+    z_allowed = [[[1, 1], [1, 1]], [[1, 0], [1, 1]]]
+    model = _built_two_stage_model(
+        monkeypatch,
+        z_restriction=[z_allowed, None, None],
+        non_isothermal_model=non_isothermal_model,
+    )
+
+    stagewise_evolution._open_added_match_slots(
+        model, [[[1, 1], [1, 1]], [[1, 1], [1, 1]]]
+    )
+
+    grids = [model.Q_r, model.theta_1, model.theta_2, model.z]
+    if non_isothermal_model:
+        grids += [model.X, [list(row) for row in zip(*model.Y, strict=True)]]
+    for grid in grids:
+        slot = grid[1][0][1]
+        _set_value(model, slot, 0.25)
+        assert slot.value == pytest.approx(0.25)
+
+
+def test_a_multiperiod_warm_start_leaves_a_removed_match_binary_at_zero(
+    monkeypatch,
+):
+    # Evolution's minus move warm-starts the child from a parent that still
+    # has the match on; the child's binary for it is the plain number 0.0.
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
+        warm_start,
+    )
+
+    parent = _built_two_stage_model(monkeypatch)
+    for row in parent.z:
+        for binaries in row:
+            for binary in binaries:
+                binary.set_value(1)
+    z_allowed = [[[1, 1], [1, 1]], [[1, 0], [1, 1]]]
+    child = _built_two_stage_model(monkeypatch, z_restriction=[z_allowed, None, None])
+
+    warm_start._set_multiperiod_initial_values(child, parent)
+
+    assert child.z[1][0][1] == 0.0
+    assert child.z[0][0][0].value == pytest.approx(1.0)

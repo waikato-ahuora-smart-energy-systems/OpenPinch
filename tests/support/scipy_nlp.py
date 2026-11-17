@@ -108,15 +108,15 @@ class ScipyModel:
         self.success = False
         self.message = ""
 
-    def Var(self, value=0.0, lb=None, ub=None, name=None, **_kwargs):
+    def Var(self, value=0.0, lb=None, ub=None, **_kwargs):
         variable = Variable(len(self.variables), value, lb, ub)
         self.variables.append(variable)
         return variable
 
-    def Param(self, value=0.0, name=None, **_kwargs):
+    def Param(self, value=0.0, **_kwargs):
         return Constant(value)
 
-    def Intermediate(self, expression, name=None):
+    def Intermediate(self, expression):
         intermediate = Expr(_wrap(expression))
         intermediate.value = [0.0]
         self.intermediates.append(intermediate)

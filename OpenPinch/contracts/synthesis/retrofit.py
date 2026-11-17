@@ -22,12 +22,22 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     match splits. A new or moved match may come with the new end-of-stream
     heater or cooler that lets it work, ``utility_exchanger_id`` with
     ``utility_area`` (m2); its unit and area costs are in ``fixed_cost`` and
-    ``area_cost``.
+    ``area_cost``. ``repiped_streams`` names the streams whose piping the
+    modification changes; their repiping is in ``fixed_cost``.
+    ``"heat_pump"`` is a heat pump from ``hot_stream`` to ``cold_stream``:
+    its evaporator ``exchanger_id`` (``added_area``) and condenser
+    ``utility_exchanger_id`` (``utility_area``), with ``heat_pump_cop`` and
+    ``heat_pump_capacity`` (its largest condenser duty, kW) and, for a
+    real-fluid cycle, ``heat_pump_refrigerant``; ``fixed_cost`` holds its
+    compressor and package, or its whole machine for a real-fluid cycle
+    (then ``area_cost`` is 0).
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["new_match", "area_addition", "relocation"]
+    kind: Literal[
+        "new_match", "area_addition", "relocation", "enhancement", "heat_pump"
+    ]
     exchanger_id: str
     added_area: float = 0.0
     fixed_cost: float = 0.0
@@ -39,6 +49,10 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     new_splits: tuple[str, ...] = ()
     utility_exchanger_id: str | None = None
     utility_area: float = 0.0
+    repiped_streams: tuple[str, ...] = ()
+    heat_pump_cop: float | None = None
+    heat_pump_capacity: float | None = None
+    heat_pump_refrigerant: str | None = None
 
 
 class HeatExchangerNetworkRetrofitDesign(BaseModel):
@@ -50,7 +64,7 @@ class HeatExchangerNetworkRetrofitDesign(BaseModel):
     ``capital_cost`` is the installed cost of the modifications in $ and
     ``payback_years`` is capital over savings (``None`` without savings).
     ``dominated`` marks a design no better in net annual benefit than one
-    with fewer modifications.
+    from an earlier search step.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -73,10 +87,13 @@ class HeatExchangerNetworkRetrofitDesign(BaseModel):
 
 
 class HeatExchangerNetworkRetrofitResult(BaseModel):
-    """Retrofit search result: the best design for each modification count.
+    """Retrofit search result: the best design for each number of steps.
 
-    ``frontier[n]`` is the design with ``n`` modifications that the search
-    found best by net annual benefit; ``frontier[0]`` is the existing network.
+    ``frontier[n]`` is the design after ``n`` steps that the search found
+    best by net annual benefit; ``frontier[0]`` is the existing network. A
+    step is one structural change with the area additions it keeps (the
+    structure strategy) or one modification (the stepwise strategy), so
+    ``modification_count`` can exceed ``n``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -86,10 +103,11 @@ class HeatExchangerNetworkRetrofitResult(BaseModel):
 
     @property
     def selected(self) -> HeatExchangerNetworkRetrofitDesign:
-        """The design with the best net annual benefit, fewest modifications
-        on a tie."""
+        """The design with the best net annual benefit, fewest steps on a
+        tie."""
 
-        return max(
-            self.frontier,
-            key=lambda d: (d.net_annual_benefit, -d.modification_count),
+        best = max(
+            range(len(self.frontier)),
+            key=lambda n: (self.frontier[n].net_annual_benefit, -n),
         )
+        return self.frontier[best]

@@ -32,6 +32,69 @@ The design view also exposes ``selected_network``, total recovery, hot and cold
 utility duty, and ``utility(name)``. Serialize the complete result with
 ``design.result.model_dump(mode="json")``.
 
+The ranked networks are every network the run verified and costed, one per
+topology (the cheapest), in ascending total annual cost: the networks each
+task ends with, and every network an evolution search finds that improves on
+its best so far.
+
+Networks as They Are Found
+--------------------------
+
+Pass a ``HeatExchangerNetworkRecord`` as ``record=`` to see the networks while
+synthesis runs. Each network enters the record as soon as it is verified and
+costed in its final form: on a multiperiod median or period basis it is first
+fitted to every period, and with an overdesign margin it is rated at the
+margin. The record is thread-safe; another thread polls it:
+
+.. code-block:: python
+
+   import threading
+   import time
+
+   from OpenPinch.analysis.heat_exchanger_networks.results.record import (
+       HeatExchangerNetworkRecord,
+   )
+
+   record = HeatExchangerNetworkRecord()
+
+   def watch():
+       version = 0
+       while True:
+           change = record.changed_since(version)
+           if change is not None:
+               version = change["version"]
+               for entry in change["entries"]:
+                   print(entry["key"], entry["method"], entry["total_annual_cost"])
+               if change["status"] != "running":
+                   return
+           time.sleep(0.5)
+
+   watcher = threading.Thread(target=watch)
+   watcher.start()
+   design = problem.design.heat_exchanger_network(record=record)
+   watcher.join()
+
+``record.version`` rises with every change. ``record.snapshot()`` returns the
+whole record as new JSON-ready data: ``version``, ``status`` (``"pending"``,
+``"running"``, ``"complete"`` or ``"failed"``), ``selected`` (the selected
+entry's key once complete) and ``entries``, cheapest first, each with its
+``key``, ``rank``, ``method``, ``task_id``, ``dt_cont_multiplier``,
+``total_annual_cost``, ``unit_count``, ``version`` and ``network`` (the
+network's JSON). ``record.changed_since(version)`` returns ``None`` when
+nothing has changed, else the same header, only the entries added or replaced
+since ``version``, and ``order``, every key in rank order. Entries are never
+removed: a topology found again at a lower cost replaces its entry under the
+same key, so a reader merges entries by key. Equal costs are ordered by task
+id and then topology, so the contents and order do not depend on the order in
+which worker processes finish.
+
+On completion the result ranks exactly the record's networks and selects its
+first. A record collects one call. With ``HENS_MAX_PARALLEL`` above 1, worker
+processes send their networks to the calling process, which holds the record;
+fitting and rating run there. Fitting and rating every improvement adds
+solves, so a fitted or overdesigned design takes longer than one that fits
+and rates the selected network alone did.
+
 Exchanger Approach Temperatures
 -------------------------------
 
@@ -462,8 +525,9 @@ runs it.
        area_addition_cost=8_650.0,
        split_cost=10_000.0,
    )
-   for design in result.frontier:
+   for step, design in enumerate(result.frontier):
        print(
+           step,
            design.modification_count,
            round(design.annual_savings),
            round(design.capital_cost),
@@ -471,37 +535,52 @@ runs it.
        )
    best = result.selected
 
-The method follows network evolution, one modification at a time:
+The method follows network evolution, one structural change at a time,
+with the network pinch approach of Smith's group deciding which changes to
+solve:
 
 1. The existing network is rated: every exchanger is held to its installed
    area and the duties minimise utility cost. This is the base case; its
    utility cost is the reference for savings.
-2. Each step tries, from every design kept so far, added area on each
-   existing exchanger whose duty is limited by its area, and the most
-   promising new matches, joining a stage (which may split a stream) or in a
-   new stage between two existing ones. New matches are ranked by the
-   utility they could cut at first order: the heat they could recover where
-   they would sit, but no more than their hot stream's cooling or their cold
-   stream's heating. Ties, including matches that cut nothing directly, go
-   to the larger heat potential. With ``relocation_cost``
-   set, a step may also move an existing recovery exchanger, with its
-   installed area, to a screened match that shares one of its streams; its
-   own pair at another position is a repiping.
-3. Each candidate is solved on the fixed-structure model: existing exchangers
-   keep their installed area unless they are given more, new exchangers are
-   sized, and the objective is utility cost plus the annualised cost of the
-   added area. Candidates are ranked by net annual benefit, savings less the
-   annualised capital, and the best ``beam_width`` go on to the next step.
-   Every solved design is checked as optimised duties are (approach
-   temperatures, heat balances and areas, with installed areas widened by
-   ``area_tolerance``) and dropped if it fails.
+2. Each step proposes, from every design kept so far, structural changes:
+   new matches, joining a stage (which may split a stream) or in a new stage
+   between two existing ones, and, with ``relocation_cost`` set, an existing
+   recovery exchanger moved with its installed area to a match that shares
+   one of its streams (its own pair at another position is a repiping). New
+   matches are screened by the utility they could cut at first order: the
+   heat they could recover where they would sit, but no more than their hot
+   stream's cooling or their cold stream's heating, ties going to the larger
+   heat potential.
+3. The ``ceiling_candidates`` (default 12) screened changes are ranked by the
+   utility cost their structure reaches with unlimited area (its network
+   pinch), and the ``new_match_candidates`` (default 4) best are solved on
+   the fixed-structure model with every existing exchanger free to grow: new
+   exchangers are sized, added area is priced, and the objective is utility
+   cost plus the annualised cost of the added area. An exchanger keeps added
+   area of at least 1 % of its installed area (and 1 m2), each an area
+   addition, and the structure is solved again with only those. Candidates
+   are ranked by net annual benefit, savings less the annualised capital,
+   and the best ``beam_width`` go on to the next step. Every solved design
+   is checked as optimised duties are (approach temperatures, heat balances
+   and areas, with installed areas widened by ``area_tolerance``) and
+   dropped if it fails.
 
 ``result.frontier`` holds the best design found for each number of
-modifications, from the existing network (0) up to ``max_modifications``, so
-the trade-off between the size of the retrofit and its benefit is visible.
-A design no better than one with fewer modifications is marked
-``dominated``. ``result.selected`` is the design with the best net annual
-benefit.
+structural changes, from the existing network (0) up to
+``max_modifications``, so the trade-off between the size of the retrofit and
+its benefit is visible; each design also lists the area additions it needs.
+A design no better than one with fewer changes is marked ``dominated``.
+``result.selected`` is the design with the best net annual benefit.
+
+``strategy="stepwise"`` instead makes one modification per step, an area
+addition on an exchanger whose duty its area limits being one, and solves
+every screened change without a ceiling ranking. With Ipopt, whose duals
+give each exchanger's area value (what one more m2 would save), it tries
+added area only where that value is above zero, most valuable first; on the
+validation cases this skips one to three solves and leaves the frontier
+unchanged, as almost every exchanger at its area limit is worth enlarging.
+It was the first version of the method and finds less on both validation
+cases below.
 
 Each design lists its ``modifications`` (``"new_match"``,
 ``"area_addition"`` or ``"relocation"``, the exchanger, the added area, fixed and area cost, and
@@ -527,21 +606,37 @@ Area tolerance
    that fraction. An existing network that still cannot meet its targets
    raises ``ValueError``.
 Search size
-   ``beam_width`` (default 3) designs are kept per step and
-   ``new_match_candidates`` (default 4) new matches are tried from each, so a
-   step solves up to ``beam_width * (existing exchangers +
-   new_match_candidates)`` small NLPs. ``min_approach_temperature`` (default
+   ``beam_width`` (default 3) designs are kept per step. From each, a step
+   solves the ``ceiling_candidates`` ceilings and up to two NLPs for each of
+   the ``new_match_candidates`` best, about
+   ``beam_width * (ceiling_candidates + 2 * new_match_candidates)`` small
+   NLPs (stepwise: ``beam_width * (existing exchangers +
+   new_match_candidates)``). ``min_approach_temperature`` (default
    1 K) applies to every exchanger.
 Relocation
    ``relocation_cost`` (default ``None``: no relocations) is the fixed cost
    of moving an existing recovery exchanger, plus ``split_cost`` per stream
    the move splits; the moved exchanger keeps its installed area at no area
-   cost. ``relocation_candidates`` (default 8) moves are tried from each
-   design, ranked by the heat the new position could recover less the duty
-   the exchanger gives up. Relocation can enlarge the search several-fold:
-   on the Ciric and Floudas case with 30 candidates it takes 319 solves
-   instead of 48, and leaves the frontier unchanged, since most moves strand
-   a stream whose utility exchanger is already at its area.
+   cost. The default search ranks up to ``ceiling_relocations`` (default
+   400) moves per design by their ceiling, where relocations and new
+   matches each get ``new_match_candidates`` full solves. A simple score, the heat the new position could recover less the
+   duty the exchanger gives up, barely tracks the ceiling: on Akpomiemie and
+   Smith's case the paper's resequencing of exchanger 7 has the best ceiling
+   of 395 moves but scores 127th. Ranking them all, the search finds that
+   move and builds on it ($740,000/y net at two changes, against $712,000/y
+   when only the 100 best-scored moves were ranked), at a cost: about 2,700
+   solves instead of 889. ``HENS_MAX_PARALLEL`` (in ``options``) runs each
+   step's solves, ceilings and sizing, on that many threads with the same
+   result: with 8 the search took 37 s instead of 89 s serially. A large
+   network offers far more moves: the 72-exchanger pulp mill offers 14,617
+   from its existing network, so the cap, applied in score order, bounds
+   the ranking; there three structural changes with relocation take 2,585
+   solves and 164 s on 8 threads. The
+   stepwise search tries the
+   ``relocation_candidates`` (default 8) best-scored moves, and only those
+   that gain more than they give up. On the Ciric and Floudas case
+   relocation leaves the frontier unchanged, since most moves strand a
+   stream whose utility exchanger is already at its area.
 New utility exchangers
    A new heater or cooler never lowers utility cost by itself, but it can
    free the recovery units a move needs: a cooler on a hot stream that has
@@ -554,6 +649,52 @@ New utility exchangers
    exchanger carries no duty is dropped. On the Ciric and Floudas case a
    cooler on H3 lets a new H1-C2 match in a new third stage save about
    $836k/y instead of $222k/y alone.
+Heat transfer enhancement
+   ``enhancement_factors`` maps an existing exchanger's id to the factor
+   its heat transfer coefficient can be raised by, tube inserts for
+   example, as limited by its geometry. An enhanced exchanger works as one
+   with its area times the factor. Each costs ``enhancement_cost`` plus
+   ``enhancement_area_cost`` per m2 of its installed area, and adds no area.
+   The stepwise search tries enhancing each exchanger at its area limit as
+   a step; the default search, after sizing a structure, sizes it again
+   with the exchangers it would enlarge enhanced where they have a factor,
+   and keeps the better design. Inserts raise pressure drop:
+   ``enhancement_pressure_drops`` gives each exchanger's insert as the
+   stream it is on and the pressure drop it adds (kPa), and
+   ``pressure_drop_allowances`` the extra pressure drop each stream can take;
+   no design's inserts exceed a stream's allowance. Hydraulics are not
+   modelled beyond these sums: take the figures from a rating of each
+   exchanger.
+Repiping
+   ``repiping_cost`` ($ per stream, default 0) prices the piping a step
+   changes, which the unit costs leave out (Nguyen et al., 2010; Bütün et
+   al., 2018 price it the same way): both streams of a new match, the
+   streams a relocated exchanger leaves and joins (a stream it stays on in
+   the same stage keeps its piping), and the stream of a new heater or
+   cooler. Each modification lists them in ``repiped_streams``. A relocated
+   exchanger keeps its id, so it can also take added area, which makes a
+   move to a match that needs a bigger unit a resized reassignment.
+Heat pumps
+   ``heat_pump_cycle`` lets a step add a heat pump between two streams, as
+   Bütün et al. (2018) retrofit heat pumping with the network: an
+   evaporator at the end of a hot stream, evaporating
+   ``min_approach_temperature`` below its target, and a condenser at the
+   end of a cold stream, condensing as far above its target. The HPR
+   service's cycle models rate it. ``"carnot"`` takes the heating COP
+   ``1 + HPR_ETA_II_CARNOT * T_evap / (T_cond - T_evap)``, prices the
+   compressor and package at ``heat_pump_cost`` per kW of condenser
+   capacity and the two exchangers by the area law. ``"vapour_compression"``
+   solves a single stage on each of ``HPR_REFRIGERANTS`` within the HPR
+   cycle limits, keeps the fluid with the best COP and prices the whole
+   machine (compressor, motor, evaporator and condenser) with the HPR
+   service's installed capital. The work costs ``COSTING_HPR_ELE_PRICE``.
+   The model links the two duties by the COP; the search screens stream
+   pairs by the utility the heat pump could relieve, and its condenser and
+   evaporator duties do not count as hot and cold utility. On the Ciric
+   and Floudas case at $30/MWh electricity a Carnot heat pump from H1 to C2
+   (COP 1.92, 14.7 MW) is the best first step, at $2.06M/y net; at the
+   case's $100/MWh, and with a single water stage (COP 1.62, $13.7M
+   installed), new matches win.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
@@ -563,11 +704,85 @@ than a recovery exchanger. Area reduction is not a move: an exchanger may
 always run below its area, and existing area is sunk.
 
 The search is a greedy beam, so more candidates or ``new_utility_units`` do
-not always end better. On the Ciric and Floudas case with the report's costs
-and four modifications, the defaults reach about $1.83M/y (67 solves);
-eight new-match candidates end at $1.17M/y after a better first step; and
-trying all 24 positions with new utility exchangers reaches $1.97M/y (496
-solves). Compare a few settings on a real case.
+not always end better. With the stepwise search on the Ciric and Floudas
+case (report costs, four modifications), four new-match candidates reach
+about $1.83M/y, eight end at $1.17M/y after a better first step, and all 24
+with new utility exchangers reach $1.97M/y (496 solves). Compare a few
+settings on a real case.
+
+Validation
+~~~~~~~~~~
+
+Three published cases check the method; the tests run all three.
+
+Ciric and Floudas (1989), as Example 1 of Hallberg and Scribner (2009)
+   The existing network rates at 17,519 kW of hot utility against the
+   published 17,759 kW. Under the report's rules (10 K approach, at most 20 %
+   more area on an existing exchanger, $17,300 per added shell, at most two
+   new exchangers) the best design with two new exchangers adds H1-C2 and
+   H2-C2 matches and 20 % more area on E1 and E3: $1.91M capital and 5,532 m2
+   of network area, against the report's MILP at $1.73M and 5,088 m2 with
+   different matches. The report's savings figures cannot be compared: its
+   NPV, annualised savings and return on investment do not reconcile.
+Hallberg and Scribner (2009), Example 2, crude unit
+   Thirteen process streams, eight of them with several segments, and 18
+   existing exchangers. Its existing network rates at 68,666 kW of hot and
+   74,835 kW of cold utility against the published 67,964 and 75,051 kW,
+   once every installed area is widened by 5 % (``area_tolerance=0.05``):
+   some published areas, E6's most, are a little short of their published
+   duties. The report gives no retrofitted utility for this example, so
+   only the existing network is checked.
+Akpomiemie and Smith (2018), simplified crude preheat train
+   Stream data, the existing network and its duties are from the paper
+   (Tables 3 and 4, Figs. 10 and 19). Every stream has h = 0.5 kW/m2K and
+   installed areas are back-calculated from the published duties, so U*A
+   matches the paper. With unlimited area at a 10 K approach the existing
+   structure saves 13.9 % of hot utility and the paper's retrofitted
+   structure reaches 10,960 kW (24.2 %, every cooler at zero), both as
+   published. The search with its defaults reaches the same hot utility in
+   three structural changes (three new matches, with added area on four
+   exchangers) in 141 solves, at $521k of capital; the paper does it with
+   two (moving one exchanger and adding one) and more area on several. The
+   paper's $4,000 fixed cost per unit makes new exchangers cheap. The
+   stepwise search, counting each enlarged exchanger as a step, needs seven
+   steps and every new-match position (811 solves), and stops at 20.5 %
+   after six with four candidates.
+
+   Enhancement (Section 5.1, Tables 5, 6 and 8): with the paper's factors
+   for E5 (U from 0.325 to 0.448) and E1 (0.517 to 0.669), inserts at $500
+   plus $10/m2 and no other changes allowed, the stepwise search enhances E5
+   and then E1, as the paper does, and reaches 13,545 kW against its
+   13,661.52 kW (5.7 % saved from the rated base against 5.5 %). Given E2's
+   factor too and the paper's pressure drops (E5's insert adds 21.94 kPa to
+   C1, E1's 1.96 and E2's 31.91, with C1 at 668.51 of its 700 kPa), the
+   search never enhances E2, as the paper concludes; without the allowance
+   it adds E2 as a third step. Combining enhancement with structural changes (Section 5.3),
+   with relocation at $10,000 and factors for every exchanger the paper
+   enhances: the first change becomes the paper's relocation of E7 with
+   five exchangers enhanced ($762k/y net against $621k/y without
+   enhancement), and at two changes enhancement cuts capital from $506k to
+   $346k and added area from 1,473 to 932 m2, raising the net benefit from
+   $740k/y to $934k/y. The paper reports about 65 % more retrofit profit
+   from the combination, under its own sizing and pressure drop limits.
+
+The default (structure-first) and stepwise searches compared (report costs; Smith's
+Table 5 costs at a 10 K approach):
+
+.. list-table::
+   :header-rows: 1
+
+   * - Case
+     - Stepwise, 4 steps
+     - Structure, 3 structural changes
+   * - Ciric and Floudas, report costs
+     - $1.83M/y net, 67 solves
+     - $1.98M/y net, 133 solves
+   * - Ciric and Floudas, report rules
+     - $1.15M/y net, 66 solves
+     - $1.29M/y net, 136 solves
+   * - Akpomiemie and Smith
+     - 11,777 kW hot utility, 76 solves
+     - 10,960 kW (the published target), 141 solves
 
 Serialized Network Input
 ------------------------
