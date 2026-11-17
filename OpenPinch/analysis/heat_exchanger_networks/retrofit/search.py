@@ -724,7 +724,7 @@ class _Evaluator:
         factors = self.settings.enhancement_factors or {}
         if sized is None or not factors:
             return sized
-        # Kept units with a factor, the most added area first, while their
+        # Kept units with a factor, best return per kPa first, while their
         # inserts fit each stream's pressure drop allowance.
         enhance: frozenset[str] = frozenset()
         for unit in sorted(
@@ -733,7 +733,7 @@ class _Evaluator:
                 for m in sized.state.moves
                 if m.kind == "area_addition" and m.exchanger_id in factors
             ),
-            key=lambda unit: -sized.added.get(unit, 0.0),
+            key=lambda unit: -self._insert_return(unit, sized.added.get(unit, 0.0)),
         ):
             if _within_pressure_drop(enhance | {unit}, self.settings):
                 enhance = enhance | {unit}
@@ -746,6 +746,26 @@ class _Evaluator:
         ):
             return enhanced
         return sized
+
+    def _insert_return(self, unit: str, added: float) -> float:
+        """What an insert on ``unit`` may save per kPa of pressure drop it
+        adds: the area addition it can stand in for (fixed cost and the
+        ``added`` area's cost) less its own cost. Infinite (first) for an
+        insert with no pressure drop; an unprofitable one ranks below every
+        profitable one."""
+
+        settings = self.settings
+        saving = (
+            settings.area_addition_cost
+            + self._area_cost(added)
+            - settings.enhancement_cost
+            - settings.enhancement_area_cost * self.installed[unit]
+        )
+        drops = settings.enhancement_pressure_drops or {}
+        drop = float(drops[unit][1]) if unit in drops else 0.0
+        if drop <= 0.0:
+            return math.inf if saving > 0.0 else saving
+        return saving / drop
 
     def _sized_with(self, state: _State, enhance: frozenset[str]) -> _Evaluated | None:
         """``state`` with the ``enhance`` units enhanced and its added area

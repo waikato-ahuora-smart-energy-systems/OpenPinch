@@ -848,3 +848,33 @@ def test_the_structure_search_keeps_inserts_within_the_pressure_drop_allowance(
         if m.kind == "enhancement"
     ]
     assert len(enhanced) == 1
+
+
+def test_competing_inserts_are_chosen_by_their_return_per_unit_of_pressure_drop(
+    fake_solver,
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # E1 and E2 are both enlarged by the same area on the fake and each
+    # insert saves the same; E2's costs a little less and adds a third of
+    # E1's pressure drop, and C1 takes only one of them.
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            enhancement_factors={"E1": 1.3, "E2": 1.3},
+            enhancement_cost=500.0,
+            enhancement_area_cost=10.0,
+            enhancement_pressure_drops={"E1": ("C1", 12.0), "E2": ("C1", 4.0)},
+            pressure_drop_allowances={"C1": 15.0},
+            **COSTS,
+        ),
+    )
+
+    enhanced = [
+        m.exchanger_id
+        for m in result.frontier[1].modifications
+        if m.kind == "enhancement"
+    ]
+    assert enhanced == ["E2"]
