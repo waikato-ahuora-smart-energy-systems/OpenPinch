@@ -346,12 +346,12 @@ The depth picks the stages run at each multiplier and their effort:
      - heuristic, then evolution
      - 50
      - 3
-     - 1
+     - 2
    * - 2
      - heuristic and MILP; MILP through the thermal derivative method
      - 50
      - 3
-     - 1
+     - 2
    * - 3
      - as 2; every MILP network also straight to evolution
      - 50
@@ -497,10 +497,14 @@ modifications that recover more heat. Give the network as for
 be mappings with ``area`` and an optional ``id`` (a plant tag), or a
 ``HeatExchangerNetwork`` whose exchangers carry ``area``. The example is
 Example 1 of Hallberg and Scribner (2009), adapted from Ciric and Floudas
-(1989); its case file is ``tests/fixtures/retrofit``.
+(1989), packaged as ``Five-stream-Ciric-and-Floudas-1989.json``; notebook 16
+runs it.
 
 .. code-block:: python
 
+   from OpenPinch import PinchProblem
+
+   problem = PinchProblem("Five-stream-Ciric-and-Floudas-1989.json")
    existing = {
        "recovery": [
            {"hot": "H3", "cold": "C2", "stage": 1, "area": 609.7, "id": "E1"},
@@ -537,14 +541,23 @@ The method follows network evolution, one modification at a time:
    utility cost is the reference for savings.
 2. Each step tries, from every design kept so far, added area on each
    existing exchanger whose duty is limited by its area, and the most
-   promising new matches. New matches are screened by the heat they could
-   recover where they would sit, joining a stage (which may split a stream)
-   or in a new stage between two existing ones.
+   promising new matches, joining a stage (which may split a stream) or in a
+   new stage between two existing ones. New matches are ranked by the
+   utility they could cut at first order: the heat they could recover where
+   they would sit, but no more than their hot stream's cooling or their cold
+   stream's heating. Ties, including matches that cut nothing directly, go
+   to the larger heat potential. With ``relocation_cost``
+   set, a step may also move an existing recovery exchanger, with its
+   installed area, to a screened match that shares one of its streams; its
+   own pair at another position is a repiping.
 3. Each candidate is solved on the fixed-structure model: existing exchangers
    keep their installed area unless they are given more, new exchangers are
    sized, and the objective is utility cost plus the annualised cost of the
    added area. Candidates are ranked by net annual benefit, savings less the
    annualised capital, and the best ``beam_width`` go on to the next step.
+   Every solved design is checked as optimised duties are (approach
+   temperatures, heat balances and areas, with installed areas widened by
+   ``area_tolerance``) and dropped if it fails.
 
 ``result.frontier`` holds the best design found for each number of
 modifications, from the existing network (0) up to ``max_modifications``, so
@@ -553,8 +566,8 @@ A design no better than one with fewer modifications is marked
 ``dominated``. ``result.selected`` is the design with the best net annual
 benefit.
 
-Each design lists its ``modifications`` (``"new_match"`` or
-``"area_addition"``, the exchanger, the added area, fixed and area cost, and
+Each design lists its ``modifications`` (``"new_match"``,
+``"area_addition"`` or ``"relocation"``, the exchanger, the added area, fixed and area cost, and
 any new splits), the rated network, hot and cold utility (kW), utility cost,
 annual savings, capital cost ($), annualised capital and net annual benefit
 ($/y), and the simple payback in years.
@@ -567,6 +580,9 @@ Costs
    area on an existing exchanger adds ``area_addition_cost``. Capital is
    annualised with the capital recovery factor of ``COSTING_DISCOUNT_RATE``
    and ``COSTING_SERVICE_LIFE``.
+   ``max_added_area_fraction`` (default ``None``, no cap) limits the area
+   added to an existing exchanger to that fraction of its installed area,
+   for example 0.2 where a shell can take at most 20 % more tubes.
 Area tolerance
    Plant areas are rounded and the solver uses Chen's LMTD approximation, so
    an existing network may fall just short of its own duties at its exact
@@ -579,10 +595,42 @@ Search size
    step solves up to ``beam_width * (existing exchangers +
    new_match_candidates)`` small NLPs. ``min_approach_temperature`` (default
    1 K) applies to every exchanger.
+Relocation
+   ``relocation_cost`` (default ``None``: no relocations) is the fixed cost
+   of moving an existing recovery exchanger, plus ``split_cost`` per stream
+   the move splits; the moved exchanger keeps its installed area at no area
+   cost. ``relocation_candidates`` (default 8) moves are tried from each
+   design, ranked by the heat the new position could recover less the duty
+   the exchanger gives up. Relocation can enlarge the search several-fold:
+   on the Ciric and Floudas case with 30 candidates it takes 319 solves
+   instead of 48, and leaves the frontier unchanged, since most moves strand
+   a stream whose utility exchanger is already at its area.
+New utility exchangers
+   A new heater or cooler never lowers utility cost by itself, but it can
+   free the recovery units a move needs: a cooler on a hot stream that has
+   none lets that stream's recovery exchangers give up duty. With
+   ``new_utility_units=True`` each new match and relocation is also tried
+   together with each new end heater (on a cold stream without one) or
+   cooler (on a hot stream without one). The pair is one modification: one
+   more ``new_unit_cost`` plus the utility exchanger's area, reported as
+   ``utility_exchanger_id`` and ``utility_area``. A pair whose utility
+   exchanger carries no duty is dropped. On the Ciric and Floudas case a
+   cooler on H3 lets a new H1-C2 match in a new third stage save about
+   $836k/y instead of $222k/y alone.
 
-Not yet covered: moving an existing exchanger to another match (relocation),
-repiping an existing match to another position, area reduction, and new
-utility exchangers.
+Not covered: moving or repiping an existing heater or cooler, and new
+utility exchangers placed between stages. Next to a paired new utility
+exchanger, moving an existing one would mainly save the new unit's cost,
+while its steam or cooling-water service usually makes it costlier to move
+than a recovery exchanger. Area reduction is not a move: an exchanger may
+always run below its area, and existing area is sunk.
+
+The search is a greedy beam, so more candidates or ``new_utility_units`` do
+not always end better. On the Ciric and Floudas case with the report's costs
+and four modifications, the defaults reach about $1.83M/y (67 solves);
+eight new-match candidates end at $1.17M/y after a better first step; and
+trying all 24 positions with new utility exchangers reaches $1.97M/y (496
+solves). Compare a few settings on a real case.
 
 Serialized Network Input
 ------------------------

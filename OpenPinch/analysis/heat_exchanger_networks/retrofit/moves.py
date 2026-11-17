@@ -10,6 +10,9 @@ from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger import HeatExchanger
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 
+HEATER = HeatExchangerKind.HOT_UTILITY
+COOLER = HeatExchangerKind.COLD_UTILITY
+
 
 @dataclass(frozen=True)
 class NewMatch:
@@ -23,6 +26,73 @@ class NewMatch:
     cold: str
     stage: int
     new_stage: bool
+
+
+@dataclass(frozen=True)
+class NewUtility:
+    """A new utility exchanger at the end of process stream ``stream``: a
+    heater served by hot utility ``utility`` (``heater``) or a cooler served
+    by cold utility ``utility``."""
+
+    stream: str
+    utility: str
+    heater: bool
+
+
+def new_utility_candidates(
+    network: HeatExchangerNetwork,
+    *,
+    hot_streams,
+    cold_streams,
+    hot_utilities,
+    cold_utilities,
+) -> tuple[NewUtility, ...]:
+    """New end-of-stream utility exchangers ``network`` could take.
+
+    Each cold stream without an end heater may take one from each hot
+    utility, then each hot stream without an end cooler one from each cold
+    utility; a heater or cooler placed after a stage does not count.
+    """
+
+    ends = {
+        (e.kind, e.sink_stream if e.kind is HEATER else e.source_stream)
+        for e in network.exchangers
+        if e.kind is not HeatExchangerKind.RECOVERY and e.stage is None
+    }
+    heaters = [
+        NewUtility(stream, utility, heater=True)
+        for stream in sorted(cold_streams)
+        if (HEATER, stream) not in ends
+        for utility in hot_utilities
+    ]
+    coolers = [
+        NewUtility(stream, utility, heater=False)
+        for stream in sorted(hot_streams)
+        if (COOLER, stream) not in ends
+        for utility in cold_utilities
+    ]
+    return tuple(heaters + coolers)
+
+
+def apply_new_utility(
+    network: HeatExchangerNetwork, move: NewUtility, exchanger_id: str
+) -> HeatExchangerNetwork:
+    """``network`` with the utility exchanger ``move`` added at its stream's
+    end as ``exchanger_id``, with no installed area."""
+
+    entry = [(move.stream, move.utility)]
+    (new,) = HeatExchangerNetwork.from_structure(
+        recovery=[],
+        heaters=entry if move.heater else (),
+        coolers=() if move.heater else entry,
+    ).exchangers
+    return network.model_copy(
+        update={
+            "exchangers": network.exchangers
+            + (new.model_copy(update={"exchanger_id": exchanger_id}),),
+            "stage_count": stage_count(network),
+        }
+    )
 
 
 def stage_count(network: HeatExchangerNetwork) -> int:
@@ -48,8 +118,8 @@ def screen_new_matches(
     Every hot and cold stream pair is tried joining each stage and in a new
     stage at each position; a pair already matched in a stage is not
     proposed there again. Moves with positive ``match_potential`` are ranked
-    by potential, then fewest new splits, then stage, joining before a new
-    stage, and stream names.
+    by ``utility_relief``, then potential, then fewest new splits, then
+    stage, joining before a new stage, and stream names.
     """
 
     hot = sorted(name for name, (supply, target, _) in ends.items() if supply > target)
@@ -75,6 +145,7 @@ def screen_new_matches(
     ranked = sorted(
         ((potential, move) for potential, move in scored if potential > 0.0),
         key=lambda item: (
+            -utility_relief(network, item[1], item[0]),
             -item[0],
             len(new_splits(network, item[1])),
             item[1].stage,
@@ -107,6 +178,28 @@ def match_potential(
     cold = _cold_temperature(network, ends, move.cold, cold_boundary)
     capacity = min(ends[move.hot][2], ends[move.cold][2])
     return capacity * max(0.0, hot - cold - approach)
+
+
+def utility_relief(
+    network: HeatExchangerNetwork, move: NewMatch, potential: float
+) -> float:
+    """Utility a new match of ``potential`` could cut at first order.
+
+    Heat it moves cuts utility only as far as its hot stream is cooled and
+    its cold stream heated: the least of ``potential``, the hot stream's
+    cooler duty and the cold stream's heater duty, read from the first
+    period of solved ``network``.
+    """
+
+    def duty(kind: HeatExchangerKind, stream: str) -> float:
+        return sum(
+            e.period_states[0].duty
+            for e in network.exchangers
+            if e.kind is kind
+            and (e.source_stream if kind is COOLER else e.sink_stream) == stream
+        )
+
+    return min(potential, duty(COOLER, move.hot), duty(HEATER, move.cold))
 
 
 def _hot_temperature(network, ends, stream: str, stage: int) -> float:
@@ -158,6 +251,36 @@ def new_splits(network: HeatExchangerNetwork, move: NewMatch) -> tuple[str, ...]
         for stream in (e.source_stream, e.sink_stream)
     }
     return tuple(stream for stream in (move.hot, move.cold) if stream in matched)
+
+
+def apply_relocation(
+    network: HeatExchangerNetwork, exchanger_id: str, move: NewMatch
+) -> HeatExchangerNetwork:
+    """``network`` with recovery exchanger ``exchanger_id`` moved to ``move``.
+
+    The exchanger leaves its match and position and is re-installed, with
+    its id and installed area, as the match ``move`` describes (inserting a
+    stage as ``apply_new_match`` does). Its old stage stays, even if empty.
+    """
+
+    (old,) = (e for e in network.exchangers if e.exchanger_id == exchanger_id)
+    remaining = network.model_copy(
+        update={
+            "exchangers": tuple(e for e in network.exchangers if e is not old),
+            "stage_count": stage_count(network),
+        }
+    )
+    moved = apply_new_match(remaining, move, exchanger_id)
+    return moved.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": old.area})
+                if e.exchanger_id == exchanger_id
+                else e
+                for e in moved.exchangers
+            )
+        }
+    )
 
 
 def apply_new_match(

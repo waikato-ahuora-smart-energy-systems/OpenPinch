@@ -9,6 +9,7 @@ import threading
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
+from functools import cached_property
 from typing import Any, Callable, Protocol, Sequence
 
 from ....contracts.synthesis.task import (
@@ -17,7 +18,7 @@ from ....contracts.synthesis.task import (
 )
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.progress import emit as emit_progress
-from ....optimisation.execution import _main_module_reruns_in_workers
+from ....optimisation.execution import _main_module_blocks_workers
 from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models._stagewise.evolution import reporting_improvements
@@ -43,13 +44,9 @@ _HEURISTIC_NETWORKS = 50
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
     """Create solver workers with the interpreter's default process context."""
-    if _main_module_reruns_in_workers():
-        logger.warning(
-            "Solving HEN tasks serially: the main script has no main guard, "
-            "so every worker process would rerun it. Put the script's entry "
-            'code under `if __name__ == "__main__":` to use worker processes.'
-        )
-        raise NotImplementedError("the main script has no main guard")
+    if reason := _main_module_blocks_workers():
+        logger.warning("Solving HEN tasks serially: %s", reason)
+        raise NotImplementedError(reason)
     return ProcessPoolExecutor(max_workers=max_workers)
 
 
@@ -104,22 +101,25 @@ class LocalSynthesisExecutor:
             self.stage_order.append(tasks[0].method)
             self._report_progress(tasks, 0)
 
+        shared = _ZoneCopiedOnce(problem)
         max_parallel = supported_workers(int(max_parallel))
         worker_count = max(1, min(max_parallel, len(tasks)))
-        if worker_count > 1 and _can_build_tasks_in_workers(tasks, parent_outcomes):
+        pool = self._start_pool(worker_count)
+        if pool is not None and _can_build_tasks_in_workers(tasks, parent_outcomes):
+            # Workers get the problem itself; each copies the zone once.
             solve_inputs = (
                 (
                     task,
                     problem,
                     self.print_output,
                     self.model_factories,
-                    _evolution_options(problem, task, max_parallel=1),
+                    _evolution_options(shared, task, max_parallel=1),
                 )
                 for task in tasks
             )
             solved_results = self._reported(
                 tasks,
-                self._map(_build_and_solve_root_task, solve_inputs, worker_count),
+                self._run(pool, _build_and_solve_root_task, solve_inputs),
                 0,
             )
             return self._collect_outcomes(tasks, solved_results, {})
@@ -134,13 +134,13 @@ class LocalSynthesisExecutor:
         failed: dict[str, HeatExchangerNetworkSynthesisTaskOutcome] = {}
         for task in tasks:
             try:
-                task_model_factories = self._model_factories_for_task(task, problem)
+                task_model_factories = self._model_factories_for_task(task, shared)
                 built.append(
                     (
                         task,
                         self._build_problem(
                             task,
-                            problem=problem,
+                            problem=shared,
                             parent_outcomes=parent_outcomes,
                         ),
                         task_model_factories,
@@ -157,45 +157,60 @@ class LocalSynthesisExecutor:
                     failed[task.task_id] = _failed_task_outcome(task, str(exc))
 
         worker_count = max(1, min(max_parallel, len(built)))
+        if pool is not None and worker_count == 1:
+            # At most one task built: close the unused pool and solve here.
+            with pool:
+                pass
+            pool = None
         branch_parallel = max(1, max_parallel) if worker_count == 1 else 1
+        # Serial tasks, including those of a pool that could not start, share
+        # the evolution topologies they solve. Tasks in worker processes do
+        # not: what they shared would depend on which tasks a worker ran.
+        solved_topologies: dict | None = {} if pool is None else None
         solve_inputs = (
             (
                 task,
                 internal_problem,
                 self.print_output,
                 task_model_factories,
-                _evolution_options(problem, task, max_parallel=branch_parallel),
+                _evolution_options(shared, task, max_parallel=branch_parallel)
+                | {"solved_topologies": solved_topologies},
             )
             for task, internal_problem, task_model_factories in built
         )
         # Tasks that failed to build count as done.
         done = len(tasks) - len(built)
         solved_results = self._reported(
-            tasks, self._map(_solve_built_task, solve_inputs, worker_count), done
+            tasks, self._run(pool, _solve_built_task, solve_inputs), done
         )
 
         return self._collect_outcomes(tasks, solved_results, failed)
 
-    def _map(self, func, inputs, worker_count: int):
-        """Yield ``func`` over ``inputs``, in a worker pool when one can start.
+    def _start_pool(self, worker_count: int):
+        """A pool of ``worker_count`` workers, or ``None`` to run serially."""
+        if worker_count <= 1:
+            return None
+        try:
+            return self.worker_pool_factory(worker_count)
+        except NotImplementedError as exc:
+            logger.debug("Solving HEN tasks serially: %s", exc)
+            return None
+
+    def _run(self, pool, func, inputs):
+        """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``.
 
         Workers hand the networks their searches admit to this process, which
         offers them to the run's records as they arrive.
         """
-        if worker_count > 1:
-            try:
-                pool = self.worker_pool_factory(worker_count)
-            except NotImplementedError as exc:
-                logger.debug("Solving HEN tasks serially: %s", exc)
-            else:
-                with self._handoff() as handoff, pool:
-                    yield from pool.map(
-                        _handed_off,
-                        ((func, handoff, worker_args) for worker_args in inputs),
-                    )
-                return
-        for worker_args in inputs:
-            yield func(worker_args)
+        if pool is None:
+            for worker_args in inputs:
+                yield func(worker_args)
+            return
+        with self._handoff() as handoff, pool:
+            yield from pool.map(
+                _handed_off,
+                ((func, handoff, worker_args) for worker_args in inputs),
+            )
 
     @contextmanager
     def _handoff(self):
@@ -495,12 +510,16 @@ def _solve_built_task(
             worker_args
         )
     is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
+    evolution_options = dict(evolution_options)
+    solved_topologies = evolution_options.pop("solved_topologies", None)
     try:
         solve_kwargs: dict[str, Any] = {
             "print_output": print_output,
             "evolution": is_evolution,
             "model_factories": model_factories,
         }
+        if is_evolution and solved_topologies is not None:
+            solve_kwargs["evolution_solved_topologies"] = solved_topologies
         if is_evolution and evolution_options != {
             "n_ad_branches": 1,
             "n_rm_branches": 1,
@@ -641,6 +660,38 @@ def _variant_key(task: HeatExchangerNetworkSynthesisTask) -> str:
     return "pdm_variant"
 
 
+class _ZoneCopiedOnce:
+    """A prepared problem whose ``master_zone`` is copied on first read only.
+
+    ``PinchProblem.master_zone`` deep-copies the whole zone tree on every
+    read, and building one stage's tasks reads it many times for settings
+    and solver arrays, none of which change it. Readers share this copy;
+    the pinch design decomposition makes its own before changing a zone.
+    Every other attribute, such as the validated input records the solver
+    arrays order streams by, is the problem's own.
+    """
+
+    def __init__(self, problem) -> None:
+        self._problem = problem
+
+    def __getattr__(self, name: str):
+        if name == "_problem":
+            raise AttributeError(name)
+        return getattr(self._problem, name)
+
+    @cached_property
+    def master_zone(self):
+        return self._problem.master_zone
+
+    @property
+    def results(self):
+        return self._problem.results
+
+    @property
+    def project_name(self) -> str:
+        return self._problem.project_name
+
+
 def _build_and_solve_root_task(
     worker_args: tuple[
         HeatExchangerNetworkSynthesisTask,
@@ -655,6 +706,7 @@ def _build_and_solve_root_task(
     InternalHeatExchangerNetworkProblem | None,
 ]:
     task, problem, print_output, model_factories, evolution_options = worker_args
+    problem = _ZoneCopiedOnce(problem)
     executor = LocalSynthesisExecutor(
         print_output=print_output,
         model_factories=model_factories,

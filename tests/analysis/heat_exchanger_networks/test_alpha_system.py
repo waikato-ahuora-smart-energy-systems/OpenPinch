@@ -75,14 +75,6 @@ def test_alpha_system_reads_each_flow_on_coefficient_once():
     assert _CountingStage.reads <= 4 * hot * cold * (stages - 1)
 
 
-def test_flow_on_terms_keep_only_nonzero_coefficients_in_order():
-    # Most matches on a large network are inactive; dropping their zero terms
-    # once per stream and stage keeps assembly from visiting them per partner.
-    terms = [(0, 0.0), (1, -0.25), (2, 0.0), (3, 0.5)]
-
-    assert base_alpha._nonzero_terms(iter(terms)) == [(1, -0.25), (3, 0.5)]
-
-
 def test_flow_fractions_read_each_solved_value_once(monkeypatch):
     # Flow fractions read the same solved temperatures and duties for every
     # cell they appear in; on the pulp mill that was seconds per design.
@@ -121,3 +113,18 @@ def test_flow_fractions_read_each_solved_value_once(monkeypatch):
     solved_values = (hot + cold) * (stages + 1) + 2 * hot * cold * stages
     assert len(reads) <= solved_values
     assert model.P_h[0][0][1] == pytest.approx((280.0 - 260.0) / (280.0 - 200.0))
+
+
+def test_flow_fractions_are_arrays_over_hot_cold_and_stage():
+    # Building the fractions and the flow-on system in nested Python lists,
+    # one coefficient at a time, took about 16 s of a pulp mill design;
+    # arrays let both be built as whole-grid operations.
+    model = _alpha_state([200.0, 150.0, 100.0], [180.0, 120.0, 50.0])
+
+    model.get_alpha_values()
+
+    for grid in (model.P_h, model.P_c, model.beta_h, model.beta_c):
+        assert isinstance(grid, np.ndarray)
+        assert grid.shape == (model.I, model.J, model.S)
+    assert model.z_j.shape == (model.I, model.S)
+    assert model.z_i.shape == (model.J, model.S)

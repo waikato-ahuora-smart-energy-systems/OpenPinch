@@ -47,6 +47,12 @@ Included Cases
    synthesis example used by notebook 06 (as a two-period case) and
    notebooks 15 through 17.
 
+``Five-stream-Ciric-and-Floudas-1989.json``
+   Five-stream heat exchanger network retrofit example after Ciric and
+   Floudas (1989), as tabulated by Hallberg and Scribner (2009), with the
+   report's utility prices and cost law; notebook 16 retrofits its existing
+   network.
+
 How To Copy Them
 ----------------
 
@@ -93,3 +99,5 @@ Choosing The Right Case
   workflow in notebook 11.
 - Use ``Four-stream-Yee-and-Grossmann-1990-1.json`` when you want the converted
   OpenHENS four-stream synthesis studies in notebooks 15 through 17.
+- Use ``Five-stream-Ciric-and-Floudas-1989.json`` for the heat exchanger
+  network retrofit workflow in notebook 16.

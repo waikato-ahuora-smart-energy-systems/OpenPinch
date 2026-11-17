@@ -77,7 +77,9 @@ def test_evolution_candidates_run_serially_without_threads(monkeypatch):
     monkeypatch.setattr(sys, "platform", "emscripten")
     monkeypatch.setattr(evolution, "ThreadPoolExecutor", NoThreads)
     monkeypatch.setattr(
-        evolution, "_solve_evolution_candidate", lambda owner, spec, print_output: spec
+        evolution,
+        "_solve_evolution_candidate",
+        lambda owner, spec, print_output, solved: spec,
     )
 
     candidates = evolution._solve_evolution_candidates(

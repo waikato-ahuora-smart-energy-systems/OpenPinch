@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -275,7 +275,8 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
         f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
     )
     monkeypatch.setattr(
-        f"{executor_module}._main_module_reruns_in_workers", lambda: True
+        f"{executor_module}._main_module_blocks_workers",
+        lambda: "the main script has no main guard",
     )
     # A platform with worker processes, so Pyodide reaches the pool too.
     monkeypatch.setattr(sys, "platform", "linux")
@@ -286,6 +287,31 @@ def test_local_executor_runs_serially_when_workers_would_rerun_main_script(
     assert [outcome.status for outcome in outcomes] == ["success", "success"]
     assert pool_starts == []
     assert "main guard" in caplog.text
+
+
+def test_local_executor_runs_serially_when_workers_cannot_import_main(
+    monkeypatch, caplog
+) -> None:
+    def forbidden_process_pool_executor(**kwargs):
+        raise AssertionError("must not start worker processes")
+
+    executor_module = "OpenPinch.analysis.heat_exchanger_networks.execution.executor"
+    monkeypatch.setattr(
+        f"{executor_module}.ProcessPoolExecutor", forbidden_process_pool_executor
+    )
+    # A script piped in with ``python - <<EOF``: spawned workers would try to
+    # run the main module from the path "<stdin>" and fail.
+    main = ModuleType("__main__")
+    main.__file__ = "<stdin>"
+    monkeypatch.setitem(sys.modules, "__main__", main)
+    monkeypatch.setattr("multiprocessing.get_start_method", lambda: "spawn")
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    with caplog.at_level("WARNING"):
+        outcomes = _two_prebuilt_successful_tasks(monkeypatch, _process_pool)
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+    assert "<stdin>" in caplog.text
 
 
 def test_user_couenne_options_are_written_to_model_run_directory(
@@ -1117,9 +1143,14 @@ def test_local_executor_preserves_parent_links_and_esm_only_evolution(
     evolution_flags = []
 
     def fake_get_solution(
-        self, *, print_output=True, evolution=None, model_factories=None
+        self,
+        *,
+        print_output=True,
+        evolution=None,
+        model_factories=None,
+        **evolution_options,
     ):
-        del print_output, model_factories
+        del print_output, model_factories, evolution_options
         evolution_flags.append((self.synthesis_task_id, evolution))
         if self.parent is not None:
             parent_links.append((self.synthesis_task_id, self.parent.synthesis_task_id))
@@ -1236,6 +1267,48 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
     assert [outcome.status for outcome in pdm_outcomes] == ["success", "success"]
     assert executor.executed_tasks == list(pdm_tasks)
     assert max_active_count == 2
+
+
+def test_local_executor_copies_the_master_zone_once_per_stage(monkeypatch) -> None:
+    # PinchProblem.master_zone deep-copies the whole zone tree on each read.
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    tasks = build_pinch_design_method_tasks(settings)[:2]
+    assert len(tasks) == 2
+    reads = []
+    copy_zone = PinchProblem.master_zone.fget
+    monkeypatch.setattr(
+        PinchProblem,
+        "master_zone",
+        property(lambda self: reads.append(None) or copy_zone(self)),
+    )
+
+    def solve(worker_args):
+        from OpenPinch.contracts.synthesis.task import (
+            HeatExchangerNetworkSynthesisTaskOutcome,
+        )
+
+        task = worker_args[0]
+        outcome = HeatExchangerNetworkSynthesisTaskOutcome(task=task, status="failed")
+        return task, outcome, None
+
+    monkeypatch.setattr(executor_module, "_solve_built_task", solve)
+
+    LocalSynthesisExecutor().execute(
+        tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert len(reads) == 1
+
+
+def test_shared_zone_problem_keeps_the_validated_input_records() -> None:
+    # Solver arrays keep the input order and supplied flow rates from these.
+    problem = _four_stream_problem()
+    expected = problem_to_solver_arrays(problem, 10.0).axis_maps
+    shared = executor_module._ZoneCopiedOnce(problem)
+
+    assert shared._validated_data is problem._validated_data
+    assert problem_to_solver_arrays(shared, 10.0).axis_maps == expected
 
 
 def test_local_executor_passes_user_solver_options_to_internal_problem() -> None:
@@ -3600,6 +3673,23 @@ def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() 
     assert amalgamated.TAC == 24.0
     assert amalgamated.solve_time == 5.0
     assert amalgamated.z_allowed[0][0] == [1, 1]
+
+
+@pytest.mark.synthesis
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy and pyomo")
+def test_the_amalgamated_network_holds_values_only() -> None:
+    # The amalgamated network is read, never solved: building its constraints
+    # and objective was about a quarter of a pulp mill design.
+    pyo = pytest.importorskip("pyomo.environ")
+    driver = _pdm_amalgamation_driver()
+
+    amalgamated = driver.amalgamate_networks(
+        above_case=_pdm_side_result(hot_utility_target=1.0),
+        below_case=_pdm_side_result(cold_utility_target=1.0),
+    )
+
+    assert amalgamated.values_only
+    assert list(amalgamated.m.model.component_data_objects(pyo.Constraint)) == []
 
 
 def test_a_nonlinear_highs_side_goes_to_scip_when_couenne_is_missing(monkeypatch):

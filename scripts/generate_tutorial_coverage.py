@@ -104,7 +104,6 @@ UNDER_DEVELOPMENT_METHODS = frozenset(
         "organic_rankine_cycle",
         "grand_composite_curve_with_orc",
         "net_load_profiles_with_orc",
-        "retrofit",
     }
 )
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"
@@ -125,6 +124,7 @@ DESIGN_TUTORIALS = {
     "thermal_derivative": 16,
     "network_evolution": 16,
     "optimise_duties": 16,
+    "retrofit": 16,
 }
 PLOT_TUTORIALS = {
     "catalog": 1,

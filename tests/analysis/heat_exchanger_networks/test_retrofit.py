@@ -25,7 +25,8 @@ from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from tests.support.paths import REPOSITORY_ROOT
 
 CASE_JSON = (
-    REPOSITORY_ROOT / "tests/fixtures/retrofit/Five-stream-Ciric-and-Floudas-1989.json"
+    REPOSITORY_ROOT
+    / "OpenPinch/tutorials/sample_cases/Five-stream-Ciric-and-Floudas-1989.json"
 )
 
 # Existing exchangers (Figure 1 and Table 2 of the report): E1 H3-C2 and
@@ -224,6 +225,24 @@ def test_retrofit_goal_lets_an_enlargeable_unit_grow_at_a_cost():
     )
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_goal_caps_added_area_at_a_fraction_of_the_installed_area():
+    structure, model = _retrofit_model(
+        _case_problem(),
+        _existing_network(),
+        area_tolerance=0.02,
+        enlargeable_recovery=frozenset({0}),
+        max_added_area_fraction=0.01,
+    )
+
+    assert model.mSuccess == 1
+    e1 = structure.results(model)[0]
+    # Uncapped, E1 grows by about 19 m2 (3%); a 1% cap binds.
+    assert e1.added_area == pytest.approx(0.01 * EXISTING_AREAS["E1"], rel=1e-4)
+
+
 # Report costs (pages 13-14): a new exchanger $34,600 plus $857/m2, added area
 # $8,650 per unit (existing shell) plus $857/m2, a split $10,000. The fixture
 # sets the area law ($857/m2, exponent 1), the new-unit cost and a 5-year life
@@ -303,6 +322,76 @@ def test_retrofit_search_needs_the_installed_area_of_every_existing_unit():
 @pytest.mark.synthesis
 @pytest.mark.solver
 @_needs_live_solver
+def test_retrofit_search_cleans_up_every_candidate_model(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
+        FixedStructureModel,
+    )
+
+    optimised, cleaned = [], []
+    optimise, cleanup = FixedStructureModel.optimise, FixedStructureModel.cleanup
+
+    def spy_optimise(self, print_output):
+        optimised.append(id(self))
+        return optimise(self, print_output)
+
+    def spy_cleanup(self):
+        cleaned.append(id(self))
+        return cleanup(self)
+
+    monkeypatch.setattr(FixedStructureModel, "optimise", spy_optimise)
+    monkeypatch.setattr(FixedStructureModel, "cleanup", spy_cleanup)
+
+    _case_problem().design.retrofit(
+        EXISTING_STRUCTURE, max_modifications=1, beam_width=2
+    )
+
+    # Couenne leaves a run directory per model until cleanup removes it.
+    assert optimised
+    assert sorted(cleaned) == sorted(optimised)
+
+
+def test_retrofit_search_needs_unique_exchanger_ids():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    network = _existing_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"exchanger_id": "E1"})
+                if e.exchanger_id == "E4"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="unique.*E1"):
+        run_retrofit_search(_case_problem(), network, RetrofitSettings())
+
+
+@pytest.mark.parametrize("fraction", [-0.1, float("nan"), float("inf")])
+def test_retrofit_search_rejects_a_cap_that_is_not_finite_and_non_negative(
+    fraction,
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    with pytest.raises(ValueError, match="max_added_area_fraction"):
+        run_retrofit_search(
+            _case_problem(),
+            _existing_network(),
+            RetrofitSettings(max_added_area_fraction=fraction),
+        )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
 def test_retrofit_search_rejects_an_existing_network_short_of_area():
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
         RetrofitSettings,
@@ -350,8 +439,9 @@ def test_the_frontier_marks_designs_no_better_than_fewer_modifications():
         run_retrofit_search,
     )
 
-    # Costly added area: one modification loses money against the existing
-    # network, and a fourth adds less than it costs.
+    # Costly added area and new units: every modification loses money
+    # against the existing network. (Costly added area alone no longer does:
+    # the screen, ranked by utility relief, finds new matches that pay.)
     result = run_retrofit_search(
         _case_problem(),
         _existing_network(),
@@ -359,7 +449,7 @@ def test_the_frontier_marks_designs_no_better_than_fewer_modifications():
             max_modifications=4,
             beam_width=2,
             new_match_candidates=4,
-            **(REPORT_COSTS | {"area_addition_cost": 2e6}),
+            **(REPORT_COSTS | {"area_addition_cost": 2e6, "new_unit_cost": 2e6}),
         ),
     )
 
@@ -535,3 +625,147 @@ def test_design_retrofit_takes_the_existing_network_as_a_mapping():
     else:
         assert modification.exchanger_id in EXISTING_AREAS
         assert modification.fixed_cost == pytest.approx(8_650.0)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_batch_design_retrofit_runs_on_every_selected_case():
+    from OpenPinch import PinchWorkspace
+
+    workspace = PinchWorkspace(source=json.loads(CASE_JSON.read_text("utf-8")))
+    workspace.scenario("scenario", activate=False)
+
+    batch = workspace.cases().design.retrofit(
+        existing=EXISTING_STRUCTURE, max_modifications=1, beam_width=2
+    )
+
+    assert dict(batch.errors) == {}
+    assert len(batch.results) == 2
+    for result in batch.results.values():
+        assert result.frontier[0].hot_utility == pytest.approx(
+            REPORTED_HOT_UTILITY, rel=0.02
+        )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_caps_added_area_like_the_report():
+    # The report allows at most 20% more area on an existing exchanger. New
+    # units are priced out so the frontier is made of area additions.
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=2,
+        max_added_area_fraction=0.2,
+        **(REPORT_COSTS | {"new_unit_cost": 1e9}),
+    )
+
+    additions = [
+        modification
+        for design in result.frontier
+        for modification in design.modifications
+        if modification.kind == "area_addition"
+    ]
+    assert additions
+    for modification in additions:
+        installed = EXISTING_AREAS[modification.exchanger_id]
+        assert modification.added_area <= 0.2 * installed * (1 + 1e-6)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_relocates_an_existing_exchanger_when_cheapest():
+    # New units and added area priced out: a relocation is the best step.
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=1,
+        new_unit_cost=1e9,
+        area_addition_cost=1e9,
+        split_cost=1_000.0,
+        relocation_cost=5_000.0,
+        # Repiping E4 into stage 1, the one relocation that pays here, ranks
+        # about 24th: most moves strand a stream whose utility is at its area.
+        relocation_candidates=30,
+    )
+
+    (modification,) = result.frontier[1].modifications
+    assert modification.kind == "relocation"
+    assert modification.exchanger_id in EXISTING_AREAS
+    assert modification.added_area == 0.0
+    assert modification.area_cost == 0.0
+    assert modification.fixed_cost == pytest.approx(
+        5_000.0 + 1_000.0 * len(modification.new_splits)
+    )
+    moved = next(
+        e
+        for e in result.frontier[1].network.exchangers
+        if e.exchanger_id == modification.exchanger_id
+    )
+    # It keeps its installed area at its new match.
+    assert moved.area == pytest.approx(EXISTING_AREAS[modification.exchanger_id])
+    # The design's network carries the solver's zone-qualified stream names.
+    assert moved.source_stream.endswith(modification.hot_stream)
+    assert moved.sink_stream.endswith(modification.cold_stream)
+    assert result.frontier[1].annual_savings > 0.0
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_design_retrofit_pairs_a_move_with_the_new_utility_it_needs():
+    def first_step(new_utility_units):
+        result = _case_problem().design.retrofit(
+            EXISTING_STRUCTURE,
+            max_modifications=1,
+            new_match_candidates=24,
+            new_utility_units=new_utility_units,
+            **REPORT_COSTS,
+        )
+        return result.frontier[1]
+
+    alone, paired = first_step(False), first_step(True)
+
+    # A new cooler on H3 frees its recovery units: H1-C2 in a new third stage
+    # then saves about $836k/y against $222k/y without the cooler.
+    (modification,) = paired.modifications
+    assert modification.kind == "new_match"
+    assert modification.utility_exchanger_id is not None
+    assert modification.utility_area > 0.0
+    # Two new units (the match and the utility exchanger) and any splits.
+    assert modification.fixed_cost == pytest.approx(
+        2 * REPORT_COSTS["new_unit_cost"]
+        + REPORT_COSTS["split_cost"] * len(modification.new_splits)
+    )
+    assert modification.area_cost == pytest.approx(
+        857.0 * (modification.added_area + modification.utility_area)
+    )
+    assert paired.net_annual_benefit > alone.net_annual_benefit
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_search_drops_designs_that_fail_solution_verification(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    def reject_new_units(structure, model, network):
+        return tuple(
+            f"{e.exchanger_id} rejected"
+            for e in network.exchangers
+            if e.exchanger_id.startswith("new:")
+        )
+
+    monkeypatch.setattr(search, "verify_solution", reject_new_units)
+
+    result = search.run_retrofit_search(
+        _case_problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=2, **REPORT_COSTS),
+    )
+
+    assert len(result.frontier) > 1
+    assert all(
+        m.kind == "area_addition" for d in result.frontier for m in d.modifications
+    )

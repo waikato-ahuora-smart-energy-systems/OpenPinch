@@ -40,9 +40,16 @@ class PyomoModel:
     ``_path`` is a run directory, created only to hold a solver option file.
     """
 
-    def __init__(self) -> None:
+    # The Pyomo module, looked up when a model is made. It lives on the
+    # class, not the instance, so a model still pickles into a worker.
+    _pyo: Any = None
+
+    def __init__(self, *, constraints: bool = True) -> None:
         self._path: str | None = None
-        pyo = _pyomo()
+        # Without constraints the model only holds values: Equation and the
+        # objective are not added, so it can never be solved.
+        self.adds_constraints = constraints
+        pyo = PyomoModel._pyo = _pyomo()
         self.model = pyo.ConcreteModel()
         self.model.variables = pyo.VarList()
         self._parameter_blocks: list[Any] = []
@@ -60,9 +67,11 @@ class PyomoModel:
         integer: bool = False,
         name: str | None = None,
     ) -> Any:
-        pyo = _pyomo()
         variable = self.model.variables.add()
-        variable.domain = pyo.Integers if integer else pyo.Reals
+        # A VarList entry is real already; setting the domain costs a set
+        # lookup, so it is set only for integers.
+        if integer:
+            variable.domain = self._pyo.Integers
         variable.setlb(lb)
         variable.setub(ub)
         variable.set_value(value, skip_validation=True)
@@ -71,14 +80,15 @@ class PyomoModel:
     def Param(self, value: float = 0.0, name: str | None = None) -> Any:
         if self._parameters_left == 0:
             self._add_parameter_block()
-        block = self._parameter_blocks[-1]
-        parameter = block[len(block) - self._parameters_left]
+        parameter = self._free_parameters[-self._parameters_left]
         self._parameters_left -= 1
-        parameter.fix(value)
+        # The block is fixed already; a parameter is a real number with no
+        # bounds, so Pyomo's domain and bound check has nothing to find.
+        parameter.set_value(value, skip_validation=True)
         return parameter
 
     def _add_parameter_block(self) -> None:
-        pyo = _pyomo()
+        pyo = self._pyo
         size = min(
             _LARGEST_PARAMETER_BLOCK,
             max(
@@ -88,10 +98,14 @@ class PyomoModel:
         )
         block = pyo.Var(range(size), dense=True)
         self.model.add_component(f"parameters_{len(self._parameter_blocks)}", block)
+        block.fix()
         self._parameter_blocks.append(block)
+        self._free_parameters = list(block.values())
         self._parameters_left = size
 
     def Equation(self, expression: Any) -> Any:
+        if not self.adds_constraints:
+            return None
         return self.model.constraints.add(expression)
 
     def Equations(self, expressions: Iterable[Any]) -> list[Any]:
@@ -101,13 +115,13 @@ class PyomoModel:
         return expression
 
     def sum(self, values: Iterable[Any]) -> Any:
-        return _pyomo().quicksum(values)
+        return self._pyo.quicksum(values)
 
     def Minimize(self, expression: Any) -> None:
-        self._set_objective(expression, sense=_pyomo().minimize)
+        self._set_objective(expression, sense=self._pyo.minimize)
 
     def Maximize(self, expression: Any) -> None:
-        self._set_objective(expression, sense=_pyomo().maximize)
+        self._set_objective(expression, sense=self._pyo.maximize)
 
     def is_linear(self) -> bool:
         """True when every active constraint and the objective is linear.
@@ -132,10 +146,12 @@ class PyomoModel:
         )
 
     def _set_objective(self, expression: Any, *, sense: Any) -> None:
+        if not self.adds_constraints:
+            return
         if self.objective is not None:
             raise ValueError(
                 "A Pyomo HEN model has exactly one objective; combine the "
                 "terms into one expression instead of adding another."
             )
-        self.objective = _pyomo().Objective(expr=expression, sense=sense)
+        self.objective = self._pyo.Objective(expr=expression, sense=sense)
         self.model.objective = self.objective

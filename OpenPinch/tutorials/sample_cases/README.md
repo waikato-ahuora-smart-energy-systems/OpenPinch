@@ -9,6 +9,7 @@ JSON input files for example problems, shipped inside the wheel. The `__init__.p
   - `pulp_mill.json`: keys `plant_profile_data`, `streams`, `utilities`, `options`.
   - `process_mvr.json`: keys `streams`, `utilities`, `zone_tree`.
   - `Four-stream-Yee-and-Grossmann-1990-1.json`: keys `options`, `streams`, `utilities`, `zone_tree`.
+  - `Five-stream-Ciric-and-Floudas-1989.json`: keys `options`, `streams`, `utilities`, `zone_tree`.
 - Loaders (outside this directory): `list_sample_cases`, `read_sample_case`, `copy_sample_case`, `sample_case_metadata` in `OpenPinch/resources.py`.
 - Subdirectories: none.
 
