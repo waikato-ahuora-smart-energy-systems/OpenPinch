@@ -4,6 +4,15 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Faster ``design.heat_exchanger_network`` with an overdesign margin or on
+  a ``"median"`` or ``"period"`` design basis: a network the search offers
+  again from another task is fitted and rated once, not each time. On the
+  four-stream Yee and Grossmann case at 10% overdesign this rates 23
+  networks rather than 60.
+
 0.9.2 (2026-11-17)
 ------------------
 
