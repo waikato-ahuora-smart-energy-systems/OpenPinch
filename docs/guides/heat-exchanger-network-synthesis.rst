@@ -617,9 +617,9 @@ Relocation
    ``relocation_cost`` (default ``None``: no relocations) is the fixed cost
    of moving an existing recovery exchanger, plus ``split_cost`` per stream
    the move splits; the moved exchanger keeps its installed area at no area
-   cost. The default search ranks every possible move by its ceiling, where
-   relocations and new matches each get ``new_match_candidates`` full
-   solves. A simple score, the heat the new position could recover less the
+   cost. The default search ranks up to ``ceiling_relocations`` (default
+   400) moves per design by their ceiling, where relocations and new
+   matches each get ``new_match_candidates`` full solves. A simple score, the heat the new position could recover less the
    duty the exchanger gives up, barely tracks the ceiling: on Akpomiemie and
    Smith's case the paper's resequencing of exchanger 7 has the best ceiling
    of 395 moves but scores 127th. Ranking them all, the search finds that
@@ -627,7 +627,11 @@ Relocation
    when only the 100 best-scored moves were ranked), at a cost: about 2,700
    solves instead of 889. ``HENS_MAX_PARALLEL`` (in ``options``) runs each
    step's solves, ceilings and sizing, on that many threads with the same
-   result: with 8 the search took 37 s instead of 89 s serially. The
+   result: with 8 the search took 37 s instead of 89 s serially. A large
+   network offers far more moves: the 72-exchanger pulp mill offers 14,617
+   from its existing network, so the cap, applied in score order, bounds
+   the ranking; there three structural changes with relocation take 2,585
+   solves and 164 s on 8 threads. The
    stepwise search tries the
    ``relocation_candidates`` (default 8) best-scored moves, and only those
    that gain more than they give up. On the Ciric and Floudas case

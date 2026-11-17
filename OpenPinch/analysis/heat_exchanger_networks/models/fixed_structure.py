@@ -1325,6 +1325,7 @@ def _retrofit_areas(owner) -> None:
     widen = 1.0 + float(owner.spec.area_tolerance)
     fraction = owner.spec.max_added_area_fraction
     owner.area_caps = {}
+    owner.rating_terms = {}
     if hasattr(owner.m, "import_duals"):
         owner.m.import_duals()
 
@@ -1351,6 +1352,11 @@ def _retrofit_areas(owner) -> None:
             points.get(index, {}),
             *terms,
         )
+        # Per period, the cap's factor per m2 (design calibration times U)
+        # and end approaches, to compare with verification's sizing.
+        owner.rating_terms[(side, index)] = [
+            (factor, thetas) for _constraint, factor, thetas in caps
+        ]
         # The value of installed area counts its widening and enhancement.
         owner.area_caps[(side, index)] = [
             (constraint, factor * widen * enhancement, thetas)
@@ -1736,6 +1742,7 @@ def post_process_fixed_structure(owner) -> None:
     )
     if owner.minimisation_goal == "retrofit":
         owner.area_values = _area_values(owner)
+        owner.rating_allowances = _rating_allowances(owner)
         owner.retrofit_capital_value = float(
             sum(
                 _added_area_costs(
@@ -1767,6 +1774,33 @@ def _area_values(owner) -> dict[tuple[str, int], float] | None:
             total += abs(dual) * float(factor) * chen_lmtd(theta_1, theta_2)
         values[key] = total
     return values
+
+
+def _rating_allowances(owner) -> dict[tuple[str, int], float]:
+    """How much more area verification needs than the model's cap for each
+    installed unit, keyed ``(side, index)``: the largest, over its active
+    periods, of the required area verification sizes (exact LMTD, or summed
+    slice areas) over the area the cap needs at that duty (duty over the
+    cap's factor and Chen LMTD), at least 1. Off its design point the cap's
+    calibration and Chen's LMTD let an installed area carry more duty than
+    exact sizing allows."""
+
+    allowances = {}
+    for (side, index), terms in owner.rating_terms.items():
+        results = (
+            owner.recovery_results if side == "recovery" else owner.utility_results
+        )
+        worst = 1.0
+        for (factor, _thetas), period in zip(
+            terms, results[index].periods, strict=True
+        ):
+            if not period.active or period.duty <= 0.0:
+                continue
+            theta_1, theta_2 = (max(float(t), 1e-6) for t in period.approach)
+            capped = period.duty / (float(factor) * chen_lmtd(theta_1, theta_2))
+            worst = max(worst, period.required_area / capped)
+        allowances[(side, index)] = worst
+    return allowances
 
 
 def _reported_area(

@@ -77,8 +77,9 @@ class RetrofitSettings:
     match splits) add to the area cost (the ``COSTING_HX_AREA_*`` law on the
     added area). ``relocation_cost`` ($ per existing recovery exchanger moved
     to another match or position, plus ``split_cost`` per new split) enables
-    relocation moves (all ranked by ceiling in the structure search, the
-    ``relocation_candidates`` best scored in the stepwise one);
+    relocation moves (in the structure search up to
+    ``ceiling_relocations`` per design, the best scored first, ranked by
+    ceiling; in the stepwise one the ``relocation_candidates`` best scored);
     ``None`` leaves them out. ``new_utility_units`` also tries each new match
     and relocation with each new end heater or cooler the network lacks, in
     the same step, priced as one more new unit. ``enhancement_factors``
@@ -114,6 +115,7 @@ class RetrofitSettings:
     new_utility_units: bool = False
     strategy: str = "structure"
     ceiling_candidates: int = 12
+    ceiling_relocations: int = 400
     enhancement_factors: Mapping[str, float] | None = None
     enhancement_cost: float = 0.0
     enhancement_area_cost: float = 0.0
@@ -374,8 +376,10 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
     A move scores the match's potential less the unit's present duty, the
     heat it gives up, best first. The stepwise search keeps the
     ``relocation_candidates`` best positive scores; the structure search
-    keeps every move, as the ceiling ranking judges a move by what its whole
-    structure can reach and the score barely tracks that. A unit that is the
+    keeps up to ``ceiling_relocations`` moves whatever their score, as the
+    ceiling ranking judges a move by what its whole structure can reach and
+    the score barely tracks that; the cap bounds the ranking on large
+    networks. A unit that is the
     only exchanger on one of its streams stays on that stream.
     """
 
@@ -410,7 +414,8 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
                     scored.append((score, unit, match))
     scored.sort(key=lambda item: -item[0])
     if settings.strategy == "structure":
-        return [(unit, match) for _score, unit, match in scored]
+        cap = max(0, int(settings.ceiling_relocations))
+        return [(unit, match) for _score, unit, match in scored[:cap]]
     limit = max(0, int(settings.relocation_candidates))
     return [(unit, match) for _score, unit, match in scored[:limit]]
 
@@ -564,16 +569,24 @@ class _Evaluator:
                 enhanced_utilities=enhanced["utility"],
             ),
         )
-        model = FixedStructureModel(
-            name="retrofit",
-            solver=self.solver,
-            solver_arrays=self.arrays,
-            spec=structure.spec,
-            minimisation_goal="retrofit",
-            default_approach=settings.approach,
-            tol=self.tol,
-            solver_options=dict(self.solver_options),
-        )
+        # A move can leave a structure the model cannot build (streams
+        # with no utility exchanger whose loads cannot balance): drop it.
+        # The existing network's own error is the user's to see.
+        try:
+            model = FixedStructureModel(
+                name="retrofit",
+                solver=self.solver,
+                solver_arrays=self.arrays,
+                spec=structure.spec,
+                minimisation_goal="retrofit",
+                default_approach=settings.approach,
+                tol=self.tol,
+                solver_options=dict(self.solver_options),
+            )
+        except ValueError:
+            if not state.moves:
+                raise
+            return None
         # Read the solved values, then remove the model's run directory
         # (Couenne writes one per model) whether or not it is kept.
         try:
@@ -584,7 +597,14 @@ class _Evaluator:
             # The solver accepts loosely converged points: drop a design whose
             # approaches, heat balances or areas fail the duty optimiser's
             # checks, judging installed areas as the model did (widened).
-            if verify_solution(structure, model, self._widened(solved, state.enhanced)):
+            reported = getattr(model, "rating_allowances", None) or {}
+            allowances = {
+                exchanger_id: reported.get(slot, 1.0)
+                for slot, exchanger_id in zip(structure.slots, ids)
+            }
+            if verify_solution(
+                structure, model, self._widened(solved, state.enhanced, allowances)
+            ):
                 return None
             results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
@@ -706,16 +726,20 @@ class _Evaluator:
             min_approach_temperature=self.settings.approach,
         )
         structure = fixed_network_structure(request, self.arrays.axis_maps)
-        model = FixedStructureModel(
-            name="retrofit-ceiling",
-            solver=self.solver,
-            solver_arrays=self.arrays,
-            spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
-            minimisation_goal="utility cost",
-            default_approach=self.settings.approach,
-            tol=self.tol,
-            solver_options=dict(self.solver_options),
-        )
+        try:
+            model = FixedStructureModel(
+                name="retrofit-ceiling",
+                solver=self.solver,
+                solver_arrays=self.arrays,
+                spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
+                minimisation_goal="utility cost",
+                default_approach=self.settings.approach,
+                tol=self.tol,
+                solver_options=dict(self.solver_options),
+            )
+        except ValueError:
+            # A structure the model cannot build has no ceiling (see evaluate).
+            return None
         try:
             model.optimise(print_output=False)
             if getattr(model, "mSuccess", 0) != 1:
@@ -813,18 +837,25 @@ class _Evaluator:
         return sized if sized is not None else self.evaluate(state)
 
     def _widened(
-        self, network: HeatExchangerNetwork, enhanced: frozenset[str] = frozenset()
+        self,
+        network: HeatExchangerNetwork,
+        enhanced: frozenset[str] = frozenset(),
+        allowances: Mapping[str, float] | None = None,
     ) -> HeatExchangerNetwork:
         """``network`` with each existing unit's installed area widened by
-        ``area_tolerance``, and an ``enhanced`` unit's area times its
-        enhancement factor (verification sizes at the base coefficient), as
-        the model rates them."""
+        ``area_tolerance`` and by the model's rating allowance for it
+        (``allowances``: how much more area exact or slice sizing needs than
+        the model's calibrated Chen cap), and an ``enhanced`` unit's area
+        times its enhancement factor (verification sizes at the base
+        coefficient), as the model rates them."""
 
         tolerance = float(self.settings.area_tolerance)
         factors = self.settings.enhancement_factors or {}
 
         def rated(e):
-            area = e.area + tolerance * self.installed[e.exchanger_id]
+            area = (e.area + tolerance * self.installed[e.exchanger_id]) * (
+                (allowances or {}).get(e.exchanger_id, 1.0)
+            )
             if e.exchanger_id in enhanced:
                 area *= float(factors[e.exchanger_id])
             return e.model_copy(update={"area": area})

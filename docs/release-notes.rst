@@ -22,6 +22,13 @@ Heat exchanger network synthesis
   rounded profile. Verification now accepts a segmented exchanger with
   more area than its duty needs, as it already did for single-segment
   exchangers, so an existing network with segmented streams can be rated.
+- Fixed: ``design.retrofit`` no longer stops when a move leaves a structure
+  the model cannot build (streams with no utility exchanger whose loads
+  cannot balance); the move is dropped. Verification now allows an
+  installed exchanger the extra duty the model rates it for off its design
+  point, so a multi-period network OpenPinch designed rates again. The
+  default search ranks at most ``ceiling_relocations`` (default 400)
+  relocations per design; the 72-exchanger pulp mill offers 14,617.
 - New ``HeatExchangerNetworkRecord``
   (``OpenPinch.analysis.heat_exchanger_networks.results.record``), passed as
   ``design.heat_exchanger_network(record=...)``: a thread-safe record that

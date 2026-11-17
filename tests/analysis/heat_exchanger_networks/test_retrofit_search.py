@@ -69,6 +69,8 @@ class _Backend:
         self.solved = 0
         self.goals: dict[str, set[str]] = {}
         self.area_values = lambda spec: None
+        self.unbuildable = lambda spec: False
+        self.rating_allowances = lambda spec: None
 
 
 @pytest.fixture
@@ -86,6 +88,8 @@ def fake_solver(monkeypatch) -> _Backend:
 
     class FakeModel:
         def __init__(self, *, spec, name, minimisation_goal, **_settings) -> None:
+            if backend.unbuildable(spec):
+                raise ValueError("streams H1 have no heater or cooler")
             self.spec = spec
             backend.goals.setdefault(name, set()).add(minimisation_goal)
 
@@ -100,6 +104,7 @@ def fake_solver(monkeypatch) -> _Backend:
                 - 20_000.0 * (enlarged + enhanced)
             )
             self.area_values = backend.area_values(spec)
+            self.rating_allowances = backend.rating_allowances(spec)
             self.mSuccess = 0 if backend.fail(spec) else 1
 
         def cleanup(self) -> None:
@@ -899,3 +904,83 @@ def test_an_insert_is_rejected_once_a_relocation_takes_its_stream_away():
 
     assert search._within_pressure_drop({"E4"}, settings, network)
     assert not search._within_pressure_drop({"E4"}, settings, moved)
+
+
+@pytest.mark.parametrize("strategy", ["structure", "stepwise"])
+def test_a_structure_the_model_cannot_build_is_dropped(fake_solver, strategy):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # A move can leave streams with no utility exchanger whose loads cannot
+    # balance; the model refuses to build it. The search drops the move.
+    fake_solver.unbuildable = lambda spec: len(spec.recovery) > 4
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1, strategy=strategy, relocation_cost=5_000.0, **COSTS
+        ),
+    )
+
+    assert not any(
+        m.kind == "new_match" for d in result.frontier for m in d.modifications
+    )
+
+
+def test_ceiling_relocations_caps_the_relocations_ranked_per_design(
+    fake_solver, monkeypatch
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # A large network can offer thousands of relocations (14,617 on the
+    # pulp mill); the structure search ranks at most ceiling_relocations
+    # of them per design, the best pre-scored first.
+    ranked = []
+    ceiling = search._Evaluator.ceiling
+
+    def spy(self, state):
+        ranked.append(state.moves[-1].kind)
+        return ceiling(self, state)
+
+    monkeypatch.setattr(search._Evaluator, "ceiling", spy)
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=1,
+            relocation_cost=5_000.0,
+            ceiling_relocations=2,
+            **COSTS,
+        ),
+    )
+
+    assert ranked.count("relocation") == 2
+
+
+def test_verification_uses_the_models_rating_allowance_for_installed_units(
+    fake_solver,
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # The model reports how much more area verification needs than its cap
+    # for each installed unit (its design calibration and Chen's LMTD);
+    # verification widens the unit by it, so the two judge alike.
+    fake_solver.rating_allowances = lambda spec: {
+        **{("recovery", r): 1.1 for r in spec.recovery_areas},
+        **{("utility", e): 1.1 for e in spec.utility_areas},
+    }
+    verified = []
+
+    def record(network):
+        verified.append({e.exchanger_id: e.area for e in network.exchangers})
+        return ()
+
+    fake_solver.reject = record
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=0, area_tolerance=0.02, **COSTS),
+    )
+
+    assert verified[0]["E3"] == pytest.approx(1008.5 * 1.02 * 1.1)
+    assert verified[0]["E7"] == pytest.approx(246.75 * 1.02 * 1.1)

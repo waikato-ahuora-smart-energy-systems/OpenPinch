@@ -1051,6 +1051,7 @@ class _DesignAccessor:
         new_utility_units: bool = False,
         strategy: str = "structure",
         ceiling_candidates: int = 12,
+        ceiling_relocations: int = 400,
         enhancement_factors: Mapping[str, float] | None = None,
         enhancement_cost: float = 0.0,
         enhancement_area_cost: float = 0.0,
@@ -1093,8 +1094,9 @@ class _DesignAccessor:
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
         split) a step may also move an existing recovery exchanger, with its
         installed area, to a screened match that shares one of its streams
-        (None, the default: no relocations). The default search ranks every
-        such move by its ceiling; the stepwise search tries the
+        (None, the default: no relocations). The default search ranks up to
+        ``ceiling_relocations`` such moves per design (default 400, the best
+        scored first) by their ceiling; the stepwise search tries the
         ``relocation_candidates`` with the most heat potential at the match
         less the unit's present duty. With ``new_utility_units`` each new match and
         relocation is also tried together with a new end heater or cooler on
@@ -1182,6 +1184,7 @@ class _DesignAccessor:
                     new_utility_units=new_utility_units,
                     strategy=strategy,
                     ceiling_candidates=ceiling_candidates,
+                    ceiling_relocations=ceiling_relocations,
                     enhancement_factors=(
                         None
                         if enhancement_factors is None
