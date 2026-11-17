@@ -8,6 +8,7 @@ solve is dropped, not raised.
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -276,7 +277,10 @@ def test_proposals_realising_the_same_side_network_are_paired_once():
     report = problem.heuristic_report
     assert report["repeated_sides"]["below"] >= 1
     assert report["pairs"] == report["realised"]["above"] * report["realised"]["below"]
-    assert report["repeated"] <= 1
+    # Was at most 1. A side network is now paired once with an empty stage
+    # and once without, as only the first is re-solved at stage reduction;
+    # here both give the same four networks, at 8 pairings against 5.
+    assert report["repeated"] <= 4
     networks = _networks(problem)
     assert len({network_structure_signature(n) for n in networks}) == len(networks)
 
@@ -313,3 +317,54 @@ def test_a_repeated_side_stands_in_when_its_first_pairing_fails(monkeypatch):
 
     assert problem.heuristic_report["repeated_sides"]["below"] >= 1
     assert problem.heuristic_report["networks"] >= 1
+
+
+def _solved_side(recovery_by_stage: list[float]):
+    """A two-by-two solved side with one match, hot 1 to cold 0, by stage."""
+
+    stages = len(recovery_by_stage)
+    return SimpleNamespace(
+        S=stages,
+        I=2,
+        J=2,
+        tol=1e-6,
+        Q_r=[
+            [[0.0] * stages, [0.0] * stages],
+            [list(recovery_by_stage), [0.0] * stages],
+        ],
+        Q_h=[[0.0], [0.0]],
+        Q_c=[[216.0], [264.0]],
+    )
+
+
+def test_a_side_with_an_empty_stage_is_not_a_repeat_of_one_without():
+    # Only a pairing with an empty stage is re-solved at stage reduction,
+    # which can rebalance the other side's duties into another network.
+    assert _side_topology(_solved_side([2200.0])) != _side_topology(
+        _solved_side([2200.0, 0.0])
+    )
+
+
+def test_where_a_side_leaves_its_empty_stage_does_not_matter():
+    # Stage reduction drops empty stages wherever they are.
+    assert _side_topology(_solved_side([0.0, 2200.0])) == _side_topology(
+        _solved_side([2200.0, 0.0])
+    )
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_a_side_whose_pairing_is_re_solved_gives_its_own_network():
+    # Escobar's two below-pinch proposals solve to one side network, but the
+    # two-stage one leaves a stage empty: its pairing is re-solved at stage
+    # reduction, which needs no heater on the first cold stream. Dropping it
+    # as a repeat lost the parent of the best evolved network.
+    pinch = _fixture("Four-stream-Escobar-and-Trierweiler-2013")
+    problem = _problem(pinch, 12.0, limit=50)
+
+    problem.get_solution(print_output=False)
+
+    heaters = sorted(
+        sum(e.kind is HeatExchangerKind.HOT_UTILITY for e in network.exchangers)
+        for network in _networks(problem)
+    )
+    assert heaters == [1, 2]

@@ -565,3 +565,25 @@ def test_evolution_can_add_a_utility_the_parent_did_not_use():
 
     assert design.selected_network.total_annual_cost < 8.5e6
     assert verify_network_feasibility(design.selected_network) == ()
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_highs_available() and _ipopt_available())", reason="needs HiGHS and Ipopt"
+)
+def test_default_synthesis_finds_escobars_cheapest_network():
+    # Dropping a heuristic side as a repeat lost the parent of this network:
+    # evolution from the network left gave 358,065, 1.6 % dearer.
+    payload = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "tests/fixtures/openhens/Four-stream-Escobar-and-Trierweiler-2013-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    payload["options"] |= {"HENS_OUTPUT_FORMATS": [], "HENS_MAX_PARALLEL": 1}
+    problem = PinchProblem(source=payload, project_name="escobar")
+
+    design = problem.design.heat_exchanger_network()
+
+    assert design.selected_network.total_annual_cost == pytest.approx(352_267, rel=1e-4)
+    assert verify_network_feasibility(design.selected_network) == ()

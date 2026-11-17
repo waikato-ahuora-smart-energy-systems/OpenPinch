@@ -1031,7 +1031,13 @@ def _peak_recovery_duties(case) -> list:
 
 def _side_topology(side) -> tuple:
     """A solved side's network: its recovery matches, numbered over the
-    stages that carry recovery, and the heaters and coolers it uses."""
+    stages that carry recovery, the heaters and coolers it uses, and
+    whether it leaves a stage empty.
+
+    Stage reduction re-solves only a pairing with an empty stage, which can
+    rebalance duties into another network, so a side with an empty stage
+    does not repeat one without.
+    """
 
     peak = _peak_recovery_duties(side)
     used = [
@@ -1052,6 +1058,7 @@ def _side_topology(side) -> tuple:
         matches,
         tuple(map(tuple, heaters)),
         tuple(map(tuple, coolers)),
+        len(used) < side.S,
     )
 
 
