@@ -23,8 +23,8 @@ pytestmark = pytest.mark.synthesis
 def test_var_has_its_bounds_start_value_and_domain():
     model = PyomoModel()
 
-    duty = model.Var(value=2.0, lb=0.0, ub=10.0, name="Q")
-    binary = model.Var(value=1, lb=0, ub=1, integer=True, name="z")
+    duty = model.Var(value=2.0, lb=0.0, ub=10.0)
+    binary = model.Var(value=1, lb=0, ub=1, integer=True)
 
     assert duty.value == pytest.approx(2.0)
     assert (duty.lb, duty.ub) == (0.0, 10.0)
@@ -36,7 +36,7 @@ def test_var_has_its_bounds_start_value_and_domain():
 def test_param_is_a_fixed_value_that_can_be_changed():
     model = PyomoModel()
 
-    selector = model.Param(value=1.0, name="active")
+    selector = model.Param(value=1.0)
     selector.fix(0.0)
 
     assert selector.fixed
@@ -672,3 +672,38 @@ def test_ipopt_returns_the_dual_of_a_binding_constraint():
     # Raising the bound by 1 raises the cost by 1 (x carries it).
     assert abs(model.dual(binding)) == pytest.approx(1.0, abs=1e-6)
     assert model.dual(slack) == pytest.approx(0.0, abs=1e-6)
+
+
+@pytest.mark.parametrize("builder", ["Var", "Param", "Intermediate"])
+def test_model_components_take_no_name(builder):
+    # Names were never stored, yet building their strings cost about 4 s of
+    # CPU per pulp mill design.
+    model = PyomoModel()
+    arguments = {"Intermediate": (1.0,)}.get(builder, ())
+
+    with pytest.raises(TypeError, match="name"):
+        getattr(model, builder)(*arguments, name="unused")
+
+
+def test_variables_come_from_preallocated_blocks_and_unused_entries_stay_out(
+    tmp_path,
+):
+    # Adding to a VarList one variable at a time cost about 1.2 us more per
+    # variable than handing out entries of a block, several seconds over a
+    # pulp mill design's 3 million variables.
+    model = PyomoModel()
+    variables = [model.Var(value=float(index), lb=0.0, ub=5.0) for index in range(3)]
+    binary = model.Var(value=1, lb=0, ub=1, integer=True)
+    model.Equation(variables[2] + binary >= 1)
+    model.Minimize(variables[2])
+
+    block = variables[0].parent_component()
+    assert all(entry.parent_component() is block for entry in [*variables, binary])
+    assert len(block) > len(variables) + 1
+    assert [variable.value for variable in variables] == [0.0, 1.0, 2.0]
+    assert binary.domain is pyo.Integers
+    assert block[len(variables) + 1].domain is pyo.Reals
+    model.model.write(str(tmp_path / "model.nl"))
+    # The NL header's second line starts with the variable count.
+    header = (tmp_path / "model.nl").read_text().splitlines()[1].split()
+    assert int(header[0]) == 2

@@ -236,10 +236,10 @@ class FixedStructureModel(BaseHeatExchangerNetworkModel):
     # -- solver primitives (overridden in tests) --------------------------
 
     def _var(self, name: str, value: float, lb: float | None, ub: float | None):
-        return self.m.Var(value=value, lb=lb, ub=ub, name=name)
+        return self.m.Var(value=value, lb=lb, ub=ub)
 
     def _param(self, name: str, value: float):
-        return self.m.Param(value=value, name=name)
+        return self.m.Param(value=value)
 
     def _equal(self, lhs, rhs) -> None:
         self.m.Equation(lhs == rhs)
@@ -251,7 +251,7 @@ class FixedStructureModel(BaseHeatExchangerNetworkModel):
         self.m.Minimize(expression)
 
     def _intermediate(self, expression, name: str):
-        return self.m.Intermediate(expression, name=name)
+        return self.m.Intermediate(expression)
 
 
 # -- preprocessing ------------------------------------------------------------

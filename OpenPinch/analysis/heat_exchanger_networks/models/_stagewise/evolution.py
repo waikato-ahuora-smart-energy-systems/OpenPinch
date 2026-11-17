@@ -556,6 +556,43 @@ def _select_best_candidate(
     )
 
 
+def _open_added_match_slots(owner, z_allowed) -> None:
+    """Make the slots of matches ``z_allowed`` adds to ``owner`` writable.
+
+    A disallowed match's slots are plain numbers, which take no value; each
+    becomes a parameter holding the same number, so the adopted network's
+    values can be copied in.
+    """
+
+    def open_slot(row: list, k: int) -> None:
+        if row[k].__class__ is float:
+            row[k] = owner.m.Param(value=row[k])
+
+    added = [
+        (i, j, k)
+        for i in range(owner.I)
+        for j in range(owner.J)
+        for k in range(owner.S)
+        if z_allowed[i][j][k] > 0 and not owner.z_allowed[i][j][k] > 0
+    ]
+    if not added:
+        return
+    by_period = [
+        getattr(owner, name)
+        for name in ("Q_r_by_period", "theta_1_by_period", "theta_2_by_period")
+    ]
+    if owner.non_isothermal_model:
+        by_period.append(owner.X_by_period)
+    for i, j, k in added:
+        open_slot(owner.z[i][j], k)
+        for grid in by_period:
+            for period in grid:
+                open_slot(period[i][j], k)
+        if owner.non_isothermal_model:
+            for period in owner.Y_by_period:
+                open_slot(period[j][i], k)
+
+
 def _update_with_best_model(owner, best_model) -> None:
     """Adopt the selected evolved topology while retaining this model object."""
 
@@ -579,6 +616,7 @@ def _update_with_best_model(owner, best_model) -> None:
         if len(best_model.alpha)
         else []
     )
+    _open_added_match_slots(owner, best_model.z_allowed)
     owner.z_allowed = build_index_grid(
         lambda i, j, k: best_model.z_allowed[i][j][k],
         (owner.I, owner.J, owner.S),

@@ -983,8 +983,8 @@ def _start_from_side(sparse, side) -> None:
     """
 
     for target, source in zip(
-        sparse.m.model.variables.values(),
-        side.m.model.variables.values(),
+        sparse.m.variables,
+        side.m.variables,
         strict=True,
     ):
         target.set_value(source.value, skip_validation=True)
@@ -995,6 +995,9 @@ def _start_from_side(sparse, side) -> None:
             binary = getattr(sparse, grid)
             for position in index:
                 binary = binary[position]
+            # A disallowed match's binary is the plain number 0.0 already.
+            if binary.__class__ is float:
+                continue
             if not binary.fixed and (binary.value or 0.0) < 0.5:
                 binary.fix(0)
     sparse.m.warm_start = True

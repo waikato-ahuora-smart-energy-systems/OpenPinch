@@ -42,21 +42,21 @@ class _FakeModelBuilder:
         self.intermediates = []
         self.equations = []
 
-    def Param(self, *, value, name: str):
-        param = _FakeExpression(name, value)
+    def Param(self, *, value):
+        param = _FakeExpression("param", value)
         self.params.append(param)
         return param
 
-    def Var(self, *, value, ub, lb, integer, name: str):
+    def Var(self, *, value, ub, lb, integer):
         variable = _FakeExpression(
-            name,
+            "variable",
             {"value": value, "ub": ub, "lb": lb, "integer": integer},
         )
         self.variables.append(variable)
         return variable
 
-    def Intermediate(self, expression, *, name: str):
-        intermediate = _FakeExpression(name, expression)
+    def Intermediate(self, expression):
+        intermediate = _FakeExpression("intermediate", expression)
         self.intermediates.append(intermediate)
         return intermediate
 
@@ -133,24 +133,12 @@ def test_stage_packing_adds_contiguous_stage_constraints_from_static_fixture():
 
     add_recovery_stage_packing_constraints(model)
 
-    assert [expr.name for expr in model.recovery_stage_active] == [
-        "recovery_stage_active_0",
-        "recovery_stage_active_1",
-        "recovery_stage_active_2",
-    ]
-    assert [expr.name for expr in model.recovery_stage_duty] == [
-        "recovery_stage_duty_0",
-        "recovery_stage_duty_1",
-        "recovery_stage_duty_2",
-    ]
-    assert [expr.name for expr in model.m.variables] == ["recovery_stage_active_0"]
-    assert [expr.name for expr in model.m.params] == [
-        "recovery_stage_active_1",
-        "recovery_stage_duty_1",
-        "recovery_stage_active_2",
-        "recovery_stage_duty_2",
-    ]
-    assert [expr.name for expr in model.m.intermediates] == ["recovery_stage_duty_0"]
+    active = model.recovery_stage_active
+    duty = model.recovery_stage_duty
+    assert len(active) == len(duty) == 3
+    assert model.m.variables == [active[0]]
+    assert model.m.params == [active[1], duty[1], active[2], duty[2]]
+    assert model.m.intermediates == [duty[0]]
     assert len(model.m.equations) == 5
     assert model.m.equations[0][0] == "ge"
     assert model.m.equations[-1][0] == "ge"

@@ -27,12 +27,8 @@ def add_recovery_stage_packing_constraints(model: Any) -> None:
     stage_duties = []
     for k, capacity in enumerate(stage_capacities):
         if capacity <= 0.0:
-            stage_active.append(
-                model.m.Param(value=0, name=f"recovery_stage_active_{k}")
-            )
-            stage_duties.append(
-                model.m.Param(value=0.0, name=f"recovery_stage_duty_{k}")
-            )
+            stage_active.append(model.m.Param(value=0))
+            stage_duties.append(model.m.Param(value=0.0))
             continue
 
         active = model.m.Var(
@@ -40,7 +36,6 @@ def add_recovery_stage_packing_constraints(model: Any) -> None:
             ub=1,
             lb=0,
             integer=True,
-            name=f"recovery_stage_active_{k}",
         )
         duty = model.m.Intermediate(
             model.m.sum(
@@ -51,7 +46,6 @@ def add_recovery_stage_packing_constraints(model: Any) -> None:
                     if model.z_allowed[i][j][k] > 0
                 ]
             ),
-            name=f"recovery_stage_duty_{k}",
         )
         model.m.Equation(duty <= capacity * active)
         model.m.Equation(duty >= threshold * active)

@@ -99,8 +99,8 @@ class _FakeModel:
         self.intermediates.append(value)
         return value
 
-    def Var(self, *, value, ub, lb, name):
-        self.variables.append({"value": value, "ub": ub, "lb": lb, "name": name})
+    def Var(self, *, value, ub, lb):
+        self.variables.append({"value": value, "ub": ub, "lb": lb})
         return value
 
     def Equation(self, expression):
@@ -782,3 +782,13 @@ def test_utility_approach_equations_skip_streams_inactive_in_a_period(inactive_b
     # Both terminals of the heater in both periods, the cooler in base only.
     assert len(model.m.equations) == 6
     assert all(model.m.equations)
+
+
+def test_setting_a_plain_number_slot_to_another_value_is_refused():
+    # A disallowed match's slot is a plain number. Dropping a different
+    # value silently lost the warm-start outlet temperatures that evolution
+    # starts an added match from.
+    _set_value(_model(), 0.0, 0.0)
+
+    with pytest.raises(ValueError, match="constant"):
+        _set_value(_model(), 0.0, 85.0)
