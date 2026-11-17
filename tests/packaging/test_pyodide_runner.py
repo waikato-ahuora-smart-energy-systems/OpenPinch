@@ -50,3 +50,12 @@ def test_the_pypi_install_retries_a_failed_metadata_fetch():
     assert "Can't fetch metadata" in source
     assert "for attempt in range(INSTALL_ATTEMPTS)" in source
     assert "await asyncio.sleep(" in source
+
+
+def test_the_pypi_install_also_retries_a_failed_wheel_download():
+    # The wheel download can fail the same way (pyodide.http.AbortError:
+    # fetch failed), as it did on the 0.9.2 release PR's application shard.
+    source = RUNNER.read_text(encoding="utf-8")
+
+    assert "AbortError" in source
+    assert "fetch failed" in source

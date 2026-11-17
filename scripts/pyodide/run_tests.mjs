@@ -53,15 +53,24 @@ pyodide.globals.set('REQUIREMENTS', pyodide.toPy(requirements))
 const exitCode = await pyodide.runPythonAsync(`
 import asyncio, os, sys, micropip
 # The constraints hold transitive dependencies to their pins as well. On CI
-# runners micropip's fetch of PyPI metadata fails now and then, on a
-# different package each time, so that error alone is retried.
+# runners micropip's fetches from PyPI fail now and then, on a different
+# package each time: the metadata ("Can't fetch metadata") or the wheel
+# itself (pyodide.http.AbortError: fetch failed). Those alone are retried.
 INSTALL_ATTEMPTS = 4
+
+
+def _network_failure(error):
+    return "Can't fetch metadata" in str(error) or (
+        type(error).__name__ == "AbortError" and "fetch failed" in str(error)
+    )
+
+
 for attempt in range(INSTALL_ATTEMPTS):
     try:
         await micropip.install(list(REQUIREMENTS), constraints=list(REQUIREMENTS))
         break
-    except ValueError as error:
-        if "Can't fetch metadata" not in str(error) or attempt == INSTALL_ATTEMPTS - 1:
+    except Exception as error:
+        if not _network_failure(error) or attempt == INSTALL_ATTEMPTS - 1:
             raise
         print(f"micropip: {error} Retrying.", file=sys.stderr)
         await asyncio.sleep(5 * (attempt + 1))
