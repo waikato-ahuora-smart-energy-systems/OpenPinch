@@ -674,6 +674,27 @@ Repiping
    cooler. Each modification lists them in ``repiped_streams``. A relocated
    exchanger keeps its id, so it can also take added area, which makes a
    move to a match that needs a bigger unit a resized reassignment.
+Heat pumps
+   ``heat_pump_cycle`` lets a step add a heat pump between two streams, as
+   Bütün et al. (2018) retrofit heat pumping with the network: an
+   evaporator at the end of a hot stream, evaporating
+   ``min_approach_temperature`` below its target, and a condenser at the
+   end of a cold stream, condensing as far above its target. The HPR
+   service's cycle models rate it. ``"carnot"`` takes the heating COP
+   ``1 + HPR_ETA_II_CARNOT * T_evap / (T_cond - T_evap)``, prices the
+   compressor and package at ``heat_pump_cost`` per kW of condenser
+   capacity and the two exchangers by the area law. ``"vapour_compression"``
+   solves a single stage on each of ``HPR_REFRIGERANTS`` within the HPR
+   cycle limits, keeps the fluid with the best COP and prices the whole
+   machine (compressor, motor, evaporator and condenser) with the HPR
+   service's installed capital. The work costs ``COSTING_HPR_ELE_PRICE``.
+   The model links the two duties by the COP; the search screens stream
+   pairs by the utility the heat pump could relieve, and its condenser and
+   evaporator duties do not count as hot and cold utility. On the Ciric
+   and Floudas case at $30/MWh electricity a Carnot heat pump from H1 to C2
+   (COP 1.92, 14.7 MW) is the best first step, at $2.06M/y net; at the
+   case's $100/MWh, and with a single water stage (COP 1.62, $13.7M
+   installed), new matches win.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility

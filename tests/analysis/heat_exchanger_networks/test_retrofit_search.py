@@ -2,7 +2,8 @@
 
 The fake keeps the real request building, structure and screen, and stands
 in for the NLP only: a design's utility cost falls by $100,000/y per
-recovery match and $20,000/y per enlarged or enhanced unit, every installed unit needs
+recovery match, $150,000/y per heat pump and $20,000/y per enlarged or
+enhanced unit, every exchanger carries 100 kW, every installed unit needs
 its whole widened area (so it is at its cap), and every new unit gets 25 m2.
 """
 
@@ -71,6 +72,7 @@ class _Backend:
         self.area_values = lambda spec: None
         self.unbuildable = lambda spec: False
         self.rating_allowances = lambda spec: None
+        self.heat_pumps: list = []
 
 
 @pytest.fixture
@@ -98,10 +100,12 @@ def fake_solver(monkeypatch) -> _Backend:
             spec = self.spec
             enlarged = len(spec.enlargeable_recovery) + len(spec.enlargeable_utilities)
             enhanced = len(spec.enhanced_recovery) + len(spec.enhanced_utilities)
+            backend.heat_pumps.append((spec.utilities, spec.heat_pumps))
             self.utility_cost_value = (
                 1_000_000.0
                 - 100_000.0 * len(spec.recovery)
                 - 20_000.0 * (enlarged + enhanced)
+                - 150_000.0 * len(spec.heat_pumps)
             )
             self.area_values = backend.area_values(spec)
             self.rating_allowances = backend.rating_allowances(spec)
@@ -1064,3 +1068,149 @@ def test_design_retrofit_takes_the_repiping_cost(fake_solver):
     (match,) = [m for m in result.frontier[1].modifications if m.kind == "new_match"]
     assert len(match.repiped_streams) == 2
     assert match.fixed_cost == pytest.approx(6_000.0)
+
+
+@pytest.mark.parametrize("strategy", ["stepwise", "structure"])
+def test_a_heat_pump_step_is_priced_by_its_capacity_and_exchanger_area(
+    fake_solver, strategy
+):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # The existing network heats only C2, so a heat pump delivers there,
+    # from H1 or H2, which have coolers. Its evaporator and condenser carry
+    # the fake's 100 kW and 25 m2 each.
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            strategy=strategy,
+            max_modifications=1,
+            heat_pump_cycle="carnot",
+            heat_pump_cost=300.0,
+            repiping_cost=1_000.0,
+            **COSTS,
+        ),
+    )
+
+    design = result.frontier[1]
+    (pump,) = [m for m in design.modifications if m.kind == "heat_pump"]
+    assert (pump.hot_stream, pump.cold_stream) in {("H1", "C2"), ("H2", "C2")}
+    assert pump.repiped_streams == (pump.hot_stream, pump.cold_stream)
+    assert pump.heat_pump_capacity == pytest.approx(100.0)
+    assert pump.heat_pump_cop > 1.0
+    assert pump.fixed_cost == pytest.approx(300.0 * 100.0 + 2 * 1_000.0)
+    assert (pump.added_area, pump.utility_area) == (NEW_UNIT_AREA, NEW_UNIT_AREA)
+    assert pump.area_cost == pytest.approx(AREA_COST * 2 * NEW_UNIT_AREA)
+    exchangers = {e.exchanger_id: e for e in design.network.exchangers}
+    evaporator = exchangers[pump.exchanger_id]
+    condenser = exchangers[pump.utility_exchanger_id]
+    assert (evaporator.source_stream, condenser.sink_stream) == (
+        pump.hot_stream,
+        pump.cold_stream,
+    )
+    # The heat pump's condenser and evaporator are not hot and cold utility.
+    assert design.hot_utility == pytest.approx(design.utility_cost / 100.0 - 100.0)
+    assert design.cold_utility == pytest.approx(design.utility_cost / 200.0 - 100.0)
+    # The model links the pair's duties by the COP.
+    linked = {
+        (utilities[evaporator].side, utilities[condenser].side, cop)
+        for utilities, pumps in fake_solver.heat_pumps
+        for evaporator, condenser, cop in pumps
+    }
+    assert ("cold", "hot", pump.heat_pump_cop) in linked
+
+
+def test_design_retrofit_rates_carnot_heat_pumps_with_the_hpr_efficiency(fake_solver):
+    def pump(eta_ii: float):
+        result = _problem().design.retrofit(
+            _existing_network(),
+            max_modifications=1,
+            heat_pump_cycle="carnot",
+            heat_pump_cost=300.0,
+            options={"HPR_ETA_II_CARNOT": eta_ii},
+        )
+        (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]
+        return pump
+
+    low, high = pump(0.5), pump(0.6)
+
+    # The HPR Carnot heating COP is 1 + eta_II T_evap / lift.
+    assert (low.hot_stream, low.cold_stream) == (high.hot_stream, high.cold_stream)
+    assert high.heat_pump_cop - 1.0 == pytest.approx(
+        1.2 * (low.heat_pump_cop - 1.0), rel=1e-12
+    )
+    assert low.fixed_cost == pytest.approx(300.0 * 100.0)
+
+
+def test_an_unknown_heat_pump_cycle_is_an_error(fake_solver):
+    with pytest.raises(ValueError, match="heat_pump_cycle.*brayton"):
+        _problem().design.retrofit(_existing_network(), heat_pump_cycle="brayton")
+    assert fake_solver.solved == 0
+
+
+def test_a_real_fluid_heat_pump_is_priced_by_the_hpr_machine_capital(fake_solver):
+    from OpenPinch.analysis.heat_pumps.common.capital import (
+        CompressorDuty,
+        MachineComponents,
+        installed_capital,
+    )
+    from OpenPinch.analysis.heat_pumps.cycles.limits import CycleLimits
+    from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_cycle import (
+        VapourCompressionCycle,
+    )
+
+    # Ciric and Floudas heats only C2, to 538 K: a single water stage lifts
+    # that far only with the pressure ratio and suction limits relaxed. New
+    # matches fail, so the step is a heat pump, however dear its machine.
+    fake_solver.fail = lambda spec: len(spec.recovery) > 4
+    options = {
+        "HPR_REFRIGERANTS": ["water"],
+        "HPR_MAX_PRESSURE_RATIO": 200.0,
+        "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.1,
+    }
+    result = _problem().design.retrofit(
+        _existing_network(),
+        max_modifications=1,
+        heat_pump_cycle="vapour_compression",
+        heat_pump_cost=300.0,
+        repiping_cost=1_000.0,
+        options=options,
+    )
+
+    design = result.frontier[1]
+    (pump,) = [m for m in design.modifications if m.kind == "heat_pump"]
+    # The HPR service's spelling of the fluid.
+    assert pump.heat_pump_refrigerant == "WATER"
+    # The machine (compressor, motor, evaporator and condenser) at its 100 kW
+    # capacity, as the HPR service prices it; heat_pump_cost is for Carnot.
+    hot = {"H1": 350.15, "H2": 361.15}[pump.hot_stream] - 1.0
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        hot - 273.15,
+        538.15 + 1.0 - 273.15,
+        dtcont=1.0,
+        eta_comp=0.7,
+        eta_motor=0.95,
+        refrigerant="water",
+        Q_heat=100.0,
+        limits=CycleLimits(
+            max_pressure_ratio=200.0,
+            max_discharge_superheat=50.0,
+            max_discharge_pressure=60e5,
+            max_discharge_pressure_co2=140e5,
+            min_suction_pressure=0.1e5,
+            min_lift=5.0,
+        ),
+    )
+    machine = MachineComponents(
+        compressors=(
+            CompressorDuty("water", cycle.suction_volume_flow, cycle.shaft_power),
+        ),
+        exchanger_areas=(NEW_UNIT_AREA, NEW_UNIT_AREA),
+    )
+    assert pump.heat_pump_cop == pytest.approx(cycle.COP_h, rel=1e-9)
+    assert pump.fixed_cost == pytest.approx(installed_capital(machine) + 2_000.0)
+    assert pump.area_cost == 0.0

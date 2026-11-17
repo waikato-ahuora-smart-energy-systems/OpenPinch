@@ -24,11 +24,20 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     ``utility_area`` (m2); its unit and area costs are in ``fixed_cost`` and
     ``area_cost``. ``repiped_streams`` names the streams whose piping the
     modification changes; their repiping is in ``fixed_cost``.
+    ``"heat_pump"`` is a heat pump from ``hot_stream`` to ``cold_stream``:
+    its evaporator ``exchanger_id`` (``added_area``) and condenser
+    ``utility_exchanger_id`` (``utility_area``), with ``heat_pump_cop`` and
+    ``heat_pump_capacity`` (its largest condenser duty, kW) and, for a
+    real-fluid cycle, ``heat_pump_refrigerant``; ``fixed_cost`` holds its
+    compressor and package, or its whole machine for a real-fluid cycle
+    (then ``area_cost`` is 0).
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["new_match", "area_addition", "relocation", "enhancement"]
+    kind: Literal[
+        "new_match", "area_addition", "relocation", "enhancement", "heat_pump"
+    ]
     exchanger_id: str
     added_area: float = 0.0
     fixed_cost: float = 0.0
@@ -41,6 +50,9 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     utility_exchanger_id: str | None = None
     utility_area: float = 0.0
     repiped_streams: tuple[str, ...] = ()
+    heat_pump_cop: float | None = None
+    heat_pump_capacity: float | None = None
+    heat_pump_refrigerant: str | None = None
 
 
 class HeatExchangerNetworkRetrofitDesign(BaseModel):
