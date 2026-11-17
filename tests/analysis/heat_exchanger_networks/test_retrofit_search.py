@@ -1056,6 +1056,42 @@ def test_repiping_cost_prices_every_stream_a_move_repipes(fake_solver, strategy,
     assert m.fixed_cost == pytest.approx(fixed + repiping * len(expected))
 
 
+def test_a_paired_utility_on_a_stream_the_match_repipes_is_charged_once(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    # Only a new match paired with a new end utility on one of its own
+    # streams solves (a new cooler on H3, which has none, with an H3 match).
+    def shares_a_stream(spec) -> bool:
+        match, utility = spec.recovery[-1], spec.utilities[-1]
+        stream = match.hot if utility.side == "cold" else match.cold
+        return len(spec.utilities) == 4 and utility.stream == stream
+
+    fake_solver.fail = lambda spec: len(spec.recovery) > 4 and not shares_a_stream(spec)
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=1,
+            new_match_candidates=50,
+            ceiling_candidates=50,
+            new_utility_units=True,
+            repiping_cost=1_000.0,
+            **COSTS,
+        ),
+    )
+
+    (match,) = [m for m in result.frontier[1].modifications if m.kind == "new_match"]
+    assert match.utility_exchanger_id is not None
+    assert sorted(match.repiped_streams) == sorted(
+        {match.hot_stream, match.cold_stream}
+    )
+    fixed = 2 * COSTS["new_unit_cost"] + COSTS["split_cost"] * len(match.new_splits)
+    assert match.fixed_cost == pytest.approx(fixed + 2 * 1_000.0)
+
+
 def test_design_retrofit_takes_the_repiping_cost(fake_solver):
     result = _problem().design.retrofit(
         _existing_network(),

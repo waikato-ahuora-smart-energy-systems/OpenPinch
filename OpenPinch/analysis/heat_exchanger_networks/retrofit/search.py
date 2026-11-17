@@ -347,7 +347,8 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
                     replace(
                         move,
                         utility_id=utility_id,
-                        repiped=move.repiped + (utility.stream,),
+                        # Each stream is repiped (and charged) once.
+                        repiped=tuple(dict.fromkeys(move.repiped + (utility.stream,))),
                     ),
                 ),
             )
