@@ -17,6 +17,21 @@ Heat exchanger network synthesis
   design variants and evolution candidates that are never ranked skip it.
   On the pulp mill sample case a design spends about 6 s in
   post-processing instead of 14 s, with the same network.
+- ``design.retrofit`` takes ``repiping_cost`` ($ per stream): each new
+  match, relocation and new end heater or cooler also costs that for every
+  stream whose piping it changes, and each modification reports those
+  streams in ``repiped_streams``. A relocated exchanger keeping its stream
+  in the same stage does not repipe it.
+- ``design.retrofit`` can add heat pumps (``heat_pump_cycle``): an
+  evaporator at the end of a hot stream and a condenser at the end of a
+  cold one, rated by the HPR service's Carnot cycle or a single real-fluid
+  vapour compression stage on ``HPR_REFRIGERANTS``, with work at
+  ``COSTING_HPR_ELE_PRICE``. A Carnot heat pump's compressor costs
+  ``heat_pump_cost`` per kW; a real-fluid one is priced with the HPR
+  service's installed machine capital. Modifications of kind ``heat_pump``
+  report ``heat_pump_cop``, ``heat_pump_capacity`` and
+  ``heat_pump_refrigerant``; ``FixedStructureSpec.heat_pumps`` links a
+  heat pump's evaporator and condenser duties by its COP.
 
 0.9.2 (2026-11-17)
 ------------------
