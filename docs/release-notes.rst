@@ -16,6 +16,24 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- New ``HeatExchangerNetworkRecord``
+  (``OpenPinch.analysis.heat_exchanger_networks.results.record``), passed as
+  ``design.heat_exchanger_network(record=...)``: a thread-safe record that
+  receives every network as soon as it is verified and costed in its final
+  form, for another thread to poll with ``version``, ``snapshot()`` and
+  ``changed_since(version)``. Worker processes send their networks to the
+  calling process. See "Networks as They Are Found" in the HEN synthesis
+  guide; tutorial 16 follows its deeper search this way.
+- A synthesis result now ranks every verified network of the run, including
+  each improvement an evolution search finds while it runs, not only the
+  network each task ends with. A network enters only with a converged solve,
+  a total annual cost and a passing feasibility check, so a successful
+  outcome without a total annual cost is no longer accepted.
+- A multiperiod design on a median or period basis now fits every network to
+  every period, and an overdesign margin rates every network, before it is
+  ranked; the cheapest fitted (and rated) network is selected, which can
+  differ from fitting the cheapest basis network alone. These designs take
+  longer, since each network costs a fit and, with a margin, its ratings.
 - New ``design.retrofit(existing, ...)`` finds cost-effective modifications
   of an existing network. The existing network, with every exchanger's
   installed area, is rated, then modified one step at a time, as in network

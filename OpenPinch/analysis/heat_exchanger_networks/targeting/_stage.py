@@ -23,6 +23,7 @@ from ..results.assembly import (
     build_synthesis_result,
     demote_infeasible_outcomes,
 )
+from ..results.record import admit
 from .topology import (
     canonical_stage_count,
     canonical_topology_restrictions,
@@ -58,6 +59,11 @@ def run_stage(
         parent_outcomes={} if parent_outcomes is None else parent_outcomes,
         max_parallel=settings.max_parallel,
     )
+    if not getattr(executor, "admits_outcomes", False):
+        # An executor that does not offer its outcomes as it solves them
+        # has them offered here, once the stage is done.
+        for outcome in outcomes:
+            admit(outcome)
     # The executor can add outcomes for tasks it derived, such as the extra
     # networks of a pinch design task.
     task_ids = {task.task_id for task in tasks}

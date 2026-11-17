@@ -170,15 +170,22 @@ class InternalHeatExchangerNetworkProblem:
     def extract_network(self, *, run_id: str) -> HeatExchangerNetwork:
         """Convert the solved private case into an OpenPinch network result."""
 
+        return self.extract_candidate_network(self.case, run_id=run_id)
+
+    def extract_candidate_network(
+        self, candidate: Any, *, run_id: str
+    ) -> HeatExchangerNetwork:
+        """Convert one solved model of this task, such as a search candidate."""
+
         return extract_heat_exchanger_network(
-            self.case,
+            candidate,
             self.solver_arrays,
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self._result_method(),
             dt_cont_multiplier=self.dt_cont_multiplier,
             stage_count=getattr(
-                self.case, "stages", getattr(self.case, "S", self.stages)
+                candidate, "stages", getattr(candidate, "S", self.stages)
             ),
         )
 

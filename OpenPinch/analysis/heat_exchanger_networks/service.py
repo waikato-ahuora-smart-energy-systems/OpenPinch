@@ -12,6 +12,7 @@ from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor
 from .prepared_problem import SynthesisProblem
 from .results.assembly import SynthesisWorkflowResult
+from .results.record import HeatExchangerNetworkRecord, running
 from .results.seeds import resolve_seed_networks
 from .targeting.network_evolution_method import (
     _execute_network_evolution_method_workflow,
@@ -97,20 +98,26 @@ def heat_exchanger_network_open_hens_method_service(
     options: dict[str, Any] | None = None,
     workspace_variant: str | None = None,
     executor: SynthesisExecutor | None = None,
+    record: HeatExchangerNetworkRecord | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Run full synthesis at the configured search width and depth."""
+    """Run full synthesis at the configured search width and depth.
+
+    Every verified network enters ``record`` (a new one when not given) as
+    the run finds it; the result ranks exactly the record's networks.
+    """
 
     target_output, settings = prepare_service_context(
         problem,
         options=options,
         workspace_variant=workspace_variant,
     )
-    workflow_result = execute_open_hens_method(
-        problem,
-        settings,
-        executor=executor,
-    )
-    return finalise_design_result(problem, target_output, workflow_result)
+    with running(record or HeatExchangerNetworkRecord()):
+        workflow_result = execute_open_hens_method(
+            problem,
+            settings,
+            executor=executor,
+        )
+        return finalise_design_result(problem, target_output, workflow_result)
 
 
 def heat_exchanger_network_pinch_design_method_service(

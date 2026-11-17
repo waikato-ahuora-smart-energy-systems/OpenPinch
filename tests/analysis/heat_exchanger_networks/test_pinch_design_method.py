@@ -589,6 +589,39 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._get_active_stages(case) == [0, 2]
 
 
+def test_a_search_candidate_is_extracted_with_the_tasks_arrays_and_labels(
+    monkeypatch,
+) -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as module
+
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "extract_heat_exchanger_network",
+        lambda model, arrays, **kwargs: calls.append((model, arrays, kwargs)),
+    )
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=_solver_arrays(),
+        framework="ESM",
+        dt_cont_multiplier=1.5,
+        synthesis_task_id="evm-task",
+    )
+    candidate = SimpleNamespace(S=3)
+
+    problem.extract_candidate_network(candidate, run_id="run")
+
+    ((model, arrays, kwargs),) = calls
+    assert model is candidate
+    assert arrays is problem.solver_arrays
+    assert kwargs == {
+        "run_id": "run",
+        "task_id": "evm-task",
+        "method": "ESM",
+        "dt_cont_multiplier": 1.5,
+        "stage_count": 3,
+    }
+
+
 def test_stage_reduction_keeps_all_stages_when_nothing_is_recovered() -> None:
     problem = InternalHeatExchangerNetworkProblem(solver_arrays=_solver_arrays())
     case = _StageReductionCase(stage_duties=[0.0, 0.0, 0.0, 0.0])
@@ -730,6 +763,71 @@ def test_stagewise_evolution_branch_frontier_selects_best_global_tac(
         "1-b1-plus1",
     ]
     assert model.updated_with == "plus-branch-best"
+
+
+def test_branched_evolution_reports_each_candidate_that_improves_its_best(
+    monkeypatch,
+) -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+    tacs = {
+        "0-b0-minus1": 120.0,
+        "0-b0-minus2": 80.0,
+        "0-b0-plus1": 90.0,
+        "0-b0-plus2": 110.0,
+    }
+
+    def solve(**kwargs):
+        label = kwargs["branch_label"]
+        z = kwargs.get("z_allowed_removed", kwargs.get("z_allowed_added"))
+        return _BranchEvolutionCase(
+            name=label,
+            tac=tacs.get(label, 70.0),
+            z=z,
+            add_candidates=((0, 0, 3),) if label == "0-b0-plus1" else (),
+        )
+
+    _patch_evolution_children(monkeypatch, minus=solve, plus=solve)
+    reported: list[str] = []
+
+    with stagewise_evolution.reporting_improvements(
+        lambda candidate: reported.append(candidate.name)
+    ):
+        model.get_net_benefit_evolution(
+            print_output=False, max_depth=2, n_ad_branches=2, n_rm_branches=2
+        )
+
+    # The root costs 100: minus2 (80) improves on it and 1-b1-plus1 (70) on
+    # that; plus1 (90) is cheaper than the root but not than minus2.
+    assert reported == ["0-b0-minus2", "1-b1-plus1"]
+
+
+def test_single_path_evolution_reports_each_improvement(monkeypatch) -> None:
+    model = _branching_root_model(
+        rm_candidates=((0, 0, 0), (0, 0, 1)),
+        add_candidates=((0, 0, 2), (0, 0, 3)),
+    )
+
+    def solve(name, tac):
+        return lambda **kwargs: _BranchEvolutionCase(
+            name=name,
+            tac=tac,
+            z=kwargs.get("z_allowed_removed", kwargs.get("z_allowed_added")),
+        )
+
+    _patch_evolution_children(
+        monkeypatch, minus=solve("minus", 90.0), plus=solve("plus", 95.0)
+    )
+    reported: list[str] = []
+
+    with stagewise_evolution.reporting_improvements(
+        lambda candidate: reported.append(candidate.name)
+    ):
+        model.get_net_benefit_evolution(print_output=False, max_depth=1)
+
+    assert reported == ["minus"]
 
 
 def test_stagewise_evolution_failed_child_does_not_stop_siblings(monkeypatch) -> None:
