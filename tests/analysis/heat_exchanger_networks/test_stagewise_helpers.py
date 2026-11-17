@@ -83,6 +83,7 @@ class _FloatOnly:
 def test_stagewise_setup_preserves_solver_construction_order():
     model = StageWiseModel.__new__(StageWiseModel)
     model.framework = "TDM"
+    model.values_only = False
     calls = []
     ordered_steps = (
         "set_blank_input_parameters",
@@ -1502,6 +1503,29 @@ def test_post_process_leaves_the_alpha_solve_to_benefit_ranking(monkeypatch):
     assert solves == [model]
 
 
+def test_a_build_looks_up_each_recovery_approach_once_per_step(monkeypatch):
+    # The approach depends on the period and the pair, not the stage, but the
+    # theta grids looked it up four times per stage slot: about 1 s of each
+    # pulp mill design's amalgamated builds alone.
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+        approach as base_approach,
+    )
+
+    lookups = []
+    approach = base_approach._recovery_approach_temperature
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda owner, *pair: lookups.append(pair) or approach(owner, *pair),
+    )
+
+    _built_two_stage_model(monkeypatch)
+
+    # Once each for the duty bounds, the big-M bounds and the theta grids,
+    # whatever the number of stages.
+    assert max(lookups.count(pair) for pair in lookups) == 3
+
+
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
 def test_a_values_only_model_has_the_same_variables_and_no_constraints(
     monkeypatch, non_isothermal_model
@@ -1527,6 +1551,35 @@ def test_a_values_only_model_has_the_same_variables_and_no_constraints(
     assert numbers(values_only) == numbers(full)
     assert list(values_only.m.model.component_data_objects(pyo.Constraint)) == []
     assert values_only.m.objective is None
+
+
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_a_values_only_model_builds_no_constraint_expressions(
+    monkeypatch, non_isothermal_model
+):
+    # A values-only model keeps no constraints, so building their expressions
+    # only to drop them was most of building an amalgamated network.
+    from OpenPinch.analysis.heat_exchanger_networks.solver.pyomo_model import (
+        PyomoModel,
+    )
+
+    built = []
+    for name in ("Equation", "Equations"):
+        method = getattr(PyomoModel, name)
+        monkeypatch.setattr(
+            PyomoModel,
+            name,
+            lambda self, expressions, method=method: (
+                built.append(self) if not self.adds_constraints else None,
+                method(self, expressions),
+            )[1],
+        )
+
+    _built_two_stage_model(
+        monkeypatch, non_isothermal_model=non_isothermal_model, values_only=True
+    )
+
+    assert built == []
 
 
 def test_a_values_only_model_cannot_be_solved(monkeypatch):

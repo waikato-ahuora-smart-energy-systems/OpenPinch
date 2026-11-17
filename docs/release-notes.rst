@@ -17,6 +17,12 @@ Heat exchanger network synthesis
   design variants and evolution candidates that are never ranked skip it.
   On the pulp mill sample case a design spends about 6 s in
   post-processing instead of 14 s, with the same network.
+- Building the amalgamated pinch design network is cheaper: it holds
+  values only, so its constraint expressions are no longer built and
+  dropped, and stage-wise builds look up each match's approach temperature
+  once rather than for every stage. On the pulp mill sample case
+  amalgamation takes about 5 s of a design instead of 8 s, with the same
+  network.
 
 0.9.2 (2026-11-17)
 ------------------

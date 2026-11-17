@@ -72,7 +72,9 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.set_preprocessing()
         self.set_match_restrictions(self.z_restriction)
         self.set_stage_wise_superstructure()
-        if self.framework == "TDM":
+        # The dQ/dA restriction is a constraint, which a values-only model
+        # does not keep.
+        if self.framework == "TDM" and not self.values_only:
             self.set_dqda_equations()
         self.set_obj()
 
