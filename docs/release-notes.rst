@@ -109,6 +109,12 @@ Heat exchanger network synthesis
   variable's value is read before asking what the object is, and a recovery
   match's binary is read once rather than once per period. Extracted
   networks are unchanged.
+- Building index grids and writing parameters is cheaper. A grid is built
+  with one call per cell rather than a recursive helper call per cell, and a
+  parameter that is already fixed is written without being fixed again,
+  which ran Pyomo's domain and bound check on every write. On the pulp mill
+  sample case a design takes about 124 s of CPU time instead of 130 s, with
+  the same network.
 
 0.9.1 (2026-11-16)
 ------------------
