@@ -40,7 +40,10 @@ Heat exchanger network synthesis
   service's installed machine capital. Modifications of kind ``heat_pump``
   report ``heat_pump_cop``, ``heat_pump_capacity`` and
   ``heat_pump_refrigerant``; ``FixedStructureSpec.heat_pumps`` links a
-  heat pump's evaporator and condenser duties by its COP.
+  heat pump's evaporator and condenser duties by its COP. A heat pump whose
+  condenser or evaporator name (``HP H1->C1:condenser``) a stream or
+  utility of the problem already has is not offered, so that stream or
+  utility keeps its own properties.
 
 0.9.2 (2026-11-17)
 ------------------

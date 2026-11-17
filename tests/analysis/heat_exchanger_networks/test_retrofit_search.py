@@ -1250,3 +1250,31 @@ def test_a_real_fluid_heat_pump_is_priced_by_the_hpr_machine_capital(fake_solver
     assert pump.heat_pump_cop == pytest.approx(cycle.COP_h, rel=1e-9)
     assert pump.fixed_cost == pytest.approx(installed_capital(machine) + 2_000.0)
     assert pump.area_cost == 0.0
+
+
+def test_a_utility_named_like_a_heat_pump_keeps_its_own_properties(fake_solver):
+    # The case's hot utility carries the name the H1 -> C2 heat pump's
+    # condenser would take; the existing heater must still draw on it.
+    name = "HP H1->C2:condenser"
+    data = json.loads(read_sample_case(CASE))
+    for utility in data["utilities"]:
+        if utility["type"] == "Hot":
+            utility["name"] = name
+    existing = _existing_network()
+    existing = existing.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"source_stream": name})
+                if e.source_stream == "HU"
+                else e
+                for e in existing.exchangers
+            )
+        }
+    )
+
+    PinchProblem(data).design.retrofit(
+        existing, max_modifications=1, heat_pump_cycle="carnot"
+    )
+
+    baseline, _pumps = fake_solver.heat_pumps[0]
+    assert [u.utility for u in baseline if u.side == "hot"] == [0]
