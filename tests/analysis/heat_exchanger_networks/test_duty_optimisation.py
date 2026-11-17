@@ -1574,3 +1574,63 @@ def test_rating_design_points_follow_the_solver_periods_and_utility_temperatures
     assert spec.utility_design_points[heater] == {0: (500.0, 30.0, 90.0, None)}
     assert set(spec.recovery_design_points[0]) == {0}
     assert spec.recovery_design_points[0][0] == (120.0, 20.0, 10.0, None)
+
+
+def test_utility_cost_goal_loads_the_cheaper_utility_first() -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.context import (
+        ensure_target_results,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        build_duty_optimisation_request,
+        fixed_network_structure,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    # LPS (40 $/MWh, 600 K) and HPS (80 $/MWh) both heat C1 in series. Any
+    # split costs the same duty, so only a cost objective fixes it: LPS
+    # takes C1 from 490 K (after recovery) to 590 K, HPS the rest to 650 K.
+    lps = _utility("LPS", "Hot", 600.0, 600.0, 40.0, 5.0)
+    problem = PinchProblem(_small_payload(extra_hot_utility=lps))
+    ensure_target_results(problem, {}, None)
+    network = _with(
+        HeatExchangerNetwork.from_structure(
+            recovery=[("H1", "C1", 1)],
+            heaters=["C1"],
+            coolers=["H1"],
+            hot_utility="HPS",
+            cold_utility="CW",
+        ),
+        _utility_exchanger(
+            HeatExchangerKind.HOT_UTILITY, "LPS", "C1", exchanger_id="lps"
+        ),
+    )
+    arrays = problem_to_solver_arrays(
+        problem, 2.0 * problem.master_zone.config.thermal.dt_cont
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", min_approach_temperature=10.0
+    )
+    structure = fixed_network_structure(request, arrays.axis_maps)
+    model = scipy_fixed_structure_model()(
+        name="ceiling",
+        solver="ipopt-pyomo",
+        solver_arrays=arrays,
+        spec=structure.spec,
+        minimisation_goal="utility cost",
+        default_approach=10.0,
+    )
+
+    model.optimise()
+
+    assert model.mSuccess == 1
+    hot_utilities = arrays.axis_maps["hot_utilities"]
+    lps_index = next(i for n, i in hot_utilities.items() if n.endswith("LPS"))
+    duties = {
+        "LPS" if match.utility == lps_index else "HPS": result.periods[0].duty
+        for match, result in zip(structure.spec.utilities, model.utility_results)
+        if match.side == "hot"
+    }
+    assert duties["LPS"] == pytest.approx(500.0, abs=0.5)
+    assert duties["HPS"] == pytest.approx(300.0, abs=0.5)

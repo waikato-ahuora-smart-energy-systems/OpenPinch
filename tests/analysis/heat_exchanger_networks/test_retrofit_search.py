@@ -67,6 +67,7 @@ class _Backend:
         self.reject = lambda network: ()
         self.cleaned = 0
         self.solved = 0
+        self.goals: dict[str, set[str]] = {}
 
 
 @pytest.fixture
@@ -83,8 +84,9 @@ def fake_solver(monkeypatch) -> _Backend:
     ExchangerPeriodResult = fixed_structure.ExchangerPeriodResult
 
     class FakeModel:
-        def __init__(self, *, spec, **_settings) -> None:
+        def __init__(self, *, spec, name, minimisation_goal, **_settings) -> None:
             self.spec = spec
+            backend.goals.setdefault(name, set()).add(minimisation_goal)
 
         def optimise(self, print_output: bool) -> None:
             backend.solved += 1
@@ -553,3 +555,18 @@ def test_hens_max_parallel_ranks_ceilings_on_threads_with_the_same_result(
     threads.clear()
     assert run(4) == serial
     assert threading.main_thread().name not in threads
+
+
+def test_the_ceiling_minimises_utility_cost_not_duty(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # The ranking reads the ceiling's utility cost, so the ceiling must
+    # minimise it: with several utilities at different prices, minimising
+    # duty leaves the split between them arbitrary.
+    search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(max_modifications=1, **COSTS),
+    )
+
+    assert fake_solver.goals["retrofit-ceiling"] == {"utility cost"}

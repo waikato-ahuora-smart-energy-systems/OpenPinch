@@ -28,6 +28,9 @@ prices with a free flow scale.
 Objectives (all multi-period aware, weighted by period weights):
 
 * ``"total utility"``: minimise utility duty;
+* ``"utility cost"``: minimise operating cost with no area model, so each
+  utility's price (segment prices for a segmented utility) decides which
+  carries the load;
 * ``"total area"``: minimise the sum of common exchanger areas. Each exchanger
   has one area shared by all periods; in every period it must provide at
   least the area that period needs (bypass covers any surplus);
@@ -56,7 +59,7 @@ from .base import BaseHeatExchangerNetworkModel
 from .thermal_profiles import ThermalProfile, smooth_clip
 
 FIXED_STRUCTURE_GOALS = frozenset(
-    {"total utility", "total area", "total cost", "rating", "retrofit"}
+    {"total utility", "utility cost", "total area", "total cost", "rating", "retrofit"}
 )
 HEATER = "hot"
 COOLER = "cold"
@@ -1364,7 +1367,7 @@ def set_fixed_structure_objective(owner) -> None:
         )
     elif goal == "total area":
         owner.objective_expression = _sum(list(owner.area_r) + list(owner.area_u))
-    elif goal == "rating":
+    elif goal in {"rating", "utility cost"}:
         owner.objective_expression = operating_cost_expression(owner)
     elif goal == "retrofit":
         owner.objective_expression = operating_cost_expression(

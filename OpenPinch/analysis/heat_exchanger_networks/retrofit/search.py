@@ -573,7 +573,7 @@ class _Evaluator:
             solver=self.solver,
             solver_arrays=self.arrays,
             spec=replace(structure.spec, recovery_areas={}, utility_areas={}),
-            minimisation_goal="total utility",
+            minimisation_goal="utility cost",
             default_approach=self.settings.approach,
             tol=self.tol,
             solver_options=dict(self.solver_options),
