@@ -1634,3 +1634,75 @@ def test_utility_cost_goal_loads_the_cheaper_utility_first() -> None:
     }
     assert duties["LPS"] == pytest.approx(500.0, abs=0.5)
     assert duties["HPS"] == pytest.approx(300.0, abs=0.5)
+
+
+def _retrofit_small_model(recovery_area: float, solver_factory=None):
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.context import (
+        ensure_target_results,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        build_duty_optimisation_request,
+        fixed_network_structure,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    problem = PinchProblem(_small_payload())
+    ensure_target_results(problem, {}, None)
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("H1", "C1", 1)],
+        heaters=["C1"],
+        coolers=["H1"],
+        hot_utility="HPS",
+        cold_utility="CW",
+    )
+    arrays = problem_to_solver_arrays(
+        problem, 2.0 * problem.master_zone.config.thermal.dt_cont
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", min_approach_temperature=10.0
+    )
+    structure = fixed_network_structure(request, arrays.axis_maps)
+    # The recovery unit is installed small (its area binds); the utility
+    # units are installed far larger than they need.
+    spec = replace(
+        structure.spec,
+        recovery_areas={0: recovery_area},
+        utility_areas={e: 1.0e4 for e in range(len(structure.spec.utilities))},
+    )
+    factory = solver_factory or fixed_model.FixedStructureModel
+    return factory(
+        name="retrofit",
+        solver="ipopt-pyomo",
+        solver_arrays=arrays,
+        spec=spec,
+        minimisation_goal="retrofit",
+        default_approach=10.0,
+    )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_retrofit_area_values_match_the_cost_of_more_area() -> None:
+    area = 2.0
+    model = _retrofit_small_model(area)
+    model.optimise(print_output=False)
+    larger = _retrofit_small_model(1.01 * area)
+    larger.optimise(print_output=False)
+
+    assert model.mSuccess == 1 and larger.mSuccess == 1
+    saved = model.utility_cost_value - larger.utility_cost_value
+    assert saved > 0.0
+    # $/y per m2 of the recovery unit's installed area, from its cap's dual.
+    value = model.area_values[("recovery", 0)]
+    assert value == pytest.approx(saved / (0.01 * area), rel=0.02)
+    # The utility units are far from their caps: more area is worth nothing.
+    assert all(
+        v == pytest.approx(0.0, abs=1e-6)
+        for (side, _index), v in model.area_values.items()
+        if side == "utility"
+    )

@@ -239,8 +239,8 @@ class FixedStructureModel(BaseHeatExchangerNetworkModel):
     def _equal(self, lhs, rhs) -> None:
         self.m.Equation(lhs == rhs)
 
-    def _at_least(self, lhs, rhs) -> None:
-        self.m.Equation(lhs >= rhs)
+    def _at_least(self, lhs, rhs):
+        return self.m.Equation(lhs >= rhs)
 
     def _minimise(self, expression) -> None:
         self.m.Minimize(expression)
@@ -1248,17 +1248,22 @@ def _design_factor(point, coefficient: float) -> float:
     return exact_lmtd(theta_1, theta_2) / chen
 
 
-def _cap_installed(owner, capacity, design, duties, coefficients, thetas) -> None:
-    """The unit's duty in every period fits ``capacity`` (an area)."""
+def _cap_installed(owner, capacity, design, duties, coefficients, thetas) -> list:
+    """The unit's duty in every period fits ``capacity`` (an area).
 
+    Returns each period's cap with its slope in area, as ``(constraint,
+    factor, thetas)``: the cap's left side grows by ``factor *
+    chen_lmtd(*thetas)`` per m2.
+    """
+
+    caps = []
     for n in range(owner.N_periods):
-        owner._at_least(
-            capacity
-            * _design_factor(design.get(n), coefficients[n])
-            * coefficients[n]
-            * chen_lmtd(*thetas[n]),
-            duties[n],
+        factor = _design_factor(design.get(n), coefficients[n]) * coefficients[n]
+        constraint = owner._at_least(
+            capacity * factor * chen_lmtd(*thetas[n]), duties[n]
         )
+        caps.append((constraint, factor, thetas[n]))
+    return caps
 
 
 def _common_areas(owner) -> None:
@@ -1308,6 +1313,9 @@ def _retrofit_areas(owner) -> None:
 
     widen = 1.0 + float(owner.spec.area_tolerance)
     fraction = owner.spec.max_added_area_fraction
+    owner.area_caps = {}
+    if hasattr(owner.m, "import_duals"):
+        owner.m.import_duals()
 
     def unit(side, tag, index, areas, points, enlargeable):
         terms = _unit_terms(owner, side, index)
@@ -1319,7 +1327,9 @@ def _retrofit_areas(owner) -> None:
         added = (
             owner._var(f"d{tag}{index}", 0.0, 0.0, cap) if index in enlargeable else 0.0
         )
-        _cap_installed(owner, installed * widen + added, points.get(index, {}), *terms)
+        owner.area_caps[(side, index)] = _cap_installed(
+            owner, installed * widen + added, points.get(index, {}), *terms
+        )
         return installed, added
 
     spec = owner.spec
@@ -1699,6 +1709,7 @@ def post_process_fixed_structure(owner) -> None:
         result.area for result in owner.recovery_results + owner.utility_results
     )
     if owner.minimisation_goal == "retrofit":
+        owner.area_values = _area_values(owner)
         owner.retrofit_capital_value = float(
             sum(
                 _added_area_costs(
@@ -1708,6 +1719,28 @@ def post_process_fixed_structure(owner) -> None:
                 )
             )
         )
+
+
+def _area_values(owner) -> dict[tuple[str, int], float] | None:
+    """Each installed unit's area value, keyed ``(side, index)``: what
+    one more m2 of installed area would save in the objective ($/y per m2),
+    the sum over periods of its cap's dual times the cap's slope in area.
+    ``None`` when the solver reported no duals."""
+
+    read = getattr(owner.m, "dual", None)
+    if read is None:
+        return None
+    values = {}
+    for key, caps in owner.area_caps.items():
+        total = 0.0
+        for constraint, factor, thetas in caps:
+            dual = read(constraint)
+            if dual is None:
+                return None
+            theta_1, theta_2 = (max(_numeric(t), 1e-6) for t in thetas)
+            total += abs(dual) * float(factor) * chen_lmtd(theta_1, theta_2)
+        values[key] = total
+    return values
 
 
 def _reported_area(
