@@ -12,6 +12,11 @@ Heat exchanger network synthesis
   again from another task is fitted and rated once, not each time. On the
   four-stream Yee and Grossmann case at 10% overdesign this rates 23
   networks rather than 60.
+- Post-processing a solved stage-wise model is cheaper: the alpha flow-on
+  solve now runs only when evolution ranks the model's matches, so pinch
+  design variants and evolution candidates that are never ranked skip it.
+  On the pulp mill sample case a design spends about 6 s in
+  post-processing instead of 14 s, with the same network.
 
 0.9.2 (2026-11-17)
 ------------------

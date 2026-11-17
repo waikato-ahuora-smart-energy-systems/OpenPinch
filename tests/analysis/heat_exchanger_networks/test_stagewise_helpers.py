@@ -9,6 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+    alpha as base_alpha,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import (
     _set_value,
 )
@@ -1059,6 +1062,39 @@ def test_update_with_best_model_keeps_unavailable_alpha_empty():
     assert target.alpha == []
 
 
+def test_update_with_best_model_adopts_the_candidates_own_alpha():
+    # A candidate's alpha is solved only when it is ranked, so an unranked
+    # winner has none yet: the owner takes the alpha solved from the
+    # candidate's values, not one solved later from its own.
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.z_allowed = [[[1]]]
+    target.alpha = []
+    target.set_initial_values_for_variables = lambda best: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        _ranking_alpha_pending=True,
+        get_alpha_values=lambda: [[[[0.25]]]],
+        I=1,
+        J=1,
+        S=1,
+        dqda=[[[2.0]]],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+    )
+
+    _update_with_best_model(target, best)
+
+    assert target.alpha == [[[[0.25]]]]
+
+
 def test_update_with_best_model_keeps_solved_cost_values_not_expressions():
     # Copying a Pyomo expression copies the whole model behind it; verify()
     # only reads the solved values, so those are what the owner keeps.
@@ -1443,6 +1479,27 @@ def test_post_process_reads_each_stream_temperature_once(monkeypatch):
     # Once for dQ/dA, once for the alpha solve and at most twice for heater
     # and cooler areas; it was twice per partner in every stage.
     assert max(value.reads for value in counted) <= 4
+
+
+def test_post_process_leaves_the_alpha_solve_to_benefit_ranking(monkeypatch):
+    # Only evolution's benefit ranking reads alpha, and most solved models
+    # (pinch design variants, rejected evolution candidates) are never
+    # ranked: the alpha solve was over half of pulp mill post-processing.
+    model = _built_two_stage_model(monkeypatch)
+    solves = []
+    solve = base_alpha._solve_flow_on_system
+    monkeypatch.setattr(
+        base_alpha,
+        "_solve_flow_on_system",
+        lambda owner: solves.append(owner) or solve(owner),
+    )
+
+    model._get_multiperiod_post_process()
+    assert solves == []
+
+    model.get_max_benefit_HX_candidates(1)
+    model.get_lowest_benefit_HX_candidates(1)
+    assert solves == [model]
 
 
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
