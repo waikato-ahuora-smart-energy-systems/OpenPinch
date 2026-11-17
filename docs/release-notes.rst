@@ -48,6 +48,23 @@ Heat exchanger network synthesis
   less time at 10 networks per multiplier, with the same best networks and
   at least as many distinct ones. ``heuristic_report`` counts the dropped
   sides as ``repeated_sides``.
+- A heuristic side that leaves a stage empty is no longer dropped as a
+  repeat of the same side network without one. Only a pairing with an empty
+  stage is re-solved at stage reduction, which can rebalance duties into
+  another network: on Four-stream Escobar the dropped side gave a network
+  with one heater fewer, the parent of the cheapest evolved network
+  (352,267 against 358,065 before evolution explored two branches). On the
+  12 OpenHENS cases at the default width and depth the best networks are
+  unchanged and the run takes about 1 % longer.
+- A heuristic side proposal's solve is limited to 10 s
+  (``HEURISTIC_SIDE_TIME_LIMIT``, unless the solver options set a limit),
+  and a side stopped there is dropped, as its incumbent need not hold the
+  minimum utility. The solve is a MIP over the proposal's matches, and on
+  the Six-stream Spray Dryer case at the default width and depth HiGHS did
+  not close one in hours, so the design never finished. It now takes 171 s
+  (8,256,978 TAC), with 14 of its 404 side solves stopped; on the other 11
+  OpenHENS cases every side solve takes at most 0.25 s and the best
+  networks and run times are unchanged.
 - ``HENS_HEURISTIC_PDM_NETWORKS`` defaults to 50 heuristic networks per
   dt_cont multiplier at search depths 0 to 3 (was 10 at depths 0 to 2 and 20
   at depth 3); depth 4 already used 50. With the faster realisation, the 12
