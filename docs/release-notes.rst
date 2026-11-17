@@ -16,6 +16,12 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Fixed: a fixed-structure solve (``optimise_duties``, retrofit) could be
+  infeasible when a segmented stream's heat capacity falls along it, as
+  the duty bounds used the exact total while the balances use the
+  rounded profile. Verification now accepts a segmented exchanger with
+  more area than its duty needs, as it already did for single-segment
+  exchangers, so an existing network with segmented streams can be rated.
 - New ``HeatExchangerNetworkRecord``
   (``OpenPinch.analysis.heat_exchanger_networks.results.record``), passed as
   ``design.heat_exchanger_network(record=...)``: a thread-safe record that

@@ -1181,3 +1181,152 @@ def test_highs_pdm_maps_segments_with_integer_intervals_in_one_solve():
     )
     assert model.mSuccess == 1
     assert model.Q_r_total == pytest.approx(150.0, abs=1e-6)
+
+
+def _falling_cp_payload() -> dict:
+    """A hot stream whose CP falls 300, 200, 100 kW/K from 150 to 70 C,
+    cooled by one cooler; a cold stream heated by one heater."""
+
+    def segment(t_supply, t_target, cp):
+        return {
+            "t_supply": {"unit": "degC", "value": t_supply},
+            "t_target": {"unit": "degC", "value": t_target},
+            "heat_flow": {"unit": "kW", "value": cp * (t_supply - t_target)},
+            "htc": {"unit": "kW/m^2/K", "value": 1.0},
+        }
+
+    def utility(name, kind, supply, target):
+        return {
+            "name": name,
+            "type": kind,
+            "heat_flow": None,
+            "htc": {"unit": "kW/m^2/K", "value": 5.0},
+            "price": {"unit": "$/MWh", "value": 10.0},
+            "t_supply": {"unit": "degC", "value": supply},
+            "t_target": {"unit": "degC", "value": target},
+        }
+
+    segments = [segment(150, 130, 300), segment(130, 100, 200), segment(100, 70, 100)]
+    return {
+        "streams": [
+            {
+                "name": "H1",
+                "zone": "Site/Process A",
+                "heat_flow": {"unit": "kW", "value": 15_000.0},
+                "t_supply": {"unit": "degC", "value": 150.0},
+                "t_target": {"unit": "degC", "value": 70.0},
+                "segments": segments,
+            },
+            {
+                "name": "C1",
+                "zone": "Site/Process A",
+                "heat_capacity_flowrate": {"unit": "kW/delta_degC", "value": 10.0},
+                "heat_flow": {"unit": "kW", "value": 500.0},
+                "htc": {"unit": "kW/m^2/K", "value": 1.0},
+                "t_supply": {"unit": "degC", "value": 30.0},
+                "t_target": {"unit": "degC", "value": 80.0},
+            },
+        ],
+        "utilities": [
+            utility("HU", "Hot", 250.0, 249.0),
+            utility("CU", "Cold", 20.0, 25.0),
+        ],
+        "options": {"HENS_SOLVER_EVM": "ipopt-pyomo", "THERMAL_DT_CONT": 5.0},
+    }
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif("not _binary_available('ipopt')", reason="needs ipopt")
+def test_a_hot_stream_whose_cp_falls_is_cooled_in_full():
+    # The solver rounds heat(T) at each segment boundary; with CP falling,
+    # the rounded span from supply to target is a little more than the
+    # exact total, so a duty bound at the exact total made this infeasible.
+    view = PinchProblem(_falling_cp_payload()).design.optimise_duties(
+        {
+            "recovery": [],
+            "heaters": [{"stream": "C1", "id": "HX"}],
+            "coolers": [{"stream": "H1", "id": "CX"}],
+        },
+        objective="utility",
+    )
+
+    assert view.total_cold_utility == pytest.approx(15_000.0, rel=1e-6)
+
+
+def test_a_duty_bound_covers_the_rounded_span_where_cp_falls():
+    from OpenPinch.analysis.heat_exchanger_networks.models.thermal_profiles import (
+        SMOOTHING_K,
+        ThermalProfile,
+    )
+
+    def hot(cps):
+        return ThermalProfile(
+            side="hot",
+            identities=("a", "b", "c"),
+            t_in=(423.15, 403.15, 373.15),
+            t_out=(403.15, 373.15, 343.15),
+            cp=cps,
+            htc=(1.0, 1.0, 1.0),
+            dt_cont=(5.0, 5.0, 5.0),
+            price=(0.0, 0.0, 0.0),
+        )
+
+    def rounded(profile, temperature):
+        value = profile.cp[0] * (profile.supply - temperature)
+        for k in range(1, 3):
+            d = profile.t_in[k] - temperature
+            value += (
+                (profile.cp[k] - profile.cp[k - 1])
+                * 0.5
+                * (d + (d * d + SMOOTHING_K**2) ** 0.5)
+            )
+        return value
+
+    falling = hot((300.0, 200.0, 100.0))
+    span = rounded(falling, falling.target) - rounded(falling, falling.supply)
+    assert falling.rounded_total == pytest.approx(span, rel=1e-12)
+    assert falling.rounded_total > falling.total == 15_000.0
+    assert falling.duty_bound == falling.rounded_total
+    rising = hot((100.0, 200.0, 300.0))
+    assert rising.rounded_total < rising.total
+    assert rising.duty_bound == rising.total
+
+
+def test_verification_accepts_a_segmented_exchanger_with_spare_area():
+    # A rated or retrofitted exchanger reports its installed area, which may
+    # exceed what its duty needs; as for single-segment exchangers, only too
+    # little area fails.
+    arrays = problem_to_solver_arrays(_segmented_problem(), 10.0)
+    solved = SimpleNamespace(
+        S=1,
+        Q_r=[[[120.0]]],
+        Q_r_by_period=[[[[120.0]]]],
+        z=[[[1.0]]],
+        z_allowed=[[[1]]],
+        Q_h=[0.0],
+        Q_c=[0.0],
+        z_hu=[0.0],
+        z_cu=[0.0],
+        T_h=[[473.15, 388.15]],
+        T_c=[[408.15, 323.15]],
+        T_h_by_period=[[[473.15, 388.15]]],
+        T_c_by_period=[[[408.15, 323.15]]],
+        area_r=[[[999.0]]],
+    )
+    network = extract_heat_exchanger_network(solved, arrays, run_id="segmented")
+    exchanger = network.exchangers[0]
+    needed = exchanger.segment_design_area
+
+    def failures(area):
+        rated = exchanger.model_copy(update={"area": area})
+        return [
+            failure
+            for failure in verify_network_feasibility(
+                network.model_copy(update={"exchangers": (rated,)})
+            )
+            if "segment area" in failure
+        ]
+
+    assert failures(1.2 * needed) == []
+    assert failures(0.8 * needed)
