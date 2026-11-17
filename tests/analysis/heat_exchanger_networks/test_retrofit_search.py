@@ -953,3 +953,48 @@ def test_ceiling_relocations_caps_the_relocations_ranked_per_design(
     )
 
     assert ranked.count("relocation") == 2
+
+
+def test_verification_allows_an_installed_unit_its_off_design_chen_error():
+    from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
+        chen_lmtd,
+        exact_lmtd,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+
+    # The model calibrates an installed unit's capacity at its design point
+    # (exact over Chen LMTD there) and rates other states with Chen's LMTD;
+    # verification sizes with the exact LMTD. A unit designed at lopsided
+    # approaches (40 and 2 K) and run at even ones (10 and 10 K) carries
+    # Chen's ratio there over the design one more duty in the model, which
+    # verification must allow; at its design state it needs no allowance.
+    def state(hot_in, hot_out, cold_in, cold_out):
+        return HeatExchangerPeriodState(
+            period_id="a",
+            period_idx=0,
+            duty=10.0,
+            active=True,
+            source_inlet_temperature=hot_in,
+            source_outlet_temperature=hot_out,
+            sink_inlet_temperature=cold_in,
+            sink_outlet_temperature=cold_out,
+        )
+
+    unit = _existing_network().exchangers[0]
+    even = unit.model_copy(update={"period_states": (state(100.0, 60.0, 50.0, 90.0),)})
+    lopsided = unit.model_copy(
+        update={"period_states": (state(150.0, 52.0, 50.0, 110.0),)}
+    )
+    design = {0: (10.0, 40.0, 2.0, None)}
+
+    def ratio(theta_1, theta_2):
+        return chen_lmtd(theta_1, theta_2) / exact_lmtd(theta_1, theta_2)
+
+    assert search._chen_allowance(even, design) == pytest.approx(
+        ratio(10.0, 10.0) / ratio(40.0, 2.0), rel=1e-6
+    )
+    assert search._chen_allowance(lopsided, design) == pytest.approx(1.0)
+    assert search._chen_allowance(even, {}) == pytest.approx(1.0, abs=1e-6)

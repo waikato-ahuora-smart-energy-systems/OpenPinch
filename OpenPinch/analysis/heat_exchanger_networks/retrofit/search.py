@@ -309,6 +309,38 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             )
 
 
+def _chen_allowance(exchanger, design_points: Mapping[int, tuple]) -> float:
+    """How much more duty the model lets ``exchanger``'s installed area
+    carry than verification's exact sizing does, at its worst active
+    period (at least 1).
+
+    The model calibrates the unit at its design point for each period
+    (``design_points``: period index to ``(duty, theta_1, theta_2,
+    required)``) and rates other states with Chen's LMTD, so off design it
+    carries Chen's ratio to the exact LMTD there over that ratio at the
+    design point."""
+
+    from ..models.fixed_structure import chen_lmtd, exact_lmtd
+
+    def ratio(theta_1: float, theta_2: float) -> float | None:
+        exact = exact_lmtd(theta_1, theta_2)
+        return chen_lmtd(theta_1, theta_2) / exact if exact > 0.0 else None
+
+    worst = 1.0
+    for state in exchanger.period_states:
+        if not state.active:
+            continue
+        solved = ratio(
+            state.source_inlet_temperature - state.sink_outlet_temperature,
+            state.source_outlet_temperature - state.sink_inlet_temperature,
+        )
+        point = design_points.get(state.period_idx)
+        design = ratio(point[1], point[2]) if point and point[0] > 0.0 else None
+        if solved is not None and design is not None:
+            worst = max(worst, solved / design)
+    return worst
+
+
 def _within_pressure_drop(
     enhanced, settings: RetrofitSettings, network: HeatExchangerNetwork
 ) -> bool:
@@ -597,7 +629,18 @@ class _Evaluator:
             # The solver accepts loosely converged points: drop a design whose
             # approaches, heat balances or areas fail the duty optimiser's
             # checks, judging installed areas as the model did (widened).
-            if verify_solution(structure, model, self._widened(solved, state.enhanced)):
+            spec = structure.spec
+            points = {
+                exchanger_id: (
+                    spec.recovery_design_points
+                    if kind == "recovery"
+                    else spec.utility_design_points
+                ).get(index, {})
+                for (kind, index), exchanger_id in zip(structure.slots, ids)
+            }
+            if verify_solution(
+                structure, model, self._widened(solved, state.enhanced, points)
+            ):
                 return None
             results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
@@ -830,18 +873,24 @@ class _Evaluator:
         return sized if sized is not None else self.evaluate(state)
 
     def _widened(
-        self, network: HeatExchangerNetwork, enhanced: frozenset[str] = frozenset()
+        self,
+        network: HeatExchangerNetwork,
+        enhanced: frozenset[str] = frozenset(),
+        design_points: Mapping[str, Mapping[int, tuple]] | None = None,
     ) -> HeatExchangerNetwork:
         """``network`` with each existing unit's installed area widened by
-        ``area_tolerance``, and an ``enhanced`` unit's area times its
-        enhancement factor (verification sizes at the base coefficient), as
-        the model rates them."""
+        ``area_tolerance`` and by Chen's LMTD error at its solved state
+        (``_chen_allowance``), and an ``enhanced`` unit's area times its
+        enhancement factor (verification sizes at the base coefficient and
+        the exact LMTD), as the model rates them."""
 
         tolerance = float(self.settings.area_tolerance)
         factors = self.settings.enhancement_factors or {}
 
         def rated(e):
-            area = e.area + tolerance * self.installed[e.exchanger_id]
+            area = (e.area + tolerance * self.installed[e.exchanger_id]) * (
+                _chen_allowance(e, (design_points or {}).get(e.exchanger_id, {}))
+            )
             if e.exchanger_id in enhanced:
                 area *= float(factors[e.exchanger_id])
             return e.model_copy(update={"area": area})
