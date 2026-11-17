@@ -1057,6 +1057,7 @@ class _DesignAccessor:
         enhancement_area_cost: float = 0.0,
         enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None,
         pressure_drop_allowances: Mapping[str, float] | None = None,
+        repiping_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1111,7 +1112,12 @@ class _DesignAccessor:
         is on and the pressure drop, kPa, it adds) and
         ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa,
         it can take) keep the inserts of every design within each stream's
-        allowance.
+        allowance. ``repiping_cost`` ($ per stream) adds the cost of each
+        stream whose piping a new match, relocation or new end heater or
+        cooler changes: both streams of a new match, the streams a relocated
+        exchanger leaves and joins (not one it stays on in the same stage),
+        and the stream of a new heater or cooler. A relocated exchanger may
+        also take added area, as an area addition.
 
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked
@@ -1205,6 +1211,7 @@ class _DesignAccessor:
                         if pressure_drop_allowances is None
                         else {k: float(v) for k, v in pressure_drop_allowances.items()}
                     ),
+                    repiping_cost=float(repiping_cost),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

@@ -91,6 +91,9 @@ class RetrofitSettings:
     is on and the pressure drop, kPa, it adds) and
     ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa, it
     can take) keep every design's inserts within each stream's allowance.
+    ``repiping_cost`` ($ per stream) adds to a new match, relocation or
+    new end heater or cooler the cost of each stream whose piping it
+    changes.
 
     ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened
@@ -121,6 +124,7 @@ class RetrofitSettings:
     enhancement_area_cost: float = 0.0
     enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None
     pressure_drop_allowances: Mapping[str, float] | None = None
+    repiping_cost: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,7 @@ class _Move:
     match: NewMatch | None = None
     splits: tuple[str, ...] = ()
     utility_id: str | None = None
+    repiped: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -305,7 +310,14 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             yield replace(
                 state,
                 network=apply_new_utility(network, utility, utility_id),
-                moves=state.moves + (replace(move, utility_id=utility_id),),
+                moves=state.moves
+                + (
+                    replace(
+                        move,
+                        utility_id=utility_id,
+                        repiped=move.repiped + (utility.stream,),
+                    ),
+                ),
             )
 
 
@@ -350,7 +362,13 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
     )
     for match in matches:
         exchanger_id = _new_id(network, match)
-        move = _Move("new_match", exchanger_id, match, new_splits(network, match))
+        move = _Move(
+            "new_match",
+            exchanger_id,
+            match,
+            new_splits(network, match),
+            repiped=(match.hot, match.cold),
+        )
         yield apply_new_match(network, match, exchanger_id), move
     if settings.relocation_cost is None:
         return
@@ -364,8 +382,28 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
                 )
             }
         )
-        move = _Move("relocation", unit, match, new_splits(remaining, match))
+        move = _Move(
+            "relocation",
+            unit,
+            match,
+            new_splits(remaining, match),
+            repiped=_relocation_repiping(network, unit, match),
+        )
         yield apply_relocation(network, unit, match), move
+
+
+def _relocation_repiping(
+    network: HeatExchangerNetwork, unit: str, match: NewMatch
+) -> tuple[str, ...]:
+    """The streams moving ``unit`` to ``match`` repipes: those it leaves
+    and those it joins, less any it stays on in the same stage."""
+
+    old = next(e for e in network.exchangers if e.exchanger_id == unit)
+    before = (str(old.source_stream), str(old.sink_stream))
+    after = (match.hot, match.cold)
+    in_place = not match.new_stage and match.stage == old.stage
+    kept = set(before).intersection(after) if in_place else set()
+    return tuple(s for s in dict.fromkeys(before + after) if s not in kept)
 
 
 def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
@@ -905,6 +943,7 @@ class _Evaluator:
         utility_area = 0.0 if utility is None else float(utility.added_area)
         if utility is not None:
             fixed += settings.new_unit_cost
+        fixed += settings.repiping_cost * len(move.repiped)
         match = move.match
         return HeatExchangerNetworkRetrofitModification(
             kind=move.kind,
@@ -919,6 +958,7 @@ class _Evaluator:
             new_splits=move.splits,
             utility_exchanger_id=move.utility_id,
             utility_area=utility_area,
+            repiped_streams=move.repiped,
         )
 
     def _area_cost(self, area: float) -> float:

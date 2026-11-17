@@ -22,7 +22,8 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     match splits. A new or moved match may come with the new end-of-stream
     heater or cooler that lets it work, ``utility_exchanger_id`` with
     ``utility_area`` (m2); its unit and area costs are in ``fixed_cost`` and
-    ``area_cost``.
+    ``area_cost``. ``repiped_streams`` names the streams whose piping the
+    modification changes; their repiping is in ``fixed_cost``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -39,6 +40,7 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     new_splits: tuple[str, ...] = ()
     utility_exchanger_id: str | None = None
     utility_area: float = 0.0
+    repiped_streams: tuple[str, ...] = ()
 
 
 class HeatExchangerNetworkRetrofitDesign(BaseModel):

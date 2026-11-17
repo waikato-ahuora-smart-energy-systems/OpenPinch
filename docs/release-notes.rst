@@ -4,6 +4,15 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger networks
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.retrofit`` takes ``repiping_cost`` ($ per stream): each new
+  match, relocation and new end heater or cooler also costs that for every
+  stream whose piping it changes, and each modification reports those
+  streams in ``repiped_streams``. A relocated exchanger keeping its stream
+  in the same stage does not repipe it.
+
 0.9.2 (2026-11-17)
 ------------------
 

@@ -665,6 +665,15 @@ Heat transfer enhancement
    no design's inserts exceed a stream's allowance. Hydraulics are not
    modelled beyond these sums: take the figures from a rating of each
    exchanger.
+Repiping
+   ``repiping_cost`` ($ per stream, default 0) prices the piping a step
+   changes, which the unit costs leave out (Nguyen et al., 2010; Bütün et
+   al., 2018 price it the same way): both streams of a new match, the
+   streams a relocated exchanger leaves and joins (a stream it stays on in
+   the same stage keeps its piping), and the stream of a new heater or
+   cooler. Each modification lists them in ``repiped_streams``. A relocated
+   exchanger keeps its id, so it can also take added area, which makes a
+   move to a match that needs a bigger unit a resized reassignment.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility

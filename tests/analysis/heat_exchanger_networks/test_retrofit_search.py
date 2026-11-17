@@ -984,3 +984,83 @@ def test_verification_uses_the_models_rating_allowance_for_installed_units(
 
     assert verified[0]["E3"] == pytest.approx(1008.5 * 1.02 * 1.1)
     assert verified[0]["E7"] == pytest.approx(246.75 * 1.02 * 1.1)
+
+
+@pytest.mark.parametrize("strategy", ["stepwise", "structure"])
+@pytest.mark.parametrize("kind", ["new_match", "relocation"])
+def test_repiping_cost_prices_every_stream_a_move_repipes(fake_solver, strategy, kind):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    # A new match repipes both its streams, and a paired end heater or
+    # cooler its stream. A relocation repipes the streams it leaves and
+    # joins; a stream it stays on, in the same stage, keeps its piping.
+    if kind == "relocation":
+        # New matches and added area fail, so the best step is a relocation.
+        fake_solver.fail = lambda spec: (
+            len(spec.recovery) > 4
+            or bool(spec.enlargeable_recovery or spec.enlargeable_utilities)
+        )
+    existing = _existing_network()
+    before = {e.exchanger_id: e for e in existing.exchangers}
+    repiping = 2_000.0
+    result = run_retrofit_search(
+        _problem(),
+        existing,
+        RetrofitSettings(
+            strategy=strategy,
+            max_modifications=1,
+            relocation_cost=5_000.0,
+            new_utility_units=True,
+            repiping_cost=repiping,
+            **COSTS,
+        ),
+    )
+
+    design = result.frontier[1]
+    moves = [m for m in design.modifications if m.kind == kind]
+    assert len(moves) == 1
+    for m in design.modifications:
+        if m.kind in {"area_addition", "enhancement"}:
+            assert m.repiped_streams == ()
+    m = moves[0]
+    expected = {m.hot_stream, m.cold_stream}
+    if kind == "relocation":
+        old = before[m.exchanger_id]
+        kept = (
+            {old.source_stream, old.sink_stream}.intersection(expected)
+            if not m.new_stage and m.stage == old.stage
+            else set()
+        )
+        expected = (expected | {old.source_stream, old.sink_stream}) - kept
+    fixed = {"new_match": COSTS["new_unit_cost"], "relocation": 5_000.0}[kind]
+    fixed += COSTS["split_cost"] * len(m.new_splits)
+    if m.utility_exchanger_id is not None:
+        utility = next(
+            e
+            for e in design.network.exchangers
+            if e.exchanger_id == m.utility_exchanger_id
+        )
+        heater = utility.kind is HeatExchangerKind.HOT_UTILITY
+        expected.add(utility.sink_stream if heater else utility.source_stream)
+        fixed += COSTS["new_unit_cost"]
+    assert set(m.repiped_streams) == expected
+    assert len(m.repiped_streams) == len(expected)
+    assert m.fixed_cost == pytest.approx(fixed + repiping * len(expected))
+
+
+def test_design_retrofit_takes_the_repiping_cost(fake_solver):
+    result = _problem().design.retrofit(
+        _existing_network(),
+        max_modifications=1,
+        new_match_candidates=1,
+        new_unit_cost=0.0,
+        repiping_cost=3_000.0,
+    )
+
+    (match,) = [m for m in result.frontier[1].modifications if m.kind == "new_match"]
+    assert len(match.repiped_streams) == 2
+    assert match.fixed_cost == pytest.approx(6_000.0)
