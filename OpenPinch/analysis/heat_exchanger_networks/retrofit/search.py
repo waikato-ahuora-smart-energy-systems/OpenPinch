@@ -86,6 +86,10 @@ class RetrofitSettings:
     be raised by, tube inserts for example; None: no enhancement) enables
     enhancement moves, each costing ``enhancement_cost`` ($) plus
     ``enhancement_area_cost`` ($ per m2 of the unit's installed area).
+    ``enhancement_pressure_drops`` (exchanger id to the stream its insert
+    is on and the pressure drop, kPa, it adds) and
+    ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa, it
+    can take) keep every design's inserts within each stream's allowance.
 
     ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened
@@ -113,6 +117,8 @@ class RetrofitSettings:
     enhancement_factors: Mapping[str, float] | None = None
     enhancement_cost: float = 0.0
     enhancement_area_cost: float = 0.0
+    enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None
+    pressure_drop_allowances: Mapping[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -148,8 +154,9 @@ def run_retrofit_search(
 
     Every exchanger of ``existing`` needs its installed ``area``; a
     ``ValueError`` names those without one. ``max_added_area_fraction`` must
-    be None or finite and non-negative, and every id in
-    ``enhancement_factors`` must name an existing exchanger.
+    be None or finite and non-negative, and every exchanger id and stream in
+    ``enhancement_factors``, ``enhancement_pressure_drops`` and
+    ``pressure_drop_allowances`` must be in the existing network.
     """
 
     if settings.strategy not in STRATEGIES:
@@ -179,13 +186,35 @@ def run_retrofit_search(
             "retrofit needs a unique id on every existing exchanger; "
             "repeated: " + ", ".join(duplicates) + "."
         )
-    unknown = sorted(set(settings.enhancement_factors or {}).difference(ids))
-    if unknown:
-        raise ValueError(
-            "enhancement_factors names exchangers not in the existing network: "
-            + ", ".join(unknown)
-            + "."
-        )
+    streams = {
+        str(name)
+        for e in _structural_exchangers(existing)
+        for name in (e.source_stream, e.sink_stream)
+    }
+    drops = settings.enhancement_pressure_drops or {}
+    for name, given, known, what in (
+        ("enhancement_factors", settings.enhancement_factors or {}, ids, "exchangers"),
+        ("enhancement_pressure_drops", drops, ids, "exchangers"),
+        (
+            "enhancement_pressure_drops",
+            {stream for stream, _drop in drops.values()},
+            streams,
+            "streams",
+        ),
+        (
+            "pressure_drop_allowances",
+            settings.pressure_drop_allowances or {},
+            streams,
+            "streams",
+        ),
+    ):
+        unknown = sorted(set(given).difference(known))
+        if unknown:
+            raise ValueError(
+                f"{name} names {what} not in the existing network: "
+                + ", ".join(unknown)
+                + "."
+            )
     ensure_target_results(problem, {}, None)
     evaluator = _Evaluator(problem, existing, settings)
     base = evaluator.evaluate(_State(existing, frozenset(), ()))
@@ -253,7 +282,13 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         sorted(state.enlarged.difference(parent.binding))
     )
     for exchanger_id in () if structural else candidates:
-        if exchanger_id in factors and exchanger_id not in state.enhanced:
+        if (
+            exchanger_id in factors
+            and exchanger_id not in state.enhanced
+            and _within_pressure_drop(
+                state.enhanced | {exchanger_id}, settings, state.network
+            )
+        ):
             yield replace(
                 state,
                 enhanced=state.enhanced | {exchanger_id},
@@ -270,6 +305,34 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
                 network=apply_new_utility(network, utility, utility_id),
                 moves=state.moves + (replace(move, utility_id=utility_id),),
             )
+
+
+def _within_pressure_drop(
+    enhanced, settings: RetrofitSettings, network: HeatExchangerNetwork
+) -> bool:
+    """Whether the inserts of ``enhanced`` fit every stream's pressure
+    drop allowance (a stream without one takes any) in ``network``. An
+    insert whose stream its exchanger no longer serves (a relocation took
+    it away) never fits."""
+
+    drops = settings.enhancement_pressure_drops or {}
+    allowances = settings.pressure_drop_allowances or {}
+    served = {
+        e.exchanger_id: {str(e.source_stream), str(e.sink_stream)}
+        for e in network.exchangers
+    }
+    added: dict[str, float] = {}
+    for unit in enhanced:
+        if unit in drops:
+            stream, drop = drops[unit]
+            if stream not in served.get(unit, ()):
+                return False
+            added[stream] = added.get(stream, 0.0) + float(drop)
+    return all(
+        total <= float(allowances[stream]) + 1e-9
+        for stream, total in added.items()
+        if stream in allowances
+    )
 
 
 def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
@@ -673,11 +736,19 @@ class _Evaluator:
         factors = self.settings.enhancement_factors or {}
         if sized is None or not factors:
             return sized
-        enhance = frozenset(
-            m.exchanger_id
-            for m in sized.state.moves
-            if m.kind == "area_addition" and m.exchanger_id in factors
-        )
+        # Kept units with a factor, best return per kPa first, while their
+        # inserts fit each stream's pressure drop allowance.
+        enhance: frozenset[str] = frozenset()
+        for unit in sorted(
+            (
+                m.exchanger_id
+                for m in sized.state.moves
+                if m.kind == "area_addition" and m.exchanger_id in factors
+            ),
+            key=lambda unit: -self._insert_return(unit, sized.added.get(unit, 0.0)),
+        ):
+            if _within_pressure_drop(enhance | {unit}, self.settings, state.network):
+                enhance = enhance | {unit}
         if not enhance:
             return sized
         enhanced = self._sized_with(state, enhance)
@@ -687,6 +758,26 @@ class _Evaluator:
         ):
             return enhanced
         return sized
+
+    def _insert_return(self, unit: str, added: float) -> float:
+        """What an insert on ``unit`` may save per kPa of pressure drop it
+        adds: the area addition it can stand in for (fixed cost and the
+        ``added`` area's cost) less its own cost. Infinite (first) for an
+        insert with no pressure drop; an unprofitable one ranks below every
+        profitable one."""
+
+        settings = self.settings
+        saving = (
+            settings.area_addition_cost
+            + self._area_cost(added)
+            - settings.enhancement_cost
+            - settings.enhancement_area_cost * self.installed[unit]
+        )
+        drops = settings.enhancement_pressure_drops or {}
+        drop = float(drops[unit][1]) if unit in drops else 0.0
+        if drop <= 0.0:
+            return math.inf if saving > 0.0 else saving
+        return saving / drop
 
     def _sized_with(self, state: _State, enhance: frozenset[str]) -> _Evaluated | None:
         """``state`` with the ``enhance`` units enhanced and its added area

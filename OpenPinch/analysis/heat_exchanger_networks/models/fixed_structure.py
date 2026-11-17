@@ -754,7 +754,13 @@ def _q_reach(owner, n: int, r: int, match: RecoveryMatch) -> float:
 
 
 def _q_max(owner, n: int, match: RecoveryMatch) -> float:
-    return max(0.0, min(owner.hot_load[n][match.hot], owner.cold_load[n][match.cold]))
+    return max(
+        0.0,
+        min(
+            owner.hot_profiles[n][match.hot].duty_bound,
+            owner.cold_profiles[n][match.cold].duty_bound,
+        ),
+    )
 
 
 # -- equations ----------------------------------------------------------------
@@ -821,7 +827,7 @@ def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
                 f"qu{e}p{n}",
                 start["q_u"][e],
                 0.0,
-                stream_profile(owner, n, m).total,
+                stream_profile(owner, n, m).duty_bound,
             )
             for e, m in enumerate(spec.utilities)
         ]

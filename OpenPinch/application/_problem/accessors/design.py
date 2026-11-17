@@ -1054,6 +1054,8 @@ class _DesignAccessor:
         enhancement_factors: Mapping[str, float] | None = None,
         enhancement_cost: float = 0.0,
         enhancement_area_cost: float = 0.0,
+        enhancement_pressure_drops: Mapping[str, tuple[str, float]] | None = None,
+        pressure_drop_allowances: Mapping[str, float] | None = None,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1103,6 +1105,11 @@ class _DesignAccessor:
         tube inserts for example; None, the default: no enhancement) lets a
         step enhance an exchanger, at ``enhancement_cost`` ($) plus
         ``enhancement_area_cost`` ($ per m2 of its installed area).
+        ``enhancement_pressure_drops`` (exchanger id to the stream its insert
+        is on and the pressure drop, kPa, it adds) and
+        ``pressure_drop_allowances`` (stream to the extra pressure drop, kPa,
+        it can take) keep the inserts of every design within each stream's
+        allowance.
 
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked
@@ -1182,6 +1189,19 @@ class _DesignAccessor:
                     ),
                     enhancement_cost=float(enhancement_cost),
                     enhancement_area_cost=float(enhancement_area_cost),
+                    enhancement_pressure_drops=(
+                        None
+                        if enhancement_pressure_drops is None
+                        else {
+                            k: (str(stream), float(drop))
+                            for k, (stream, drop) in enhancement_pressure_drops.items()
+                        }
+                    ),
+                    pressure_drop_allowances=(
+                        None
+                        if pressure_drop_allowances is None
+                        else {k: float(v) for k, v in pressure_drop_allowances.items()}
+                    ),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

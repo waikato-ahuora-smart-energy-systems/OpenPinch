@@ -45,6 +45,17 @@ RETROFITTED_HOT_UTILITY = 10_958.81
 # left out. Inserts cost 500 + 10 A $ (Table 5).
 ENHANCEMENT_FACTORS = {"E5": 0.448 / 0.325, "E1": 0.669 / 0.517}
 ENHANCED_HOT_UTILITY = 13_661.52
+# Section 5.1: inserts raise C1's tube-side pressure drop in E5 from 15.73
+# to 37.67 kPa, in E1 from 167.29 to 169.25 and in E2 (U 0.475 to 0.597,
+# Table 6) from 131.40 to 163.31; C1 runs at 668.51 kPa of its 700 kPa
+# limit (Table 3), so E2's insert is the one that breaks it.
+E2_FACTOR = 0.597 / 0.475
+INSERT_PRESSURE_DROPS = {
+    "E5": ("C1", 37.67 - 15.73),
+    "E1": ("C1", 169.25 - 167.29),
+    "E2": ("C1", 163.31 - 131.40),
+}
+C1_ALLOWANCE = 700.0 - 668.51
 
 # Fig. 10, in stages: C1 from its hot end meets 1, 5, 2, 4, 6, 7, 3; H1 meets
 # 1, 2, 3. Areas in m2 at U = 0.25 from the Table 4 duties.
@@ -226,3 +237,28 @@ def test_enhancing_e5_then_e1_reaches_the_published_hot_utility():
     assert result.frontier[2].hot_utility == pytest.approx(
         ENHANCED_HOT_UTILITY, rel=0.01
     )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_the_pressure_drop_limit_rules_out_e2_as_the_paper_does():
+    result = _problem().design.retrofit(
+        EXISTING,
+        max_modifications=3,
+        strategy="stepwise",
+        new_unit_cost=1e9,
+        area_addition_cost=1e9,
+        enhancement_factors={**ENHANCEMENT_FACTORS, "E2": E2_FACTOR},
+        enhancement_cost=500.0,
+        enhancement_area_cost=10.0,
+        enhancement_pressure_drops=INSERT_PRESSURE_DROPS,
+        pressure_drop_allowances={"C1": C1_ALLOWANCE},
+    )
+
+    steps = [
+        [m.exchanger_id for m in design.modifications if m.kind == "enhancement"]
+        for design in result.frontier
+    ]
+    assert steps[:3] == [[], ["E5"], ["E5", "E1"]]
+    assert not any("E2" in step for step in steps)

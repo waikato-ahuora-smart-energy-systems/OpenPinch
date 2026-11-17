@@ -16,6 +16,12 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Fixed: a fixed-structure solve (``optimise_duties``, retrofit) could be
+  infeasible when a segmented stream's heat capacity falls along it, as
+  the duty bounds used the exact total while the balances use the
+  rounded profile. Verification now accepts a segmented exchanger with
+  more area than its duty needs, as it already did for single-segment
+  exchangers, so an existing network with segmented streams can be rated.
 - New ``HeatExchangerNetworkRecord``
   (``OpenPinch.analysis.heat_exchanger_networks.results.record``), passed as
   ``design.heat_exchanger_network(record=...)``: a thread-safe record that
@@ -51,7 +57,8 @@ Heat exchanger network synthesis
   exchanger. ``enhancement_factors``, ``enhancement_cost`` and
   ``enhancement_area_cost`` add heat transfer enhancement (tube inserts)
   of existing exchangers as a move, checked against Akpomiemie and Smith
-  (2018). With Ipopt the stepwise search adds area only on exchangers whose
+  (2018); ``enhancement_pressure_drops`` and ``pressure_drop_allowances``
+  keep inserts within each stream's pressure drop allowance. With Ipopt the stepwise search adds area only on exchangers whose
   area is worth something, from the solver's duals; the fixed-structure
   model reports them as ``area_values`` and has a ``"utility cost"`` goal.
   ``HENS_MAX_PARALLEL`` runs each step's solves on threads.
