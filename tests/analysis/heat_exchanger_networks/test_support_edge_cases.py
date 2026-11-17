@@ -1046,3 +1046,28 @@ def test_recovery_extraction_reads_each_match_binary_once():
 
     assert exchangers == ()
     assert {binary.reads for row in binaries for cell in row for binary in cell} == {1}
+
+
+class _NumpyLikeFloat(float):
+    """A float subclass, as NumPy's float64 is."""
+
+    @property
+    def value(self) -> float:
+        raise AssertionError("a float was asked for a value attribute")
+
+
+class _BracketedValue(list):
+    """A ``[value]`` list, which ``float()`` cannot convert."""
+
+    def __float__(self) -> float:
+        raise AssertionError("a [value] list was passed to float()")
+
+
+def test_extraction_reads_numbers_and_bracketed_values_directly():
+    # Floats, ints, NumPy floats and [value] lists are most of what extraction
+    # reads; a NumPy float took an extra lookup and a list raised and caught
+    # a TypeError in float() on every read.
+    assert extraction_metadata._optional_float(_NumpyLikeFloat(1.25)) == 1.25
+    assert extraction_metadata._optional_float(_BracketedValue([0.5])) == 0.5
+    assert extraction_metadata._optional_float(_BracketedValue()) is None
+    assert extraction_metadata._optional_float(3) == 3.0

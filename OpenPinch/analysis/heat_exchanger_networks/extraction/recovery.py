@@ -11,11 +11,12 @@ from .metadata import (
     _allowed,
     _index,
     _is_active,
+    _normalized_solver_duty,
     _optional_float,
     _optional_int,
     _third_dimension,
 )
-from .period_state import _recovery_duty, _recovery_period_state
+from .period_state import _recovery_period_state
 from .segment_area import _recovery_segment_contributions
 
 
@@ -40,27 +41,31 @@ def _recovery_exchangers(
     if not stages and q_values_by_period is not None:
         stages = _third_dimension(_index(q_values_by_period, 0))
     binaries = getattr(solved_model, "z", None)
+    # Each period's duty grid, and below each (hot, cold) row, is looked up
+    # once rather than from the top for every stage of every match.
+    period_grids = [
+        _index(q_values_by_period, period_idx)
+        if q_values_by_period is not None
+        else q_values
+        for period_idx in range(len(period_ids))
+    ]
     exchangers: list[HeatExchanger] = []
     for i, hot_stream in enumerate(hot_streams):
         for j, cold_stream in enumerate(cold_streams):
+            duty_rows = [_index(grid, i, j) for grid in period_grids]
+            binary_row = _index(binaries, i, j)
             for k in range(stages):
                 # The binary is shared by every period, so it is read once.
-                binary = _optional_float(_index(binaries, i, j, k))
+                binary = _optional_float(_index(binary_row, k))
                 if not include_inactive and not any(
                     _is_active(
-                        _recovery_duty(
-                            q_values,
-                            q_values_by_period,
-                            period_idx=period_idx,
-                            hot_index=i,
-                            cold_index=j,
-                            stage_index=k,
-                            tolerance=tolerance,
+                        _normalized_solver_duty(
+                            _index(duty_row, k), tolerance=tolerance
                         ),
                         binary,
                         tolerance,
                     )
-                    for period_idx in range(len(period_ids))
+                    for duty_row in duty_rows
                 ):
                     continue
                 states = tuple(
