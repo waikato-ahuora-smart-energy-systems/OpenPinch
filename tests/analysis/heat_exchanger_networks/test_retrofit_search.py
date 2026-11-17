@@ -1278,3 +1278,20 @@ def test_a_utility_named_like_a_heat_pump_keeps_its_own_properties(fake_solver):
 
     baseline, _pumps = fake_solver.heat_pumps[0]
     assert [u.utility for u in baseline if u.side == "hot"] == [0]
+
+
+def test_a_period_named_like_a_heat_pump_leaves_the_heat_pump_offered(fake_solver):
+    # Only stream and utility names can clash with a heat pump's utilities;
+    # a period, stage or segment of the same name does not.
+    def pump(problem: PinchProblem):
+        result = problem.design.retrofit(
+            _existing_network(), max_modifications=1, heat_pump_cycle="carnot"
+        )
+        (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]
+        return pump.hot_stream, pump.cold_stream
+
+    hot, cold = pump(_problem())
+    named = _problem()
+    named.update_options({"PROBLEM_PERIOD_IDS": [f"HP {hot}->{cold}:condenser"]})
+
+    assert pump(named) == (hot, cold)

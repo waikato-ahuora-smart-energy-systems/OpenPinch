@@ -651,7 +651,16 @@ class _Evaluator:
             # A pump whose condenser or evaporator would take a name the
             # problem already uses is left out, so that name keeps resolving
             # to the problem's own stream or utility.
-            taken = [str(key) for axis in axes.values() for key in axis]
+            taken = [
+                str(key)
+                for axis in (
+                    "hot_process_streams",
+                    "cold_process_streams",
+                    "hot_utilities",
+                    "cold_utilities",
+                )
+                for key in axes[axis]
+            ]
             self.heat_pumps = [
                 candidate
                 for candidate in heat_pump_candidates(
