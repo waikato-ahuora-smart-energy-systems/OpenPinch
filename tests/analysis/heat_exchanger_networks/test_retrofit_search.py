@@ -711,3 +711,31 @@ def test_an_enhanced_unit_is_verified_at_its_enhanced_capacity(fake_solver):
 
     assert verified[0] == pytest.approx(1008.5 * 1.02)
     assert pytest.approx(1008.5 * 1.02 * 1.3) in verified
+
+
+def test_the_structure_search_enhances_units_it_would_enlarge(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    # On the fake an enhanced unit saves $20,000/y; at $500 an insert is
+    # worth it, so each sized structure keeps E1 enhanced as well as
+    # enlarged (the fake still adds its area).
+    result = search.run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        search.RetrofitSettings(
+            max_modifications=1,
+            enhancement_factors={"E1": 1.3},
+            enhancement_cost=500.0,
+            **COSTS,
+        ),
+    )
+
+    kinds = {(m.kind, m.exchanger_id) for m in result.frontier[1].modifications}
+    assert ("enhancement", "E1") in kinds
+    assert ("area_addition", "E1") in kinds
+    structural = [
+        m
+        for m in result.frontier[1].modifications
+        if m.kind not in {"area_addition", "enhancement"}
+    ]
+    assert len(structural) == 1

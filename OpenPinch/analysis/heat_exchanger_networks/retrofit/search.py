@@ -651,8 +651,40 @@ class _Evaluator:
     def sized(self, state: _State) -> _Evaluated | None:
         """``state``'s structure with its added area sized: solved with every
         existing unit free to grow, then again with only the units whose
-        added area is worth keeping, each an area addition."""
+        added area is worth keeping, each an area addition. With
+        ``enhancement_factors``, the kept units that have one are also tried
+        enhanced, their area sized again the same way; the better of the two
+        by net annual benefit is kept."""
 
+        sized = self._sized_with(state, frozenset())
+        factors = self.settings.enhancement_factors or {}
+        if sized is None or not factors:
+            return sized
+        enhance = frozenset(
+            m.exchanger_id
+            for m in sized.state.moves
+            if m.kind == "area_addition" and m.exchanger_id in factors
+        )
+        if not enhance:
+            return sized
+        enhanced = self._sized_with(state, enhance)
+        if (
+            enhanced is not None
+            and enhanced.design.net_annual_benefit > sized.design.net_annual_benefit
+        ):
+            return enhanced
+        return sized
+
+    def _sized_with(self, state: _State, enhance: frozenset[str]) -> _Evaluated | None:
+        """``state`` with the ``enhance`` units enhanced and its added area
+        sized (see ``sized``)."""
+
+        state = replace(
+            state,
+            enhanced=enhance,
+            moves=state.moves
+            + tuple(_Move("enhancement", unit) for unit in sorted(enhance)),
+        )
         free = self.evaluate(replace(state, enlarged=frozenset(self.installed)))
         if free is None:
             return self.evaluate(state)
