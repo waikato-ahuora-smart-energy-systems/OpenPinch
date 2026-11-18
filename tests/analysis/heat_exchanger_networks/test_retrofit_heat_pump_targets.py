@@ -175,3 +175,50 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
     assert targets.hot_utility_gap == pytest.approx(
         piped.hot_utility_after - targets.ideal.hot_utility_after
     )
+
+
+def test_each_target_is_priced_at_the_utilities_and_hpr_electricity(monkeypatch):
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        annual_cost_scales,
+    )
+
+    monkeypatch.setattr(
+        heat_pump_targets,
+        "compute_profile_heat_pump_target",
+        lambda **_kwargs: SimpleNamespace(
+            Q_cond=np.array([1000.0]),
+            T_cond=np.array([270.0]),
+            Q_evap=np.array([700.0]),
+            T_evap=np.array([90.0]),
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            w_net=300.0,
+            cop_h=1000.0 / 300.0,
+            hpr_total_annualized_cost=None,
+        ),
+    )
+    problem = _problem()
+
+    piped = heat_pump_targets.retrofit_heat_pump_targets(
+        problem, _solved_network()
+    ).as_piped
+
+    # The case's utilities ($/MWh) and the HPR electricity price, on the
+    # retrofit's $/y basis (price times kW times operating hours / 1000).
+    costing = problem.master_zone.config.costing
+    scale, _capital = annual_cost_scales(costing)
+    hot, cold = 40.68 * scale, 8.568 * scale
+    electricity = float(costing.hpr_ele_price) * scale
+    assert piped.operating_cost_before == pytest.approx(
+        17518.7 * hot + (13603.6 + 1665.1) * cold
+    )
+    assert piped.operating_cost_after == pytest.approx(
+        (17518.7 - 1000.0) * hot
+        + (13603.6 + 1665.1 - 700.0) * cold
+        + 300.0 * electricity
+    )

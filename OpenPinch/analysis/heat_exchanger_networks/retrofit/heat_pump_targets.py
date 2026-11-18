@@ -19,6 +19,7 @@ from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ...heat_pumps.service import compute_profile_heat_pump_target
 from ...targeting.cascade import get_process_heat_cascade
+from ..solver.arrays import annual_cost_scales, problem_to_solver_arrays
 
 # Solved network states carry temperatures in K; problem tables in degC.
 _KELVIN = 273.15
@@ -43,17 +44,27 @@ def retrofit_heat_pump_targets(
         ),
         "as_piped": as_piped_profiles(problem, network),
     }
+    # Prices in $/kW/y as the retrofit's: the first hot and cold utility,
+    # and the HPR electricity price.
+    config = zone.config
+    data = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont).arrays
+    price_scale, _capital = annual_cost_scales(config.costing)
+    prices = {
+        "hot_utility_price": float(data["hu_cost_period"][0][0]),
+        "cold_utility_price": float(data["cu_cost_period"][0][0]),
+        "electricity_price": float(config.costing.hpr_ele_price) * price_scale,
+    }
     targets = {}
     for name, (T_vals, H_hot, H_cold) in profiles.items():
         result = compute_profile_heat_pump_target(
-            T_vals=T_vals, H_hot=H_hot, H_cold=H_cold, config=zone.config, args=args
+            T_vals=T_vals, H_hot=H_hot, H_cold=H_cold, config=config, args=args
         )
-        targets[name] = _summary(result, H_hot, H_cold)
+        targets[name] = _summary(result, H_hot, H_cold, prices)
     return RetrofitHeatPumpTargets(**targets)
 
 
-def _summary(result, H_hot, H_cold) -> RetrofitHeatPumpTarget:
-    """``result`` against the utility its profiles carry."""
+def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
+    """``result`` against the utility its profiles carry, at ``prices``."""
 
     condenser = np.atleast_1d(np.asarray(result.Q_cond, dtype=float))
     evaporator = np.atleast_1d(np.asarray(result.Q_evap, dtype=float))
@@ -77,6 +88,7 @@ def _summary(result, H_hot, H_cold) -> RetrofitHeatPumpTarget:
         ),
         evaporator_duties=tuple(float(q) for q in evaporator),
         total_annualized_cost=result.hpr_total_annualized_cost,
+        **prices,
     )
 
 

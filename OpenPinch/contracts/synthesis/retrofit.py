@@ -135,6 +135,9 @@ class RetrofitHeatPumpTarget(BaseModel):
     condenser_duties: tuple[float, ...]
     evaporating_temperatures: tuple[float, ...]
     evaporator_duties: tuple[float, ...]
+    hot_utility_price: float
+    cold_utility_price: float
+    electricity_price: float
     total_annualized_cost: float | None = None
 
     @property
@@ -144,6 +147,25 @@ class RetrofitHeatPumpTarget(BaseModel):
     @property
     def cold_utility_after(self) -> float:
         return self.cold_utility_before - self.process_heat_absorbed
+
+    @property
+    def operating_cost_before(self) -> float:
+        """The utility cost without the heat pump, $/y."""
+
+        return (
+            self.hot_utility_before * self.hot_utility_price
+            + self.cold_utility_before * self.cold_utility_price
+        )
+
+    @property
+    def operating_cost_after(self) -> float:
+        """The utility and electricity cost with the heat pump, $/y."""
+
+        return (
+            self.hot_utility_after * self.hot_utility_price
+            + self.cold_utility_after * self.cold_utility_price
+            + self.work * self.electricity_price
+        )
 
 
 class RetrofitHeatPumpTargets(BaseModel):
