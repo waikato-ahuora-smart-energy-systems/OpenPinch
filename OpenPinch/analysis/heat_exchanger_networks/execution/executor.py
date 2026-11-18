@@ -392,6 +392,8 @@ class LocalSynthesisExecutor:
             min_approach_share=config.hens.min_exchanger_approach_share,
         )
         arrays = problem_to_solver_arrays(problem, dTmin)
+        # A site seed's task holds each process's levels within the process.
+        site_processes = task.settings.get("site_processes")
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
         is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
@@ -454,12 +456,14 @@ class LocalSynthesisExecutor:
                 if is_heuristic
                 else 0
             ),
-            staged_utilities=(
+            staged_utilities=site_processes is not None
+            or (
                 decompositions is not None
                 and _utility_placement(problem) == "temperature"
                 and _has_utility_levels(decompositions["above"])
             ),
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
+            site_processes=site_processes,
         )
 
     def _parent_problem(

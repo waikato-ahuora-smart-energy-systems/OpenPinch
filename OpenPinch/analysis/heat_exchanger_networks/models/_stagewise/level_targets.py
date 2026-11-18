@@ -9,9 +9,11 @@ period. Stream-end and staged units count together.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from ...solver.utility_slices import utility_slices
 from . import staged_utilities as _staged
 
 # Relative slack on each target, as in the pinch design sides: rounding
@@ -68,4 +70,58 @@ def _level_duty(owner, target: UtilityLevelTarget, n: int):
     return sum(terms)
 
 
-__all__ = ["LEVEL_BAND", "UtilityLevelTarget", "set_level_target_equations"]
+def site_level_targets(
+    solver_arrays, processes: Mapping[str, Mapping[str, Sequence[float]]]
+) -> tuple[tuple[UtilityLevelTarget, ...], tuple[tuple[str, ...], tuple[str, ...]]]:
+    """Each process's levels as targets, and each stream's process as its group.
+
+    ``processes`` maps a process's stream-key prefix (``"<process>.<stream>"``)
+    to its targeted duty per period by utility name (``"Hot Utility.LPS"``).
+    A sliced utility's slices count as their parent. A stream of no listed
+    process is in the group ``""``.
+    """
+
+    identities = solver_arrays.stream_identities
+    groups = (
+        tuple(
+            _process_of(name, processes) for name in identities["hot_process_streams"]
+        ),
+        tuple(
+            _process_of(name, processes) for name in identities["cold_process_streams"]
+        ),
+    )
+    slices = utility_slices(solver_arrays)
+    targets: list[UtilityLevelTarget] = []
+    for side, axis, served in (
+        ("hot", "hot_utilities", groups[1]),
+        ("cold", "cold_utilities", groups[0]),
+    ):
+        names = list(solver_arrays.utility_identities[axis])
+        parents = [slices.get(axis, {}).get(name, (name, 1.0))[0] for name in names]
+        for process, levels in processes.items():
+            streams = tuple(s for s, group in enumerate(served) if group == process)
+            for name, duties in levels.items():
+                utilities = tuple(
+                    u for u, parent in enumerate(parents) if parent == name
+                )
+                if not utilities:
+                    continue
+                targets.append(
+                    UtilityLevelTarget(
+                        side, utilities, streams, tuple(float(d) for d in duties)
+                    )
+                )
+    return tuple(targets), groups
+
+
+def _process_of(stream: str, processes: Mapping[str, object]) -> str:
+    matches = [process for process in processes if stream.startswith(f"{process}.")]
+    return max(matches, key=len, default="")
+
+
+__all__ = [
+    "LEVEL_BAND",
+    "UtilityLevelTarget",
+    "set_level_target_equations",
+    "site_level_targets",
+]

@@ -30,6 +30,7 @@ from ..solver.utility_slices import (
 from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
 from ._stagewise import staged_utilities as _staged
+from ._stagewise.level_targets import site_level_targets
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -96,6 +97,11 @@ class InternalHeatExchangerNetworkProblem:
     utility_level_targets: dict[str, list[float]] | None = field(
         default=None, init=False
     )
+    # A site design: each process's targeted duty per period by utility
+    # name, keyed by its stream-key prefix. The stage-wise model holds each
+    # process's levels and matches streams only within a process
+    # (``_stagewise/level_targets.py:site_level_targets``).
+    site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
 
     def load_model(
         self,
@@ -125,6 +131,12 @@ class InternalHeatExchangerNetworkProblem:
             getattr(self.parent, "case", None), "staged_utilities", False
         ):
             self.args["staged_utilities"] = True
+        if self.site_processes is not None and self.framework != "PDM":
+            targets, groups = site_level_targets(
+                self.solver_arrays, self.site_processes
+            )
+            self.args["level_targets"] = targets
+            self.args["stream_groups"] = groups
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)
             return
@@ -138,6 +150,18 @@ class InternalHeatExchangerNetworkProblem:
         parent_targets = getattr(self.parent, "utility_level_targets", None)
         if parent_targets is not None:
             self.utility_level_targets = parent_targets
+            return
+        if self.site_processes is not None:
+            totals: dict[str, list[float]] = {}
+            for levels in self.site_processes.values():
+                for name, duties in levels.items():
+                    duties = [float(duty) for duty in duties]
+                    totals[name] = (
+                        [a + b for a, b in zip(totals[name], duties)]
+                        if name in totals
+                        else duties
+                    )
+            self.utility_level_targets = totals
             return
         if not (
             self.framework == "PDM"
@@ -183,7 +207,11 @@ class InternalHeatExchangerNetworkProblem:
         parent_arrays = getattr(self.parent, "solver_arrays", None)
         if parent_arrays is not None and utility_slices(parent_arrays):
             sliced = with_utility_slices(self.solver_arrays, like=parent_arrays)
-        elif self.framework == "PDM" and self.staged_utilities and self.utility_slicing:
+        elif (
+            (self.framework == "PDM" or self.site_processes is not None)
+            and self.staged_utilities
+            and self.utility_slicing
+        ):
             sliced = with_utility_slices(self.solver_arrays)
         else:
             return

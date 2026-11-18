@@ -232,9 +232,7 @@ def test_searches_share_solved_children_only_with_the_same_holds():
     held = _model(problem, staged_utilities=True, level_targets=_lps_held(probe))
     also_held = _model(problem, staged_utilities=True, level_targets=_lps_held(probe))
     free = _model(problem, staged_utilities=True)
-    grouped = _model(
-        problem, staged_utilities=True, stream_groups=(("P", "Q"), ("P",))
-    )
+    grouped = _model(problem, staged_utilities=True, stream_groups=(("P", "Q"), ("P",)))
     store: dict = {}
 
     shared = stagewise_evolution._shared_solved_topologies(held, store)
@@ -245,3 +243,115 @@ def test_searches_share_solved_children_only_with_the_same_holds():
     assert stagewise_evolution._shared_solved_topologies(grouped, store) is not (
         free_store
     )
+
+
+def _two_heated_plants() -> PinchProblem:
+    """Plants A and B each heat a stream from 100 to 130 C on LPS or HPS."""
+    return _site(
+        [
+            _stream("A", "C1", 100.0, 130.0, 30.0),
+            _stream("B", "C2", 100.0, 130.0, 30.0),
+            _stream("A", "H1", 200.0, 190.0, 10.0),
+            _stream("B", "H2", 200.0, 190.0, 10.0),
+        ],
+        [
+            _utility("LPS", "Hot", 140.0, 139.9, 60.0),
+            _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+            _utility("CW", "Cold", 20.0, 25.0, 5.0),
+        ],
+    )
+
+
+def test_a_site_problem_holds_each_processs_levels_by_name():
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    problem = _two_heated_plants()
+    arrays = problem_to_solver_arrays(problem, D_TMIN)
+    cold = list(arrays.stream_identities["cold_process_streams"])
+    hot = list(arrays.stream_identities["hot_process_streams"])
+    a, b = (name.rsplit(".", 1)[0] for name in sorted(cold))
+    internal = InternalHeatExchangerNetworkProblem(
+        solver_arrays=arrays,
+        name="site",
+        framework="ESM",
+        solver="highs",
+        dTmin=D_TMIN,
+        stages=2,
+        minimisation_goal="utility costs",
+        integers=True,
+        tol=1e-6,
+        staged_utilities=True,
+        site_processes={
+            a: {"Hot Utility.LPS": [30.0], "Hot Utility.HPS": [0.0]},
+            b: {"Hot Utility.LPS": [0.0], "Hot Utility.HPS": [30.0]},
+        },
+    )
+
+    internal.load_model()
+    case = internal.case
+
+    assert case.stream_groups == (
+        tuple(name.rsplit(".", 1)[0] for name in hot),
+        tuple(name.rsplit(".", 1)[0] for name in cold),
+    )
+    c1 = cold.index(f"{a}.C1")
+    c2 = cold.index(f"{b}.C2")
+    assert UtilityLevelTarget("hot", (0,), (c1,), (30.0,)) in case.level_targets
+    assert UtilityLevelTarget("hot", (1,), (c2,), (30.0,)) in case.level_targets
+    assert internal.utility_level_targets == {
+        "Hot Utility.LPS": [30.0],
+        "Hot Utility.HPS": [30.0],
+    }
+    case.optimise(False)
+    assert case.mSuccess == 1
+    assert _value(case.Q_h_by_period[0][c1][0]) == pytest.approx(30.0, rel=1e-6)
+    assert _value(case.Q_h_by_period[0][c2][1]) == pytest.approx(30.0, rel=1e-6)
+
+
+def test_a_site_seed_carries_its_process_targets_into_the_evolution_task():
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        LocalSynthesisExecutor,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+        workflow_settings_from_problem,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+        build_seeded_network_evolution_method_tasks,
+    )
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+    from tests.analysis.heat_exchanger_networks.test_network_evolution_method import (
+        _recovery_exchanger,
+    )
+
+    problem = _two_heated_plants()
+    arrays = problem_to_solver_arrays(problem, D_TMIN)
+    a, b = sorted(
+        {
+            name.rsplit(".", 1)[0]
+            for name in arrays.stream_identities["cold_process_streams"]
+        }
+    )
+    processes = {
+        a: {"Hot Utility.LPS": [30.0]},
+        b: {"Hot Utility.HPS": [30.0]},
+    }
+    seed = HeatExchangerNetwork(
+        exchangers=(_recovery_exchanger(f"{a}.H1", f"{a}.C1", 1),),
+        run_id="seed-run",
+        method="heuristic_pinch_design_method",
+        stage_count=1,
+        source_metadata={"site_processes": processes},
+    )
+
+    (task,) = build_seeded_network_evolution_method_tasks(
+        workflow_settings_from_problem(problem), [seed]
+    )
+    built = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task, problem=problem, parent_outcomes={}
+    )
+
+    assert task.settings["site_processes"] == processes
+    assert built.site_processes == processes
+    assert built.staged_utilities
