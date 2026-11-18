@@ -384,7 +384,8 @@ then runs its utility over the whole range, and a level it cannot hold is
 chosen by price instead, with a warning.
 
 ``design.heat_exchanger_network()`` on a site pools every process's streams
-as one process, so any two streams may match. For a site of several
+as one process, so any two streams may match, and it warns when the problem
+has more than one process zone. For a site of several
 process zones, ``design.total_site_heat_exchanger_network(width=, depth=,
 options=)`` designs each process alone with the pinch design method, its
 utilities placed by temperature, then joins one network per process at each

@@ -146,3 +146,30 @@ def test_a_site_network_holds_each_processs_levels_and_matches_within_it():
 def test_a_site_network_needs_more_than_one_process():
     with pytest.raises(ValueError, match="more than one process zone"):
         _site(("Heating",)).design.total_site_heat_exchanger_network()
+
+
+def test_a_pooled_design_of_a_site_warns_that_processes_may_match(monkeypatch):
+    """``heat_exchanger_network()`` on a site pools every process's streams;
+    it says so and names the site method. A single process does not warn."""
+    from OpenPinch.application._problem.accessors import design
+
+    monkeypatch.setattr(
+        design._DesignAccessor, "_synthesise", lambda self, **kwargs: "designed"
+    )
+
+    with pytest.warns(UserWarning, match="total_site_heat_exchanger_network"):
+        assert _site().design.heat_exchanger_network() == "designed"
+
+
+def test_a_single_process_design_does_not_warn(monkeypatch, recwarn):
+    from OpenPinch.application._problem.accessors import design
+
+    monkeypatch.setattr(
+        design._DesignAccessor, "_synthesise", lambda self, **kwargs: "designed"
+    )
+
+    _site(("Heating",)).design.heat_exchanger_network()
+    site = _site()
+    site.design.heat_exchanger_network(zone=next(iter(site.master_zone.subzones)))
+
+    assert not [w for w in recwarn if "total_site" in str(w.message)]

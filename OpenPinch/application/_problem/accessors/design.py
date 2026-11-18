@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import warnings
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
@@ -507,6 +508,17 @@ class _DesignAccessor:
                 )
         from ....analysis.heat_exchanger_networks.utility_only import is_one_sided
 
+        if len(self._process_zones()) > 1:
+            warnings.warn(
+                "heat_exchanger_network() pools the streams of every process "
+                "zone, so it allows any inter-process match with no piping "
+                "cost and places utilities by temperature for the site. Use "
+                "design.total_site_heat_exchanger_network() for a network that "
+                "recovers heat within each process and holds each process's "
+                "utility levels.",
+                UserWarning,
+                stacklevel=2,
+            )
         hens = self._effective_hens(options)
         margin = self._overdesign_margin(overdesign_percentage, hens)
         basis = self._design_basis(design_basis, period_id, hens)
@@ -573,14 +585,8 @@ class _DesignAccessor:
             resolve_search,
         )
         from ....analysis.heat_exchanger_networks.site import site_seeds
-        from ....domain.enums import ZoneType
 
-        master = self._problem.master_zone
-        processes = [
-            name
-            for name, zone in (master.subzones or {}).items()
-            if str(getattr(zone, "type", "")) == ZoneType.P.value
-        ]
+        processes = self._process_zones()
         if len(processes) < 2:
             raise ValueError(
                 "a site network needs more than one process zone; design a "
@@ -608,6 +614,16 @@ class _DesignAccessor:
         return self.network_evolution(
             site_seeds(pools), options=options, width=width, depth=depth
         )
+
+    def _process_zones(self) -> list[str]:
+        """The master zone's immediate subzones of type ``Process Zone``."""
+        from ....domain.enums import ZoneType
+
+        return [
+            name
+            for name, zone in (self._problem.master_zone.subzones or {}).items()
+            if str(getattr(zone, "type", "")) == ZoneType.P.value
+        ]
 
     def _effective_hens(self, options):
         """The HENS configuration a call runs with: its options over the stored."""

@@ -15,7 +15,10 @@ Heat exchanger network synthesis
   evolution refines them as one problem with no thermal derivative step.
   Every process keeps each utility level at its duty, and heat is recovered
   only between streams of one process. On ``zonal_site`` every process meets
-  each of its level targets.
+  each of its level targets. ``design.heat_exchanger_network()`` on a problem
+  with more than one process zone now emits a ``UserWarning`` that it pools
+  every process's streams (any inter-process match, no piping cost) and
+  names the site method.
 - A network evolution or stage-wise model can hold a utility level's duty
   over a group of streams and allow recovery only within a group; a stream
   with several stream-end heaters (or coolers) is now reported as split
