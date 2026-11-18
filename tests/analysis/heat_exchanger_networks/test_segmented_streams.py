@@ -45,6 +45,7 @@ from OpenPinch.domain._stream.segment import StreamSegment
 from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import StreamType
 from OpenPinch.domain.stream import Stream
+from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.zone import Zone
 from tests.strategies.stream_segments import segmented_streams
 
@@ -521,6 +522,8 @@ def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
             heat_recovery_target=140.0,
             hot_pinch=100.0,
             cold_pinch=90.0,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
         )
 
     monkeypatch.setattr(

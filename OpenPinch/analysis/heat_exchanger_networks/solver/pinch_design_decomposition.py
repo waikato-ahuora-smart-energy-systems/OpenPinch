@@ -20,6 +20,7 @@ from ....analysis.targeting.direct import (
 )
 from ....domain.configuration import tol
 from ....domain.stream import Stream
+from ....domain.stream_collection import StreamCollection
 from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
@@ -28,6 +29,7 @@ from .arrays import (
     PreparedSolverArrays,
     _array_dt_cont_multiplier,
     _temperature_contribution,
+    _value,
     problem_to_solver_arrays,
 )
 
@@ -50,6 +52,9 @@ class PinchDesignTarget(BaseModel):
     hot_pinch: float | None
     cold_pinch: float | None
     shifted_pinch_temperature: float | None
+    # Each utility's targeted duty (kW), in the decomposition's utility order.
+    hot_utility_level_targets: tuple[float, ...] = ()
+    cold_utility_level_targets: tuple[float, ...] = ()
     target_access_contract: tuple[str, ...] = Field(
         default=(
             "OpenPinch direct_heat_integration on copied Zone",
@@ -117,6 +122,8 @@ class PinchDesignDecomposition(BaseModel):
     manual_stage_selection: tuple[int, int] | None
     hot_stream_identities: tuple[str, ...]
     cold_stream_identities: tuple[str, ...]
+    hot_utility_identities: tuple[str, ...] = ()
+    cold_utility_identities: tuple[str, ...] = ()
     unit_conventions: dict[str, str]
     dt_cont_convention: str
 
@@ -220,7 +227,12 @@ def build_pinch_design_decomposition(
         raise ValueError("pinch_location must be 'above' or 'below'.")
 
     arrays = problem_to_solver_arrays(problem, dTmin)
-    period_targets = _calculate_openpinch_targets(problem, dTmin=float(dTmin))
+    period_targets = _calculate_openpinch_targets(
+        problem,
+        dTmin=float(dTmin),
+        hot_utilities=tuple(arrays.utility_identities["hot_utilities"]),
+        cold_utilities=tuple(arrays.utility_identities["cold_utilities"]),
+    )
     return _build_decomposition(
         arrays=arrays,
         period_targets=period_targets,
@@ -234,6 +246,8 @@ def _calculate_openpinch_targets(
     problem: PreparedProblem,
     *,
     dTmin: float,
+    hot_utilities: tuple[str, ...] = (),
+    cold_utilities: tuple[str, ...] = (),
 ) -> tuple[PinchDesignTarget, ...]:
     zone = _zone_with_hen_dt_contribution(problem, dTmin=dTmin)
     period_ids = ordered_mapping_keys(zone.period_ids or {"0": 0})
@@ -259,9 +273,26 @@ def _calculate_openpinch_targets(
                 hot_pinch=target.hot_pinch,
                 cold_pinch=target.cold_pinch,
                 shifted_pinch_temperature=shifted_pinch_temperature,
+                hot_utility_level_targets=_level_targets(
+                    target.hot_utilities, hot_utilities, period_idx
+                ),
+                cold_utility_level_targets=_level_targets(
+                    target.cold_utilities, cold_utilities, period_idx
+                ),
             )
         )
     return tuple(targets)
+
+
+def _level_targets(
+    targeted: StreamCollection, identities: tuple[str, ...], period_idx: int
+) -> tuple[float, ...]:
+    """Each utility's targeted duty (kW) in ``identities`` order."""
+    duties = {
+        key: _value(utility.heat_flow, "kW", period_idx=period_idx)
+        for key, utility in targeted.items()
+    }
+    return tuple(duties.get(key, 0.0) for key in identities)
 
 
 def _zone_with_hen_dt_contribution(problem: PreparedProblem, *, dTmin: float) -> Zone:
@@ -458,6 +489,8 @@ def _build_decomposition(
         manual_stage_selection=manual_stage_selection,
         hot_stream_identities=tuple(arrays.stream_identities["hot_process_streams"]),
         cold_stream_identities=tuple(arrays.stream_identities["cold_process_streams"]),
+        hot_utility_identities=tuple(arrays.utility_identities["hot_utilities"]),
+        cold_utility_identities=tuple(arrays.utility_identities["cold_utilities"]),
         unit_conventions={
             "process_temperatures": "K in solver arrays; degC in ProblemTable rows",
             "pinch_temperatures": (
