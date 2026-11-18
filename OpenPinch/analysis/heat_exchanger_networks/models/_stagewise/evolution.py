@@ -301,6 +301,9 @@ def _shared_solved_topologies(owner, store: dict | None) -> dict | None:
         # warm start fixes their binaries), so searches share children only
         # when those agree.
         _staged.staged_units_on(owner),
+        # Children inherit the level holds and the stream groups too.
+        getattr(owner, "level_targets", ()),
+        getattr(owner, "stream_groups", None),
     )
     return store.setdefault(key, {})
 
@@ -762,6 +765,8 @@ def _build_and_solve_evolution(
         tol=1e-3,
         solver_options=owner.solver_options,
         staged_utilities=getattr(prev_case, "staged_utilities", False),
+        level_targets=getattr(prev_case, "level_targets", ()),
+        stream_groups=getattr(prev_case, "stream_groups", None),
     )
 
     # Start from the parent's solution, then apply the move over it.

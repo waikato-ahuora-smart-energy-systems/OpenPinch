@@ -13,6 +13,7 @@ from ._stagewise import postprocess as _postprocess
 from ._stagewise import setup as _setup
 from ._stagewise import verification as _verification
 from ._stagewise import warm_start as _warm_start
+from ._stagewise.level_targets import UtilityLevelTarget
 from .base import BaseHeatExchangerNetworkModel
 
 
@@ -46,8 +47,20 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
         values_only: bool = False,
         staged_utilities: bool = False,
+        level_targets: Sequence[UtilityLevelTarget] = (),
+        stream_groups: tuple[Sequence[str], Sequence[str]] | None = None,
     ) -> None:
         self.stages = stages
+        # Each level held at a duty over a group of streams, as a site
+        # network holds each process's levels (``_stagewise/level_targets.py``).
+        self.level_targets = tuple(level_targets)
+        # A group label per hot and per cold stream: recovery matches only
+        # streams of one group, as a site network matches within a process.
+        self.stream_groups = (
+            None
+            if stream_groups is None
+            else (tuple(stream_groups[0]), tuple(stream_groups[1]))
+        )
         # Offer a heater and a cooler at every interior stage boundary, in
         # series between the stages (``_stagewise/staged_utilities.py``).
         self.staged_utilities = staged_utilities

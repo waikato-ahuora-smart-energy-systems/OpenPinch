@@ -7,6 +7,25 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
+  designs one network for a site of several process zones. Each process is
+  designed alone with the pinch design method, its utilities placed by
+  temperature so each level carries its targeted duty; the process networks
+  are joined, one per process at each dt_cont multiplier, and network
+  evolution refines them as one problem with no thermal derivative step.
+  Every process keeps each utility level at its duty, and heat is recovered
+  only between streams of one process. On ``zonal_site`` every process meets
+  each of its level targets. ``design.heat_exchanger_network()`` on a problem
+  with more than one process zone now emits a ``UserWarning`` that it pools
+  every process's streams (any inter-process match, no piping cost) and
+  names the site method.
+- A network evolution or stage-wise model can hold a utility level's duty
+  over a group of streams and allow recovery only within a group; a stream
+  with several stream-end heaters (or coolers) is now reported as split
+  between them, as the model sizes them, so such networks pass the
+  exchanger heat balance checks. The recovery area check now allows for the
+  model's own area smoothing, so a tiny match is no longer rejected for it.
+
 - ``design.retrofit_heat_pumps`` gives an existing network's ideal
   and as-piped heat pump targets from the HPR service: the ideal against
   the process's heating and cooling targets, the as-piped against only the
@@ -72,9 +91,12 @@ Heat exchanger network synthesis
   Hospital now holds its hot water and steam levels.
   ``HENS_UTILITY_SLICES: false`` turns the slices off.
 - ``HENS_UTILITY_PLACEMENT`` chooses how synthesis shares duty between
-  utility levels: ``"temperature"`` (the default) holds each level at the
-  duty targeting gives it, lowest exergy first; ``"price"`` lets the pinch
-  design choose levels by utility cost, as before.
+  utility levels: ``"temperature"`` holds each level at the duty targeting
+  gives it, lowest exergy first, as a site design needs; ``"price"`` lets
+  the pinch design choose levels by utility cost, as before. The default,
+  ``"auto"``, is ``"price"`` for a design covering one process zone (an
+  isolated zone, such as ``heat_exchanger_network(zone="Hospital[S]")``)
+  and ``"temperature"`` for one covering several.
 - The pinch design method no longer drops a side of the pinch whose
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the

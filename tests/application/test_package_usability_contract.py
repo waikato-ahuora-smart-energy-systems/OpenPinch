@@ -61,6 +61,7 @@ EXPECTED_DESIGN_METHODS = {
     "retrofit",
     "retrofit_heat_pumps",
     "thermal_derivative",
+    "total_site_heat_exchanger_network",
 }
 EXPECTED_WORKSPACE_METHODS = {
     "add",

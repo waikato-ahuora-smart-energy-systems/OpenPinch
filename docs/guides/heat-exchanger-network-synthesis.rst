@@ -368,17 +368,32 @@ The extra minimum-unit MILP networks are not part of the depth: set
 default) to add them at any depth that runs the MILP.
 
 With more than one hot or cold utility, ``HENS_UTILITY_PLACEMENT`` sets how
-synthesis shares duty between the levels. ``"temperature"`` (the default)
-places utility as targeting does: the least valuable (lowest exergy) level
-serves first, and the pinch design holds each level at the duty targeting
-gives it. ``"price"`` lets the pinch design choose the levels by utility
-cost instead. A utility whose temperature slides,
+synthesis shares duty between the levels. ``"temperature"`` places utility
+as targeting does, as a site design needs: the least valuable (lowest
+exergy) level serves first, and the pinch design holds each level at the
+duty targeting gives it. ``"price"`` lets the pinch design choose the levels
+by utility cost, as an isolated process would. ``"auto"`` (the default) is
+``"price"`` when the design covers one process zone, for example
+``heat_exchanger_network(zone="Hospital[S]")`` or a problem of one process,
+and ``"temperature"`` when it covers more than one. A utility whose temperature slides,
 such as hot water from 90 to 70 C, is then, by temperature, run through slices in series, so
 one utility flow heats (or cools) several process streams in turn and
 reaches streams a single heater on its whole range could not.
 ``HENS_UTILITY_SLICES: false`` turns the slices off: each heater and cooler
 then runs its utility over the whole range, and a level it cannot hold is
 chosen by price instead, with a warning.
+
+``design.heat_exchanger_network()`` on a site pools every process's streams
+as one process, so any two streams may match, and it warns when the problem
+has more than one process zone. For a site of several
+process zones, ``design.total_site_heat_exchanger_network(width=, depth=,
+options=)`` designs each process alone with the pinch design method, its
+utilities placed by temperature, then joins one network per process at each
+dt_cont multiplier and refines the joined networks with network evolution
+as one problem, with no thermal derivative step. Every process keeps each
+utility level at its targeted duty, and heat is recovered only between
+streams of one process. ``depth`` sets the evolution's breadth, and from 2
+the MILP pinch design method joins the heuristic for the process networks.
 
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import warnings
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
@@ -29,6 +30,9 @@ if TYPE_CHECKING:
 
 # Options a search level sets when they are unset (execution/search.py).
 _WIDTH_OPTIONS = ("HENS_DT_CONT_MULTIPLIERS",)
+# Ranked networks each process offers a site design: enough to hold its best
+# at every multiplier of the widest search.
+_SITE_POOL = 50
 _DEPTH_OPTIONS = (
     "HENS_HEURISTIC_PDM_NETWORKS",
     "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS",
@@ -504,6 +508,17 @@ class _DesignAccessor:
                 )
         from ....analysis.heat_exchanger_networks.utility_only import is_one_sided
 
+        if len(self._process_zones()) > 1:
+            warnings.warn(
+                "heat_exchanger_network() pools the streams of every process "
+                "zone, so it allows any inter-process match with no piping "
+                "cost and places utilities by temperature for the site. Use "
+                "design.total_site_heat_exchanger_network() for a network that "
+                "recovers heat within each process and holds each process's "
+                "utility levels.",
+                UserWarning,
+                stacklevel=2,
+            )
         hens = self._effective_hens(options)
         margin = self._overdesign_margin(overdesign_percentage, hens)
         basis = self._design_basis(design_basis, period_id, hens)
@@ -541,6 +556,74 @@ class _DesignAccessor:
             basis_clusters=basis_clusters,
             arguments=arguments,
         )
+
+    def total_site_heat_exchanger_network(
+        self,
+        *,
+        width: int | None = None,
+        depth: int | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> HeatExchangerNetworkDesignView:
+        """Design one network for a site of several process zones.
+
+        Each process zone (an immediate subzone of type ``Process Zone``) is
+        designed alone with the pinch design method at the search width's
+        dt_cont multipliers, its utilities placed by temperature, so each
+        level carries the duty targeting gives it. The process networks are
+        then joined, one per process at each multiplier, into site seeds,
+        and network evolution refines the seeds as one problem: every
+        process keeps each utility level at its duty, and heat is recovered
+        only between streams of one process. There is no thermal derivative
+        step.
+
+        ``depth`` sets the evolution's breadth as in
+        ``heat_exchanger_network``, and at 2 and above the MILP pinch
+        design method joins the heuristic for the process networks.
+        """
+
+        from ....analysis.heat_exchanger_networks.execution.search import (
+            resolve_search,
+        )
+        from ....analysis.heat_exchanger_networks.site import site_seeds
+
+        processes = self._process_zones()
+        if len(processes) < 2:
+            raise ValueError(
+                "a site network needs more than one process zone; design a "
+                "single process with heat_exchanger_network()."
+            )
+        _runtime, configuration = self._arguments(
+            options=options, period_id=None, width=width, depth=depth
+        )
+        search = resolve_search(self._effective_hens(configuration))
+        process_options = {
+            **configuration,
+            "HENS_SEARCH_DEPTH": 0,
+            "HENS_PDM_MILP": search.milp,
+            "HENS_UTILITY_PLACEMENT": "temperature",
+        }
+        pools = {
+            name: tuple(
+                outcome.network
+                for outcome in self.heat_exchanger_network(
+                    zone=name, options=process_options
+                ).top(_SITE_POOL)
+            )
+            for name in processes
+        }
+        return self.network_evolution(
+            site_seeds(pools), options=options, width=width, depth=depth
+        )
+
+    def _process_zones(self) -> list[str]:
+        """The master zone's immediate subzones of type ``Process Zone``."""
+        from ....domain.enums import ZoneType
+
+        return [
+            name
+            for name, zone in (self._problem.master_zone.subzones or {}).items()
+            if str(getattr(zone, "type", "")) == ZoneType.P.value
+        ]
 
     def _effective_hens(self, options):
         """The HENS configuration a call runs with: its options over the stored."""

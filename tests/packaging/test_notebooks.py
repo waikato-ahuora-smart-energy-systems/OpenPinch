@@ -537,7 +537,8 @@ def test_notebook_16_follows_the_live_network_record() -> None:
     assert 'assert record.status == "complete"' in source
     # The deeper search runs once, now on a background thread.
     assert source.count("heat_exchanger_network,") == 1
-    assert "heat_exchanger_network(" not in source
+    # Not called directly; the site design's own method is another one.
+    assert re.search(r"\bheat_exchanger_network\(", source) is None
 
 
 def test_notebook_16_retrofits_with_relocation_and_tube_inserts() -> None:

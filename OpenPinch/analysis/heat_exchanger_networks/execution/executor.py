@@ -16,7 +16,7 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from ....domain.enums import HeatExchangerNetworkDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod, ZoneType
 from ....domain.progress import emit as emit_progress
 from ....optimisation.execution import _main_module_blocks_workers
 from ...parallelism import supported_workers
@@ -392,6 +392,8 @@ class LocalSynthesisExecutor:
             min_approach_share=config.hens.min_exchanger_approach_share,
         )
         arrays = problem_to_solver_arrays(problem, dTmin)
+        # A site seed's task holds each process's levels within the process.
+        site_processes = task.settings.get("site_processes")
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
         is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
@@ -454,12 +456,14 @@ class LocalSynthesisExecutor:
                 if is_heuristic
                 else 0
             ),
-            staged_utilities=(
+            staged_utilities=site_processes is not None
+            or (
                 decompositions is not None
-                and problem.master_zone.config.hens.utility_placement == "temperature"
+                and _utility_placement(problem) == "temperature"
                 and _has_utility_levels(decompositions["above"])
             ),
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
+            site_processes=site_processes,
         )
 
     def _parent_problem(
@@ -1002,6 +1006,26 @@ __all__ = [
     "SynthesisExecutor",
     "_failed_task_outcome",
 ]
+
+
+def _utility_placement(problem) -> str:
+    """``HENS_UTILITY_PLACEMENT``, with ``"auto"`` resolved by the design's scope.
+
+    A design covering one process zone (a zone designed in isolation, or a
+    problem of one process) places utility by price; one covering several,
+    a site design, by temperature, as site targeting does.
+    """
+    placement = problem.master_zone.config.hens.utility_placement
+    if placement != "auto":
+        return placement
+    return "temperature" if _process_zone_count(problem.master_zone) > 1 else "price"
+
+
+def _process_zone_count(zone) -> int:
+    own = 1 if str(getattr(zone, "type", "")) == ZoneType.P.value else 0
+    return own + sum(
+        _process_zone_count(child) for child in (zone.subzones or {}).values()
+    )
 
 
 def _has_utility_levels(decomposition) -> bool:

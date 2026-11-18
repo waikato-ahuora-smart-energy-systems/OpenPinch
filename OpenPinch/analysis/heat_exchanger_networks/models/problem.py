@@ -30,6 +30,7 @@ from ..solver.utility_slices import (
 from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
 from ._stagewise import staged_utilities as _staged
+from ._stagewise.level_targets import site_level_targets
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -96,6 +97,11 @@ class InternalHeatExchangerNetworkProblem:
     utility_level_targets: dict[str, list[float]] | None = field(
         default=None, init=False
     )
+    # A site design: each process's targeted duty per period by utility
+    # name, keyed by its stream-key prefix. The stage-wise model holds each
+    # process's levels and matches streams only within a process
+    # (``_stagewise/level_targets.py:site_level_targets``).
+    site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
 
     def load_model(
         self,
@@ -125,6 +131,12 @@ class InternalHeatExchangerNetworkProblem:
             getattr(self.parent, "case", None), "staged_utilities", False
         ):
             self.args["staged_utilities"] = True
+        if self.site_processes is not None and self.framework != "PDM":
+            targets, groups = site_level_targets(
+                self.solver_arrays, self.site_processes
+            )
+            self.args["level_targets"] = targets
+            self.args["stream_groups"] = groups
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)
             return
@@ -138,6 +150,18 @@ class InternalHeatExchangerNetworkProblem:
         parent_targets = getattr(self.parent, "utility_level_targets", None)
         if parent_targets is not None:
             self.utility_level_targets = parent_targets
+            return
+        if self.site_processes is not None:
+            totals: dict[str, list[float]] = {}
+            for levels in self.site_processes.values():
+                for name, duties in levels.items():
+                    duties = [float(duty) for duty in duties]
+                    totals[name] = (
+                        [a + b for a, b in zip(totals[name], duties)]
+                        if name in totals
+                        else duties
+                    )
+            self.utility_level_targets = totals
             return
         if not (
             self.framework == "PDM"
@@ -183,7 +207,11 @@ class InternalHeatExchangerNetworkProblem:
         parent_arrays = getattr(self.parent, "solver_arrays", None)
         if parent_arrays is not None and utility_slices(parent_arrays):
             sliced = with_utility_slices(self.solver_arrays, like=parent_arrays)
-        elif self.framework == "PDM" and self.staged_utilities and self.utility_slicing:
+        elif (
+            (self.framework == "PDM" or self.site_processes is not None)
+            and self.staged_utilities
+            and self.utility_slicing
+        ):
             sliced = with_utility_slices(self.solver_arrays)
         else:
             return
@@ -399,6 +427,55 @@ class InternalHeatExchangerNetworkProblem:
         self.case = factory(**self.args, stages=stages)
         if self.parent is not None:
             self.case.set_initial_values_for_variables(self.parent.case)
+        elif self.site_processes is not None and not self.integers:
+            placed = self._placed_staged_units(stages)
+            if placed is not None:
+                self.case.set_initial_values_for_variables(placed)
+                # The seed sets the matches: one the MILP left without duty
+                # reads as off after its post-processing, but stays in use.
+                for i, j, k in product(
+                    range(self.case.I), range(self.case.J), range(self.case.S)
+                ):
+                    if self.case.z_allowed[i][j][k] > 0:
+                        _assign_value(self.case.z[i][j][k], 1)
+
+    def _placed_staged_units(self, stages: int):
+        """Place a seeded site task's staged units before it is relaxed.
+
+        A relaxed model holds each staged unit at its warm-start flag, and
+        a seed has no parent to take them from (every unit would run). A
+        MILP on the seed's recovery topology, isothermal and priced by
+        utility cost, with every seed match kept in use, holds the levels
+        and picks the units; it is linear,
+        so HiGHS solves it. Without HiGHS, or when it fails, the task runs
+        as built.
+        """
+
+        try:
+            backend.require_solver_backend("highs")
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            return None
+        placed = StageWiseModel(
+            **(
+                self.args
+                | {
+                    "name": f"placed-{self.name}",
+                    "solver": "highs",
+                    "solver_options": None,
+                    "minimisation_goal": "utility costs",
+                    "non_isothermal_model": False,
+                    "integers": True,
+                    "tol": 1e-6,
+                }
+            ),
+            stages=stages,
+        )
+        # The seed's matches stay: the MILP picks the staged units only.
+        for i, j, k in product(range(placed.I), range(placed.J), range(placed.S)):
+            if placed.z_allowed[i][j][k] > 0:
+                placed.m.Equation(placed.z[i][j][k] == 1)
+        placed.optimise(False)
+        return placed if placed.mSuccess == 1 else None
 
     def _solve_pdm(self, *, print_output: bool = True) -> None:
         """Solve PDM sides and amalgamate them before stage reduction."""

@@ -578,12 +578,34 @@ def test_heuristic_designs_hold_the_zonal_sites_levels(zone, caplog):
     assert verify_network_feasibility(network) == ()
 
 
+def _site_problem(options: dict) -> PinchProblem:
+    """The heating problem split over two process zones of one site."""
+    problem = _problem(HEATING)
+    source = problem.to_problem_json()
+    for stream in source["streams"]:
+        stream["zone"] = "Site/Other" if stream["name"] == "H2" else "Site/Plant"
+    source["zone_tree"]["children"].append({"name": "Other", "type": "Process Zone"})
+    source["options"] = (source.get("options") or {}) | options
+    return PinchProblem(source=source)
+
+
 @pytest.mark.parametrize(
-    ("placement", "held"), [(None, True), ("temperature", True), ("price", False)]
+    ("placement", "site", "held"),
+    [
+        # Unset ("auto"): a lone process by price, a site by temperature.
+        (None, False, False),
+        ("auto", False, False),
+        (None, True, True),
+        ("temperature", False, True),
+        ("price", True, False),
+    ],
 )
-def test_the_workflow_places_utilities_by_temperature_or_by_price(placement, held):
+def test_the_workflow_places_utilities_by_temperature_or_by_price(
+    placement, site, held
+):
     """By temperature, the pinch design holds each level at its target; by
-    price, it picks the levels by cost."""
+    price, it picks the levels by cost. Unset, a design covering one process
+    zone goes by price and one covering a site's processes by temperature."""
     from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
         LocalSynthesisExecutor,
     )
@@ -597,7 +619,7 @@ def test_the_workflow_places_utilities_by_temperature_or_by_price(placement, hel
     options = {"HENS_SOLVER_PDM": "highs"}
     if placement is not None:
         options["HENS_UTILITY_PLACEMENT"] = placement
-    problem = _problem(HEATING, options)
+    problem = _site_problem(options) if site else _problem(HEATING, options)
     task = build_pinch_design_method_tasks(workflow_settings_from_problem(problem))[0]
 
     built = LocalSynthesisExecutor(print_output=False)._build_problem(
