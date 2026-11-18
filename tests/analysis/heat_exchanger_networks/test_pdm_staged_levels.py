@@ -279,6 +279,16 @@ def test_a_pdm_network_meets_each_level_target_and_verifies(make_problem):
     assert verify_network_feasibility(network) == ()
 
 
+def _couenne_available() -> bool:
+    try:
+        backend.require_solver_backend("couenne")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+@pytest.mark.skipif("not _couenne_available()", reason="needs couenne")
 def test_a_stage_wise_task_takes_on_its_pdm_parents_staged_units():
     problem = _problem(HEATING)
     pdm = InternalHeatExchangerNetworkProblem(
