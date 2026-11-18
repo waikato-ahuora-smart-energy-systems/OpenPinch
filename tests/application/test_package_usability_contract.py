@@ -59,7 +59,7 @@ EXPECTED_DESIGN_METHODS = {
     "optimise_duties",
     "pinch_design",
     "retrofit",
-    "retrofit_heat_pump_targets",
+    "retrofit_heat_pumps",
     "thermal_derivative",
 }
 EXPECTED_WORKSPACE_METHODS = {

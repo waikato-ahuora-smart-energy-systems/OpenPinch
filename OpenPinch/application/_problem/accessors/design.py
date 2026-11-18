@@ -1281,7 +1281,7 @@ class _DesignAccessor:
         commit_problem(self._problem, isolated)
         return result
 
-    def retrofit_heat_pump_targets(
+    def retrofit_heat_pumps(
         self,
         existing: "HeatExchangerNetwork",
         *,

@@ -247,7 +247,7 @@ def test_a_target_without_load_is_a_heat_pump_that_delivers_nothing(monkeypatch)
     assert targets.heat_pump_gap == 0.0
 
 
-def test_design_retrofit_heat_pump_targets_run_the_chosen_cycle(monkeypatch):
+def test_design_retrofit_heat_pumps_run_the_chosen_cycle(monkeypatch):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
         heat_pump_targets,
     )
@@ -264,7 +264,7 @@ def test_design_retrofit_heat_pump_targets_run_the_chosen_cycle(monkeypatch):
     )
     problem = PinchProblem(json.loads(read_sample_case(CASE)))
 
-    targets = problem.design.retrofit_heat_pump_targets(
+    targets = problem.design.retrofit_heat_pumps(
         _solved_network(),
         cycle="carnot",
         topology="parallel",

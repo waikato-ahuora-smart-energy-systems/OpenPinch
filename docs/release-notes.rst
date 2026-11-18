@@ -7,7 +7,7 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``design.retrofit_heat_pump_targets`` gives an existing network's ideal
+- ``design.retrofit_heat_pumps`` gives an existing network's ideal
   and as-piped heat pump targets from the HPR service: the ideal against
   the process's heating and cooling targets, the as-piped against only the
   existing heaters and coolers (no process-side repiping). Each reports

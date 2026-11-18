@@ -697,7 +697,7 @@ Heat pumps
    installed), new matches win.
 
 Heat pump targets
-   ``design.retrofit_heat_pump_targets(existing, cycle=..., topology=...,
+   ``design.retrofit_heat_pumps(existing, cycle=..., topology=...,
    options=...)`` asks the HPR service how much a heat pump could save
    before any search. The *ideal* target serves the process's heating
    target from its cooling target, as a new design could. The *as-piped*

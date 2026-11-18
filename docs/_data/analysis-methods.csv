@@ -34,4 +34,4 @@ design.optimise_duties,Site; Process Zone; Unit Operation,specialized,direct_hea
 design.pinch_design,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
 design.retrofit,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
 design.thermal_derivative,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
-design.retrofit_heat_pump_targets,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.retrofit_heat_pumps,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
