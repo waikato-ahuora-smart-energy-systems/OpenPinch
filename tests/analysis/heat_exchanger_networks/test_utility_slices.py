@@ -27,6 +27,23 @@ D_TMIN = 10.0
 HW = "Hot Utility.HW"
 
 
+def _highs_available() -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend("highs")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+needs_highs = pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+
+
 @pytest.fixture(scope="module")
 def hospital():
     return _process("Hospital[S]")
@@ -151,6 +168,7 @@ def _utility_duties(network) -> dict[str, float]:
     return duties
 
 
+@needs_highs
 @pytest.mark.parametrize("heuristic_network_limit", [0, 3], ids=["milp", "heuristic"])
 def test_hospital_holds_hot_water_at_its_target_through_slices(
     hospital, heuristic_network_limit, caplog
@@ -201,6 +219,7 @@ def _slice_duties(model, sliced) -> dict[str, float]:
     return duties
 
 
+@needs_highs
 def test_slices_run_in_series_when_the_levels_are_not_held(hospital, arrays):
     """Priced freely, a slice still takes only its share of its utility."""
     from dataclasses import replace
@@ -287,6 +306,7 @@ def test_a_stage_wise_task_takes_on_its_parents_slices(hospital):
     assert tdm.case.NHU == pdm.case.NHU
 
 
+@needs_highs
 def test_slicing_can_be_turned_off(hospital):
     """Off, each heater runs its utility over the utility's whole range."""
     from OpenPinch.analysis.heat_exchanger_networks.solver.utility_slices import (
