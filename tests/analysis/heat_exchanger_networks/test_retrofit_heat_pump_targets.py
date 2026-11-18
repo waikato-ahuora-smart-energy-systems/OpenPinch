@@ -140,7 +140,7 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
     )
     problem = _problem()
 
-    targets = heat_pump_targets.retrofit_heat_pump_targets(
+    targets = heat_pump_targets.retrofit_heat_pumps(
         problem, _solved_network(), args={"maximum_iterations": 7}
     )
 
@@ -207,9 +207,7 @@ def test_each_target_is_priced_at_the_utilities_and_hpr_electricity(monkeypatch)
     )
     problem = _problem()
 
-    piped = heat_pump_targets.retrofit_heat_pump_targets(
-        problem, _solved_network()
-    ).as_piped
+    piped = heat_pump_targets.retrofit_heat_pumps(problem, _solved_network()).as_piped
 
     # The case's utilities ($/MWh) and the HPR electricity price, on the
     # retrofit's $/y basis (price times kW times operating hours / 1000).
@@ -237,9 +235,7 @@ def test_a_target_without_load_is_a_heat_pump_that_delivers_nothing(monkeypatch)
         heat_pump_targets, "compute_profile_heat_pump_target", lambda **_k: None
     )
 
-    targets = heat_pump_targets.retrofit_heat_pump_targets(
-        _problem(), _solved_network()
-    )
+    targets = heat_pump_targets.retrofit_heat_pumps(_problem(), _solved_network())
 
     piped = targets.as_piped
     assert (piped.heat_delivered, piped.work, piped.condenser_duties) == (0, 0, ())
@@ -305,7 +301,7 @@ def test_an_unsolved_network_is_solved_as_the_retrofit_baseline(monkeypatch):
         heat_pump_targets, "compute_profile_heat_pump_target", lambda **_k: None
     )
 
-    targets = heat_pump_targets.retrofit_heat_pump_targets(_problem(), unsolved)
+    targets = heat_pump_targets.retrofit_heat_pumps(_problem(), unsolved)
 
     assert searched == [(unsolved, 0)]
     assert targets.as_piped.hot_utility_before == pytest.approx(17518.7)

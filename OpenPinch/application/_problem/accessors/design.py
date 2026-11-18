@@ -1318,7 +1318,7 @@ class _DesignAccessor:
             ensure_target_results,
         )
         from ....analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
-            retrofit_heat_pump_targets,
+            retrofit_heat_pumps,
         )
         from ....analysis.heat_pumps.cycles.registry import (
             cycle_spec,
@@ -1345,7 +1345,7 @@ class _DesignAccessor:
         stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
         with temporary_zone_configuration(root, configuration):
             ensure_target_results(isolated, {}, None)
-            result = retrofit_heat_pump_targets(isolated, existing, args=args)
+            result = retrofit_heat_pumps(isolated, existing, args=args)
         for zone in walk_zone_tree(isolated._master_zone):
             zone.config = stored_configs[zone.address]
         commit_problem(self._problem, isolated)

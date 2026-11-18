@@ -26,7 +26,7 @@ from .search import RetrofitSettings, run_retrofit_search
 _KELVIN = 273.15
 
 
-def retrofit_heat_pump_targets(
+def retrofit_heat_pumps(
     problem, network: HeatExchangerNetwork, *, args: dict | None = None
 ) -> RetrofitHeatPumpTargets:
     """The HPR service's heat pump targets for ``problem`` (its master
