@@ -121,7 +121,7 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
     # 5000 kW of source heat to air.
     calls = []
 
-    def fake_target(*, T_vals, H_hot, H_cold, config, args=None):
+    def fake_target(*, T_vals, H_hot, H_cold, config, args=None, **_period):
         calls.append((np.asarray(H_hot), np.asarray(H_cold), args))
         return SimpleNamespace(
             Q_cond=np.array([600.0, 400.0]),
@@ -243,6 +243,26 @@ def test_a_target_without_load_is_a_heat_pump_that_delivers_nothing(monkeypatch)
     assert targets.heat_pump_gap == 0.0
 
 
+def test_both_targets_take_the_first_periods_load(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    # A period-valued HPR load is read at the network's first period.
+    periods = []
+
+    def fake_target(*, period_id=None, period_idx=None, **_kwargs):
+        periods.append((period_id, period_idx))
+
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", fake_target
+    )
+
+    heat_pump_targets.retrofit_heat_pumps(_problem(), _solved_network())
+
+    assert periods == [("0", 0)] * 2
+
+
 def test_design_retrofit_heat_pumps_run_the_chosen_cycle(monkeypatch):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
         heat_pump_targets,
@@ -252,7 +272,7 @@ def test_design_retrofit_heat_pumps_run_the_chosen_cycle(monkeypatch):
 
     seen = []
 
-    def fake_target(*, T_vals, H_hot, H_cold, config, args=None):
+    def fake_target(*, T_vals, H_hot, H_cold, config, args=None, **_period):
         seen.append((config.hpr.type, config.hpr.load_fraction, args))
 
     monkeypatch.setattr(

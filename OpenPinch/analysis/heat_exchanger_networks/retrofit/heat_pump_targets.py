@@ -62,10 +62,18 @@ def retrofit_heat_pumps(
         "cold_utility_price": float(data["cu_cost_period"][0][0]),
         "electricity_price": float(config.costing.hpr_ele_price) * price_scale,
     }
+    # The first period, whose states the as-piped profiles and prices take.
+    period_id = min(problem.period_ids.items(), key=lambda item: item[1])[0]
     targets = {}
     for name, (T_vals, H_hot, H_cold) in profiles.items():
         result = compute_profile_heat_pump_target(
-            T_vals=T_vals, H_hot=H_hot, H_cold=H_cold, config=config, args=args
+            T_vals=T_vals,
+            H_hot=H_hot,
+            H_cold=H_cold,
+            config=config,
+            args=args,
+            period_id=period_id,
+            period_idx=0,
         )
         targets[name] = _summary(result, H_hot, H_cold, prices)
     return RetrofitHeatPumpTargets(**targets)
