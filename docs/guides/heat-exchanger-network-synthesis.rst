@@ -368,11 +368,14 @@ The extra minimum-unit MILP networks are not part of the depth: set
 default) to add them at any depth that runs the MILP.
 
 With more than one hot or cold utility, ``HENS_UTILITY_PLACEMENT`` sets how
-synthesis shares duty between the levels. ``"temperature"`` (the default)
-places utility as targeting does: the least valuable (lowest exergy) level
-serves first, and the pinch design holds each level at the duty targeting
-gives it. ``"price"`` lets the pinch design choose the levels by utility
-cost instead. A utility whose temperature slides,
+synthesis shares duty between the levels. ``"temperature"`` places utility
+as targeting does, as a site design needs: the least valuable (lowest
+exergy) level serves first, and the pinch design holds each level at the
+duty targeting gives it. ``"price"`` lets the pinch design choose the levels
+by utility cost, as an isolated process would. ``"auto"`` (the default) is
+``"price"`` when the design covers one process zone, for example
+``heat_exchanger_network(zone="Hospital[S]")`` or a problem of one process,
+and ``"temperature"`` when it covers more than one. A utility whose temperature slides,
 such as hot water from 90 to 70 C, is then, by temperature, run through slices in series, so
 one utility flow heats (or cools) several process streams in turn and
 reaches streams a single heater on its whole range could not.

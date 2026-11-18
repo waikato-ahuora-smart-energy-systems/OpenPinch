@@ -72,9 +72,12 @@ Heat exchanger network synthesis
   Hospital now holds its hot water and steam levels.
   ``HENS_UTILITY_SLICES: false`` turns the slices off.
 - ``HENS_UTILITY_PLACEMENT`` chooses how synthesis shares duty between
-  utility levels: ``"temperature"`` (the default) holds each level at the
-  duty targeting gives it, lowest exergy first; ``"price"`` lets the pinch
-  design choose levels by utility cost, as before.
+  utility levels: ``"temperature"`` holds each level at the duty targeting
+  gives it, lowest exergy first, as a site design needs; ``"price"`` lets
+  the pinch design choose levels by utility cost, as before. The default,
+  ``"auto"``, is ``"price"`` for a design covering one process zone (an
+  isolated zone, such as ``heat_exchanger_network(zone="Hospital[S]")``)
+  and ``"temperature"`` for one covering several.
 - The pinch design method no longer drops a side of the pinch whose
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the

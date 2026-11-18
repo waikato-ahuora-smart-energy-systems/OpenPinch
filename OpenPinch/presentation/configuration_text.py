@@ -429,8 +429,11 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "How synthesis shares duty between utility levels when there is more "
             "than one hot or cold utility. \"temperature\" holds each level at the "
             "duty targeting gives it, the least valuable (lowest exergy) level "
-            "first, as the grand composite curve places them. \"price\" lets the "
-            "pinch design choose the levels by utility cost."
+            "first, as the grand composite curve places them, as a site design "
+            "does. \"price\" lets the pinch design choose the levels by utility "
+            "cost, as an isolated process does. \"auto\" (the default) is "
+            "\"price\" for a design covering one process zone and \"temperature\" "
+            "for one covering more."
         ),
     ),
     "HENS_UTILITY_SLICES": FieldText(
