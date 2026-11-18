@@ -1,5 +1,6 @@
 Pre-Release Notes
-==========
+=================
+
 Unreleased
 ----------
 
@@ -68,7 +69,7 @@ Heat exchanger network synthesis
   utility's name, with the slice in the exchanger id (for example
   ``hot-utility:Hot Utility.HW@90-87.1->...``). On ``zonal_site`` the
   Hospital now holds its hot water and steam levels.
-=======
+  ``HENS_UTILITY_SLICES: false`` turns the slices off.
 - The pinch design method no longer drops a side of the pinch whose
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the

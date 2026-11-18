@@ -458,6 +458,7 @@ class LocalSynthesisExecutor:
                 decompositions is not None
                 and _has_utility_levels(decompositions["above"])
             ),
+            utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
         )
 
     def _parent_problem(

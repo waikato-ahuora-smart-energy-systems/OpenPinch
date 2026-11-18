@@ -367,6 +367,15 @@ The extra minimum-unit MILP networks are not part of the depth: set
 ``HENS_PDM_MIN_UNIT_NETWORKS`` and ``HENS_PDM_EXTRA_UNIT_NETWORKS`` (both 0 by
 default) to add them at any depth that runs the MILP.
 
+With more than one hot or cold utility, the pinch design holds each utility
+level at the duty targeting gives it. A utility whose temperature slides,
+such as hot water from 90 to 70 C, is then run through slices in series, so
+one utility flow heats (or cools) several process streams in turn and
+reaches streams a single heater on its whole range could not.
+``HENS_UTILITY_SLICES: false`` turns the slices off: each heater and cooler
+then runs its utility over the whole range, and a level it cannot hold is
+chosen by price instead, with a warning.
+
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
 and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS``,

@@ -285,3 +285,42 @@ def test_a_stage_wise_task_takes_on_its_parents_slices(hospital):
 
     assert tdm.solver_arrays.utility_identities == pdm.solver_arrays.utility_identities
     assert tdm.case.NHU == pdm.case.NHU
+
+
+def test_slicing_can_be_turned_off(hospital):
+    """Off, each heater runs its utility over the utility's whole range."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.utility_slices import (
+        utility_slices,
+    )
+
+    pdm = _pdm(hospital, utility_slicing=False)
+
+    pdm.load_model()
+
+    assert not utility_slices(pdm.solver_arrays)
+    assert HW in pdm.solver_arrays.utility_identities["hot_utilities"]
+
+
+@pytest.mark.parametrize("option", [True, False])
+def test_the_workflow_reads_slicing_from_the_configuration(option):
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        LocalSynthesisExecutor,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+        workflow_settings_from_problem,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.pinch_design_method import (
+        build_pinch_design_method_tasks,
+    )
+    from tests.analysis.heat_exchanger_networks.test_minimum_unit_pdm import (
+        _pinch_problem,
+    )
+
+    pinch = _pinch_problem({"HENS_UTILITY_SLICES": option})
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(pinch))[0]
+
+    built = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task, problem=pinch, parent_outcomes={}
+    )
+
+    assert built.utility_slicing is option

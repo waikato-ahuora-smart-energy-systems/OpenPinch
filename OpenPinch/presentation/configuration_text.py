@@ -423,6 +423,16 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "HENS_PDM_MILP)."
         ),
     ),
+    "HENS_UTILITY_SLICES": FieldText(
+        "Utility slices in series", None,
+        (
+            "With more than one hot or cold utility, the pinch design holds each "
+            "utility level at its target and runs a utility whose temperature "
+            "slides (hot water, say) through slices in series, so one utility "
+            "flow can heat or cool several process streams in turn. False keeps "
+            "each heater and cooler on the utility's whole range."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (

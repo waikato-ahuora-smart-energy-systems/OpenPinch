@@ -86,6 +86,10 @@ class InternalHeatExchangerNetworkProblem:
     # at its target (``_stagewise/staged_utilities.py``). A stage-wise task
     # also takes them on when its parent's network has them.
     staged_utilities: bool = False
+    # With levels held, slice sliding utilities into slices in series
+    # (``../solver/utility_slices.py``); off, each heater or cooler runs its
+    # utility over the whole range.
+    utility_slicing: bool = True
 
     def load_model(
         self,
@@ -135,7 +139,7 @@ class InternalHeatExchangerNetworkProblem:
         parent_arrays = getattr(self.parent, "solver_arrays", None)
         if parent_arrays is not None and utility_slices(parent_arrays):
             sliced = with_utility_slices(self.solver_arrays, like=parent_arrays)
-        elif self.framework == "PDM" and self.staged_utilities:
+        elif self.framework == "PDM" and self.staged_utilities and self.utility_slicing:
             sliced = with_utility_slices(self.solver_arrays)
         else:
             return
