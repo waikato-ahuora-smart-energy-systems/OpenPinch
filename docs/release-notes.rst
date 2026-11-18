@@ -13,6 +13,10 @@ Heat exchanger network synthesis
   up each period's duty grid and each match's row once rather than for
   every stage. Under a profiler, a design on the pulp mill sample case
   spends about 28 s in extraction instead of 34 s.
+- The pinch design method no longer drops a side of the pinch whose
+  utility target is zero but whose streams still exchange heat there, as in
+  a threshold problem. Before, that side's matches were left out of the
+  network, which then failed verification.
 
 0.9.3 (2026-11-18)
 ------------------

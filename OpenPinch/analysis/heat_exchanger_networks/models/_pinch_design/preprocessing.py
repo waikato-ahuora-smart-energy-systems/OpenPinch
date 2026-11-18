@@ -66,12 +66,18 @@ def calculate_pinch(owner) -> None:
         raise ValueError(
             "PDM construction requires a shifted pinch temperature in every period."
         )
+    # A side with streams on it has recovery to do even at zero utility target.
     owner.side_required = any(
         target > owner.tol
         for target in (
             owner.HU_target_by_period
             if owner.pinch_loc == "above"
             else owner.CU_target_by_period
+        )
+    ) or any(
+        (
+            *owner.pinch_decomposition.z_i_active,
+            *owner.pinch_decomposition.z_j_active,
         )
     )
 
