@@ -57,7 +57,9 @@ def _summary(result, H_hot, H_cold) -> RetrofitHeatPumpTarget:
 
     condenser = np.atleast_1d(np.asarray(result.Q_cond, dtype=float))
     evaporator = np.atleast_1d(np.asarray(result.Q_evap, dtype=float))
-    ambient = float(result.Q_amb_cold)
+    # Air heat the evaporators take (the service's ambient source); the
+    # ambient sink is source heat left to air, not taken by the heat pump.
+    ambient = float(result.Q_amb_hot)
     return RetrofitHeatPumpTarget(
         hot_utility_before=float(np.abs(H_cold).max()),
         cold_utility_before=float(np.abs(H_hot).max()),

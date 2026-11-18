@@ -117,7 +117,8 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
     from OpenPinch.domain.enums import ProblemTableLabel, TargetType
 
     # The HPR service, faked: each target delivers 1000 kW at two levels
-    # for 300 kW of work, 100 kW of its heat from ambient air.
+    # for 300 kW of work, 100 kW of its heat from ambient air, and leaves
+    # 5000 kW of source heat to air.
     calls = []
 
     def fake_target(*, T_vals, H_hot, H_cold, config, args=None):
@@ -127,7 +128,8 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
             T_cond=np.array([270.0, 200.0]),
             Q_evap=np.array([700.0]),
             T_evap=np.array([90.0]),
-            Q_amb_cold=100.0,
+            Q_amb_hot=100.0,
+            Q_amb_cold=5000.0,
             w_net=300.0,
             cop_h=1000.0 / 300.0,
             hpr_total_annualized_cost=None,
