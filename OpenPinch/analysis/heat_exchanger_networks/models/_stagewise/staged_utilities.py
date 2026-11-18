@@ -399,3 +399,24 @@ def _cooler_area(owner, n: int, i: int, u: int, k: int, duty: float) -> float:
         formula_allowed=False,
     )
     return _area._heat_load_area(owner, duty, owner.U_cu_period[n][i][u], lmtd)
+
+
+def staged_terminal_differences(
+    owner, side: str, n: int, s: int, u: int, k: int, *, value=lambda x: x
+):
+    """A staged unit's (hot-end, cold-end) temperature differences.
+
+    ``value`` reads a solved temperature; by default the model expressions
+    are returned for the solver.
+    """
+    if side == "hot":
+        return (
+            owner.T_hu_in_period[n][u] - value(owner.T_c_by_period[n][s][k]),
+            owner._utility_solved_outlet_temperature("hot", n, s, u)
+            - value(owner.T_c_mid_by_period[n][s][k]),
+        )
+    return (
+        value(owner.T_h_mid_by_period[n][s][k])
+        - owner._utility_solved_outlet_temperature("cold", n, s, u),
+        value(owner.T_h_by_period[n][s][k]) - owner.T_cu_in_period[n][u],
+    )

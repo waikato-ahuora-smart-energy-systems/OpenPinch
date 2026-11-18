@@ -232,11 +232,6 @@ def _raise_unsupported_goal(owner) -> None:
 
 
 def _set_total_cost_objective(owner) -> None:
-    if getattr(owner, "staged_utilities", False):
-        raise ValueError(
-            "staged utilities are priced for utility goals only; "
-            f"{owner.minimisation_goal!r} would cost their area as free."
-        )
     if getattr(owner, "N_periods", 1) == 1:
         _set_source_total_cost_objective(owner)
         return
@@ -320,7 +315,8 @@ def _set_source_total_cost_objective(owner) -> None:
             for j in range(owner.J)
             for u in range(owner.NHU)
             if owner.z_hu_allowed[j][u] > 0
-        ),
+        )
+        + _staged_area_cost(owner, "hot"),
     )
     owner.cu_area_cost_total = owner.m.Intermediate(
         owner.cu_coeff[0]
@@ -343,13 +339,15 @@ def _set_source_total_cost_objective(owner) -> None:
             for i in range(owner.I)
             for u in range(owner.NCU)
             if owner.z_cu_allowed[i][u] > 0
-        ),
+        )
+        + _staged_area_cost(owner, "cold"),
     )
 
     if owner.minimisation_goal == "total cost":
         owner.utility_unit_cost_total = owner.m.Intermediate(
             owner.hu_unit_cost[0] * sum(_utility_loads(owner.z_hu))
-            + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu)),
+            + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu))
+            + _staged_unit_cost(owner),
         )
         owner.recovery_unit_cost = [
             [0 for _j in range(owner.J)] for _k in range(owner.S)
@@ -550,14 +548,16 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         * sum(
             (area + _SHARED_AREA_OFFSET) ** owner.hu_exp[0]
             for area in _utility_loads(owner.area_hu_shared)
-        ),
+        )
+        + _staged_area_cost(owner, "hot"),
     )
     owner.cu_area_cost_total = owner.m.Intermediate(
         owner.cu_coeff[0]
         * sum(
             (area + _SHARED_AREA_OFFSET) ** owner.cu_exp[0]
             for area in _utility_loads(owner.area_cu_shared)
-        ),
+        )
+        + _staged_area_cost(owner, "cold"),
     )
     owner.unit_cost_total = owner.m.Intermediate(
         owner.unit_cost[0]
@@ -570,7 +570,8 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     )
     owner.utility_unit_cost_total = owner.m.Intermediate(
         owner.hu_unit_cost[0] * sum(_utility_loads(owner.z_hu))
-        + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu)),
+        + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu))
+        + _staged_unit_cost(owner),
     )
     owner.capital_cost_total = owner.m.Intermediate(
         owner.unit_cost_total
@@ -580,3 +581,80 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         + owner.cu_area_cost_total,
     )
     owner.m.Minimize(owner.capital_cost_total + owner.weighted_operating_cost)
+
+
+def _staged_unit_cost(owner):
+    """Fixed cost of the staged heaters and coolers switched on."""
+    if not getattr(owner, "staged_utilities", False):
+        return 0.0
+    return owner.hu_unit_cost[0] * sum(
+        _staged_binaries(owner, owner.z_hs, owner.z_hs_allowed)
+    ) + owner.cu_unit_cost[0] * sum(
+        _staged_binaries(owner, owner.z_cs, owner.z_cs_allowed)
+    )
+
+
+def _staged_binaries(owner, binaries, allowed) -> list:
+    return [
+        binaries[s][u][k]
+        for s, row in enumerate(allowed)
+        for u, by_k in enumerate(row)
+        for k in _staged.interior_boundaries(owner)
+        if by_k[k]
+    ]
+
+
+def _staged_area_cost(owner, side: str):
+    """Area cost of the staged heaters (or coolers): one area per unit.
+
+    Each unit's area is a variable at least what every period needs, from
+    Chen's mean of its terminal differences, costed with the utility area
+    law as the stream-end units are. The variables are kept in
+    ``area_hs_shared`` (or ``area_cs_shared``), keyed ``(stream, utility,
+    boundary)``, for verification.
+    """
+    if not getattr(owner, "staged_utilities", False):
+        return 0.0
+    if side == "hot":
+        allowed, duties, coefficient, exponent = (
+            owner.z_hs_allowed,
+            owner.Q_hs_by_period,
+            owner.hu_coeff[0],
+            owner.hu_exp[0],
+        )
+    else:
+        allowed, duties, coefficient, exponent = (
+            owner.z_cs_allowed,
+            owner.Q_cs_by_period,
+            owner.cu_coeff[0],
+            owner.cu_exp[0],
+        )
+    shared = {}
+    setattr(owner, "area_hs_shared" if side == "hot" else "area_cs_shared", shared)
+    total = 0.0
+    for s, row in enumerate(allowed):
+        for u, by_k in enumerate(row):
+            for k in _staged.interior_boundaries(owner):
+                if not by_k[k]:
+                    continue
+                area = owner.m.Var(value=0.0, lb=0.0)
+                shared[(s, u, k)] = area
+                for n in range(owner.N_periods):
+                    owner.m.Equation(
+                        area
+                        >= duties[n][s][u][k]
+                        / (
+                            _staged_coefficient(owner, side, n, s, u)
+                            * _chen_mean(
+                                *_staged.staged_terminal_differences(
+                                    owner, side, n, s, u, k
+                                )
+                            )
+                        )
+                    )
+                total = total + coefficient * (area + _SHARED_AREA_OFFSET) ** exponent
+    return total
+
+
+def _staged_coefficient(owner, side: str, n: int, s: int, u: int) -> float:
+    return owner.U_hu_period[n][s][u] if side == "hot" else owner.U_cu_period[n][s][u]

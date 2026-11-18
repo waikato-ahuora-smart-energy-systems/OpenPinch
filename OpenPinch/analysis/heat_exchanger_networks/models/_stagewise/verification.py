@@ -6,6 +6,7 @@ import math
 
 from .._base import costing as _costing
 from .._base.execution import _value
+from . import staged_utilities as _staged
 
 
 def verify(owner) -> tuple[bool, list[str]]:
@@ -150,11 +151,17 @@ def _check_state_temperatures(
                         ):
                             issues = True
                     else:
+                        # Stage outlets are the mid temperatures, before any
+                        # staged heater or cooler.
+                        hot_mid = getattr(case, "T_h_mid_by_period", case.T_h_by_period)
+                        cold_mid = getattr(
+                            case, "T_c_mid_by_period", case.T_c_by_period
+                        )
                         if _value(case.T_h_by_period[n][i][k]) < _value(
-                            case.T_c_by_period[n][j][k]
+                            cold_mid[n][j][k]
                         ):
                             issues = True
-                        if _value(case.T_h_by_period[n][i][k + 1]) < _value(
+                        if _value(hot_mid[n][i][k + 1]) < _value(
                             case.T_c_by_period[n][j][k + 1]
                         ):
                             issues = True
@@ -187,7 +194,10 @@ def _check_utility_costs(
             utility_cost(
                 side,
                 n,
-                [sum(_value(row[u]) for row in grid) for u in range(len(grid[0]))],
+                [
+                    sum(_value(row[u]) for row in grid) + _staged_duty(case, side, n, u)
+                    for u in range(len(grid[0]))
+                ],
             )
             for n, grid in enumerate(grids)
         ]
@@ -210,6 +220,13 @@ def _check_utility_costs(
         rel_tol=rel_tol,
         abs_tol=abs_tol,
     )
+
+
+def _staged_duty(case, side: str, n: int, u: int) -> float:
+    """Utility ``u``'s staged duty in period ``n`` (0 without staging)."""
+    if not getattr(case, "staged_utilities", False):
+        return 0.0
+    return sum(_value(duty) for duty in _staged.staged_utility_loads(case, side, n, u))
 
 
 def _solver_utility_cost(case, solver_costs) -> float:
@@ -366,6 +383,9 @@ def _check_shared_area_costs(
                 if _value(case.area_cu_shared[i][u]) + abs_tol < required_area:
                     return False
 
+    if not _staged_areas_cover_duties(case, abs_tol=abs_tol, q_tol=q_tol):
+        return False
+
     recovery_area_cost = case.A_coeff[0] * sum(
         _value(case.area_r_shared[i][j][k]) ** case.A_exp[0]
         for k in range(case.S)
@@ -373,10 +393,18 @@ def _check_shared_area_costs(
         for i in range(case.I)
     )
     hu_area_cost = case.hu_coeff[0] * sum(
-        _value(area) ** case.hu_exp[0] for row in case.area_hu_shared for area in row
+        _value(area) ** case.hu_exp[0]
+        for area in [
+            *(area for row in case.area_hu_shared for area in row),
+            *getattr(case, "area_hs_shared", {}).values(),
+        ]
     )
     cu_area_cost = case.cu_coeff[0] * sum(
-        _value(area) ** case.cu_exp[0] for row in case.area_cu_shared for area in row
+        _value(area) ** case.cu_exp[0]
+        for area in [
+            *(area for row in case.area_cu_shared for area in row),
+            *getattr(case, "area_cs_shared", {}).values(),
+        ]
     )
     return (
         math.isclose(
@@ -398,6 +426,30 @@ def _check_shared_area_costs(
             abs_tol=abs_tol,
         )
     )
+
+
+def _staged_areas_cover_duties(case, *, abs_tol: float, q_tol: float) -> bool:
+    """Whether each staged unit's area covers what every period needs."""
+    for side, areas in (
+        ("hot", getattr(case, "area_hs_shared", {})),
+        ("cold", getattr(case, "area_cs_shared", {})),
+    ):
+        if not areas:
+            continue
+        duties = case.Q_hs_by_period if side == "hot" else case.Q_cs_by_period
+        coefficients = case.U_hu_period if side == "hot" else case.U_cu_period
+        for (s, u, k), area in areas.items():
+            for n in range(case.N_periods):
+                q = _value(duties[n][s][u][k])
+                if q <= q_tol:
+                    continue
+                differences = _staged.staged_terminal_differences(
+                    case, side, n, s, u, k, value=_value
+                )
+                required_area = q / (coefficients[n][s][u] * _chen_mean(*differences))
+                if _value(area) + abs_tol < required_area:
+                    return False
+    return True
 
 
 def _chen_mean(delta_1: float, delta_2: float) -> float:

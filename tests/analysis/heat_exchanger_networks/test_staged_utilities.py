@@ -28,6 +28,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
 from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
     MissingSynthesisDependencyError,
     MissingSynthesisSolverError,
+    require_solver_binary,
 )
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.domain.enums import HeatExchangerKind
@@ -58,7 +59,11 @@ def _stream(name, supply, target, heat_flow):
         "name": name,
         "t_supply": _quantity(supply, "degC"),
         "t_target": _quantity(target, "degC"),
-        "heat_flow": _quantity(heat_flow, "kW"),
+        "heat_flow": (
+            {"values": heat_flow, "unit": "kW"}
+            if isinstance(heat_flow, list)
+            else _quantity(heat_flow, "kW")
+        ),
         "dt_cont": _quantity(D_TMIN / 2, "delta_degC"),
         "htc": _quantity(1.0, "kW/m^2/delta_degC"),
     }
@@ -77,19 +82,29 @@ def _utility(name, kind, supply, target, price):
     }
 
 
-def _heating_problem() -> PinchProblem:
+def _heating_problem(periods: int = 1) -> PinchProblem:
     """C1 (60 to 200 C) is heated by H2 low, H1 high, and 40 kW between.
 
     H1 (220 to 150 C) can heat C1 from 130 to 200 C and H2 (100 to 70 C)
     from 60 to 90 C. Between them C1 needs 40 kW from 90 to 130 C, which LPS
     (140 C) can give; at C1's hot end only HPS (250 C) can.
     """
+
+    def flows(heat_flow):
+        return heat_flow if periods == 1 else [heat_flow] * periods
+
+    options = (
+        {}
+        if periods == 1
+        else {"PROBLEM_PERIOD_IDS": [f"p{n}" for n in range(periods)]}
+    )
     return PinchProblem(
         source={
+            "options": options,
             "streams": [
-                _stream("H1", 220.0, 150.0, 70.0),
-                _stream("H2", 100.0, 70.0, 30.0),
-                _stream("C1", 60.0, 200.0, 140.0),
+                _stream("H1", 220.0, 150.0, flows(70.0)),
+                _stream("H2", 100.0, 70.0, flows(30.0)),
+                _stream("C1", 60.0, 200.0, flows(140.0)),
             ],
             "utilities": [
                 _utility("LPS", "Hot", 140.0, 139.9, 20.0),
@@ -226,24 +241,43 @@ def test_a_staged_cooler_serves_the_span_between_two_recovery_stages():
     )
 
 
+def _couenne_available() -> bool:
+    try:
+        require_solver_binary("couenne", purpose="staged utility regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.skipif("not _couenne_available()", reason="needs couenne")
+@pytest.mark.parametrize("periods", [1, 2])
 @pytest.mark.parametrize("goal", ["total cost", "variable total cost"])
-def test_area_costed_goals_refuse_staged_utilities(goal):
-    with pytest.raises(ValueError, match="staged utilities"):
-        StageWiseModel(
-            name="staged-utilities-total-cost",
-            framework="ESM",
-            solver="highs",
-            solver_arrays=problem_to_solver_arrays(_heating_problem(), D_TMIN),
-            stages=2,
-            dTmin=D_TMIN,
-            z_restriction=None,
-            min_dqda=0.0,
-            minimisation_goal=goal,
-            non_isothermal_model=False,
-            integers=True,
-            tol=1e-6,
-            staged_utilities=True,
-        )
+def test_total_cost_prices_a_staged_heaters_area(goal, periods):
+    model = StageWiseModel(
+        name="staged-utilities-total-cost",
+        framework="TDM",
+        solver="couenne",
+        solver_arrays=problem_to_solver_arrays(_heating_problem(periods), D_TMIN),
+        stages=2,
+        dTmin=D_TMIN,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal=goal,
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+        staged_utilities=True,
+    )
+    model.optimise(False)
+    assert model.mSuccess == 1
+
+    duties = _hot_utility_duties(model)
+    assert duties["LPS"] == pytest.approx(40.0, rel=1e-4)
+    assert duties["HPS"] == pytest.approx(0.0, abs=1e-4)
+    (c1,) = range(model.J)
+    assert model.area_hs[c1][0][1] > 0.0
+    ok, reasons = model.verify()
+    assert ok, reasons
 
 
 def _network(model, problem):
