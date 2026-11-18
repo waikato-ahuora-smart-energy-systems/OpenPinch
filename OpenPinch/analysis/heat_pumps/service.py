@@ -100,6 +100,43 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
 
 
+def compute_profile_heat_pump_target(
+    *,
+    T_vals: np.ndarray,
+    H_hot: np.ndarray,
+    H_cold: np.ndarray,
+    config: Configuration,
+    args: dict | None = None,
+) -> HeatPumpTargetOutputs:
+    """Target a heat pump that takes heat only from the source profile
+    ``H_hot`` and delivers it only to the sink profile ``H_cold``, with no
+    heat recovery between them.
+
+    The profiles are cumulative duties on the shifted temperatures
+    ``T_vals`` (hottest first), as a problem table's ``H(net-hot)`` and
+    ``H(net-cold)`` columns. The load is the sink's duty capped by
+    ``config``'s HPR load; ``args`` takes the search budget keys
+    (``maximum_iterations``, ``maximum_evaluations``).
+    """
+
+    load = resolve_hpr_target_load(
+        H_net_cold=H_cold,
+        H_net_hot=H_hot,
+        is_heat_pumping=True,
+        config=config,
+    )
+    return _get_hpr_targets(
+        Q_hpr_target=load,
+        T_vals=T_vals,
+        H_hot=H_hot,
+        H_cold=H_cold,
+        config=config,
+        is_heat_pumping=True,
+        search_budget=_hpr_search_budget(args),
+        background_is_utility=False,
+    )
+
+
 ################################################################################
 # Helper functions API
 ################################################################################
