@@ -137,3 +137,43 @@ def test_a_side_with_recovery_but_no_utility_target_keeps_its_matches(
     assert case is not None, getattr(pdm, "solution_failure_reason", None)
     network = pdm.extract_network(run_id="zero-target-side")
     assert verify_network_feasibility(network) == ()
+
+
+def test_a_side_whose_streams_carry_no_more_than_tol_is_not_required():
+    """H2 carries 0.0003 kW below the pinch, under the 1e-3 kW tolerance.
+
+    The side model places no recovery that small, so requiring the side
+    would leave H2's load nowhere to go.
+    """
+    from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
+        PinchDecompModel,
+    )
+
+    problem = _problem(
+        [
+            _stream("H1", 220.0, 150.0, 70.0),
+            _stream("H2", 100.0, 70.0, 0.0003),
+            _stream("C1", 90.0, 200.0, 110.0),
+        ]
+    )
+    model = PinchDecompModel(
+        name="below",
+        framework="PDM",
+        solver="highs",
+        solver_arrays=problem_to_solver_arrays(problem, D_TMIN),
+        dTmin=D_TMIN,
+        z_restriction=None,
+        min_dqda=0,
+        minimisation_goal="cold utility",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-3,
+        pinch_loc="below",
+        pinch_decomposition=decomposition_module.build_pinch_design_decomposition(
+            problem, D_TMIN, pinch_location="below"
+        ),
+        stage_selection="automated",
+    )
+
+    assert any(model.z_i_active)
+    assert model.side_required is False

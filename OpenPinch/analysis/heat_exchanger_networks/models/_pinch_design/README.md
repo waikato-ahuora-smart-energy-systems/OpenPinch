@@ -13,7 +13,7 @@ Private helper modules for `PinchDecompModel` (`../pinch_decomposition.py`), whi
 
 ## Invariants
 - The decomposition's pinch location must equal the model's `pinch_loc`; target count and period identities must match the model's periods; every period needs a shifted pinch temperature. [preprocessing.py:calculate_pinch]
-- A side is required when its utility target (hot above, cold below) exceeds `tol` in some period, or when any stream is active on it, so a side with recovery but zero utility target is still designed. [preprocessing.py:calculate_pinch]
+- A side is required when its utility target (hot above, cold below) exceeds `tol` in some period, or when a stream's load on it exceeds `tol` in some period, so a side with recovery but zero utility target is still designed; loads within `tol` get no recovery match and do not require the side. [preprocessing.py:calculate_pinch, _set_multiperiod_preprocessing]
 - Heaters are feasible only above the pinch and coolers only below, on streams active on that side. [preprocessing.py:set_preprocessing]
 - Stage count is `max(sum(z_i_active), sum(z_j_active))` unless the decomposition carries a manual selection. [preprocessing.py:_set_multiperiod_preprocessing]
 - A stream absent from this side in a period has zero duty and no recovery approach constraint in that period. [preprocessing.py:_set_multiperiod_preprocessing] [equations.py:_set_multiperiod_stage_wise_superstructure]
