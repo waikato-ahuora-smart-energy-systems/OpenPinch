@@ -82,7 +82,7 @@ def _utility(name, kind, supply, target, price):
     }
 
 
-def _problem(utilities) -> PinchProblem:
+def _problem(utilities, options: dict | None = None) -> PinchProblem:
     """H1 (220 to 150 C) and H2 (100 to 40 C) heat C1 (60 to 200 C).
 
     The pinch is at 95 C shifted. Above it C1 runs from 90 to 200 C: H1 can
@@ -104,6 +104,7 @@ def _problem(utilities) -> PinchProblem:
                 "children": [{"name": "Plant", "type": "Process Zone"}],
             },
         }
+        | ({"options": options} if options else {})
     )
 
 
@@ -575,3 +576,32 @@ def test_heuristic_designs_hold_the_zonal_sites_levels(zone, caplog):
         # The heuristic counts a load within 0.1% as met.
         assert duties.get(name, 0.0) == pytest.approx(target, rel=1e-3, abs=1e-3)
     assert verify_network_feasibility(network) == ()
+
+
+@pytest.mark.parametrize(
+    ("placement", "held"), [(None, True), ("temperature", True), ("price", False)]
+)
+def test_the_workflow_places_utilities_by_temperature_or_by_price(placement, held):
+    """By temperature, the pinch design holds each level at its target; by
+    price, it picks the levels by cost."""
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        LocalSynthesisExecutor,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+        workflow_settings_from_problem,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.pinch_design_method import (
+        build_pinch_design_method_tasks,
+    )
+
+    options = {"HENS_SOLVER_PDM": "highs"}
+    if placement is not None:
+        options["HENS_UTILITY_PLACEMENT"] = placement
+    problem = _problem(HEATING, options)
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(problem))[0]
+
+    built = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task, problem=problem, parent_outcomes={}
+    )
+
+    assert built.staged_utilities is held

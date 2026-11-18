@@ -456,6 +456,7 @@ class LocalSynthesisExecutor:
             ),
             staged_utilities=(
                 decompositions is not None
+                and problem.master_zone.config.hens.utility_placement == "temperature"
                 and _has_utility_levels(decompositions["above"])
             ),
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),

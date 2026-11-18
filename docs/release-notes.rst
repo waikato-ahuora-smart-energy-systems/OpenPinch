@@ -70,6 +70,10 @@ Heat exchanger network synthesis
   ``hot-utility:Hot Utility.HW@90-87.1->...``). On ``zonal_site`` the
   Hospital now holds its hot water and steam levels.
   ``HENS_UTILITY_SLICES: false`` turns the slices off.
+- ``HENS_UTILITY_PLACEMENT`` chooses how synthesis shares duty between
+  utility levels: ``"temperature"`` (the default) holds each level at the
+  duty targeting gives it, lowest exergy first; ``"price"`` lets the pinch
+  design choose levels by utility cost, as before.
 - The pinch design method no longer drops a side of the pinch whose
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the

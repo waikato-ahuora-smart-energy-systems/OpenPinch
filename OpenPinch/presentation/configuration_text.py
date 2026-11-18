@@ -423,6 +423,16 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "HENS_PDM_MILP)."
         ),
     ),
+    "HENS_UTILITY_PLACEMENT": FieldText(
+        "Utility placement", None,
+        (
+            "How synthesis shares duty between utility levels when there is more "
+            "than one hot or cold utility. \"temperature\" holds each level at the "
+            "duty targeting gives it, the least valuable (lowest exergy) level "
+            "first, as the grand composite curve places them. \"price\" lets the "
+            "pinch design choose the levels by utility cost."
+        ),
+    ),
     "HENS_UTILITY_SLICES": FieldText(
         "Utility slices in series", None,
         (
