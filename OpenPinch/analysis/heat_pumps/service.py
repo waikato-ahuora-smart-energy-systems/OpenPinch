@@ -108,6 +108,8 @@ def compute_profile_heat_pump_target(
     H_cold: np.ndarray,
     config: Configuration,
     args: dict | None = None,
+    period_id: str | None = None,
+    period_idx: int | None = None,
 ) -> HeatPumpTargetOutputs | None:
     """Target a heat pump that takes heat only from the source profile
     ``H_hot`` and delivers it only to the sink profile ``H_cold``, with no
@@ -116,7 +118,8 @@ def compute_profile_heat_pump_target(
     The profiles are cumulative duties on the shifted temperatures
     ``T_vals`` (hottest first), as a problem table's ``H(net-hot)`` and
     ``H(net-cold)`` columns. The load is the sink's duty capped by
-    ``config``'s HPR load; ``args`` takes the search budget keys
+    ``config``'s HPR load (a period-valued load at ``period_id`` or
+    ``period_idx``); ``args`` takes the search budget keys
     (``maximum_iterations``, ``maximum_evaluations``).
     """
 
@@ -125,6 +128,8 @@ def compute_profile_heat_pump_target(
         H_net_hot=H_hot,
         is_heat_pumping=True,
         config=config,
+        period_id=period_id,
+        period_idx=period_idx,
     )
     if load < tol:
         return None
