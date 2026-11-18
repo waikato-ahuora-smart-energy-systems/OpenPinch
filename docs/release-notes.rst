@@ -20,6 +20,14 @@ Heat exchanger network synthesis
   serves that zone's streams alone, with every utility of the problem, and
   the problem's stored results are not changed. The default, the root zone,
   designs on every stream as before.
+- ``design.heat_exchanger_network()`` now designs a problem or zone with
+  only hot or only cold process streams, which used to fail with "prepared
+  PinchProblem must contain hot and cold streams". Its network is heaters
+  (or coolers) alone, and each utility level takes the duty targeting gives
+  it: the least valuable level serves the composite curve from the pinch end
+  first, so a stream spanning several levels gets utility exchangers in
+  series. The network is built without a solver and serves every period;
+  overdesign is not available for it.
 
 0.9.3 (2026-11-18)
 ------------------

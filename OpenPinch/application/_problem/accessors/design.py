@@ -499,9 +499,19 @@ class _DesignAccessor:
                     solve_tolerance=solve_tolerance,
                     record=record,
                 )
+        from ....analysis.heat_exchanger_networks.utility_only import is_one_sided
+
         hens = self._effective_hens(options)
         margin = self._overdesign_margin(overdesign_percentage, hens)
         basis = self._design_basis(design_basis, period_id, hens)
+        if is_one_sided(self._problem._require_prepared_root_zone()):
+            # Utility exchangers alone need no fit: design over every period.
+            if margin is not None:
+                raise ValueError(
+                    "overdesign is not available for a network of only hot or "
+                    "only cold streams."
+                )
+            basis, period_id = "all", None
         arguments = dict(
             width=width,
             depth=depth,
