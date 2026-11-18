@@ -90,6 +90,12 @@ class InternalHeatExchangerNetworkProblem:
     # (``../solver/utility_slices.py``); off, each heater or cooler runs its
     # utility over the whole range.
     utility_slicing: bool = True
+    # Each utility's targeted duty per period (kW), when a pinch design holds
+    # the levels; tasks built on it inherit them, and extracted networks
+    # carry them so ranking can put level-held networks first.
+    utility_level_targets: dict[str, list[float]] | None = field(
+        default=None, init=False
+    )
 
     def load_model(
         self,
@@ -99,6 +105,7 @@ class InternalHeatExchangerNetworkProblem:
         """Construct the private PDM or StageWise model for this task."""
 
         self._model_factories = model_factories
+        self._record_level_targets()
         self._slice_utilities()
         self.args = {
             "name": self.name,
@@ -122,6 +129,43 @@ class InternalHeatExchangerNetworkProblem:
             self._build_pdm(model_factories=model_factories)
             return
         self._build_stage_wise(model_factories=model_factories)
+
+    def _record_level_targets(self) -> None:
+        """Keep the levels a design holds, or its parent's, by utility name."""
+
+        if self.utility_level_targets is not None:
+            return
+        parent_targets = getattr(self.parent, "utility_level_targets", None)
+        if parent_targets is not None:
+            self.utility_level_targets = parent_targets
+            return
+        if not (
+            self.framework == "PDM"
+            and self.staged_utilities
+            and self.pinch_decompositions
+        ):
+            return
+        decomposition = self.pinch_decompositions["above"]
+        slices = {
+            label: parent
+            for side in utility_slices(self.solver_arrays).values()
+            for label, (parent, _share) in side.items()
+        }
+        targets: dict[str, list[float]] = {}
+        for names, field_name in (
+            (decomposition.hot_utility_identities, "hot_utility_level_targets"),
+            (decomposition.cold_utility_identities, "cold_utility_level_targets"),
+        ):
+            for u, name in enumerate(names):
+                name = slices.get(name, name)
+                duties = [
+                    float(getattr(target, field_name)[u])
+                    for target in decomposition.period_targets
+                ]
+                if name in targets:
+                    duties = [a + b for a, b in zip(targets[name], duties)]
+                targets[name] = duties
+        self.utility_level_targets = targets
 
     def _slice_utilities(self) -> None:
         """Slice sliding utilities where the levels are held, or as the parent.
@@ -228,7 +272,7 @@ class InternalHeatExchangerNetworkProblem:
     ) -> HeatExchangerNetwork:
         """Convert one solved model of this task, such as a search candidate."""
 
-        return extract_heat_exchanger_network(
+        network = extract_heat_exchanger_network(
             candidate,
             self.solver_arrays,
             run_id=run_id,
@@ -238,6 +282,14 @@ class InternalHeatExchangerNetworkProblem:
             stage_count=getattr(
                 candidate, "stages", getattr(candidate, "S", self.stages)
             ),
+        )
+        if self.utility_level_targets is None:
+            return network
+        return network.model_copy(
+            update={
+                "source_metadata": network.source_metadata
+                | {"utility_level_targets": self.utility_level_targets}
+            }
         )
 
     def extract_result(

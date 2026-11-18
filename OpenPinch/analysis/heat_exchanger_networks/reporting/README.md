@@ -13,7 +13,8 @@ Checks, ranks and exports synthesis designs. Feasibility checks work on service-
 - `export_heat_exchanger_network_synthesis_results` (`exports.py`): writes JSON and CSV views and a manifest from a problem's cached design.
 
 ## Invariants
-- The same key ranks and accepts outcomes: lowest objective first, task id as tie-break, missing objective last [ranking.py:outcome_ranking_key].
+- The same key ranks and accepts outcomes: networks that hold their utility levels first, then lowest objective, task id as tie-break, missing objective last [ranking.py:outcome_ranking_key].
+- A network holds its utility levels when each utility's duty in every period is within `LEVEL_TOLERANCE` (1e-3, relative to the target or of 1 kW) of `source_metadata["utility_level_targets"]`, summing its heaters or coolers by utility name; a network without targets holds them [ranking.py:holds_utility_levels].
 - Only successful outcomes with a network, an objective and a passing feasibility check are ranked [ranking.py:_ranked_candidate_outcomes].
 - Structure signatures ignore duty and count only active matches [ranking.py:network_structure_signature].
 - Verification reads a utility slice's approach and film coefficient under its parent's name (`solver_axis_metadata["utility_parents"]`), as its exchangers carry the parent's name [verification.py:_stream_order].

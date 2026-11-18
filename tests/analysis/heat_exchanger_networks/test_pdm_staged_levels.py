@@ -605,3 +605,14 @@ def test_the_workflow_places_utilities_by_temperature_or_by_price(placement, hel
     )
 
     assert built.staged_utilities is held
+
+
+def test_a_level_held_network_records_the_level_targets():
+    problem = _problem(HEATING)
+    targets = _targets(problem)
+
+    network = _pdm_network(problem)
+
+    recorded = network.source_metadata["utility_level_targets"]
+    assert recorded["Hot Utility.LPS"] == pytest.approx([targets["LPS"]])
+    assert recorded["Cold Utility.CW"] == pytest.approx([targets["CW"]])

@@ -55,10 +55,11 @@ Heat exchanger network synthesis
   region designed on its own, so no match crosses a utility pinch. A
   heuristic side holds each level at its target or, failing that, within
   0.1% of it, the share of a load the heuristic counts as met. Networks
-  are still ranked by total annual cost, and the later stages
+  that hold the levels (each utility within 0.1% of its target) rank
+  ahead of those that do not, then by total annual cost, so the selected
+  network holds the targeted levels whenever one does. The later stages
   (temperature-driven method, network evolution) do not yet hold the
-  levels, so the selected network may still differ from the targeted
-  levels. A network that holds levels keeps its stages: stage reduction
+  levels, so their networks usually rank behind. A network that holds levels keeps its stages: stage reduction
   re-solves by utility cost, which would undo them.
 - A utility whose temperature slides, such as hot water from 90 to 70 C,
   now reaches the streams targeting lets it heat. A heater runs its utility
