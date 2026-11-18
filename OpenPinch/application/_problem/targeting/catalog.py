@@ -147,6 +147,12 @@ METHOD_CATALOG = MappingProxyType(
                 "thermal_derivative",
             )
         },
+        # HPR targets on an existing network: no synthesis or solver.
+        "design.retrofit_heat_pumps": _spec(
+            prerequisites=("direct_heat_integration",),
+            periods="specialized",
+            adapter="hen",
+        ),
     }
 )
 

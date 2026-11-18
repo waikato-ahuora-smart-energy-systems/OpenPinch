@@ -1,11 +1,19 @@
 Pre-Release Notes
-=================
-
+==========
 Unreleased
 ----------
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.retrofit_heat_pumps`` gives an existing network's ideal
+  and as-piped heat pump targets from the HPR service: the ideal against
+  the process's heating and cooling targets, the as-piped against only the
+  existing heaters and coolers (no process-side repiping). Each reports
+  its levels, work, COP and the utility and operating cost before and
+  after; ``network_gap`` and ``heat_pump_gap`` split the difference
+  between them. ``compute_profile_heat_pump_target`` in the HPR service
+  targets a heat pump against any given source and sink profiles.
 
 - Extracting a network from a solved model is cheaper: plain numbers,
   NumPy floats and ``[value]`` lists are read directly rather than through
@@ -60,6 +68,11 @@ Heat exchanger network synthesis
   utility's name, with the slice in the exchanger id (for example
   ``hot-utility:Hot Utility.HW@90-87.1->...``). On ``zonal_site`` the
   Hospital now holds its hot water and steam levels.
+=======
+- The pinch design method no longer drops a side of the pinch whose
+  utility target is zero but whose streams still exchange heat there, as in
+  a threshold problem. Before, that side's matches were left out of the
+  network, which then failed verification.
 
 0.9.3 (2026-11-18)
 ------------------
