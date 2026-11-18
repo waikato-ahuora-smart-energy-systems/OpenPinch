@@ -22,6 +22,7 @@ from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
+from OpenPinch.application.problem import PinchProblem
 from tests.analysis.heat_exchanger_networks.test_staged_utilities import (
     D_TMIN,
     _highs_available,
@@ -30,10 +31,9 @@ from tests.analysis.heat_exchanger_networks.test_staged_utilities import (
     _quantity,
     _utility,
 )
-from OpenPinch.application.problem import PinchProblem
 
 pytestmark = pytest.mark.skipif(
-    "not _highs_available()", reason="needs highspy and pyomo"
+    not _highs_available(), reason="needs highspy and pyomo"
 )
 
 
@@ -64,12 +64,14 @@ def _site(streams, utilities) -> PinchProblem:
     )
 
 
-def _heating_site() -> PinchProblem:
+def _heating_site(*, hot_water: bool = False) -> PinchProblem:
     """C1 (60 to 200 C) is heated by H2 low, H1 high, and 40 kW between.
 
     LPS (140 C) can serve the 40 kW between; it is priced above HPS, so by
-    price HPS takes it.
+    price HPS takes it. Hot water (90 to 70 C) could heat C1's cold end but
+    not the span between.
     """
+    water = [_utility("HW", "Hot", 90.0, 70.0, 10.0)] if hot_water else []
     return _site(
         [
             _stream("Plant", "H1", 220.0, 150.0, 70.0),
@@ -79,6 +81,7 @@ def _heating_site() -> PinchProblem:
         [
             _utility("LPS", "Hot", 140.0, 139.9, 60.0),
             _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+            *water,
             _utility("CW", "Cold", 20.0, 25.0, 5.0),
         ],
     )
@@ -190,7 +193,7 @@ def test_streams_of_one_group_only_match_each_other():
     assert model.get_max_benefit_HX_candidates(5) == []
 
 
-@pytest.mark.skipif("not _ipopt_available()", reason="needs ipopt")
+@pytest.mark.skipif(not _ipopt_available(), reason="needs ipopt")
 def test_an_evolution_child_keeps_its_parents_holds():
     problem = _heating_site()
     probe = _model(problem, staged_utilities=True)
@@ -355,3 +358,147 @@ def test_a_site_seed_carries_its_process_targets_into_the_evolution_task():
     assert task.settings["site_processes"] == processes
     assert built.site_processes == processes
     assert built.staged_utilities
+
+
+@pytest.mark.skipif(not _ipopt_available(), reason="needs ipopt")
+def test_a_seeded_site_task_places_its_staged_units_before_relaxing():
+    """A relaxed model fixes staged binaries; a seed without a parent first
+    places them with a MILP on its recovery topology and levels."""
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    problem = _heating_site(hot_water=True)
+    arrays = problem_to_solver_arrays(problem, D_TMIN)
+    (plant,) = {
+        name.rsplit(".", 1)[0]
+        for name in arrays.stream_identities["cold_process_streams"]
+    }
+    placed = _model(
+        problem,
+        staged_utilities=True,
+        level_targets=_lps_held(_model(problem, staged_utilities=True)),
+    )
+    placed.optimise(False)
+    recovery = [
+        [
+            [1 if _value(placed.z[i][j][k]) > 0.5 else 0 for k in range(placed.S)]
+            for j in range(placed.J)
+        ]
+        for i in range(placed.I)
+    ]
+    internal = InternalHeatExchangerNetworkProblem(
+        solver_arrays=arrays,
+        name="site-seed",
+        framework="ESM",
+        solver="ipopt-pyomo",
+        dTmin=D_TMIN,
+        stages=2,
+        z_restriction=[recovery, None, None],
+        minimisation_goal="total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+        staged_utilities=True,
+        site_processes={
+            plant: {
+                "Hot Utility.LPS": [40.0],
+                "Hot Utility.HPS": [0.0],
+                "Hot Utility.HW": [0.0],
+            }
+        },
+    )
+
+    internal.load_model()
+    internal.case.optimise(False)
+
+    case = internal.case
+    assert case.mSuccess == 1
+    lps, hw = 0, 2
+    for u, duty in ((lps, 40.0), (hw, 0.0)):
+        held = sum(_value(row[u]) for row in case.Q_h_by_period[0]) + sum(
+            _value(by_k) for row in case.Q_hs_by_period[0] for by_k in row[u]
+        )
+        assert held == pytest.approx(duty, rel=1e-4, abs=1e-4)
+
+
+def _tiny_match_case(model_cost: float):
+    """One 0.011 kW match, as a pinch design leaves in a site seed."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        S=1,
+        I=1,
+        J=1,
+        z_allowed=[[[1]]],
+        Q_r=[[[0.011]]],
+        theta_1=[[[96.0]]],
+        theta_2=[[[95.7]]],
+        U_r=[[0.5]],
+        A_coeff=[943.9],
+        A_exp=[0.6],
+        recovery_area_cost_filtered=[[model_cost]],
+    )
+
+
+def _smoothed_cost(case) -> float:
+    """The model's own area cost: ``A_coeff * (area + 1e-3) ** A_exp``."""
+    theta_1, theta_2 = case.theta_1[0][0][0], case.theta_2[0][0][0]
+    mean = (theta_1 * theta_2 * (theta_1 + theta_2) / 2 + 1e-3) ** (1 / 3)
+    area = case.Q_r[0][0][0] / (case.U_r[0][0] * mean)
+    return case.A_coeff[0] * (area + 1e-3) ** case.A_exp[0]
+
+
+def test_the_area_check_compares_the_models_smoothed_cost_on_a_tiny_match():
+    """The model adds 1e-3 m2 to each area before the cost exponent, so a
+    tiny match's cost exceeds its exact cost by up to
+    ``A_coeff * 1e-3 ** A_exp`` (about 15 here), well over the check's 1.0
+    absolute tolerance. The check recomputes the model's smoothed cost, so a
+    cost off by that much still fails."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
+        verification,
+    )
+
+    case = _tiny_match_case(0.0)
+    smoothed = _smoothed_cost(case)
+
+    assert verification._check_area_costs(_tiny_match_case(smoothed)) is True
+    bound = case.A_coeff[0] * 1e-3 ** case.A_exp[0]
+    assert verification._check_area_costs(_tiny_match_case(smoothed + bound)) is False
+
+
+def test_a_seed_match_the_placement_leaves_idle_stays_in_use():
+    """H1 is spent in stage 1, so the placement gives its seed match in
+    stage 2 no duty; post-processing reads that as off, but the seed keeps
+    it."""
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    problem = _heating_site()
+    arrays = problem_to_solver_arrays(problem, D_TMIN)
+    hot = list(arrays.stream_identities["hot_process_streams"])
+    (plant,) = {name.rsplit(".", 1)[0] for name in hot}
+    h1, h2 = hot.index(f"{plant}.H1"), hot.index(f"{plant}.H2")
+    recovery = [[[0, 0]], [[0, 0]]]
+    recovery[h1][0] = [1, 1]
+    recovery[h2][0] = [0, 1]
+    internal = InternalHeatExchangerNetworkProblem(
+        solver_arrays=arrays,
+        name="site-seed",
+        framework="ESM",
+        solver="ipopt-pyomo",
+        dTmin=D_TMIN,
+        stages=2,
+        z_restriction=[recovery, None, None],
+        minimisation_goal="total cost",
+        non_isothermal_model=True,
+        integers=False,
+        tol=1e-3,
+        staged_utilities=True,
+        site_processes={plant: {"Hot Utility.LPS": [40.0], "Hot Utility.HPS": [0.0]}},
+    )
+
+    internal.load_model()
+
+    assert _value(internal.case.z[h1][0][1]) == pytest.approx(1.0)

@@ -427,6 +427,55 @@ class InternalHeatExchangerNetworkProblem:
         self.case = factory(**self.args, stages=stages)
         if self.parent is not None:
             self.case.set_initial_values_for_variables(self.parent.case)
+        elif self.site_processes is not None and not self.integers:
+            placed = self._placed_staged_units(stages)
+            if placed is not None:
+                self.case.set_initial_values_for_variables(placed)
+                # The seed sets the matches: one the MILP left without duty
+                # reads as off after its post-processing, but stays in use.
+                for i, j, k in product(
+                    range(self.case.I), range(self.case.J), range(self.case.S)
+                ):
+                    if self.case.z_allowed[i][j][k] > 0:
+                        _assign_value(self.case.z[i][j][k], 1)
+
+    def _placed_staged_units(self, stages: int):
+        """Place a seeded site task's staged units before it is relaxed.
+
+        A relaxed model holds each staged unit at its warm-start flag, and
+        a seed has no parent to take them from (every unit would run). A
+        MILP on the seed's recovery topology, isothermal and priced by
+        utility cost, with every seed match kept in use, holds the levels
+        and picks the units; it is linear,
+        so HiGHS solves it. Without HiGHS, or when it fails, the task runs
+        as built.
+        """
+
+        try:
+            backend.require_solver_backend("highs")
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            return None
+        placed = StageWiseModel(
+            **(
+                self.args
+                | {
+                    "name": f"placed-{self.name}",
+                    "solver": "highs",
+                    "solver_options": None,
+                    "minimisation_goal": "utility costs",
+                    "non_isothermal_model": False,
+                    "integers": True,
+                    "tol": 1e-6,
+                }
+            ),
+            stages=stages,
+        )
+        # The seed's matches stay: the MILP picks the staged units only.
+        for i, j, k in product(range(placed.I), range(placed.J), range(placed.S)):
+            if placed.z_allowed[i][j][k] > 0:
+                placed.m.Equation(placed.z[i][j][k] == 1)
+        placed.optimise(False)
+        return placed if placed.mSuccess == 1 else None
 
     def _solve_pdm(self, *, print_output: bool = True) -> None:
         """Solve PDM sides and amalgamate them before stage reduction."""

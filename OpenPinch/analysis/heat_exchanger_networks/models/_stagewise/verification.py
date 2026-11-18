@@ -305,6 +305,9 @@ def _check_area_costs(
                                 ** (1 / 3)
                             )
                         )
+                        # The model's own smoothing (``objectives.py``): a
+                        # tiny match's cost is mostly this term.
+                        + 1e-3
                     )
                     ** case.A_exp[0]
                     for hot_idx in allowed_hots

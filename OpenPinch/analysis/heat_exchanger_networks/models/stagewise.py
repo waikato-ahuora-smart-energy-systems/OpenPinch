@@ -8,12 +8,12 @@ from typing import Any, Literal
 from ..solver.arrays import PreparedSolverArrays
 from ._stagewise import equations as _equations
 from ._stagewise import evolution as _evolution
-from ._stagewise.level_targets import UtilityLevelTarget
 from ._stagewise import objectives as _objectives
 from ._stagewise import postprocess as _postprocess
 from ._stagewise import setup as _setup
 from ._stagewise import verification as _verification
 from ._stagewise import warm_start as _warm_start
+from ._stagewise.level_targets import UtilityLevelTarget
 from .base import BaseHeatExchangerNetworkModel
 
 
