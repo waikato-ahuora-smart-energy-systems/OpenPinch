@@ -133,6 +133,10 @@ def set_staged_utility_equations(owner) -> None:
                     * owner.f_c_period[n][j]
                     == sum(owner.Q_hs_by_period[n][j][u][k] for u in range(owner.NHU))
                 )
+                # A stream absent in a period (a pinch side clips it to 0 K)
+                # has no approach to keep there.
+                if not _approach._stream_active(owner, "cold", n, j):
+                    continue
                 for u in range(owner.NHU):
                     if owner.z_hs_allowed[j][u][k]:
                         _set_staged_heater_approach(owner, n, j, u, k)
@@ -145,6 +149,8 @@ def set_staged_utility_equations(owner) -> None:
                     * owner.f_h_period[n][i]
                     == sum(owner.Q_cs_by_period[n][i][u][k] for u in range(owner.NCU))
                 )
+                if not _approach._stream_active(owner, "hot", n, i):
+                    continue
                 for u in range(owner.NCU):
                     if owner.z_cs_allowed[i][u][k]:
                         _set_staged_cooler_approach(owner, n, i, u, k)
@@ -156,13 +162,19 @@ def set_staged_utility_equations(owner) -> None:
 def _allowed(owner, side: str) -> list:
     """Flag ``[stream][utility][boundary]`` for each staged unit offered.
 
-    A staged unit is offered when ``staged_utilities`` is on, the stream and
+    A staged unit is offered when ``staged_utilities`` is on (on a pinch
+    side, for heaters above the pinch and coolers below it), the stream and
     utility are not segmented, and the utility's inlet clears the stream's
     supply by its approach in every period the stream runs, so some duty is
     possible.
     """
     streams, utilities = (owner.J, owner.NHU) if side == "hot" else (owner.I, owner.NCU)
-    if not getattr(owner, "staged_utilities", False):
+    # A pinch side has heaters only above the pinch and coolers only below.
+    side_location = getattr(owner, "pinch_loc", None)
+    wrong_side = side_location is not None and side_location != (
+        "above" if side == "hot" else "below"
+    )
+    if not getattr(owner, "staged_utilities", False) or wrong_side:
         return [
             [[0 for _k in range(owner.K)] for _u in range(utilities)]
             for _s in range(streams)
@@ -320,6 +332,30 @@ def post_process_staged_utilities(owner) -> None:
     owner.n_cs_units = _used_units(owner, owner.Q_cs_values)
     owner.area_hs = _design_areas(owner, owner.Q_hs_values, _heater_area)
     owner.area_cs = _design_areas(owner, owner.Q_cs_values, _cooler_area)
+    # As for the stream-end units, each offered binary becomes ``[flag]``:
+    # whether the unit carries duty in some period.
+    owner.z_hs = _used_flags(owner, owner.Q_hs_values, owner.z_hs_allowed)
+    owner.z_cs = _used_flags(owner, owner.Q_cs_values, owner.z_cs_allowed)
+
+
+def _used_flags(owner, duties, allowed) -> list:
+    return [
+        [
+            [
+                [
+                    int(
+                        max(duties[n][s][u][k] for n in range(owner.N_periods))
+                        > owner.tol
+                    )
+                ]
+                if offered
+                else 0.0
+                for k, offered in enumerate(by_k)
+            ]
+            for u, by_k in enumerate(row)
+        ]
+        for s, row in enumerate(allowed)
+    ]
 
 
 def with_staged_duties(owner, duties, side: str) -> list:

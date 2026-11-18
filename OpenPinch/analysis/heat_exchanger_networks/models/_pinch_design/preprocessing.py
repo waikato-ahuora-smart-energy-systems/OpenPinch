@@ -109,6 +109,10 @@ def _set_multiperiod_preprocessing(owner) -> None:
     owner.z_j_active = list(decomposition.z_j_active)
     if decomposition.manual_stage_selection is None:
         owner.S = max(sum(owner.z_i_active), sum(owner.z_j_active))
+        if getattr(owner, "staged_utilities", False):
+            # Room for a staged heater (or cooler) at the pinch end, before
+            # the first recovery stage, where the lowest level often serves.
+            owner.S += 1
     else:
         owner.S = decomposition.S
     owner.K = owner.S + 1

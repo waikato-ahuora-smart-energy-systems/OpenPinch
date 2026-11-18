@@ -24,6 +24,7 @@ from ..solver.dependencies import (
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
 from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
+from ._stagewise import staged_utilities as _staged
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -76,6 +77,10 @@ class InternalHeatExchangerNetworkProblem:
     # ``pdm_variants``.
     heuristic_network_limit: int = 0
     heuristic_report: dict[str, Any] = field(default_factory=dict, init=False)
+    # Staged heaters and coolers, with PDM sides holding each utility level
+    # at its target (``_stagewise/staged_utilities.py``). A stage-wise task
+    # also takes them on when its parent's network has them.
+    staged_utilities: bool = False
 
     def load_model(
         self,
@@ -99,6 +104,10 @@ class InternalHeatExchangerNetworkProblem:
             "tol": self.tol,
             "solver_options": self.solver_options,
         }
+        if self.staged_utilities or getattr(
+            getattr(self.parent, "case", None), "staged_utilities", False
+        ):
+            self.args["staged_utilities"] = True
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)
             return
@@ -796,6 +805,10 @@ class InternalHeatExchangerNetworkProblem:
 
     def _reduce_stages(self, case, *, empty_only: bool) -> StageWiseModel:
         if case.mSuccess != 1:
+            return case
+        if _staged.staged_units_on(case):
+            # The reduced model does not relocate staged heaters and coolers
+            # yet, so a network with them keeps its stages.
             return case
 
         active_stages = self._get_active_stages(

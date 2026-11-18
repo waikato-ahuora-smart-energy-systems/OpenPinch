@@ -51,8 +51,13 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         stage_selection: Literal["automated"] | list[int] | tuple[int, int],
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
         utility_cost_cap: float | None = None,
+        staged_utilities: bool = False,
     ) -> None:
         self.pinch_loc = pinch_loc
+        # Offer staged heaters and coolers (with one more automated stage)
+        # and hold each utility level at its target
+        # (``_stagewise/staged_utilities.py``, ``_pinch_design/equations.py``).
+        self.staged_utilities = staged_utilities
         # With a cap, "min units" minimises the unit count alone, keeping
         # utility cost at or below the cap instead of adding it in.
         self.utility_cost_cap = utility_cost_cap
