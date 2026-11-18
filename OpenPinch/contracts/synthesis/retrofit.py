@@ -111,3 +111,58 @@ class HeatExchangerNetworkRetrofitResult(BaseModel):
             key=lambda n: (self.frontier[n].net_annual_benefit, -n),
         )
         return self.frontier[best]
+
+
+class RetrofitHeatPumpTarget(BaseModel):
+    """One HPR service heat pump target, against the utility it relieves.
+
+    Duties and work in kW, temperatures in degC. ``*_before`` is the hot and
+    cold utility the target starts from, ``*_after`` what is left once the
+    heat pump delivers ``heat_delivered`` and takes the process part of its
+    evaporator heat (all of it but ``ambient_heat``, drawn from air).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    hot_utility_before: float
+    cold_utility_before: float
+    heat_delivered: float
+    process_heat_absorbed: float
+    ambient_heat: float
+    work: float
+    cop: float
+    condensing_temperatures: tuple[float, ...]
+    condenser_duties: tuple[float, ...]
+    evaporating_temperatures: tuple[float, ...]
+    evaporator_duties: tuple[float, ...]
+    total_annualized_cost: float | None = None
+
+    @property
+    def hot_utility_after(self) -> float:
+        return self.hot_utility_before - self.heat_delivered
+
+    @property
+    def cold_utility_after(self) -> float:
+        return self.cold_utility_before - self.process_heat_absorbed
+
+
+class RetrofitHeatPumpTargets(BaseModel):
+    """The ideal and the as-piped heat pump target of an existing network.
+
+    ``ideal`` serves the process's heating target from its cooling target
+    (the direct-integration cascade), as a new design could; ``as_piped``
+    serves only the existing network's heaters from only its coolers, so
+    it needs no process-side repiping. Either is ``None`` when it has no
+    load. ``hot_utility_gap`` is the hot utility the as-piped heat pump
+    leaves beyond the ideal's: what keeping to the existing pipework, and
+    the network's own heat recovery, cost.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ideal: RetrofitHeatPumpTarget | None
+    as_piped: RetrofitHeatPumpTarget | None
+
+    @property
+    def hot_utility_gap(self) -> float:
+        return self.as_piped.hot_utility_after - self.ideal.hot_utility_after
