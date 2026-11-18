@@ -17,7 +17,8 @@ Heat exchanger network synthesis
   zone, given by name as in targeting or as a ``Zone``, for example
   ``site.design.heat_exchanger_network(zone="Hospital[S]")`` or
   ``site.design.heat_exchanger_network(zone=site.master_zone.subzones["Hospital[S]"])``. The network
-  serves that zone's streams alone, with every utility of the problem, and
+  serves that zone's streams alone, with every utility of the problem
+  (including any default utility, placed for the whole problem), and
   the problem's stored results are not changed. The default, the root zone,
   designs on every stream as before.
 - ``design.heat_exchanger_network()`` now designs a problem or zone with

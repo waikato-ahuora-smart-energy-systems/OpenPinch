@@ -22,12 +22,23 @@ def _tree_along(tree: dict, path: list[str]) -> dict:
     return tree | {"children": children}
 
 
+def _ancestry(zone) -> list[str]:
+    """Zone names from the root down to ``zone``; a name may contain "/"."""
+    names = []
+    while zone is not None:
+        names.append(zone.name)
+        zone = zone.parent_zone
+    return names[::-1]
+
+
 def _zone_case(problem, zone):
     """A new problem holding one zone's streams with every utility.
 
     The zones above it are kept, without their other subzones, so stream keys
-    match the source problem's. Plant profile data and any network are not
-    carried over.
+    match the source problem's. The utilities are the source problem's
+    prepared ones, defaults included: preparation places a default from the
+    streams' temperatures, which the zone's streams alone would change. Plant
+    profile data and any network are not carried over.
     """
     if problem._process_components:
         raise ValueError(
@@ -37,10 +48,18 @@ def _zone_case(problem, zone):
     source["streams"] = [
         record for record in source["streams"] if _within(record["zone"], zone.address)
     ]
-    source["zone_tree"] = _tree_along(source["zone_tree"], zone.address.split("/"))
+    source["zone_tree"] = _tree_along(source["zone_tree"], _ancestry(zone))
     source["network"] = None
     source["plant_profile_data"] = []
-    return type(problem)(source, project_name=problem.project_name)
+    case = type(problem)(source, project_name=problem.project_name)
+    site = problem._require_prepared_root_zone()
+    _set_utilities_for_zone_and_subzones(
+        case._require_prepared_root_zone(),
+        deepcopy(site.hot_utilities),
+        deepcopy(site.cold_utilities),
+    )
+    case._invalidate_analysis()
+    return case
 
 
 def _align_period_values(value, donor_ids, receiver_ids):

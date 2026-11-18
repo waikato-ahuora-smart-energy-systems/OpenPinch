@@ -132,3 +132,78 @@ def test_a_zone_network_matches_only_that_zones_streams():
     }
     assert process_streams
     assert all(stream.startswith("Hospital[S].") for stream in process_streams)
+
+
+def _two_zone_source(root: str) -> dict:
+    """A site with no utilities: A runs hotter and colder than B."""
+
+    def quantity(value, unit):
+        return {"value": value, "unit": unit}
+
+    def stream(zone, name, supply, target, heat_flow):
+        return {
+            "zone": f"{root}/{zone}",
+            "name": name,
+            "t_supply": quantity(supply, "degC"),
+            "t_target": quantity(target, "degC"),
+            "heat_flow": quantity(heat_flow, "kW"),
+            "dt_cont": quantity(5.0, "delta_degC"),
+            "htc": quantity(1.0, "kW/m^2/delta_degC"),
+        }
+
+    return {
+        "streams": [
+            stream("A", "H1", 300.0, 100.0, 100.0),
+            stream("A", "C1", 20.0, 250.0, 100.0),
+            stream("B", "H2", 120.0, 60.0, 50.0),
+            stream("B", "C2", 70.0, 110.0, 40.0),
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": root,
+            "type": "Site",
+            "children": [
+                {"name": "A", "type": "Process Zone"},
+                {"name": "B", "type": "Process Zone"},
+            ],
+        },
+    }
+
+
+def _utility_temperatures(problem: PinchProblem) -> dict[str, tuple[str, str]]:
+    zone = problem.master_zone
+    return {
+        key: (str(stream.supply_temperature), str(stream.target_temperature))
+        for key, stream in (*zone.hot_utilities.items(), *zone.cold_utilities.items())
+    }
+
+
+def test_a_zone_case_keeps_the_sites_default_utilities():
+    """Defaults are placed from the whole site's temperatures, not the zone's."""
+    from OpenPinch.analysis.targeting.utilities import is_default_utility
+    from OpenPinch.application.case_derivation import _zone_case
+
+    site = PinchProblem(source=_two_zone_source("Site"))
+
+    case = _zone_case(site, site._resolve_target_zone("Site/B"))
+
+    assert _utility_temperatures(case) == _utility_temperatures(site)
+    assert all(
+        is_default_utility(stream)
+        for _key, stream in (
+            *case.master_zone.hot_utilities.items(),
+            *case.master_zone.cold_utilities.items(),
+        )
+    )
+
+
+def test_a_zone_case_keeps_a_root_name_with_a_slash():
+    from OpenPinch.application.case_derivation import _zone_case
+
+    site = PinchProblem(source=_two_zone_source("Site A/2026"))
+
+    case = _zone_case(site, site._resolve_target_zone("Site A/2026/B"))
+
+    assert _keys(case.master_zone) == {
+        key for key in _keys(site.master_zone) if key.startswith("B.")
+    }
