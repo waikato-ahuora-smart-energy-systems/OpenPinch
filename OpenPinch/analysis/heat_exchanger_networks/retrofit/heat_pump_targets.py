@@ -20,6 +20,7 @@ from ....domain.stream_collection import StreamCollection
 from ...heat_pumps.service import compute_profile_heat_pump_target
 from ...targeting.cascade import get_process_heat_cascade
 from ..solver.arrays import annual_cost_scales, problem_to_solver_arrays
+from .search import RetrofitSettings, run_retrofit_search
 
 # Solved network states carry temperatures in K; problem tables in degC.
 _KELVIN = 273.15
@@ -31,9 +32,16 @@ def retrofit_heat_pump_targets(
     """The HPR service's heat pump targets for ``problem`` (its master
     zone's direct-integration cascade, already targeted) and for
     ``network``'s solved coolers and heaters (``as_piped_profiles``), with
-    the zone's HPR configuration. ``args`` takes the HPR search budget
-    keys."""
+    the zone's HPR configuration. A ``network`` whose heaters and coolers
+    have no solved temperatures is solved first, as the retrofit search's
+    existing design. ``args`` takes the HPR search budget keys."""
 
+    if not _solved(network):
+        network = (
+            run_retrofit_search(problem, network, RetrofitSettings(max_modifications=0))
+            .frontier[0]
+            .network
+        )
     zone = problem.master_zone
     pt = zone.targets[TargetType.DI.value].pt
     profiles = {
@@ -61,6 +69,26 @@ def retrofit_heat_pump_targets(
         )
         targets[name] = _summary(result, H_hot, H_cold, prices)
     return RetrofitHeatPumpTargets(**targets)
+
+
+def _solved(network: HeatExchangerNetwork) -> bool:
+    """Whether every heater and cooler of ``network`` has solved process-side
+    temperatures in its first period."""
+
+    for exchanger in network.exchangers:
+        state = exchanger.period_states[0]
+        if exchanger.kind == HeatExchangerKind.COLD_UTILITY:
+            temperatures = (
+                state.source_inlet_temperature,
+                state.source_outlet_temperature,
+            )
+        elif exchanger.kind == HeatExchangerKind.HOT_UTILITY:
+            temperatures = (state.sink_inlet_temperature, state.sink_outlet_temperature)
+        else:
+            continue
+        if None in temperatures:
+            return False
+    return True
 
 
 def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
@@ -95,13 +123,9 @@ def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
         ambient_heat=ambient,
         work=float(result.w_net),
         cop=float(result.cop_h),
-        condensing_temperatures=tuple(
-            float(t) for t in np.atleast_1d(result.T_cond)
-        ),
+        condensing_temperatures=tuple(float(t) for t in np.atleast_1d(result.T_cond)),
         condenser_duties=tuple(float(q) for q in condenser),
-        evaporating_temperatures=tuple(
-            float(t) for t in np.atleast_1d(result.T_evap)
-        ),
+        evaporating_temperatures=tuple(float(t) for t in np.atleast_1d(result.T_evap)),
         evaporator_duties=tuple(float(q) for q in evaporator),
         total_annualized_cost=result.hpr_total_annualized_cost,
         **prices,

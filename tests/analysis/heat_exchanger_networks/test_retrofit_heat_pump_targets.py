@@ -151,9 +151,7 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
     assert ideal[2] == piped[2] == {"maximum_iterations": 7}
     # The ideal starts from the process's utility targets, the as-piped
     # from the existing heaters and coolers.
-    assert targets.ideal.hot_utility_before == pytest.approx(
-        direct.hot_utility_target
-    )
+    assert targets.ideal.hot_utility_before == pytest.approx(direct.hot_utility_target)
     assert targets.ideal.cold_utility_before == pytest.approx(
         direct.cold_utility_target
     )
@@ -278,3 +276,36 @@ def test_design_retrofit_heat_pump_targets_run_the_chosen_cycle(monkeypatch):
     parallel = HeatPumpAndRefrigerationCycle.ParallelCarnot
     assert [(str(t), f) for t, f, _ in seen] == [(parallel.value, 0.5)] * 2
     assert [args["maximum_iterations"] for _, _, args in seen] == [7, 7]
+
+
+def test_an_unsolved_network_is_solved_as_the_retrofit_baseline(monkeypatch):
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    # The existing network as design.retrofit takes it: structure and areas,
+    # no temperatures. The retrofit search's depth zero solves it.
+    unsolved = HeatExchangerNetwork.from_structure(
+        recovery=[("H3", "C2", 1), ("H1", "C1", 1), ("H2", "C2", 2), ("H3", "C1", 2)],
+        heaters=["C2"],
+        coolers=["H1", "H2"],
+        hot_utility="HU",
+        cold_utility="CU",
+    )
+    searched = []
+
+    def fake_search(problem, existing, settings):
+        searched.append((existing, settings.max_modifications))
+        return SimpleNamespace(frontier=(SimpleNamespace(network=_solved_network()),))
+
+    monkeypatch.setattr(heat_pump_targets, "run_retrofit_search", fake_search)
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", lambda **_k: None
+    )
+
+    targets = heat_pump_targets.retrofit_heat_pump_targets(_problem(), unsolved)
+
+    assert searched == [(unsolved, 0)]
+    assert targets.as_piped.hot_utility_before == pytest.approx(17518.7)
