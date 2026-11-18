@@ -171,10 +171,15 @@ def test_the_ideal_and_as_piped_targets_relieve_their_own_utilities(monkeypatch)
         (90.0,),
         (700.0,),
     )
-    # What keeping to the existing pipework costs in hot utility and work.
-    assert targets.hot_utility_gap == pytest.approx(
-        piped.hot_utility_after - targets.ideal.hot_utility_after
+    # The existing network's own shortfall from the targets, priced, and the
+    # saving the as-piped heat pump falls short of the ideal's by (none
+    # here: the faked service gives both the same heat pump).
+    ideal = targets.ideal
+    assert targets.network_gap == pytest.approx(
+        (17518.7 - direct.hot_utility_target) * ideal.hot_utility_price
+        + (13603.6 + 1665.1 - direct.cold_utility_target) * ideal.cold_utility_price
     )
+    assert targets.heat_pump_gap == pytest.approx(0.0, abs=1e-6)
 
 
 def test_each_target_is_priced_at_the_utilities_and_hpr_electricity(monkeypatch):

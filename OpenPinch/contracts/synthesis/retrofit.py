@@ -175,9 +175,14 @@ class RetrofitHeatPumpTargets(BaseModel):
     (the direct-integration cascade), as a new design could; ``as_piped``
     serves only the existing network's heaters from only its coolers, so
     it needs no process-side repiping. Either is ``None`` when it has no
-    load. ``hot_utility_gap`` is the hot utility the as-piped heat pump
-    leaves beyond the ideal's: what keeping to the existing pipework, and
-    the network's own heat recovery, cost.
+    load.
+
+    The gap between their operating costs after the heat pump splits in
+    two: ``network_gap``, what the existing network's utility costs beyond
+    the targets before any heat pump (the heat recovery a network retrofit
+    could win), and ``heat_pump_gap``, the operating saving the as-piped
+    heat pump falls short of the ideal's by (what reworking the network
+    for the heat pump could win). Neither counts heat pump capital.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -186,5 +191,16 @@ class RetrofitHeatPumpTargets(BaseModel):
     as_piped: RetrofitHeatPumpTarget | None
 
     @property
-    def hot_utility_gap(self) -> float:
-        return self.as_piped.hot_utility_after - self.ideal.hot_utility_after
+    def network_gap(self) -> float:
+        """$/y."""
+
+        return self.as_piped.operating_cost_before - self.ideal.operating_cost_before
+
+    @property
+    def heat_pump_gap(self) -> float:
+        """$/y."""
+
+        def saving(target: RetrofitHeatPumpTarget) -> float:
+            return target.operating_cost_before - target.operating_cost_after
+
+        return saving(self.ideal) - saving(self.as_piped)
