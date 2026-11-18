@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         HeatExchangerNetworkView,
     )
     from ....domain.heat_exchanger_network import HeatExchangerNetwork
+    from ....domain.zone import Zone
     from ...problem import PinchProblem
 
 
@@ -402,7 +403,7 @@ class _DesignAccessor:
     def heat_exchanger_network(
         self,
         *,
-        zone: str | None = None,
+        zone: "str | Zone | None" = None,
         width: int | None = None,
         depth: int | None = None,
         options: Mapping[str, Any] | None = None,
@@ -467,11 +468,13 @@ class _DesignAccessor:
         so another thread can poll it while the design runs. The result ranks
         exactly the record's networks. A record collects one call.
 
-        ``zone`` names one zone, as targeting does (``"Hospital[S]"``); the
-        network then serves that zone's streams alone, with every utility of
-        the problem. It is designed on a case derived from the zone, so the
-        problem's stored results are not changed. The root zone (the default)
-        designs on every stream.
+        ``zone`` is one zone, by name or address as targeting takes it
+        (``"Hospital[S]"``) or as a ``Zone`` such as
+        ``problem.master_zone.subzones["Hospital[S]"]``; the network then
+        serves that zone's streams alone, with every utility of the problem.
+        It is designed on a case derived from the zone, so the problem's
+        stored results are not changed. The root zone (the default) designs
+        on every stream.
         """
         if zone is not None:
             target = self._problem._resolve_target_zone(zone)

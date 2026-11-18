@@ -14,8 +14,9 @@ Heat exchanger network synthesis
   every stage. Under a profiler, a design on the pulp mill sample case
   spends about 28 s in extraction instead of 34 s.
 - ``design.heat_exchanger_network(zone=...)`` designs a network for one
-  zone, named as in targeting, for example
-  ``site.design.heat_exchanger_network(zone="Hospital[S]")``. The network
+  zone, given by name as in targeting or as a ``Zone``, for example
+  ``site.design.heat_exchanger_network(zone="Hospital[S]")`` or
+  ``site.design.heat_exchanger_network(zone=site.master_zone.subzones["Hospital[S]"])``. The network
   serves that zone's streams alone, with every utility of the problem, and
   the problem's stored results are not changed. The default, the root zone,
   designs on every stream as before.

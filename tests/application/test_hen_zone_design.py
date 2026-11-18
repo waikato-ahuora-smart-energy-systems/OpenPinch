@@ -64,6 +64,20 @@ def test_a_zone_design_synthesises_on_that_zones_streams_alone(synthesised_keys)
     assert all(keys == hospital for keys in synthesised_keys)
 
 
+def test_a_subzone_of_the_master_zone_designs_on_its_own_streams(synthesised_keys):
+    problem = _zonal_site()
+    subzone = problem.master_zone.subzones["Hospital[S]"]
+
+    problem.design.heat_exchanger_network(zone=subzone, width=0, depth=0)
+
+    assert synthesised_keys
+    assert all(
+        keys
+        == {key for key in _keys(problem.master_zone) if key.startswith("Hospital[S].")}
+        for keys in synthesised_keys
+    )
+
+
 @pytest.mark.parametrize("zone", [None, "Site"])
 def test_a_root_zone_design_synthesises_on_every_stream(synthesised_keys, zone):
     problem = _zonal_site()
