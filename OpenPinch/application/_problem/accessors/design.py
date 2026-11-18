@@ -14,7 +14,10 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
-    from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitResult
+    from ....contracts.synthesis.retrofit import (
+        HeatExchangerNetworkRetrofitResult,
+        RetrofitHeatPumpTargets,
+    )
     from ....contracts.synthesis.view import (
         HeatExchangerNetworkGridLayout,
         HeatExchangerNetworkView,
@@ -1273,6 +1276,79 @@ class _DesignAccessor:
                     heat_pump_cost=float(heat_pump_cost),
                 ),
             )
+        for zone in walk_zone_tree(isolated._master_zone):
+            zone.config = stored_configs[zone.address]
+        commit_problem(self._problem, isolated)
+        return result
+
+    def retrofit_heat_pumps(
+        self,
+        existing: "HeatExchangerNetwork",
+        *,
+        cycle: str = "carnot",
+        topology: str | None = None,
+        maximum_iterations: int | None = None,
+        maximum_evaluations: int | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> "RetrofitHeatPumpTargets":
+        """The ideal and the as-piped heat pump target of ``existing``.
+
+        Both come from the HPR service with the ``cycle`` (``"carnot"`` or
+        ``"vapour_compression"``) and ``topology`` (``"cascade"`` or
+        ``"parallel"``, the cycle's own by default) of
+        ``target.heat_pump_and_refrigeration``, and with any ``HPR_*``
+        settings in ``options`` (``HPR_LOAD_FRACTION``, ``HPR_N_COND``,
+        ``HPR_REFRIGERANTS`` as a list of fluids, and so on).
+        ``maximum_iterations`` and ``maximum_evaluations`` bound each
+        target's search. The ideal target serves the process's heating
+        target from its cooling target, as a new design could; the as-piped
+        target serves only ``existing``'s heaters from only its coolers, at
+        their solved temperatures and duties (first period), so it needs no
+        process-side repiping.
+
+        Returns a ``RetrofitHeatPumpTargets``: each target's heat, work,
+        levels and operating cost before and after, priced at the first hot
+        and cold utility and ``COSTING_HPR_ELE_PRICE``, and the gap between
+        them split into the network's (``network_gap``) and the heat
+        pump's (``heat_pump_gap``). The problem's cached design is not
+        changed.
+        """
+
+        from ....analysis.heat_exchanger_networks.context import (
+            ensure_target_results,
+        )
+        from ....analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
+            retrofit_heat_pumps,
+        )
+        from ....analysis.heat_pumps.cycles.registry import (
+            cycle_spec,
+            family_value,
+        )
+        from ..targeting.execution import walk_zone_tree
+        from ..targeting.state import commit_problem, snapshot_problem
+
+        spec = cycle_spec(cycle)
+        _runtime, configuration = self._arguments(options=options, period_id=None)
+        configuration["HPR_TYPE"] = family_value(
+            spec.topologies[topology or spec.default_topology]
+        )
+        args = {
+            key: value
+            for key, value in (
+                ("maximum_iterations", maximum_iterations),
+                ("maximum_evaluations", maximum_evaluations),
+            )
+            if value is not None
+        }
+        isolated = snapshot_problem(self._problem)
+        root = isolated._build_execution_master_zone()
+        stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
+        # The first period's direct target, whose period the as-piped
+        # profiles and prices take, not whichever period was targeted last.
+        first_period = min(isolated.period_ids.items(), key=lambda item: item[1])[0]
+        with temporary_zone_configuration(root, configuration):
+            ensure_target_results(isolated, {"period_id": first_period}, first_period)
+            result = retrofit_heat_pumps(isolated, existing, args=args)
         for zone in walk_zone_tree(isolated._master_zone):
             zone.config = stored_configs[zone.address]
         commit_problem(self._problem, isolated)

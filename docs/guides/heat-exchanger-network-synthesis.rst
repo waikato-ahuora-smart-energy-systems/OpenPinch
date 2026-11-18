@@ -696,6 +696,28 @@ Heat pumps
    case's $100/MWh, and with a single water stage (COP 1.62, $13.7M
    installed), new matches win.
 
+Heat pump targets
+   ``design.retrofit_heat_pumps(existing, cycle=..., topology=...,
+   options=...)`` asks the HPR service how much a heat pump could save
+   before any search. The *ideal* target serves the process's heating
+   target from its cooling target, as a new design could. The *as-piped*
+   target serves only the existing heaters from only the existing coolers,
+   at their solved temperatures and duties, so it needs no process-side
+   repiping: each evaporator goes in series with a cooler, each condenser
+   with a heater. Each target reports its levels, work and COP, and its hot
+   utility, cold utility and operating cost before and after (utility
+   prices and ``COSTING_HPR_ELE_PRICE``; no heat pump capital). Their gap
+   splits into ``network_gap``, what the existing network costs beyond the
+   targets before any heat pump, and ``heat_pump_gap``, how much less the
+   as-piped heat pump saves than the ideal one. On the Ciric and Floudas
+   case with Carnot cycles at the case's prices, the network gap is
+   $2.84M/y. At full load the as-piped heat pump saves $0.31M/y against the
+   ideal's $1.00M/y (COP 2.30 against 2.85, lifting to 271 degC for the
+   existing heater); at half load it saves $0.95M/y against $1.08M/y. Most
+   of the heat pump's value is reachable on the existing pipework, and the
+   network's own recovery is worth more. Each target runs the HPR search,
+   about 80 s each on this case.
+
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
 exchanger, moving an existing one would mainly save the new unit's cost,
