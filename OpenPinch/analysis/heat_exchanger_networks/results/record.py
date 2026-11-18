@@ -18,14 +18,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTaskOutcome
-from ..reporting.ranking import network_structure_signature
+from ..reporting.ranking import holds_utility_levels, network_structure_signature
 from ..reporting.verification import _count_active
 
 
 @dataclass(frozen=True)
 class _Entry:
     key: str
-    sort_key: tuple[float, str, str]
+    sort_key: tuple[bool, float, str, str]
     outcome: HeatExchangerNetworkSynthesisTaskOutcome
     version: int
     data: dict
@@ -111,7 +111,9 @@ class HeatExchangerNetworkRecord:
     def _insert(self, outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
         signature = network_structure_signature(outcome.network)
         key = hashlib.sha1(repr(signature).encode()).hexdigest()[:16]
+        # Networks that hold their utility levels first, then cheapest.
         sort_key = (
+            not holds_utility_levels(outcome.network),
             float(outcome.network.total_annual_cost),
             outcome.task.task_id or "",
             key,
@@ -136,6 +138,7 @@ def _entry_json(key: str, outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> 
         "task_id": outcome.task.task_id,
         "dt_cont_multiplier": float(outcome.task.dt_cont_multiplier),
         "total_annual_cost": float(network.total_annual_cost),
+        "holds_utility_levels": holds_utility_levels(network),
         "unit_count": _count_active(network.exchangers, None),
         "network": network.model_dump(mode="json"),
     }

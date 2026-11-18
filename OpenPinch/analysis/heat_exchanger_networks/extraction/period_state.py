@@ -28,6 +28,30 @@ def _period_value(
     )
 
 
+def _stage_outlet(
+    solved_model: Any, side: str, period_idx: int, stream_index: int, boundary: int
+) -> float | None:
+    """A stream's temperature leaving a stage at ``boundary``.
+
+    It is the boundary temperature, or the mid temperature before the
+    boundary's staged heater (or cooler) when the model has one.
+    """
+    prefix = "T_h" if side == "hot" else "T_c"
+    mid = _optional_float(
+        _index(
+            getattr(solved_model, f"{prefix}_mid_by_period", None),
+            period_idx,
+            stream_index,
+            boundary,
+        )
+    )
+    if mid is not None:
+        return mid
+    return _period_value(
+        solved_model, f"{prefix}_by_period", prefix, period_idx, stream_index, boundary
+    )
+
+
 def _utility_outlet_temperature(
     solved_model: Any,
     *,
@@ -384,8 +408,9 @@ def _hot_recovery_outlet(
         )
     if explicit is not None:
         return explicit
-    # Isothermal mixing: every branch leaves at the stage's outlet boundary.
-    boundary = _period_value(solved_model, "T_h_by_period", "T_h", period_idx, i, k + 1)
+    # Isothermal mixing: every branch leaves at the stage's outlet, which is
+    # the mid temperature where a staged cooler follows the stage.
+    boundary = _stage_outlet(solved_model, "hot", period_idx, i, k + 1)
     if boundary is not None:
         return boundary
     inlet = _period_value(solved_model, "T_h_by_period", "T_h", period_idx, i, k)
@@ -412,12 +437,16 @@ def _isothermal_split_fraction(
     is its share of the stage duty.
     """
     prefix, cp_name = ("T_h", "f_h") if side == "hot" else ("T_c", "f_c")
-    boundaries = (stage_index, stage_index + 1)
+    inlet, outlet = (
+        (stage_index, stage_index + 1)
+        if side == "hot"
+        else (stage_index + 1, stage_index)
+    )
     temperatures = [
         _period_value(
-            solved_model, f"{prefix}_by_period", prefix, period_idx, stream_index, k
-        )
-        for k in boundaries
+            solved_model, f"{prefix}_by_period", prefix, period_idx, stream_index, inlet
+        ),
+        _stage_outlet(solved_model, side, period_idx, stream_index, outlet),
     ]
     heat_capacity = _period_value(
         solved_model, f"{cp_name}_period", cp_name, period_idx, stream_index
@@ -552,8 +581,9 @@ def _cold_recovery_outlet(
         )
     if explicit is not None:
         return explicit
-    # Isothermal mixing: every branch leaves at the stage's outlet boundary.
-    boundary = _period_value(solved_model, "T_c_by_period", "T_c", period_idx, j, k)
+    # Isothermal mixing: every branch leaves at the stage's outlet, which is
+    # the mid temperature where a staged heater follows the stage.
+    boundary = _stage_outlet(solved_model, "cold", period_idx, j, k)
     if boundary is not None:
         return boundary
     inlet = _period_value(solved_model, "T_c_by_period", "T_c", period_idx, j, k + 1)
@@ -561,3 +591,97 @@ def _cold_recovery_outlet(
     if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
         return inlet + duty / heat_capacity
     return None
+
+
+def _staged_hot_utility_period_state(
+    solved_model: Any,
+    *,
+    period_id: str,
+    period_idx: int,
+    cold_index: int,
+    utility_index: int,
+    boundary: int,
+    tolerance: float,
+) -> HeatExchangerPeriodState:
+    """A heater between stages: from the mid temperature to the boundary's."""
+    duty = _normalized_solver_duty(
+        _index(
+            solved_model.Q_hs_by_period, period_idx, cold_index, utility_index, boundary
+        ),
+        tolerance=tolerance,
+    )
+    return HeatExchangerPeriodState(
+        period_id=period_id,
+        period_idx=period_idx,
+        duty=duty,
+        active=_is_active(
+            duty,
+            _index(solved_model.z_hs, cold_index, utility_index, boundary),
+            tolerance,
+        ),
+        approach_temperatures=(),
+        source_inlet_temperature=_period_value(
+            solved_model, "T_hu_in_period", "T_hu_in", period_idx, utility_index
+        ),
+        source_outlet_temperature=_utility_outlet_temperature(
+            solved_model,
+            side="hot",
+            period_idx=period_idx,
+            match_index=cold_index,
+            utility_index=utility_index,
+            duty=duty,
+        ),
+        sink_inlet_temperature=_stage_outlet(
+            solved_model, "cold", period_idx, cold_index, boundary
+        ),
+        sink_outlet_temperature=_period_value(
+            solved_model, "T_c_by_period", "T_c", period_idx, cold_index, boundary
+        ),
+    )
+
+
+def _staged_cold_utility_period_state(
+    solved_model: Any,
+    *,
+    period_id: str,
+    period_idx: int,
+    hot_index: int,
+    utility_index: int,
+    boundary: int,
+    tolerance: float,
+) -> HeatExchangerPeriodState:
+    """A cooler between stages: from the mid temperature to the boundary's."""
+    duty = _normalized_solver_duty(
+        _index(
+            solved_model.Q_cs_by_period, period_idx, hot_index, utility_index, boundary
+        ),
+        tolerance=tolerance,
+    )
+    return HeatExchangerPeriodState(
+        period_id=period_id,
+        period_idx=period_idx,
+        duty=duty,
+        active=_is_active(
+            duty,
+            _index(solved_model.z_cs, hot_index, utility_index, boundary),
+            tolerance,
+        ),
+        approach_temperatures=(),
+        source_inlet_temperature=_stage_outlet(
+            solved_model, "hot", period_idx, hot_index, boundary
+        ),
+        source_outlet_temperature=_period_value(
+            solved_model, "T_h_by_period", "T_h", period_idx, hot_index, boundary
+        ),
+        sink_inlet_temperature=_period_value(
+            solved_model, "T_cu_in_period", "T_cu_in", period_idx, utility_index
+        ),
+        sink_outlet_temperature=_utility_outlet_temperature(
+            solved_model,
+            side="cold",
+            period_idx=period_idx,
+            match_index=hot_index,
+            utility_index=utility_index,
+            duty=duty,
+        ),
+    )

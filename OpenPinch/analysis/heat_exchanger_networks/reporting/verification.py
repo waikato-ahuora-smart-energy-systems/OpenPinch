@@ -697,7 +697,10 @@ def _stream_order(
     axis_map = network.solver_axis_metadata.get("axis_maps", {}).get(axis_name, {})
     if not axis_map:
         return ()
-    return ordered_mapping_keys(axis_map)
+    # A utility slice's exchangers carry its parent's name; slices share
+    # their parent's approach and film coefficient.
+    parents = network.solver_axis_metadata.get("utility_parents") or {}
+    return tuple(parents.get(name, name) for name in ordered_mapping_keys(axis_map))
 
 
 def _uses_isothermal_stage_boundaries(metadata: dict) -> bool:

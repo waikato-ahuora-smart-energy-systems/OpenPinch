@@ -200,6 +200,8 @@ class HensConfig:
     heuristic_pdm_networks: int | None
     heuristic_pdm_evolution_seeds: int | None
     pdm_milp: bool | None
+    utility_placement: str
+    utility_slices: bool
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]

@@ -99,16 +99,57 @@ def network_structure_signature(
     return tuple(sorted(links))
 
 
+# A utility's duty within this fraction of its level target (or this many
+# kW of a small one) holds the level: the heuristic counts a load within
+# 0.1% as met.
+LEVEL_TOLERANCE = 1e-3
+
+
+def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
+    """Whether each utility's duty meets its level target in every period.
+
+    The targets are ``source_metadata["utility_level_targets"]`` (utility
+    name to per-period kW), recorded by a design that holds the levels and
+    by the tasks built on it. A network without them holds no level to miss.
+    """
+    targets = (network.source_metadata or {}).get("utility_level_targets")
+    if not targets:
+        return True
+    duties: dict[str, dict[int, float]] = {}
+    for exchanger in network.exchangers:
+        if exchanger.kind.value == "hot_utility":
+            name = exchanger.source_stream
+        elif exchanger.kind.value == "cold_utility":
+            name = exchanger.sink_stream
+        else:
+            continue
+        for state in exchanger.period_states:
+            by_period = duties.setdefault(name, {})
+            by_period[state.period_idx] = by_period.get(state.period_idx, 0.0) + (
+                float(state.duty) if state.active else 0.0
+            )
+    for name, by_period in targets.items():
+        for period, target in enumerate(by_period):
+            duty = duties.get(name, {}).get(period, 0.0)
+            if abs(duty - float(target)) > LEVEL_TOLERANCE * max(1.0, abs(target)):
+                return False
+    return True
+
+
 def outcome_ranking_key(
     outcome: "HeatExchangerNetworkSynthesisTaskOutcome",
-) -> tuple[float, str]:
+) -> tuple[bool, float, str]:
     """Return the one key used both to accept and to rank outcomes.
 
-    Lowest objective first; ties go to the task id, so the choice never
+    Networks that hold their utility levels first (``holds_utility_levels``),
+    then lowest objective; ties go to the task id, so the choice never
     depends on the order in which tasks finished.
     """
     objective = outcome.objective_value
+    network = getattr(outcome, "network", None)
+    held = network is None or holds_utility_levels(network)
     return (
+        not held,
         float("inf") if objective is None else float(objective),
         outcome.task.task_id or "",
     )
@@ -129,6 +170,8 @@ def _ranked_candidate_outcomes(
 
 
 __all__ = [
+    "LEVEL_TOLERANCE",
+    "holds_utility_levels",
     "network_structure_signature",
     "outcome_ranking_key",
     "rank_unique_network_outcomes",

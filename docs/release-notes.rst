@@ -22,6 +22,59 @@ Heat exchanger network synthesis
   up each period's duty grid and each match's row once rather than for
   every stage. Under a profiler, a design on the pulp mill sample case
   spends about 28 s in extraction instead of 34 s.
+- ``design.heat_exchanger_network(zone=...)`` designs a network for one
+  zone, given by name as in targeting or as a ``Zone``, for example
+  ``site.design.heat_exchanger_network(zone="Hospital[S]")`` or
+  ``site.design.heat_exchanger_network(zone=site.master_zone.subzones["Hospital[S]"])``. The network
+  serves that zone's streams alone, with every utility of the problem
+  (including any default utility, placed for the whole problem), and
+  the problem's stored results are not changed. The default, the root zone,
+  designs on every stream as before.
+- ``design.heat_exchanger_network()`` now designs a problem or zone with
+  only hot or only cold process streams, which used to fail with "prepared
+  PinchProblem must contain hot and cold streams". Its network is heaters
+  (or coolers) alone, and each utility level takes the duty targeting gives
+  it: the least valuable level serves the composite curve from the pinch end
+  first, so a stream spanning several levels gets utility exchangers in
+  series. The network is built without a solver and serves every period;
+  overdesign is not available for it.
+- With more than one hot or cold utility, the pinch design method (MILP and
+  heuristic) now holds each utility level at the duty targeting gives it,
+  rather than choosing levels by price. To place a level where it serves,
+  the stage-wise model can put a heater or cooler between stages, in series
+  between them; such units are reported as
+  ``hot-utility:<utility>-><stream>:S<stage>`` (or
+  ``cold-utility:...:S<stage>``), with ``stage`` the stage the stream has
+  just left, and the grid view draws them on that stage boundary. A side
+  that cannot hold its levels (for example hot water, whose fixed outlet
+  can face a stream entering above it) is solved as before, choosing levels
+  by price, with a warning. The heuristic method designs the levels into
+  its proposals: each level with a target is matched like a process stream
+  that must be used, and a side is split at its utility pinches (where,
+  with the levels at their targets, the heat cascade closes) and each
+  region designed on its own, so no match crosses a utility pinch. A
+  heuristic side holds each level at its target or, failing that, within
+  0.1% of it, the share of a load the heuristic counts as met. Networks
+  that hold the levels (each utility within 0.1% of its target) rank
+  ahead of those that do not, then by total annual cost, so the selected
+  network holds the targeted levels whenever one does. The later stages
+  (temperature-driven method, network evolution) do not yet hold the
+  levels, so their networks usually rank behind. A network that holds levels keeps its stages: stage reduction
+  re-solves by utility cost, which would undo them.
+- A utility whose temperature slides, such as hot water from 90 to 70 C,
+  now reaches the streams targeting lets it heat. A heater runs its utility
+  over the whole range, so hot water could not heat a stream entering at
+  82 C; with levels held, such a utility is cut into slices at the streams'
+  supply temperatures (plus their approach), run in series, each taking its
+  share of the level's duty. Their exchangers are reported under the
+  utility's name, with the slice in the exchanger id (for example
+  ``hot-utility:Hot Utility.HW@90-87.1->...``). On ``zonal_site`` the
+  Hospital now holds its hot water and steam levels.
+  ``HENS_UTILITY_SLICES: false`` turns the slices off.
+- ``HENS_UTILITY_PLACEMENT`` chooses how synthesis shares duty between
+  utility levels: ``"temperature"`` (the default) holds each level at the
+  duty targeting gives it, lowest exergy first; ``"price"`` lets the pinch
+  design choose levels by utility cost, as before.
 - The pinch design method no longer drops a side of the pinch whose
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the

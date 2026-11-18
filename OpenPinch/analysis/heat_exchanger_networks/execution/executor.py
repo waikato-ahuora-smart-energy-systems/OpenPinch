@@ -454,6 +454,12 @@ class LocalSynthesisExecutor:
                 if is_heuristic
                 else 0
             ),
+            staged_utilities=(
+                decompositions is not None
+                and problem.master_zone.config.hens.utility_placement == "temperature"
+                and _has_utility_levels(decompositions["above"])
+            ),
+            utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
         )
 
     def _parent_problem(
@@ -996,3 +1002,15 @@ __all__ = [
     "SynthesisExecutor",
     "_failed_task_outcome",
 ]
+
+
+def _has_utility_levels(decomposition) -> bool:
+    """Whether targeting splits utility between levels on either side.
+
+    With one hot and one cold utility there is no level to hold, and the
+    pinch design sides keep their stream-end heaters and coolers.
+    """
+    return (
+        len(decomposition.hot_utility_identities) > 1
+        or len(decomposition.cold_utility_identities) > 1
+    )

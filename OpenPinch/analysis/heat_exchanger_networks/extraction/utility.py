@@ -7,7 +7,12 @@ from typing import Any
 from ....domain.enums import HeatExchangerKind, StreamID
 from ....domain.heat_exchanger import HeatExchanger
 from .metadata import _allowed, _index, _optional_float, _optional_int
-from .period_state import _cold_utility_period_state, _hot_utility_period_state
+from .period_state import (
+    _cold_utility_period_state,
+    _hot_utility_period_state,
+    _staged_cold_utility_period_state,
+    _staged_hot_utility_period_state,
+)
 from .segment_area import _model_utility_segment_contributions
 
 
@@ -15,6 +20,7 @@ def _hot_utility_exchangers(
     solved_model: Any,
     *,
     hot_utility: str,
+    utility_name: str | None = None,
     utility_index: int,
     cold_streams: tuple[str, ...],
     period_ids: tuple[str, ...],
@@ -57,7 +63,7 @@ def _hot_utility_exchangers(
             HeatExchanger(
                 exchanger_id=f"hot-utility:{hot_utility}->{cold_stream}",
                 kind=HeatExchangerKind.HOT_UTILITY,
-                source_stream=hot_utility,
+                source_stream=utility_name or hot_utility,
                 sink_stream=cold_stream,
                 source_stream_role=StreamID.Utility,
                 sink_stream_role=StreamID.Process,
@@ -78,6 +84,7 @@ def _cold_utility_exchangers(
     solved_model: Any,
     *,
     cold_utility: str,
+    utility_name: str | None = None,
     utility_index: int,
     hot_streams: tuple[str, ...],
     period_ids: tuple[str, ...],
@@ -123,7 +130,7 @@ def _cold_utility_exchangers(
                 exchanger_id=f"cold-utility:{hot_stream}->{cold_utility}",
                 kind=HeatExchangerKind.COLD_UTILITY,
                 source_stream=hot_stream,
-                sink_stream=cold_utility,
+                sink_stream=utility_name or cold_utility,
                 source_stream_role=StreamID.Process,
                 sink_stream_role=StreamID.Utility,
                 period_states=states,
@@ -136,4 +143,120 @@ def _cold_utility_exchangers(
                 ),
             )
         )
+    return tuple(exchangers)
+
+
+def _staged_hot_utility_exchangers(
+    solved_model: Any,
+    *,
+    hot_utility: str,
+    utility_name: str | None = None,
+    utility_index: int,
+    cold_streams: tuple[str, ...],
+    period_ids: tuple[str, ...],
+    tolerance: float,
+    include_inactive: bool,
+) -> tuple[HeatExchanger, ...]:
+    """Heaters between stages, ``hot-utility:<u>-><j>:S<stage>``.
+
+    ``stage`` is the 1-based stage the cold stream has just left, as in
+    duty optimisation: boundary ``k`` follows 0-based stage ``k``.
+    """
+    allowed = getattr(solved_model, "z_hs_allowed", None)
+    if allowed is None:
+        return ()
+    exchangers: list[HeatExchanger] = []
+    for j, cold_stream in enumerate(cold_streams):
+        for k, offered in enumerate(allowed[j][utility_index]):
+            if not offered:
+                continue
+            states = tuple(
+                _staged_hot_utility_period_state(
+                    solved_model,
+                    period_id=period_id,
+                    period_idx=period_idx,
+                    cold_index=j,
+                    utility_index=utility_index,
+                    boundary=k,
+                    tolerance=tolerance,
+                )
+                for period_idx, period_id in enumerate(period_ids)
+            )
+            if not any(state.active for state in states) and not include_inactive:
+                continue
+            exchangers.append(
+                HeatExchanger(
+                    exchanger_id=f"hot-utility:{hot_utility}->{cold_stream}:S{k + 1}",
+                    kind=HeatExchangerKind.HOT_UTILITY,
+                    source_stream=utility_name or hot_utility,
+                    sink_stream=cold_stream,
+                    source_stream_role=StreamID.Utility,
+                    sink_stream_role=StreamID.Process,
+                    period_states=states,
+                    area=_optional_float(
+                        _index(
+                            getattr(solved_model, "area_hs", None), j, utility_index, k
+                        )
+                    ),
+                    stage=k + 1,
+                )
+            )
+    return tuple(exchangers)
+
+
+def _staged_cold_utility_exchangers(
+    solved_model: Any,
+    *,
+    cold_utility: str,
+    utility_name: str | None = None,
+    utility_index: int,
+    hot_streams: tuple[str, ...],
+    period_ids: tuple[str, ...],
+    tolerance: float,
+    include_inactive: bool,
+) -> tuple[HeatExchanger, ...]:
+    """Coolers between stages, ``cold-utility:<i>-><u>:S<stage>``.
+
+    ``stage`` is the 1-based stage the hot stream has just left, as in
+    duty optimisation: boundary ``k`` follows 0-based stage ``k - 1``.
+    """
+    allowed = getattr(solved_model, "z_cs_allowed", None)
+    if allowed is None:
+        return ()
+    exchangers: list[HeatExchanger] = []
+    for i, hot_stream in enumerate(hot_streams):
+        for k, offered in enumerate(allowed[i][utility_index]):
+            if not offered:
+                continue
+            states = tuple(
+                _staged_cold_utility_period_state(
+                    solved_model,
+                    period_id=period_id,
+                    period_idx=period_idx,
+                    hot_index=i,
+                    utility_index=utility_index,
+                    boundary=k,
+                    tolerance=tolerance,
+                )
+                for period_idx, period_id in enumerate(period_ids)
+            )
+            if not any(state.active for state in states) and not include_inactive:
+                continue
+            exchangers.append(
+                HeatExchanger(
+                    exchanger_id=f"cold-utility:{hot_stream}->{cold_utility}:S{k}",
+                    kind=HeatExchangerKind.COLD_UTILITY,
+                    source_stream=hot_stream,
+                    sink_stream=utility_name or cold_utility,
+                    source_stream_role=StreamID.Process,
+                    sink_stream_role=StreamID.Utility,
+                    period_states=states,
+                    area=_optional_float(
+                        _index(
+                            getattr(solved_model, "area_cs", None), i, utility_index, k
+                        )
+                    ),
+                    stage=k,
+                )
+            )
     return tuple(exchangers)

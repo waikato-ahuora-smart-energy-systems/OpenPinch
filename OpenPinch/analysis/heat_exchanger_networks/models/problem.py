@@ -22,8 +22,14 @@ from ..solver.dependencies import (
     MissingSynthesisSolverError,
 )
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
+from ..solver.utility_slices import (
+    sliced_decomposition,
+    utility_slices,
+    with_utility_slices,
+)
 from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
+from ._stagewise import staged_utilities as _staged
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -76,6 +82,20 @@ class InternalHeatExchangerNetworkProblem:
     # ``pdm_variants``.
     heuristic_network_limit: int = 0
     heuristic_report: dict[str, Any] = field(default_factory=dict, init=False)
+    # Staged heaters and coolers, with PDM sides holding each utility level
+    # at its target (``_stagewise/staged_utilities.py``). A stage-wise task
+    # also takes them on when its parent's network has them.
+    staged_utilities: bool = False
+    # With levels held, slice sliding utilities into slices in series
+    # (``../solver/utility_slices.py``); off, each heater or cooler runs its
+    # utility over the whole range.
+    utility_slicing: bool = True
+    # Each utility's targeted duty per period (kW), when a pinch design holds
+    # the levels; tasks built on it inherit them, and extracted networks
+    # carry them so ranking can put level-held networks first.
+    utility_level_targets: dict[str, list[float]] | None = field(
+        default=None, init=False
+    )
 
     def load_model(
         self,
@@ -85,6 +105,8 @@ class InternalHeatExchangerNetworkProblem:
         """Construct the private PDM or StageWise model for this task."""
 
         self._model_factories = model_factories
+        self._record_level_targets()
+        self._slice_utilities()
         self.args = {
             "name": self.name,
             "framework": self.framework,
@@ -99,10 +121,83 @@ class InternalHeatExchangerNetworkProblem:
             "tol": self.tol,
             "solver_options": self.solver_options,
         }
+        if self.staged_utilities or getattr(
+            getattr(self.parent, "case", None), "staged_utilities", False
+        ):
+            self.args["staged_utilities"] = True
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)
             return
         self._build_stage_wise(model_factories=model_factories)
+
+    def _record_level_targets(self) -> None:
+        """Keep the levels a design holds, or its parent's, by utility name."""
+
+        if self.utility_level_targets is not None:
+            return
+        parent_targets = getattr(self.parent, "utility_level_targets", None)
+        if parent_targets is not None:
+            self.utility_level_targets = parent_targets
+            return
+        if not (
+            self.framework == "PDM"
+            and self.staged_utilities
+            and self.pinch_decompositions
+        ):
+            return
+        decomposition = self.pinch_decompositions["above"]
+        slices = {
+            label: parent
+            for side in utility_slices(self.solver_arrays).values()
+            for label, (parent, _share) in side.items()
+        }
+        targets: dict[str, list[float]] = {}
+        for names, field_name in (
+            (decomposition.hot_utility_identities, "hot_utility_level_targets"),
+            (decomposition.cold_utility_identities, "cold_utility_level_targets"),
+        ):
+            for u, name in enumerate(names):
+                name = slices.get(name, name)
+                duties = [
+                    float(getattr(target, field_name)[u])
+                    for target in decomposition.period_targets
+                ]
+                if name in targets:
+                    duties = [a + b for a, b in zip(targets[name], duties)]
+                targets[name] = duties
+        self.utility_level_targets = targets
+
+    def _slice_utilities(self) -> None:
+        """Slice sliding utilities where the levels are held, or as the parent.
+
+        A pinch design that holds its levels runs each sliding utility
+        through slices in series (``../solver/utility_slices.py``), each
+        slice taking its share of the level's target; a task built on a
+        sliced parent takes the parent's slices, so its warm start and staged
+        units line up. Heater and cooler restrictions are copied to each
+        slice of their utility.
+        """
+
+        if utility_slices(self.solver_arrays):
+            return
+        parent_arrays = getattr(self.parent, "solver_arrays", None)
+        if parent_arrays is not None and utility_slices(parent_arrays):
+            sliced = with_utility_slices(self.solver_arrays, like=parent_arrays)
+        elif self.framework == "PDM" and self.staged_utilities and self.utility_slicing:
+            sliced = with_utility_slices(self.solver_arrays)
+        else:
+            return
+        if sliced is self.solver_arrays:
+            return
+        before = self.solver_arrays
+        self.solver_arrays = sliced
+        if self.pinch_decompositions is not None:
+            self.pinch_decompositions = {
+                name: sliced_decomposition(decomposition, sliced)
+                for name, decomposition in self.pinch_decompositions.items()
+            }
+        if self.z_restriction is not None:
+            self.z_restriction = _sliced_restriction(self.z_restriction, before, sliced)
 
     def get_solution(
         self,
@@ -177,7 +272,7 @@ class InternalHeatExchangerNetworkProblem:
     ) -> HeatExchangerNetwork:
         """Convert one solved model of this task, such as a search candidate."""
 
-        return extract_heat_exchanger_network(
+        network = extract_heat_exchanger_network(
             candidate,
             self.solver_arrays,
             run_id=run_id,
@@ -187,6 +282,14 @@ class InternalHeatExchangerNetworkProblem:
             stage_count=getattr(
                 candidate, "stages", getattr(candidate, "S", self.stages)
             ),
+        )
+        if self.utility_level_targets is None:
+            return network
+        return network.model_copy(
+            update={
+                "source_metadata": network.source_metadata
+                | {"utility_level_targets": self.utility_level_targets}
+            }
         )
 
     def extract_result(
@@ -302,9 +405,11 @@ class InternalHeatExchangerNetworkProblem:
 
         if self.above.side_required:
             self.above.optimise(print_output=print_output)
+            self.above = self._side_without_levels_if_failed("above", self.above)
             self.above = self._fewest_units_side("above", self.above)
         if self.below.side_required:
             self.below.optimise(print_output=print_output)
+            self.below = self._side_without_levels_if_failed("below", self.below)
             self.below = self._fewest_units_side("below", self.below)
         self.case = self.above.amalgamate_networks(
             below_case=self.below,
@@ -321,6 +426,60 @@ class InternalHeatExchangerNetworkProblem:
                 "tol": self.tol,
             }
         )
+
+    def _side_args(self, name: str) -> dict[str, Any]:
+        """Model arguments for a side, without staging if it fell back."""
+        args = dict(self.args)
+        if name in getattr(self, "_sides_without_levels", ()):
+            args.pop("staged_utilities", None)
+        return args
+
+    def _drop_levels(self, name: str) -> None:
+        self._sides_without_levels = {
+            *getattr(self, "_sides_without_levels", ()),
+            name,
+        }
+
+    def _side_without_levels_if_failed(self, name: str, side):
+        """Re-solve a side that cannot hold its utility levels without them.
+
+        Targeting splits utility between levels over the composite curves;
+        one exchanger may not be able to use a level there (a utility with a
+        fixed outlet, such as hot water, facing a stream that enters above
+        it). The side is then solved as before staging, with levels chosen
+        by price, and later sides for it (fewest units, variants) follow.
+        """
+
+        if side.mSuccess == 1 or not getattr(side, "staged_utilities", False):
+            return side
+        logger.warning(
+            "[%s] The %s pinch side cannot hold its utility levels at their "
+            "targets; it is solved without them, choosing levels by price.",
+            self.name,
+            name,
+        )
+        self._drop_levels(name)
+        factory = self._model_factory(
+            getattr(self, "_model_factories", None),
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        retry = factory(
+            **(
+                self._side_args(name)
+                | {
+                    "name": f"{side.name} without levels",
+                    "pinch_loc": name,
+                    "minimisation_goal": side.minimisation_goal,
+                    "pinch_decomposition": self.pinch_decompositions[name],
+                    "stage_selection": self.stage_selection,
+                    "solver_options": side.solver_options,
+                }
+            )
+        )
+        retry.optimise(print_output=False)
+        _cleanup_model(side)
+        return retry
 
     def _fewest_units_side(self, name: str, side):
         """Re-solve a side for the fewest units among the matches it used.
@@ -342,7 +501,7 @@ class InternalHeatExchangerNetworkProblem:
         )
         sparse = factory(
             **(
-                dict(self.args)
+                self._side_args(name)
                 | {
                     "name": f"{name} pinch {self.dTmin} fewest units",
                     "pinch_loc": name,
@@ -497,7 +656,7 @@ class InternalHeatExchangerNetworkProblem:
         def solve(floor: int | None):
             side = factory(
                 **(
-                    dict(self.args)
+                    self._side_args(name)
                     | {
                         "name": f"{name} pinch {self.dTmin} min units {len(found)}",
                         "pinch_loc": name,
@@ -595,24 +754,17 @@ class InternalHeatExchangerNetworkProblem:
                 sides[name] = [template]
                 continue
             proposals = propose_side_topologies(pinch_side(template), limit=limit)
-            realised = []
-            first_by_topology: dict[tuple, Any] = {}
-            for rank, proposal in enumerate(proposals):
-                side = self._realise_side(name, proposal, rank)
-                if side is None:
-                    continue
-                # Proposals often realise the same side network, and every
-                # pairing of a repeat would amalgamate into a repeated
-                # network: pair the first. A repeat may differ in duties, so
-                # it stands in only where the first's pairing fails.
-                topology = _side_topology(side)
-                if topology in first_by_topology:
-                    alternates[id(first_by_topology[topology])].append(side)
-                    report["repeated_sides"][name] += 1
-                    continue
-                first_by_topology[topology] = side
-                alternates[id(side)] = []
-                realised.append(side)
+            realised = self._realise_proposals(name, proposals, alternates, report)
+            if not realised and self._side_args(name).get("staged_utilities"):
+                logger.warning(
+                    "[%s] No %s pinch side proposal holds the utility levels "
+                    "at their targets; they are realised without them, "
+                    "choosing levels by price.",
+                    self.name,
+                    name,
+                )
+                self._drop_levels(name)
+                realised = self._realise_proposals(name, proposals, alternates, report)
             report["proposed"][name] = len(proposals)
             report["realised"][name] = len(realised)
             sides[name] = realised
@@ -658,6 +810,29 @@ class InternalHeatExchangerNetworkProblem:
         self.above, self.below, self.case = first.above, first.below, first.case
         self.pdm_variants = rest
 
+    def _realise_proposals(self, name: str, proposals, alternates, report) -> list:
+        """Realise a side's proposals, keeping the first of each repeat."""
+
+        realised = []
+        first_by_topology: dict[tuple, Any] = {}
+        for rank, proposal in enumerate(proposals):
+            side = self._realise_side(name, proposal, rank)
+            if side is None:
+                continue
+            # Proposals often realise the same side network, and every
+            # pairing of a repeat would amalgamate into a repeated network:
+            # pair the first. A repeat may differ in duties, so it stands in
+            # only where the first's pairing fails.
+            topology = _side_topology(side)
+            if topology in first_by_topology:
+                alternates[id(first_by_topology[topology])].append(side)
+                report["repeated_sides"][name] += 1
+                continue
+            first_by_topology[topology] = side
+            alternates[id(side)] = []
+            realised.append(side)
+        return realised
+
     def _verified_heuristic_variant(self, above, below, alternates):
         """Amalgamate a side pair, or failing that a pair of their repeats.
 
@@ -676,10 +851,34 @@ class InternalHeatExchangerNetworkProblem:
         return None
 
     def _realise_side(self, name: str, proposal, rank: int):
-        """Solve one side proposal, or return ``None`` if it cannot be."""
+        """Solve one side proposal, or return ``None`` if it cannot be.
+
+        A side holding its utility levels is solved with each level at its
+        target; failing that, within ``LOAD_FRACTION_TOLERANCE`` of it, the
+        fraction of a load the proposal counts as met.
+        """
+
+        from ..heuristic.enumeration import LOAD_FRACTION_TOLERANCE
 
         template = getattr(self, name)
         stages = proposal.stages
+        restriction = proposal.z_restriction(
+            hot_count=template.I,
+            cold_count=template.J,
+            hot_utilities=template.NHU,
+            cold_utilities=template.NCU,
+        )
+        bands: list[dict] = [{}]
+        if self._side_args(name).get("staged_utilities"):
+            stages, restriction = _with_pinch_end_stage(name, stages, restriction)
+            bands.append({"level_band": LOAD_FRACTION_TOLERANCE})
+        for band in bands:
+            side = self._solved_side(name, rank, stages, restriction, band)
+            if side is not None:
+                return side
+        return None
+
+    def _solved_side(self, name: str, rank: int, stages: int, restriction, band):
         factory = self._model_factory(
             getattr(self, "_model_factories", None),
             "pinch_design_method",
@@ -688,7 +887,7 @@ class InternalHeatExchangerNetworkProblem:
         try:
             side = factory(
                 **(
-                    dict(self.args)
+                    self._side_args(name)
                     | {
                         "name": f"{name} pinch {self.dTmin} heuristic {rank}",
                         "pinch_loc": name,
@@ -710,13 +909,9 @@ class InternalHeatExchangerNetworkProblem:
                             self.args.get("solver_options"),
                             seconds=backend.HEURISTIC_SIDE_TIME_LIMIT,
                         ),
-                        "z_restriction": proposal.z_restriction(
-                            hot_count=template.I,
-                            cold_count=template.J,
-                            hot_utilities=template.NHU,
-                            cold_utilities=template.NCU,
-                        ),
+                        "z_restriction": restriction,
                     }
+                    | band
                 )
             )
         except (
@@ -796,6 +991,11 @@ class InternalHeatExchangerNetworkProblem:
 
     def _reduce_stages(self, case, *, empty_only: bool) -> StageWiseModel:
         if case.mSuccess != 1:
+            return case
+        if getattr(case, "staged_utilities", False):
+            # The reduced model neither relocates staged heaters and coolers
+            # nor holds utility levels (its re-solve would pick them by
+            # price), so a network that holds them keeps its stages.
             return case
 
         active_stages = self._get_active_stages(
@@ -1003,6 +1203,47 @@ def _start_from_side(sparse, side) -> None:
     sparse.m.warm_start = True
 
 
+def _sliced_restriction(restriction: list, before, after) -> list:
+    """``[z, z_hu, z_cu]`` on sliced utility axes: each slice as its parent."""
+
+    recovery, heaters, coolers = restriction
+    slices = utility_slices(after)
+
+    def columns(side: str) -> list[int]:
+        axis = f"{side}_utilities"
+        index = before.axis_maps[axis]
+        return [
+            index[slices.get(axis, {}).get(name, [name])[0]]
+            for name in after.utility_identities[axis]
+        ]
+
+    hot, cold = columns("hot"), columns("cold")
+    return [
+        recovery,
+        None if heaters is None else [[row[u] for u in hot] for row in heaters],
+        None if coolers is None else [[row[u] for u in cold] for row in coolers],
+    ]
+
+
+def _with_pinch_end_stage(name: str, stages: int, restriction: list):
+    """A side proposal with one more, empty, stage at its pinch end.
+
+    A staged heater (or cooler) there serves the level nearest the pinch.
+    Cold streams enter the above side at the pinch, after its last stage;
+    hot streams enter the below side at the pinch, before its first.
+    """
+    recovery, heaters, coolers = restriction
+    empty = [0]
+    recovery = [
+        [
+            (list(by_k) + empty) if name == "above" else (empty + list(by_k))
+            for by_k in row
+        ]
+        for row in recovery
+    ]
+    return stages + 1, [recovery, heaters, coolers]
+
+
 def _with_time_limit(
     solver: str, options, *, seconds: float = backend.FEWEST_UNITS_TIME_LIMIT
 ) -> Any:
@@ -1076,6 +1317,7 @@ def _side_topology(side) -> tuple:
         tuple(map(tuple, heaters)),
         tuple(map(tuple, coolers)),
         len(used) < side.S,
+        _staged.staged_units_on(side),
     )
 
 

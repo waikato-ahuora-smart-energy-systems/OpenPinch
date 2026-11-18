@@ -11,6 +11,7 @@ from ....domain.configuration import tol
 from ....domain.heat_exchanger import HeatExchanger
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..solver.arrays import SEGMENT_PROFILE_VERSION, PreparedSolverArrays
+from ..solver.utility_slices import utility_slices
 from .metadata import (
     _boundary_temperature_matrix,
     _capital_cost,
@@ -27,7 +28,12 @@ from .metadata import (
     _utility_cost,
 )
 from .recovery import _recovery_exchangers
-from .utility import _cold_utility_exchangers, _hot_utility_exchangers
+from .utility import (
+    _cold_utility_exchangers,
+    _hot_utility_exchangers,
+    _staged_cold_utility_exchangers,
+    _staged_hot_utility_exchangers,
+)
 
 
 def _float_tensor(values) -> list[list[list[float]]]:
@@ -60,6 +66,13 @@ def extract_heat_exchanger_network(
     cold_streams = _identities_by_axis(solver_arrays, "cold_process_streams")
     hot_utilities = _identities_by_axis(solver_arrays, "hot_utilities")
     cold_utilities = _identities_by_axis(solver_arrays, "cold_utilities")
+    # A utility slice (``../solver/utility_slices.py``) is reported under its
+    # parent utility; its exchanger id keeps the slice.
+    parents = {
+        label: parent
+        for side in utility_slices(solver_arrays).values()
+        for label, (parent, _share) in side.items()
+    }
     stage_total = stage_count or _optional_int(getattr(solved_model, "S", None))
     period_ids = _period_ids(solved_model, solver_arrays)
 
@@ -78,9 +91,22 @@ def extract_heat_exchanger_network(
     )
     for u, hot_utility in enumerate(_utilities(hot_utilities, "hot utility")):
         exchangers.extend(
+            _staged_hot_utility_exchangers(
+                solved_model,
+                hot_utility=hot_utility,
+                utility_name=parents.get(hot_utility),
+                utility_index=u,
+                cold_streams=cold_streams,
+                period_ids=period_ids,
+                tolerance=tolerance,
+                include_inactive=include_inactive,
+            )
+        )
+        exchangers.extend(
             _hot_utility_exchangers(
                 solved_model,
                 hot_utility=hot_utility,
+                utility_name=parents.get(hot_utility),
                 utility_index=u,
                 cold_streams=cold_streams,
                 period_ids=period_ids,
@@ -90,9 +116,22 @@ def extract_heat_exchanger_network(
         )
     for u, cold_utility in enumerate(_utilities(cold_utilities, "cold utility")):
         exchangers.extend(
+            _staged_cold_utility_exchangers(
+                solved_model,
+                cold_utility=cold_utility,
+                utility_name=parents.get(cold_utility),
+                utility_index=u,
+                hot_streams=hot_streams,
+                period_ids=period_ids,
+                tolerance=tolerance,
+                include_inactive=include_inactive,
+            )
+        )
+        exchangers.extend(
             _cold_utility_exchangers(
                 solved_model,
                 cold_utility=cold_utility,
+                utility_name=parents.get(cold_utility),
                 utility_index=u,
                 hot_streams=hot_streams,
                 period_ids=period_ids,
@@ -120,6 +159,7 @@ def extract_heat_exchanger_network(
         summary_metrics=_summary_metrics(solved_model, dt_cont_multiplier),
         solver_axis_metadata={
             "axis_maps": solver_arrays.axis_maps,
+            "utility_parents": parents,
             "source_array_names": (
                 "Q_r",
                 "Q_h",
