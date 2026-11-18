@@ -1,61 +1,9 @@
 """Application-owned case derivation with independent runtime ownership."""
 
 from copy import deepcopy
-from dataclasses import dataclass
 
-from ..domain.enums import ZoneType
 from ._problem.input.utilities import _set_utilities_for_zone_and_subzones
 from ._problem.targeting.state import snapshot_problem
-
-
-@dataclass(frozen=True)
-class SiteProcess:
-    """One process of a Total Site case and the keys of its process streams."""
-
-    name: str
-    address: str
-    hot_streams: tuple[str, ...]
-    cold_streams: tuple[str, ...]
-
-    @property
-    def one_sided(self) -> bool:
-        """Whether the process has only hot or only cold streams."""
-        return not self.hot_streams or not self.cold_streams
-
-
-def _site_keys(site_collection, process_collection) -> tuple[str, ...]:
-    """The site's keys of the streams a process holds, in site order."""
-    held = {id(stream) for _, stream in process_collection.items()}
-    return tuple(key for key, stream in site_collection.items() if id(stream) in held)
-
-
-def site_processes(problem, zone=None) -> tuple[SiteProcess, ...]:
-    """The processes of a Site zone (the root by default), in zone order.
-
-    Every subzone of the site must be a Process Zone; a process holds the
-    streams of its own subzones, and a stream placed on the site zone itself
-    is prepared into a Process Zone of its own. Stream keys are the site
-    zone's, as its solver arrays use them.
-    """
-    site = problem._resolve_target_zone(zone)
-    if site.type != ZoneType.S.value:
-        raise ValueError(f"{site.address!r} is a {site.type}, not a Site zone.")
-    processes = []
-    for subzone in site.subzones.values():
-        if subzone.type != ZoneType.P.value:
-            raise ValueError(
-                f"{subzone.address!r} is a {subzone.type}; every subzone of a "
-                "site must be a Process Zone."
-            )
-        processes.append(
-            SiteProcess(
-                name=subzone.name,
-                address=subzone.address,
-                hot_streams=_site_keys(site.hot_streams, subzone.hot_streams),
-                cold_streams=_site_keys(site.cold_streams, subzone.cold_streams),
-            )
-        )
-    return tuple(processes)
 
 
 def _within(address: str, ancestor: str) -> bool:
@@ -74,35 +22,25 @@ def _tree_along(tree: dict, path: list[str]) -> dict:
     return tree | {"children": children}
 
 
-def process_case(problem, zone, *, project_name=None):
-    """A new problem holding one Process Zone's streams with every utility.
+def _zone_case(problem, zone):
+    """A new problem holding one zone's streams with every utility.
 
-    The zones above the process are kept, without their other subzones, so
-    stream keys match the source problem's. Plant profile data and any
-    network are not carried over.
+    The zones above it are kept, without their other subzones, so stream keys
+    match the source problem's. Plant profile data and any network are not
+    carried over.
     """
-    process = problem._resolve_target_zone(zone)
-    if process.type != ZoneType.P.value:
-        raise ValueError(
-            f"{process.address!r} is a {process.type}, not a Process Zone."
-        )
     if problem._process_components:
         raise ValueError(
-            "a process case cannot be derived from a problem with process components."
+            "a zone case cannot be derived from a problem with process components."
         )
     source = problem.to_problem_json()
     source["streams"] = [
-        record
-        for record in source["streams"]
-        if _within(record["zone"], process.address)
+        record for record in source["streams"] if _within(record["zone"], zone.address)
     ]
-    source["zone_tree"] = _tree_along(source["zone_tree"], process.address.split("/"))
+    source["zone_tree"] = _tree_along(source["zone_tree"], zone.address.split("/"))
     source["network"] = None
     source["plant_profile_data"] = []
-    return type(problem)(
-        source,
-        project_name=problem.project_name if project_name is None else project_name,
-    )
+    return type(problem)(source, project_name=problem.project_name)
 
 
 def _align_period_values(value, donor_ids, receiver_ids):

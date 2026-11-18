@@ -402,6 +402,7 @@ class _DesignAccessor:
     def heat_exchanger_network(
         self,
         *,
+        zone: str | None = None,
         width: int | None = None,
         depth: int | None = None,
         options: Mapping[str, Any] | None = None,
@@ -465,7 +466,36 @@ class _DesignAccessor:
         every period and rated at the margin where the design calls for it),
         so another thread can poll it while the design runs. The result ranks
         exactly the record's networks. A record collects one call.
+
+        ``zone`` names one zone, as targeting does (``"Hospital[S]"``); the
+        network then serves that zone's streams alone, with every utility of
+        the problem. It is designed on a case derived from the zone, so the
+        problem's stored results are not changed. The root zone (the default)
+        designs on every stream.
         """
+        if zone is not None:
+            target = self._problem._resolve_target_zone(zone)
+            if target.address != self._problem._require_prepared_root_zone().address:
+                from ...case_derivation import _zone_case
+
+                return _zone_case(self._problem, target).design.heat_exchanger_network(
+                    width=width,
+                    depth=depth,
+                    options=options,
+                    period_id=period_id,
+                    design_basis=design_basis,
+                    basis_clusters=basis_clusters,
+                    overdesign_percentage=overdesign_percentage,
+                    dt_cont_multipliers=dt_cont_multipliers,
+                    derivative_thresholds=derivative_thresholds,
+                    stages=stages,
+                    pack_stages=pack_stages,
+                    solver=solver,
+                    max_parallel=max_parallel,
+                    best_solutions=best_solutions,
+                    solve_tolerance=solve_tolerance,
+                    record=record,
+                )
         hens = self._effective_hens(options)
         margin = self._overdesign_margin(overdesign_percentage, hens)
         basis = self._design_basis(design_basis, period_id, hens)
