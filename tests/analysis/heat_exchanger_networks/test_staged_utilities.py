@@ -11,9 +11,15 @@ from __future__ import annotations
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
+    extract_heat_exchanger_network,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import _value
 from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
     StageWiseModel,
+)
+from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+    verify_network_feasibility,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver import backend
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
@@ -24,6 +30,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
     MissingSynthesisSolverError,
 )
 from OpenPinch.application.problem import PinchProblem
+from OpenPinch.domain.enums import HeatExchangerKind
 
 D_TMIN = 10.0
 
@@ -237,3 +244,68 @@ def test_area_costed_goals_refuse_staged_utilities(goal):
             tol=1e-6,
             staged_utilities=True,
         )
+
+
+def _network(model, problem):
+    return extract_heat_exchanger_network(
+        model, problem_to_solver_arrays(problem, D_TMIN), run_id="staged"
+    )
+
+
+def test_a_staged_heater_is_extracted_between_its_stages():
+    problem = _heating_problem()
+    network = _network(_solved(problem, staged_utilities=True), problem)
+
+    heaters = [
+        exchanger
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+    ]
+    (heater,) = heaters
+    # C1 has just left (1-based) stage 2, its colder stage.
+    assert heater.exchanger_id.endswith(":S2")
+    assert heater.stage == 2
+    assert heater.source_stream.endswith("LPS")
+    state = heater.state()
+    assert state.duty == pytest.approx(40.0, rel=1e-6)
+    assert state.sink_inlet_temperature == pytest.approx(90.0 + 273.15, abs=1e-6)
+    assert state.sink_outlet_temperature == pytest.approx(130.0 + 273.15, abs=1e-6)
+    (low_match,) = [
+        exchanger
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.RECOVERY
+        and exchanger.source_stream.endswith("H2")
+    ]
+    assert low_match.state().sink_outlet_temperature == pytest.approx(
+        90.0 + 273.15, abs=1e-6
+    )
+    assert verify_network_feasibility(network) == ()
+
+
+def test_a_staged_cooler_is_extracted_between_its_stages():
+    problem = _cooling_problem()
+    network = _network(_solved(problem, staged_utilities=True), problem)
+
+    (cooler,) = [
+        exchanger
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.COLD_UTILITY
+    ]
+    # H1 has just left stage 1, its hotter stage.
+    assert cooler.exchanger_id.endswith(":S1")
+    assert cooler.stage == 1
+    assert cooler.sink_stream.endswith("LPG")
+    state = cooler.state()
+    assert state.duty == pytest.approx(40.0, rel=1e-6)
+    assert state.source_inlet_temperature == pytest.approx(170.0 + 273.15, abs=1e-6)
+    assert state.source_outlet_temperature == pytest.approx(130.0 + 273.15, abs=1e-6)
+    (high_match,) = [
+        exchanger
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.RECOVERY
+        and exchanger.sink_stream.endswith("C2")
+    ]
+    assert high_match.state().source_outlet_temperature == pytest.approx(
+        170.0 + 273.15, abs=1e-6
+    )
+    assert verify_network_feasibility(network) == ()

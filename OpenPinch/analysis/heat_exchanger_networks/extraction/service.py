@@ -27,7 +27,12 @@ from .metadata import (
     _utility_cost,
 )
 from .recovery import _recovery_exchangers
-from .utility import _cold_utility_exchangers, _hot_utility_exchangers
+from .utility import (
+    _cold_utility_exchangers,
+    _hot_utility_exchangers,
+    _staged_cold_utility_exchangers,
+    _staged_hot_utility_exchangers,
+)
 
 
 def _float_tensor(values) -> list[list[list[float]]]:
@@ -78,6 +83,17 @@ def extract_heat_exchanger_network(
     )
     for u, hot_utility in enumerate(_utilities(hot_utilities, "hot utility")):
         exchangers.extend(
+            _staged_hot_utility_exchangers(
+                solved_model,
+                hot_utility=hot_utility,
+                utility_index=u,
+                cold_streams=cold_streams,
+                period_ids=period_ids,
+                tolerance=tolerance,
+                include_inactive=include_inactive,
+            )
+        )
+        exchangers.extend(
             _hot_utility_exchangers(
                 solved_model,
                 hot_utility=hot_utility,
@@ -89,6 +105,17 @@ def extract_heat_exchanger_network(
             )
         )
     for u, cold_utility in enumerate(_utilities(cold_utilities, "cold utility")):
+        exchangers.extend(
+            _staged_cold_utility_exchangers(
+                solved_model,
+                cold_utility=cold_utility,
+                utility_index=u,
+                hot_streams=hot_streams,
+                period_ids=period_ids,
+                tolerance=tolerance,
+                include_inactive=include_inactive,
+            )
+        )
         exchangers.extend(
             _cold_utility_exchangers(
                 solved_model,

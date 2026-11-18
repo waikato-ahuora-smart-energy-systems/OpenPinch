@@ -15,6 +15,7 @@ Segmented streams and segmented utilities take no staged units.
 from __future__ import annotations
 
 from .._base import approach as _approach
+from .._base import area as _area
 from .._base import piecewise as _piecewise
 
 
@@ -295,3 +296,106 @@ def _set_one_unit_per_boundary(owner, binaries, allowed) -> None:
             ]
             if len(used) > 1:
                 owner.m.Equation(sum(used) <= 1)
+
+
+def post_process_staged_utilities(owner) -> None:
+    """Read solved staged duties and set their unit counts and areas.
+
+    Sets ``Q_hs_values`` and ``Q_cs_values`` (``[period][stream][utility]
+    [boundary]``), ``n_hs_units`` and ``n_cs_units``, and ``area_hs`` and
+    ``area_cs`` (``[stream][utility][boundary]``, the largest over periods,
+    from the exact log-mean of each period's terminal differences). With
+    ``staged_utilities`` off there are no staged units: counts are 0 and the
+    grids empty.
+    """
+    if not getattr(owner, "staged_utilities", False):
+        owner.Q_hs_values = owner.Q_cs_values = []
+        owner.area_hs = owner.area_cs = []
+        owner.n_hs_units = owner.n_cs_units = 0
+        return
+    owner.Q_hs_values = _solved_duties(owner, owner.Q_hs_by_period)
+    owner.Q_cs_values = _solved_duties(owner, owner.Q_cs_by_period)
+    owner.n_hs_units = _used_units(owner, owner.Q_hs_values)
+    owner.n_cs_units = _used_units(owner, owner.Q_cs_values)
+    owner.area_hs = _design_areas(owner, owner.Q_hs_values, _heater_area)
+    owner.area_cs = _design_areas(owner, owner.Q_cs_values, _cooler_area)
+
+
+def with_staged_duties(owner, duties, side: str) -> list:
+    """``[period][stream][utility]`` duties with the staged ones added."""
+    if not getattr(owner, "staged_utilities", False):
+        return duties
+    staged = owner.Q_hs_values if side == "hot" else owner.Q_cs_values
+    return [
+        [
+            [duty + sum(staged[n][s][u]) for u, duty in enumerate(row)]
+            for s, row in enumerate(duties[n])
+        ]
+        for n in range(owner.N_periods)
+    ]
+
+
+def _solved_duties(owner, grid) -> list:
+    return [
+        [
+            [[owner._active_binary_value(q) for q in by_k] for by_k in row]
+            for row in rows
+        ]
+        for rows in grid
+    ]
+
+
+def _used_units(owner, duties) -> int:
+    return sum(
+        1
+        for s, row in enumerate(duties[0])
+        for u, by_k in enumerate(row)
+        for k in range(len(by_k))
+        if max(duties[n][s][u][k] for n in range(owner.N_periods)) > owner.tol
+    )
+
+
+def _design_areas(owner, duties, area) -> list:
+    return [
+        [
+            [
+                max(
+                    area(owner, n, s, u, k, duties[n][s][u][k])
+                    for n in range(owner.N_periods)
+                )
+                for k in range(len(by_k))
+            ]
+            for u, by_k in enumerate(row)
+        ]
+        for s, row in enumerate(duties[0])
+    ]
+
+
+def _heater_area(owner, n: int, j: int, u: int, k: int, duty: float) -> float:
+    if duty <= owner.tol:
+        return 0.0
+    lmtd = _area._post_process_lmtd(
+        owner,
+        owner.T_hu_in_period[n][u]
+        - owner._active_binary_value(owner.T_c_by_period[n][j][k]),
+        owner._utility_solved_outlet_temperature("hot", n, j, u, duty)
+        - owner._active_binary_value(owner.T_c_mid_by_period[n][j][k]),
+        1.0,
+        formula_allowed=False,
+    )
+    return _area._heat_load_area(owner, duty, owner.U_hu_period[n][j][u], lmtd)
+
+
+def _cooler_area(owner, n: int, i: int, u: int, k: int, duty: float) -> float:
+    if duty <= owner.tol:
+        return 0.0
+    lmtd = _area._post_process_lmtd(
+        owner,
+        owner._active_binary_value(owner.T_h_mid_by_period[n][i][k])
+        - owner._utility_solved_outlet_temperature("cold", n, i, u, duty),
+        owner._active_binary_value(owner.T_h_by_period[n][i][k])
+        - owner.T_cu_in_period[n][u],
+        1.0,
+        formula_allowed=False,
+    )
+    return _area._heat_load_area(owner, duty, owner.U_cu_period[n][i][u], lmtd)
