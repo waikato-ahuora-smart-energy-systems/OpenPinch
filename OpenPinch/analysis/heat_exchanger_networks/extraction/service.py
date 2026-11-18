@@ -8,6 +8,7 @@ import numpy as np
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ....domain.configuration import tol
+from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger import HeatExchanger
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..solver.arrays import SEGMENT_PROFILE_VERSION, PreparedSolverArrays
@@ -41,6 +42,54 @@ def _float_tensor(values) -> list[list[list[float]]]:
     if values is None:
         return []
     return [_float_matrix(matrix) for matrix in values]
+
+
+def _end_utilities_in_parallel(
+    exchangers: list[HeatExchanger], period_ids: tuple[str, ...]
+) -> list[HeatExchanger]:
+    """Split a stream between its stream-end heaters (or coolers).
+
+    The stage-wise model holds each end heater's approaches and sizes its
+    area against the stream's whole end span, so several on one stream run
+    in parallel, each on the share of the stream's flow its duty takes.
+    """
+
+    for period_idx, period_id in enumerate(period_ids):
+        groups: dict[tuple[HeatExchangerKind, str], list[int]] = {}
+        for index, exchanger in enumerate(exchangers):
+            if exchanger.stage is not None or exchanger.kind not in (
+                HeatExchangerKind.HOT_UTILITY,
+                HeatExchangerKind.COLD_UTILITY,
+            ):
+                continue
+            if not exchanger.state(period_id).active:
+                continue
+            hot = exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            stream = exchanger.sink_stream if hot else exchanger.source_stream
+            groups.setdefault((exchanger.kind, stream), []).append(index)
+        for (kind, _stream), members in groups.items():
+            total = sum(exchangers[index].state(period_id).duty for index in members)
+            if len(members) < 2 or total <= 0.0:
+                continue
+            field = (
+                "sink_split_fraction"
+                if kind is HeatExchangerKind.HOT_UTILITY
+                else "source_split_fraction"
+            )
+            for index in members:
+                exchanger = exchangers[index]
+                share = exchanger.state(period_id).duty / total
+                exchangers[index] = exchanger.model_copy(
+                    update={
+                        "period_states": tuple(
+                            item.model_copy(update={field: share})
+                            if n == period_idx
+                            else item
+                            for n, item in enumerate(exchanger.period_states)
+                        )
+                    }
+                )
+    return exchangers
 
 
 def extract_heat_exchanger_network(
@@ -139,6 +188,8 @@ def extract_heat_exchanger_network(
                 include_inactive=include_inactive,
             )
         )
+
+    exchangers = _end_utilities_in_parallel(exchangers, period_ids)
 
     total_annual_cost = _optional_float(getattr(solved_model, "TAC", None))
     objective = (

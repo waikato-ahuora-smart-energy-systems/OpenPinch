@@ -502,3 +502,52 @@ def test_a_seed_match_the_placement_leaves_idle_stays_in_use():
     internal.load_model()
 
     assert _value(internal.case.z[h1][0][1]) == pytest.approx(1.0)
+
+
+def test_two_heaters_at_one_stream_end_split_the_stream():
+    """LPS and HPS share C1's end in parallel, each on its duty's share of
+    C1's flow over the whole end span, as the model sized them."""
+    from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
+        extract_heat_exchanger_network,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+        verify_network_feasibility,
+    )
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    problem = _site(
+        [
+            _stream("Plant", "C1", 100.0, 130.0, 30.0),
+            _stream("Plant", "H1", 90.0, 80.0, 10.0),
+        ],
+        [
+            _utility("LPS", "Hot", 140.0, 139.9, 60.0),
+            _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+            _utility("CW", "Cold", 20.0, 25.0, 5.0),
+        ],
+    )
+    model = _model(
+        problem,
+        stages=1,
+        level_targets=(
+            UtilityLevelTarget("hot", (0,), (0,), (10.0,)),
+            UtilityLevelTarget("hot", (1,), (0,), (20.0,)),
+        ),
+    )
+    model.optimise(False)
+    assert model.mSuccess == 1
+
+    network = extract_heat_exchanger_network(
+        model, model.solver_arrays, run_id="series", method="ESM", stage_count=1
+    )
+
+    heaters = {
+        exchanger.source_stream: exchanger.state()
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+    }
+    for name, share in (("Hot Utility.LPS", 1 / 3), ("Hot Utility.HPS", 2 / 3)):
+        assert heaters[name].sink_split_fraction == pytest.approx(share, rel=1e-6)
+        assert heaters[name].sink_inlet_temperature == pytest.approx(100.0 + 273.15)
+        assert heaters[name].sink_outlet_temperature == pytest.approx(130.0 + 273.15)
+    assert verify_network_feasibility(network) == ()
