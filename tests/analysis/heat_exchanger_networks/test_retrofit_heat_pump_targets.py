@@ -310,6 +310,30 @@ def test_design_retrofit_heat_pumps_run_the_chosen_cycle(monkeypatch):
     assert [args["maximum_iterations"] for _, _, args in seen] == [7, 7]
 
 
+def test_design_retrofit_heat_pumps_target_the_first_period(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks import context
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    # The cached direct target must be the first period's, whose states the
+    # as-piped profiles and prices read, not whichever ran last.
+    requested = []
+
+    def fake_targets(problem, runtime_options, period_id):
+        requested.append((runtime_options.get("period_id"), period_id))
+
+    monkeypatch.setattr(context, "ensure_target_results", fake_targets)
+    monkeypatch.setattr(
+        heat_pump_targets, "retrofit_heat_pumps", lambda *_a, **_k: "targets"
+    )
+    problem = PinchProblem(json.loads(read_sample_case(CASE)))
+
+    problem.design.retrofit_heat_pumps(_solved_network())
+
+    assert requested == [("0", "0")]
+
+
 def test_an_unsolved_network_is_solved_as_the_retrofit_baseline(monkeypatch):
     from types import SimpleNamespace
 

@@ -1343,8 +1343,11 @@ class _DesignAccessor:
         isolated = snapshot_problem(self._problem)
         root = isolated._build_execution_master_zone()
         stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
+        # The first period's direct target, whose period the as-piped
+        # profiles and prices take, not whichever period was targeted last.
+        first_period = min(isolated.period_ids.items(), key=lambda item: item[1])[0]
         with temporary_zone_configuration(root, configuration):
-            ensure_target_results(isolated, {}, None)
+            ensure_target_results(isolated, {"period_id": first_period}, first_period)
             result = retrofit_heat_pumps(isolated, existing, args=args)
         for zone in walk_zone_tree(isolated._master_zone):
             zone.config = stored_configs[zone.address]
