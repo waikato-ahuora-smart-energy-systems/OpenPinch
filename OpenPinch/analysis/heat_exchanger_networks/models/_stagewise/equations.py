@@ -5,6 +5,7 @@ from __future__ import annotations
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
+from .._base import utility_slices as _slices
 from .._base.superstructure import create_match_binaries, create_utility_duty_grids
 from . import staged_utilities as _staged
 
@@ -262,6 +263,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     if not owner.values_only:
         _approach._set_multiperiod_utility_approach_equations(owner)
         _staged.set_staged_utility_equations(owner)
+        _slices.set_utility_slice_coupling(owner)
 
     if owner.non_isothermal_model:
         _set_multiperiod_non_isothermal_equations(owner)

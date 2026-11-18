@@ -22,6 +22,11 @@ from ..solver.dependencies import (
     MissingSynthesisSolverError,
 )
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
+from ..solver.utility_slices import (
+    sliced_decomposition,
+    utility_slices,
+    with_utility_slices,
+)
 from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
 from ._stagewise import staged_utilities as _staged
@@ -90,6 +95,7 @@ class InternalHeatExchangerNetworkProblem:
         """Construct the private PDM or StageWise model for this task."""
 
         self._model_factories = model_factories
+        self._slice_utilities()
         self.args = {
             "name": self.name,
             "framework": self.framework,
@@ -112,6 +118,38 @@ class InternalHeatExchangerNetworkProblem:
             self._build_pdm(model_factories=model_factories)
             return
         self._build_stage_wise(model_factories=model_factories)
+
+    def _slice_utilities(self) -> None:
+        """Slice sliding utilities where the levels are held, or as the parent.
+
+        A pinch design that holds its levels runs each sliding utility
+        through slices in series (``../solver/utility_slices.py``), each
+        slice taking its share of the level's target; a task built on a
+        sliced parent takes the parent's slices, so its warm start and staged
+        units line up. Heater and cooler restrictions are copied to each
+        slice of their utility.
+        """
+
+        if utility_slices(self.solver_arrays):
+            return
+        parent_arrays = getattr(self.parent, "solver_arrays", None)
+        if parent_arrays is not None and utility_slices(parent_arrays):
+            sliced = with_utility_slices(self.solver_arrays, like=parent_arrays)
+        elif self.framework == "PDM" and self.staged_utilities:
+            sliced = with_utility_slices(self.solver_arrays)
+        else:
+            return
+        if sliced is self.solver_arrays:
+            return
+        before = self.solver_arrays
+        self.solver_arrays = sliced
+        if self.pinch_decompositions is not None:
+            self.pinch_decompositions = {
+                name: sliced_decomposition(decomposition, sliced)
+                for name, decomposition in self.pinch_decompositions.items()
+            }
+        if self.z_restriction is not None:
+            self.z_restriction = _sliced_restriction(self.z_restriction, before, sliced)
 
     def get_solution(
         self,
@@ -1107,6 +1145,28 @@ def _start_from_side(sparse, side) -> None:
             if not binary.fixed and (binary.value or 0.0) < 0.5:
                 binary.fix(0)
     sparse.m.warm_start = True
+
+
+def _sliced_restriction(restriction: list, before, after) -> list:
+    """``[z, z_hu, z_cu]`` on sliced utility axes: each slice as its parent."""
+
+    recovery, heaters, coolers = restriction
+    slices = utility_slices(after)
+
+    def columns(side: str) -> list[int]:
+        axis = f"{side}_utilities"
+        index = before.axis_maps[axis]
+        return [
+            index[slices.get(axis, {}).get(name, [name])[0]]
+            for name in after.utility_identities[axis]
+        ]
+
+    hot, cold = columns("hot"), columns("cold")
+    return [
+        recovery,
+        None if heaters is None else [[row[u] for u in hot] for row in heaters],
+        None if coolers is None else [[row[u] for u in cold] for row in coolers],
+    ]
 
 
 def _with_pinch_end_stage(name: str, stages: int, restriction: list):

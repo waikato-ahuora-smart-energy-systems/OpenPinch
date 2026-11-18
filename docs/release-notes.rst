@@ -51,6 +51,15 @@ Heat exchanger network synthesis
   levels, so the selected network may still differ from the targeted
   levels. A network that holds levels keeps its stages: stage reduction
   re-solves by utility cost, which would undo them.
+- A utility whose temperature slides, such as hot water from 90 to 70 C,
+  now reaches the streams targeting lets it heat. A heater runs its utility
+  over the whole range, so hot water could not heat a stream entering at
+  82 C; with levels held, such a utility is cut into slices at the streams'
+  supply temperatures (plus their approach), run in series, each taking its
+  share of the level's duty. Their exchangers are reported under the
+  utility's name, with the slice in the exchanger id (for example
+  ``hot-utility:Hot Utility.HW@90-87.1->...``). On ``zonal_site`` the
+  Hospital now holds its hot water and steam levels.
 
 0.9.3 (2026-11-18)
 ------------------
