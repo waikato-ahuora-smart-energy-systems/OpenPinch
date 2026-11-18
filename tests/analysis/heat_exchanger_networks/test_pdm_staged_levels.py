@@ -226,7 +226,7 @@ def test_the_below_side_holds_each_cold_level_at_its_target():
         assert duties[name] == pytest.approx(targets[name], rel=1e-6, abs=1e-6)
 
 
-def _pdm_network(problem: PinchProblem):
+def _pdm_network(problem: PinchProblem, **kwargs):
     pdm = InternalHeatExchangerNetworkProblem(
         solver_arrays=problem_to_solver_arrays(problem, D_TMIN),
         name="staged-pdm",
@@ -241,6 +241,7 @@ def _pdm_network(problem: PinchProblem):
             for location in ("above", "below")
         },
         staged_utilities=True,
+        **kwargs,
     )
     case = pdm.get_solution(print_output=False)
     assert case is not None, getattr(pdm, "solution_failure_reason", None)
@@ -261,7 +262,11 @@ def _network_duties(network) -> dict[str, float]:
     return duties
 
 
-@pytest.mark.parametrize("make_problem", [lambda: _problem(HEATING), _cooling_problem])
+@pytest.mark.parametrize(
+    "make_problem",
+    [lambda: _problem(HEATING), _cooling_problem, lambda: _utility_pinch_problem()],
+    ids=["heating", "cooling", "utility pinch"],
+)
 def test_a_pdm_network_meets_each_level_target_and_verifies(make_problem):
     problem = make_problem()
     targets = _targets(problem)
@@ -322,6 +327,94 @@ def test_a_side_offers_staged_heaters_above_the_pinch_and_coolers_below():
 
     assert offered(above.z_hs_allowed) and not offered(above.z_cs_allowed)
     assert offered(below.z_cs_allowed) and not offered(below.z_hs_allowed)
+
+
+def _steam_raising_problem() -> PinchProblem:
+    """H1 (200 to 195 C, 32 kW) raises LP steam and helps H2 heat C1.
+
+    Only H1 is hot enough to raise the steam (LPG, 150 C), and it must keep
+    26 kW for it: H2 (150 to 40 C) heats C1 (100 to 120 C) from its top,
+    and H1 only the last 6 kW. A design that ticks C1 off with H1 alone
+    leaves too little for the steam.
+    """
+    return PinchProblem(
+        source={
+            "streams": [
+                _stream("H1", 200.0, 195.0, 32.0),
+                _stream("H2", 150.0, 40.0, 11.0),
+                _stream("C1", 100.0, 120.0, 10.0),
+            ],
+            "utilities": [
+                _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+                _utility("LPG", "Cold", 150.0, 150.1, 10.0),
+                _utility("CW", "Cold", 20.0, 25.0, 5.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "Plant", "type": "Process Zone"}],
+            },
+        }
+    )
+
+
+def _utility_pinch_problem() -> PinchProblem:
+    """H1 (200 to 199 C, 100 kW) raises LP steam; H2 heats C1's cold end.
+
+    C1 (50 to 190 C) meets H1 at the pinch. H2 (120 to 40 C) can heat it
+    to 110 C, so H1 heats it only above 110 C and raises 92 kW of steam
+    (LPG, 180 C). The steam leaves no heat to spare at 115 C shifted, a
+    utility pinch: a pinch match that ticks C1 off with H1 alone crosses it.
+    """
+    return PinchProblem(
+        source={
+            "streams": [
+                _stream("H1", 200.0, 199.0, 100.0),
+                _stream("H2", 120.0, 40.0, 8.0),
+                _stream("C1", 50.0, 190.0, 14.0),
+            ],
+            "utilities": [
+                _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+                _utility("LPG", "Cold", 180.0, 180.1, 10.0),
+                _utility("CW", "Cold", 20.0, 25.0, 5.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "Plant", "type": "Process Zone"}],
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "make_problem",
+    [
+        lambda: _problem(HEATING),
+        _cooling_problem,
+        _steam_raising_problem,
+        _utility_pinch_problem,
+    ],
+    ids=["heating", "cooling", "steam raising", "utility pinch"],
+)
+def test_heuristic_proposals_hold_each_level_at_its_target(make_problem, caplog):
+    """The heuristic designs each level's duty into its proposals.
+
+    Each level is matched like a process stream that must be used, so the
+    process matches leave the level its share of the partners, nearest the
+    pinch where its temperature serves.
+    """
+    problem = make_problem()
+    targets = _targets(problem)
+
+    with caplog.at_level("WARNING"):
+        network = _pdm_network(problem, heuristic_network_limit=3)
+
+    assert "utility levels" not in caplog.text
+    duties = _network_duties(network)
+    for name, target in targets.items():
+        assert duties.get(name, 0.0) == pytest.approx(target, rel=1e-6, abs=1e-6)
+    assert verify_network_feasibility(network) == ()
 
 
 def test_a_side_that_cannot_hold_its_levels_falls_back_with_a_warning(caplog):
@@ -434,3 +527,41 @@ def test_the_workflow_holds_levels_only_with_more_than_one_utility_on_a_side():
 
     assert executor._has_utility_levels(levels)
     assert not executor._has_utility_levels(single)
+
+
+@pytest.mark.parametrize("zone", ["Food Plant[S]", "Chemical Plant[S]"])
+def test_heuristic_designs_hold_the_zonal_sites_levels(zone, caplog):
+    """The heuristic meets each level of two ``zonal_site`` processes.
+
+    Food Plant's condensing stream must keep most of its heat to raise steam;
+    Chemical Plant's steam raising leaves a utility pinch below the process
+    pinch that no match may cross.
+    """
+    from tests.analysis.heat_exchanger_networks.test_pdm_level_targets import (
+        _process,
+        _targeted,
+    )
+
+    problem = _process(zone)
+    # Keyed "Hot Utility.<name>" or "Cold Utility.<name>": a steam level can
+    # be both a hot and a cold utility.
+    targets = _targeted(problem, zone)
+
+    with caplog.at_level("WARNING"):
+        network = _pdm_network(problem, heuristic_network_limit=3)
+
+    assert "utility levels" not in caplog.text
+    duties: dict[str, float] = {}
+    for exchanger in network.exchangers:
+        if exchanger.kind is HeatExchangerKind.RECOVERY:
+            continue
+        utility = (
+            exchanger.source_stream
+            if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            else exchanger.sink_stream
+        )
+        duties[utility] = duties.get(utility, 0.0) + exchanger.state().duty
+    for name, target in targets.items():
+        # The heuristic counts a load within 0.1% as met.
+        assert duties.get(name, 0.0) == pytest.approx(target, rel=1e-3, abs=1e-3)
+    assert verify_network_feasibility(network) == ()

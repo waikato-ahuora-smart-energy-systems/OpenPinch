@@ -396,7 +396,10 @@ def _set_level_targets(owner, side: str) -> None:
             )
             # A relative band, not the model tolerance: within the tolerance
             # prices would still shift up to 1e-3 kW between levels.
-            band = _LEVEL_BAND * max(1.0, abs(level))
+            relative = getattr(owner, "level_band", None)
+            band = (_LEVEL_BAND if relative is None else relative) * max(
+                1.0, abs(level)
+            )
             owner.m.Equation(duty <= level + band)
             owner.m.Equation(duty >= level - band)
 

@@ -38,13 +38,18 @@ Heat exchanger network synthesis
   just left, and the grid view draws them on that stage boundary. A side
   that cannot hold its levels (for example hot water, whose fixed outlet
   can face a stream entering above it) is solved as before, choosing levels
-  by price, with a warning. The heuristic method's proposals often cannot
-  hold the levels and then fall back the same way. Networks are still
-  ranked by total annual cost, and the later stages (temperature-driven
-  method, network evolution) do not yet hold the levels, so the selected
-  network may still differ from the targeted levels. A network with
-  staged units keeps its stages: stage reduction does not yet relocate
-  them.
+  by price, with a warning. The heuristic method designs the levels into
+  its proposals: each level with a target is matched like a process stream
+  that must be used, and a side is split at its utility pinches (where,
+  with the levels at their targets, the heat cascade closes) and each
+  region designed on its own, so no match crosses a utility pinch. A
+  heuristic side holds each level at its target or, failing that, within
+  0.1% of it, the share of a load the heuristic counts as met. Networks
+  are still ranked by total annual cost, and the later stages
+  (temperature-driven method, network evolution) do not yet hold the
+  levels, so the selected network may still differ from the targeted
+  levels. A network that holds levels keeps its stages: stage reduction
+  re-solves by utility cost, which would undo them.
 
 0.9.3 (2026-11-18)
 ------------------

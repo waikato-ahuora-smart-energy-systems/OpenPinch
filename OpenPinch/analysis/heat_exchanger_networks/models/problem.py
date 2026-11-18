@@ -757,7 +757,14 @@ class InternalHeatExchangerNetworkProblem:
         return None
 
     def _realise_side(self, name: str, proposal, rank: int):
-        """Solve one side proposal, or return ``None`` if it cannot be."""
+        """Solve one side proposal, or return ``None`` if it cannot be.
+
+        A side holding its utility levels is solved with each level at its
+        target; failing that, within ``LOAD_FRACTION_TOLERANCE`` of it, the
+        fraction of a load the proposal counts as met.
+        """
+
+        from ..heuristic.enumeration import LOAD_FRACTION_TOLERANCE
 
         template = getattr(self, name)
         stages = proposal.stages
@@ -767,8 +774,17 @@ class InternalHeatExchangerNetworkProblem:
             hot_utilities=template.NHU,
             cold_utilities=template.NCU,
         )
+        bands: list[dict] = [{}]
         if self._side_args(name).get("staged_utilities"):
             stages, restriction = _with_pinch_end_stage(name, stages, restriction)
+            bands.append({"level_band": LOAD_FRACTION_TOLERANCE})
+        for band in bands:
+            side = self._solved_side(name, rank, stages, restriction, band)
+            if side is not None:
+                return side
+        return None
+
+    def _solved_side(self, name: str, rank: int, stages: int, restriction, band):
         factory = self._model_factory(
             getattr(self, "_model_factories", None),
             "pinch_design_method",
@@ -801,6 +817,7 @@ class InternalHeatExchangerNetworkProblem:
                         ),
                         "z_restriction": restriction,
                     }
+                    | band
                 )
             )
         except (
@@ -881,9 +898,10 @@ class InternalHeatExchangerNetworkProblem:
     def _reduce_stages(self, case, *, empty_only: bool) -> StageWiseModel:
         if case.mSuccess != 1:
             return case
-        if _staged.staged_units_on(case):
-            # The reduced model does not relocate staged heaters and coolers
-            # yet, so a network with them keeps its stages.
+        if getattr(case, "staged_utilities", False):
+            # The reduced model neither relocates staged heaters and coolers
+            # nor holds utility levels (its re-solve would pick them by
+            # price), so a network that holds them keeps its stages.
             return case
 
         active_stages = self._get_active_stages(
