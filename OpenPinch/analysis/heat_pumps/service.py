@@ -50,6 +50,7 @@ from .performance_maps.targeting import (
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
     "compute_indirect_heat_pump_or_refrigeration_target",
+    "compute_profile_heat_pump_target",
 ]
 
 
@@ -107,10 +108,10 @@ def compute_profile_heat_pump_target(
     H_cold: np.ndarray,
     config: Configuration,
     args: dict | None = None,
-) -> HeatPumpTargetOutputs:
+) -> HeatPumpTargetOutputs | None:
     """Target a heat pump that takes heat only from the source profile
     ``H_hot`` and delivers it only to the sink profile ``H_cold``, with no
-    heat recovery between them.
+    heat recovery between them; ``None`` when the load is below ``tol``.
 
     The profiles are cumulative duties on the shifted temperatures
     ``T_vals`` (hottest first), as a problem table's ``H(net-hot)`` and
@@ -125,6 +126,8 @@ def compute_profile_heat_pump_target(
         is_heat_pumping=True,
         config=config,
     )
+    if load < tol:
+        return None
     return _get_hpr_targets(
         Q_hpr_target=load,
         T_vals=T_vals,

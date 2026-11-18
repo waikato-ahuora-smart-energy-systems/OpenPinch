@@ -884,6 +884,20 @@ def test_a_profile_heat_pump_target_serves_the_given_sink_from_the_given_source(
         np.testing.assert_array_equal(captured[name], values)
 
 
+def test_a_profile_heat_pump_target_with_no_sink_is_none(monkeypatch):
+    monkeypatch.setattr(hp, "_get_hpr_targets", lambda **_kwargs: "target")
+
+    assert (
+        hp.compute_profile_heat_pump_target(
+            T_vals=np.array([150.0, 50.0]),
+            H_hot=np.array([0.0, -80.0]),
+            H_cold=np.array([0.0, 0.0]),
+            config=Configuration(),
+        )
+        is None
+    )
+
+
 def test_compute_indirect_hpr_returns_none_when_utility_profile_has_no_load(
     monkeypatch,
 ):
