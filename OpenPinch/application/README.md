@@ -16,6 +16,7 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - `run_problem_utility_placement`, `build_problem_placement_context` (`utility_placement.py`, in `__all__`): optimise a utility set and return it as a new solved `PinchProblem`, or build the detached `(blueprints, context)` pair.
 - `with_utilities_from` (`case_derivation.py`): receiver problem with the donor's utilities, aligned by period identity.
 - `single_period_case` (`case_derivation.py`): a new single-period problem holding one period's data alone, keeping its period id with weight 1; the basis a HEN is synthesised from before it is fitted to every period.
+- `site_processes`, `SiteProcess`, `process_case` (`case_derivation.py`): the Process Zones of a Site zone with their stream keys and one-sided flag, and a new problem holding one Process Zone's streams with every utility; the per-process cases of total site network synthesis.
 - `residual_basis`, `create_hpr_residual_case`, `residual_utility_service`, `prepare_residual_problem` (`residual_utility.py`): frozen HPR residual cases.
 - `hpr_result_digest`, `retain_hpr_target`, `validate_hpr_target`, `select_hpr_graphs` (`hpr_selection.py`): identify local HPR targets and select their graphs.
 - Subdirectories: [_problem](./_problem/README.md) problem internals (input, periods, targeting, output, accessors); [_workspace](./_workspace/README.md) case-input and case-state helpers for `PinchWorkspace`.
@@ -47,6 +48,9 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - A residual case is frozen to one period, and its utilities start with zero duty (segmented utilities carry duty fractions) [residual_utility.py:create_hpr_residual_case].
 - `with_utilities_from` requires matching period sets and a `PinchProblem` donor, and does not copy donor results [case_derivation.py:with_utilities_from].
 - `single_period_case` reduces every per-period quantity to that period's `value` with `period_source` (`analysis/heat_exchanger_networks/basis`), and rejects an unknown period and a problem with process components; the derived problem's targets equal that period's all-period targets [case_derivation.py:single_period_case].
+
+- `site_processes` requires a Site zone (the root by default) whose subzones are all Process Zones, else `ValueError` naming the zone; a stream placed on the site zone itself has already been prepared into a Process Zone of its own; stream keys are the site zone's (`"<process>.<stream>"`), matched to processes by stream identity [case_derivation.py:site_processes].
+- `process_case` requires a Process Zone and rejects a problem with process components; it keeps the zones above the process without their other subzones, so its stream keys equal the source's, keeps every utility, period and option, and drops plant profile data and any network; its direct targets for the process equal the source's [case_derivation.py:process_case].
 
 ## Side Effects
 - `commands._SESSIONS` is module-level state holding live problems, workspaces and returned targets until the `close` command or process exit; each `open` and each returned case adds an entry [commands.py:_SESSIONS].

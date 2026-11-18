@@ -13,6 +13,14 @@ Heat exchanger network synthesis
   up each period's duty grid and each match's row once rather than for
   every stage. Under a profiler, a design on the pulp mill sample case
   spends about 28 s in extraction instead of 34 s.
+- ``OpenPinch.application.case_derivation`` adds ``site_processes`` and
+  ``process_case``, the first step towards total site network synthesis.
+  ``site_processes(problem)`` lists the Process Zones of a Site zone, each
+  with the site's keys of its hot and cold streams and whether it is
+  one-sided (only hot or only cold streams). ``process_case(problem, zone)``
+  returns a new case holding one Process Zone's streams with every site
+  utility, so today's synthesis can run on each process of a site, for
+  example ``process_case(site, "Hospital[S]").design.heat_exchanger_network()``.
 
 0.9.3 (2026-11-18)
 ------------------
