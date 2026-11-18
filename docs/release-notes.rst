@@ -7,6 +7,15 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.retrofit_heat_pump_targets`` gives an existing network's ideal
+  and as-piped heat pump targets from the HPR service: the ideal against
+  the process's heating and cooling targets, the as-piped against only the
+  existing heaters and coolers (no process-side repiping). Each reports
+  its levels, work, COP and the utility and operating cost before and
+  after; ``network_gap`` and ``heat_pump_gap`` split the difference
+  between them. ``compute_profile_heat_pump_target`` in the HPR service
+  targets a heat pump against any given source and sink profiles.
+
 - Extracting a network from a solved model is cheaper: plain numbers,
   NumPy floats and ``[value]`` lists are read directly rather than through
   Pyomo lookups and a caught ``TypeError``, and recovery extraction looks
