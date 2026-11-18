@@ -247,3 +247,34 @@ def test_a_target_without_load_is_a_heat_pump_that_delivers_nothing(monkeypatch)
     assert (piped.heat_delivered, piped.work, piped.condenser_duties) == (0, 0, ())
     assert piped.operating_cost_after == pytest.approx(piped.operating_cost_before)
     assert targets.heat_pump_gap == 0.0
+
+
+def test_design_retrofit_heat_pump_targets_run_the_chosen_cycle(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+    from OpenPinch.contracts.synthesis.retrofit import RetrofitHeatPumpTargets
+    from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
+
+    seen = []
+
+    def fake_target(*, T_vals, H_hot, H_cold, config, args=None):
+        seen.append((config.hpr.type, config.hpr.load_fraction, args))
+
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", fake_target
+    )
+    problem = PinchProblem(json.loads(read_sample_case(CASE)))
+
+    targets = problem.design.retrofit_heat_pump_targets(
+        _solved_network(),
+        cycle="carnot",
+        topology="parallel",
+        maximum_iterations=7,
+        options={"HPR_LOAD_FRACTION": 0.5},
+    )
+
+    assert isinstance(targets, RetrofitHeatPumpTargets)
+    parallel = HeatPumpAndRefrigerationCycle.ParallelCarnot
+    assert [(str(t), f) for t, f, _ in seen] == [(parallel.value, 0.5)] * 2
+    assert [args["maximum_iterations"] for _, _, args in seen] == [7, 7]
