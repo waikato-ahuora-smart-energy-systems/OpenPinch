@@ -64,8 +64,24 @@ def retrofit_heat_pump_targets(
 
 
 def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
-    """``result`` against the utility its profiles carry, at ``prices``."""
+    """``result`` against the utility its profiles carry, at ``prices``;
+    with no result (no load), a heat pump that delivers nothing."""
 
+    if result is None:
+        return RetrofitHeatPumpTarget(
+            hot_utility_before=float(np.abs(H_cold).max()),
+            cold_utility_before=float(np.abs(H_hot).max()),
+            heat_delivered=0.0,
+            process_heat_absorbed=0.0,
+            ambient_heat=0.0,
+            work=0.0,
+            cop=0.0,
+            condensing_temperatures=(),
+            condenser_duties=(),
+            evaporating_temperatures=(),
+            evaporator_duties=(),
+            **prices,
+        )
     condenser = np.atleast_1d(np.asarray(result.Q_cond, dtype=float))
     evaporator = np.atleast_1d(np.asarray(result.Q_evap, dtype=float))
     # Air heat the evaporators take (the service's ambient source); the

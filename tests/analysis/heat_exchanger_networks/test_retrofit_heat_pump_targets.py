@@ -227,3 +227,23 @@ def test_each_target_is_priced_at_the_utilities_and_hpr_electricity(monkeypatch)
         + (13603.6 + 1665.1 - 700.0) * cold
         + 300.0 * electricity
     )
+
+
+def test_a_target_without_load_is_a_heat_pump_that_delivers_nothing(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    # The HPR service finds no load (as for a network with no heater).
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", lambda **_k: None
+    )
+
+    targets = heat_pump_targets.retrofit_heat_pump_targets(
+        _problem(), _solved_network()
+    )
+
+    piped = targets.as_piped
+    assert (piped.heat_delivered, piped.work, piped.condenser_duties) == (0, 0, ())
+    assert piped.operating_cost_after == pytest.approx(piped.operating_cost_before)
+    assert targets.heat_pump_gap == 0.0

@@ -174,8 +174,8 @@ class RetrofitHeatPumpTargets(BaseModel):
     ``ideal`` serves the process's heating target from its cooling target
     (the direct-integration cascade), as a new design could; ``as_piped``
     serves only the existing network's heaters from only its coolers, so
-    it needs no process-side repiping. Either is ``None`` when it has no
-    load.
+    it needs no process-side repiping. A target with no load is a heat pump
+    that delivers nothing.
 
     The gap between their operating costs after the heat pump splits in
     two: ``network_gap``, what the existing network's utility costs beyond
@@ -187,8 +187,8 @@ class RetrofitHeatPumpTargets(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    ideal: RetrofitHeatPumpTarget | None
-    as_piped: RetrofitHeatPumpTarget | None
+    ideal: RetrofitHeatPumpTarget
+    as_piped: RetrofitHeatPumpTarget
 
     @property
     def network_gap(self) -> float:
