@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .._base import approach as _approach
 from .._base import execution as _execution
+from . import staged_utilities as _staged
 from .verification import _value
 
 
@@ -17,6 +18,7 @@ def set_initial_values_for_variables(
         _set_multiperiod_initial_values(owner, init_solution)
     else:
         _set_single_period_initial_values(owner, init_solution)
+    _staged.set_staged_initial_values(owner, init_solution)
     _approach.switch_on_idle_safe_utilities(owner)
 
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from .._base import approach as _approach
 from .._base import area as _area
+from .._base import execution as _execution
 from .._base import piecewise as _piecewise
 
 
@@ -420,3 +421,87 @@ def staged_terminal_differences(
         - owner._utility_solved_outlet_temperature("cold", n, s, u),
         value(owner.T_h_by_period[n][s][k]) - owner.T_cu_in_period[n][u],
     )
+
+
+def set_staged_initial_values(owner, source) -> None:
+    """Copy a solved parent's staged units into this model.
+
+    Each offered unit takes the parent's binary, duties and mid temperatures
+    (period by period, the parent's last period where it has fewer); a unit
+    the parent did not offer, or a parent without staging, gives a unit
+    switched off with no duty, the mid temperature at the boundary's.
+    """
+    if not getattr(owner, "staged_utilities", False):
+        return
+    staged_source = getattr(source, "staged_utilities", False)
+    for side in ("hot", "cold"):
+        if side == "hot":
+            allowed, flags, duties, mids, boundaries = (
+                owner.z_hs_allowed,
+                owner.z_hs,
+                owner.Q_hs_by_period,
+                owner.T_c_mid_by_period,
+                owner.T_c_by_period,
+            )
+        else:
+            allowed, flags, duties, mids, boundaries = (
+                owner.z_cs_allowed,
+                owner.z_cs,
+                owner.Q_cs_by_period,
+                owner.T_h_mid_by_period,
+                owner.T_h_by_period,
+            )
+        prefix = "hs" if side == "hot" else "cs"
+        mid_name = "T_c_mid_by_period" if side == "hot" else "T_h_mid_by_period"
+        source_allowed = getattr(source, f"z_{prefix}_allowed", None)
+        for s, row in enumerate(allowed):
+            for u, by_k in enumerate(row):
+                for k in interior_boundaries(owner):
+                    if not by_k[k]:
+                        continue
+                    carried = bool(
+                        staged_source and source_allowed and source_allowed[s][u][k]
+                    )
+                    _execution._set_value(
+                        owner,
+                        flags[s][u][k],
+                        owner._active_binary_value(
+                            getattr(source, f"z_{prefix}")[s][u][k]
+                        )
+                        if carried
+                        else 0.0,
+                    )
+                    for n in range(owner.N_periods):
+                        source_n = min(
+                            n, len(getattr(source, f"Q_{prefix}_by_period", [[]])) - 1
+                        )
+                        _execution._set_value(
+                            owner,
+                            duties[n][s][u][k],
+                            owner._active_binary_value(
+                                getattr(source, f"Q_{prefix}_by_period")[source_n][s][
+                                    u
+                                ][k]
+                            )
+                            if carried
+                            else 0.0,
+                        )
+        for n in range(owner.N_periods):
+            for s, row in enumerate(mids[n]):
+                for k in interior_boundaries(owner):
+                    if row[k] is boundaries[n][s][k]:
+                        continue
+                    source_grid = (
+                        getattr(source, mid_name)
+                        if staged_source
+                        else getattr(
+                            source,
+                            "T_c_by_period" if side == "hot" else "T_h_by_period",
+                        )
+                    )
+                    source_n = min(n, len(source_grid) - 1)
+                    _execution._set_value(
+                        owner,
+                        row[k],
+                        owner._active_binary_value(source_grid[source_n][s][k]),
+                    )

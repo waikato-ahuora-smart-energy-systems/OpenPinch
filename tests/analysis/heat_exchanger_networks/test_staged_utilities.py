@@ -343,3 +343,91 @@ def test_a_staged_cooler_is_extracted_between_its_stages():
         170.0 + 273.15, abs=1e-6
     )
     assert verify_network_feasibility(network) == ()
+
+
+def _ipopt_available() -> bool:
+    try:
+        backend.require_solver_backend("ipopt-pyomo")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+def _relaxed_child(problem: PinchProblem) -> StageWiseModel:
+    """A relaxed child, as evolution builds one; it solves with Ipopt.
+
+    Ipopt stops at an interior point, so its duties are compared at
+    ``rel=1e-4`` rather than the MILP solves' ``1e-6``.
+    """
+    return StageWiseModel(
+        name="staged-utilities-child",
+        framework="TDM",
+        solver="ipopt-pyomo",
+        solver_arrays=problem_to_solver_arrays(problem, D_TMIN),
+        stages=2,
+        dTmin=D_TMIN,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="utility costs",
+        non_isothermal_model=False,
+        integers=False,
+        tol=1e-6,
+        staged_utilities=True,
+    )
+
+
+@pytest.mark.skipif("not _ipopt_available()", reason="needs ipopt")
+@pytest.mark.parametrize("periods", [1, 2])
+def test_a_warm_start_carries_the_parents_staged_units(periods):
+    problem = _heating_problem(periods)
+    parent = StageWiseModel(
+        name="staged-utilities-parent",
+        framework="ESM",
+        solver="highs",
+        solver_arrays=problem_to_solver_arrays(problem, D_TMIN),
+        stages=2,
+        dTmin=D_TMIN,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="utility costs",
+        non_isothermal_model=False,
+        integers=True,
+        tol=1e-6,
+        staged_utilities=True,
+    )
+    parent.optimise(False)
+    child = _relaxed_child(problem)
+
+    child.set_initial_values_for_variables(parent)
+
+    (c1,) = range(child.J)
+    lps, hps = 0, 1
+    assert _value(child.z_hs[c1][lps][1]) == pytest.approx(1.0)
+    assert _value(child.z_hs[c1][hps][1]) == pytest.approx(0.0)
+    for n in range(periods):
+        assert _value(child.Q_hs_by_period[n][c1][lps][1]) == pytest.approx(
+            40.0, rel=1e-6
+        )
+        assert _value(child.T_c_mid_by_period[n][c1][1]) == pytest.approx(
+            _value(parent.T_c_mid_by_period[n][c1][1]), abs=1e-9
+        )
+    child.optimise(False)
+    assert child.mSuccess == 1
+    assert _hot_utility_duties(child)["LPS"] == pytest.approx(40.0, rel=1e-4)
+
+
+@pytest.mark.skipif("not _ipopt_available()", reason="needs ipopt")
+def test_a_warm_start_from_an_unstaged_parent_switches_staged_units_off():
+    problem = _heating_problem()
+    parent = _solved(problem, staged_utilities=False)
+    child = _relaxed_child(problem)
+
+    child.set_initial_values_for_variables(parent)
+
+    for row in child.z_hs:
+        for by_k in row:
+            for k in range(1, child.S):
+                assert _value(by_k[k]) == pytest.approx(0.0)
+    child.optimise(False)
+    assert child.mSuccess == 1
+    assert _hot_utility_duties(child)["HPS"] == pytest.approx(40.0, rel=1e-4)
