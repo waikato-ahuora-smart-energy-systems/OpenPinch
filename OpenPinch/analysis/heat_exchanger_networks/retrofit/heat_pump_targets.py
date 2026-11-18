@@ -82,8 +82,11 @@ def _process_stream(streams: StreamCollection, name: str) -> Stream:
     """The process stream ``name`` names, as is or without its zone prefix
     (``H1`` for ``Process A.H1``)."""
 
-    return next(
+    matches = [
         stream
         for key, stream in streams.items()
         if key == name or str(key).endswith("." + name)
-    )
+    ]
+    if not matches:
+        raise ValueError(f"the problem has no process stream {name!r}.")
+    return matches[0]

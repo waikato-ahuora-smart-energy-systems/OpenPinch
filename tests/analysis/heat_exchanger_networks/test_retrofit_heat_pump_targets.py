@@ -85,3 +85,24 @@ def test_the_as_piped_profiles_are_the_existing_coolers_and_heaters():
     # hottest cooler inlet.
     assert np.all(H_cold[T_vals <= 448.81 - KELVIN + DT_CONT] == 0.0)
     assert np.all(H_hot[T_vals >= 442.77 - KELVIN - DT_CONT] == 0.0)
+
+
+def test_a_cooler_on_a_stream_the_problem_lacks_is_an_error():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
+        as_piped_profiles,
+    )
+
+    network = _solved_network()
+    network = network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"source_stream": "H9"})
+                if e.source_stream == "H1"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="H9"):
+        as_piped_profiles(_problem(), network)
