@@ -147,6 +147,14 @@ METHOD_CATALOG = MappingProxyType(
                 "thermal_derivative",
             )
         },
+        # One network for a site's process zones, each holding its levels.
+        "design.total_site_heat_exchanger_network": _spec(
+            scopes=(ZoneType.S.value,),
+            prerequisites=("direct_heat_integration",),
+            periods="specialized",
+            dependencies=("synthesis", "external solver"),
+            adapter="hen",
+        ),
         # HPR targets on an existing network: no synthesis or solver.
         "design.retrofit_heat_pumps": _spec(
             prerequisites=("direct_heat_integration",),

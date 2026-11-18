@@ -7,6 +7,22 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
+  designs one network for a site of several process zones. Each process is
+  designed alone with the pinch design method, its utilities placed by
+  temperature so each level carries its targeted duty; the process networks
+  are joined, one per process at each dt_cont multiplier, and network
+  evolution refines them as one problem with no thermal derivative step.
+  Every process keeps each utility level at its duty, and heat is recovered
+  only between streams of one process. On ``zonal_site`` every process meets
+  each of its level targets.
+- A network evolution or stage-wise model can hold a utility level's duty
+  over a group of streams and allow recovery only within a group; a stream
+  with several stream-end heaters (or coolers) is now reported as split
+  between them, as the model sizes them, so such networks pass the
+  exchanger heat balance checks. The recovery area check now allows for the
+  model's own area smoothing, so a tiny match is no longer rejected for it.
+
 - ``design.retrofit_heat_pumps`` gives an existing network's ideal
   and as-piped heat pump targets from the HPR service: the ideal against
   the process's heating and cooling targets, the as-piped against only the

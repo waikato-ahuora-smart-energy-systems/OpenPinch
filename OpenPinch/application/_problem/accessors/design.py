@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 
 # Options a search level sets when they are unset (execution/search.py).
 _WIDTH_OPTIONS = ("HENS_DT_CONT_MULTIPLIERS",)
+# Ranked networks each process offers a site design: enough to hold its best
+# at every multiplier of the widest search.
+_SITE_POOL = 50
 _DEPTH_OPTIONS = (
     "HENS_HEURISTIC_PDM_NETWORKS",
     "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS",
@@ -540,6 +543,70 @@ class _DesignAccessor:
             period_id=period_id,
             basis_clusters=basis_clusters,
             arguments=arguments,
+        )
+
+    def total_site_heat_exchanger_network(
+        self,
+        *,
+        width: int | None = None,
+        depth: int | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> HeatExchangerNetworkDesignView:
+        """Design one network for a site of several process zones.
+
+        Each process zone (an immediate subzone of type ``Process Zone``) is
+        designed alone with the pinch design method at the search width's
+        dt_cont multipliers, its utilities placed by temperature, so each
+        level carries the duty targeting gives it. The process networks are
+        then joined, one per process at each multiplier, into site seeds,
+        and network evolution refines the seeds as one problem: every
+        process keeps each utility level at its duty, and heat is recovered
+        only between streams of one process. There is no thermal derivative
+        step.
+
+        ``depth`` sets the evolution's breadth as in
+        ``heat_exchanger_network``, and at 2 and above the MILP pinch
+        design method joins the heuristic for the process networks.
+        """
+
+        from ....analysis.heat_exchanger_networks.execution.search import (
+            resolve_search,
+        )
+        from ....analysis.heat_exchanger_networks.site import site_seeds
+        from ....domain.enums import ZoneType
+
+        master = self._problem.master_zone
+        processes = [
+            name
+            for name, zone in (master.subzones or {}).items()
+            if str(getattr(zone, "type", "")) == ZoneType.P.value
+        ]
+        if len(processes) < 2:
+            raise ValueError(
+                "a site network needs more than one process zone; design a "
+                "single process with heat_exchanger_network()."
+            )
+        _runtime, configuration = self._arguments(
+            options=options, period_id=None, width=width, depth=depth
+        )
+        search = resolve_search(self._effective_hens(configuration))
+        process_options = {
+            **configuration,
+            "HENS_SEARCH_DEPTH": 0,
+            "HENS_PDM_MILP": search.milp,
+            "HENS_UTILITY_PLACEMENT": "temperature",
+        }
+        pools = {
+            name: tuple(
+                outcome.network
+                for outcome in self.heat_exchanger_network(
+                    zone=name, options=process_options
+                ).top(_SITE_POOL)
+            )
+            for name in processes
+        }
+        return self.network_evolution(
+            site_seeds(pools), options=options, width=width, depth=depth
         )
 
     def _effective_hens(self, options):
