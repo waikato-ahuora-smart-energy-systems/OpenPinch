@@ -6,6 +6,7 @@ from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 from .._base.superstructure import create_match_binaries, create_utility_duty_grids
+from . import staged_utilities as _staged
 
 
 def set_stage_wise_superstructure(owner) -> None:
@@ -138,6 +139,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         for n in range(owner.N_periods)
     ]
 
+    _staged.create_staged_utility_grids(owner)
+
     owner.Q_r = owner.Q_r_by_period[0]
     owner.Q_c = owner.Q_c_by_period[0]
     owner.Q_h = owner.Q_h_by_period[0]
@@ -163,6 +166,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         ]
                     )
                     - sum(owner.Q_c_by_period[n][i])
+                    - _staged.staged_cooler_duty(owner, n, i)
                     == 0.0
                     for i in range(owner.I)
                 ]
@@ -178,13 +182,17 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         ]
                     )
                     - sum(owner.Q_h_by_period[n][j])
+                    - _staged.staged_heater_duty(owner, n, j)
                     == 0.0
                     for j in range(owner.J)
                 ]
             )
             owner.m.Equations(
                 [
-                    (owner.T_h_by_period[n][i][k + 1] - owner.T_h_by_period[n][i][k])
+                    (
+                        owner.T_h_mid_by_period[n][i][k + 1]
+                        - owner.T_h_by_period[n][i][k]
+                    )
                     * owner.f_h_period[n][i]
                     + sum(owner.Q_r_by_period[n][i][j][k] for j in range(owner.J))
                     == 0
@@ -195,7 +203,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             )
             owner.m.Equations(
                 [
-                    (owner.T_c_by_period[n][j][k + 1] - owner.T_c_by_period[n][j][k])
+                    (
+                        owner.T_c_by_period[n][j][k + 1]
+                        - owner.T_c_mid_by_period[n][j][k]
+                    )
                     * owner.f_c_period[n][j]
                     + sum(owner.Q_r_by_period[n][i][j][k] for i in range(owner.I))
                     == 0
@@ -250,6 +261,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     # them. The non-isothermal one also creates the branch variables.
     if not owner.values_only:
         _approach._set_multiperiod_utility_approach_equations(owner)
+        _staged.set_staged_utility_equations(owner)
 
     if owner.non_isothermal_model:
         _set_multiperiod_non_isothermal_equations(owner)
@@ -266,7 +278,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
             (
                 owner.m.Equation(
                     owner.theta_1_by_period[n][i][j][k]
-                    <= (owner.T_h_by_period[n][i][k] - owner.T_c_by_period[n][j][k])
+                    <= (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
@@ -280,7 +292,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
             (
                 owner.m.Equation(
                     owner.theta_1_by_period[n][i][j][k]
-                    >= (owner.T_h_by_period[n][i][k] - owner.T_c_by_period[n][j][k])
+                    >= (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     - owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
@@ -295,7 +307,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                 owner.m.Equation(
                     owner.theta_2_by_period[n][i][j][k]
                     <= (
-                        owner.T_h_by_period[n][i][k + 1]
+                        owner.T_h_mid_by_period[n][i][k + 1]
                         - owner.T_c_by_period[n][j][k + 1]
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
@@ -312,7 +324,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                 owner.m.Equation(
                     owner.theta_2_by_period[n][i][j][k]
                     >= (
-                        owner.T_h_by_period[n][i][k + 1]
+                        owner.T_h_mid_by_period[n][i][k + 1]
                         - owner.T_c_by_period[n][j][k + 1]
                     )
                     - owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])

@@ -45,8 +45,12 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         tol: float,
         solver_options: Mapping[str, Any] | Sequence[str] | None = None,
         values_only: bool = False,
+        staged_utilities: bool = False,
     ) -> None:
         self.stages = stages
+        # Offer a heater and a cooler at every interior stage boundary, in
+        # series between the stages (``_stagewise/staged_utilities.py``).
+        self.staged_utilities = staged_utilities
         # A values-only model has the variables and parameters of a full one
         # but no constraints or objective: it holds copied values, such as an
         # amalgamated pinch design network, and is never solved.

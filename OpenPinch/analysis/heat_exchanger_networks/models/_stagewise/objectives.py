@@ -5,6 +5,7 @@ from __future__ import annotations
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
+from . import staged_utilities as _staged
 
 # m^2 added to a shared area under its cost exponent: a unit with no duty has
 # zero area, where the cost's derivative is infinite and stops Ipopt. At
@@ -22,7 +23,7 @@ def set_obj(owner) -> None:
                 _approach._weighted_state_average(
                     owner,
                     [
-                        owner.m.sum(_utility_loads(owner.Q_h_by_period[n]))
+                        owner.m.sum(_side_loads(owner, "hot", n))
                         for n in range(owner.N_periods)
                     ],
                 )
@@ -32,7 +33,7 @@ def set_obj(owner) -> None:
                 _approach._weighted_state_average(
                     owner,
                     [
-                        owner.m.sum(_utility_loads(owner.Q_c_by_period[n]))
+                        owner.m.sum(_side_loads(owner, "cold", n))
                         for n in range(owner.N_periods)
                     ],
                 )
@@ -42,8 +43,8 @@ def set_obj(owner) -> None:
                 _approach._weighted_state_average(
                     owner,
                     [
-                        owner.m.sum(_utility_loads(owner.Q_h_by_period[n]))
-                        + owner.m.sum(_utility_loads(owner.Q_c_by_period[n]))
+                        owner.m.sum(_side_loads(owner, "hot", n))
+                        + owner.m.sum(_side_loads(owner, "cold", n))
                         for n in range(owner.N_periods)
                     ],
                 )
@@ -94,10 +95,7 @@ def set_obj(owner) -> None:
             owner.m.Minimize(
                 _approach._weighted_state_average(
                     owner,
-                    [
-                        sum(_utility_loads(owner.Q_h_by_period[n]))
-                        for n in range(owner.N_periods)
-                    ],
+                    [sum(_side_loads(owner, "hot", n)) for n in range(owner.N_periods)],
                 )
                 - owner.HU_target
             )
@@ -108,13 +106,13 @@ def set_obj(owner) -> None:
         return
 
     if owner.minimisation_goal == "hot utility":
-        owner.m.Minimize(owner.m.sum(_utility_loads(owner.Q_h)))
+        owner.m.Minimize(owner.m.sum(_side_loads(owner, "hot", 0)))
     elif owner.minimisation_goal == "cold utility":
-        owner.m.Minimize(owner.m.sum(_utility_loads(owner.Q_c)))
+        owner.m.Minimize(owner.m.sum(_side_loads(owner, "cold", 0)))
     elif owner.minimisation_goal == "total utility":
         owner.m.Minimize(
-            owner.m.sum(_utility_loads(owner.Q_h))
-            + owner.m.sum(_utility_loads(owner.Q_c))
+            owner.m.sum(_side_loads(owner, "hot", 0))
+            + owner.m.sum(_side_loads(owner, "cold", 0))
         )
     elif owner.minimisation_goal == "utility costs":
         hot_cost = _utilities_cost_expression(
@@ -136,7 +134,7 @@ def set_obj(owner) -> None:
             )
         )
     elif owner.minimisation_goal == "dQ/dA obj":
-        owner.m.Minimize(sum(_utility_loads(owner.Q_h)) - owner.HU_target)
+        owner.m.Minimize(sum(_side_loads(owner, "hot", 0)) - owner.HU_target)
     elif owner.minimisation_goal in {"total cost", "variable total cost"}:
         _set_total_cost_objective(owner)
     else:
@@ -148,11 +146,27 @@ def _utility_loads(grid) -> list:
     return [load for row in grid for load in row]
 
 
+def _side_loads(owner, side: str, n: int) -> list:
+    """Every heater (or cooler) duty in period n, stream-end and staged."""
+    grid = owner.Q_h_by_period[n] if side == "hot" else owner.Q_c_by_period[n]
+    count = owner.NHU if side == "hot" else owner.NCU
+    return _utility_loads(grid) + [
+        load
+        for u in range(count)
+        for load in _staged.staged_utility_loads(owner, side, n, u)
+    ]
+
+
 def _utility_totals(owner, side: str, n: int) -> list:
     """Return each utility's total duty over its heaters or coolers in period n."""
     grid = owner.Q_h_by_period[n] if side == "hot" else owner.Q_c_by_period[n]
     count = owner.NHU if side == "hot" else owner.NCU
-    return [owner.m.sum([row[u] for row in grid]) for u in range(count)]
+    return [
+        owner.m.sum(
+            [row[u] for row in grid] + _staged.staged_utility_loads(owner, side, n, u)
+        )
+        for u in range(count)
+    ]
 
 
 def _utilities_cost_expression(owner, side: str, n: int, totals):
@@ -218,6 +232,11 @@ def _raise_unsupported_goal(owner) -> None:
 
 
 def _set_total_cost_objective(owner) -> None:
+    if getattr(owner, "staged_utilities", False):
+        raise ValueError(
+            "staged utilities are priced for utility goals only; "
+            f"{owner.minimisation_goal!r} would cost their area as free."
+        )
     if getattr(owner, "N_periods", 1) == 1:
         _set_source_total_cost_objective(owner)
         return
