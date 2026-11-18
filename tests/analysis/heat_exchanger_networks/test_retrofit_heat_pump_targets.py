@@ -87,6 +87,22 @@ def test_the_as_piped_profiles_are_the_existing_coolers_and_heaters():
     assert np.all(H_hot[T_vals >= 442.77 - KELVIN - DT_CONT] == 0.0)
 
 
+def test_the_as_piped_profiles_keep_a_streams_contribution_multiplier():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
+        as_piped_profiles,
+    )
+
+    problem = _problem()
+    problem.set_dt_cont_multiplier(2.0)
+
+    T_vals, _H_hot, _H_cold = as_piped_profiles(problem, _solved_network())
+
+    # The heater's outlet raised and H1's cooler outlet, the coldest,
+    # lowered by twice the contribution.
+    assert T_vals[0] == pytest.approx(538.15 - KELVIN + 2.0 * DT_CONT)
+    assert T_vals[-1] == pytest.approx(350.15 - KELVIN - 2.0 * DT_CONT)
+
+
 def test_a_cooler_on_a_stream_the_problem_lacks_is_an_error():
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
         as_piped_profiles,

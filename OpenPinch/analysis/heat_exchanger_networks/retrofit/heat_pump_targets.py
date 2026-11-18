@@ -148,7 +148,8 @@ def as_piped_profiles(
 
     Each cooler is a hot segment and each heater a cold one, between the
     process stream's solved inlet and outlet temperatures (K) at the
-    exchanger's duty, shifted by that stream's temperature contribution.
+    exchanger's duty, shifted by that stream's temperature contribution
+    and its multiplier.
     The sources and sinks are cascaded apart, so none recovers heat from
     another.
     """
@@ -166,15 +167,17 @@ def as_piped_profiles(
         else:
             continue
         state = exchanger.period_states[0]
+        stream = _process_stream(process, name)
         segments.add(
             Stream(
                 str(exchanger.exchanger_id or name),
                 getattr(state, f"{side}_inlet_temperature") - _KELVIN,
                 getattr(state, f"{side}_outlet_temperature") - _KELVIN,
                 heat_flow=state.duty,
-                delta_t_contribution=_process_stream(
-                    process, name
-                ).delta_t_contribution,
+                delta_t_contribution=stream.delta_t_contribution,
+                delta_t_contribution_multiplier=(
+                    stream.delta_t_contribution_multiplier
+                ),
             )
         )
     every = sources + sinks
