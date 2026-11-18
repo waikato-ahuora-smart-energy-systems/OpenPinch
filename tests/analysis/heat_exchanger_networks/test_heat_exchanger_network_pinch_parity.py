@@ -14,6 +14,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.pinch_design_decompositio
 )
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.domain.configuration import tol
+from OpenPinch.domain.stream_collection import StreamCollection
 from tests.support.paths import FIXTURES_ROOT, REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -116,6 +117,8 @@ def test_decomposition_targets_preserve_original_effective_contributions(
             heat_recovery_target=1.0,
             hot_pinch=100.0,
             cold_pinch=90.0,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
         )
 
     monkeypatch.setattr(
