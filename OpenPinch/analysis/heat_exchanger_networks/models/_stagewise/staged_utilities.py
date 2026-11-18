@@ -505,3 +505,23 @@ def set_staged_initial_values(owner, source) -> None:
                         row[k],
                         owner._active_binary_value(source_grid[source_n][s][k]),
                     )
+
+
+def staged_units_on(owner) -> tuple:
+    """The staged units switched on, as ``(side, stream, utility, boundary)``.
+
+    Empty without staging.
+    """
+    if not getattr(owner, "staged_utilities", False):
+        return ()
+    return tuple(
+        (side, s, u, k)
+        for side, flags, allowed in (
+            ("hot", owner.z_hs, owner.z_hs_allowed),
+            ("cold", owner.z_cs, owner.z_cs_allowed),
+        )
+        for s, row in enumerate(allowed)
+        for u, by_k in enumerate(row)
+        for k in interior_boundaries(owner)
+        if by_k[k] and owner._active_binary_value(flags[s][u][k]) > 0.5
+    )

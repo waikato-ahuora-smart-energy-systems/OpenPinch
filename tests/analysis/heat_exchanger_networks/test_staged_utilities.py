@@ -15,6 +15,9 @@ from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
     extract_heat_exchanger_network,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import _value
+from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
+    evolution as stagewise_evolution,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
     StageWiseModel,
 )
@@ -431,3 +434,42 @@ def test_a_warm_start_from_an_unstaged_parent_switches_staged_units_off():
     child.optimise(False)
     assert child.mSuccess == 1
     assert _hot_utility_duties(child)["HPS"] == pytest.approx(40.0, rel=1e-4)
+
+
+@pytest.mark.skipif("not _ipopt_available()", reason="needs ipopt")
+def test_an_evolution_child_keeps_its_parents_staged_heater():
+    parent = _solved(_heating_problem(), staged_utilities=True)
+    (position,) = [
+        (i, j, k)
+        for i in range(parent.I)
+        for j in range(parent.J)
+        for k in range(parent.S)
+        if _value(parent.Q_r_by_period[0][i][j][k]) > 1e-6 and k == 0
+    ]
+
+    child = stagewise_evolution._build_and_solve_evolution(
+        parent,
+        "plus",
+        print_output=False,
+        unit=0,
+        prev_case=parent,
+        position=position,
+        z_allowed=parent.z_allowed,
+    )
+
+    assert child.mSuccess == 1
+    assert child.staged_utilities
+    assert _hot_utility_duties(child)["LPS"] == pytest.approx(40.0, rel=1e-4)
+
+
+def test_searches_share_solved_children_only_with_the_same_staged_units():
+    problem = _heating_problem()
+    staged = _solved(problem, staged_utilities=True)
+    also_staged = _solved(problem, staged_utilities=True)
+    unstaged = _solved(problem, staged_utilities=False)
+    store: dict = {}
+
+    shared = stagewise_evolution._shared_solved_topologies(staged, store)
+
+    assert stagewise_evolution._shared_solved_topologies(also_staged, store) is shared
+    assert stagewise_evolution._shared_solved_topologies(unstaged, store) is not shared

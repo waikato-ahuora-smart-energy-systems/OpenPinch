@@ -17,6 +17,7 @@ from ....parallelism import supported_workers
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base.execution import _assign_value
+from . import staged_utilities as _staged
 from .postprocess import _solve_ranking_alpha
 from .verification import _value
 
@@ -296,6 +297,10 @@ def _shared_solved_topologies(owner, store: dict | None) -> dict | None:
         owner.solver,
         repr(owner.solver_options),
         hashlib.sha256(arrays).hexdigest(),
+        # Children inherit the search root's staged heaters and coolers (a
+        # warm start fixes their binaries), so searches share children only
+        # when those agree.
+        _staged.staged_units_on(owner),
     )
     return store.setdefault(key, {})
 
@@ -756,6 +761,7 @@ def _build_and_solve_evolution(
         integers=False,
         tol=1e-3,
         solver_options=owner.solver_options,
+        staged_utilities=getattr(prev_case, "staged_utilities", False),
     )
 
     # Start from the parent's solution, then apply the move over it.
