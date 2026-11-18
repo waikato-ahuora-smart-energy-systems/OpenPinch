@@ -322,3 +322,115 @@ def test_a_side_offers_staged_heaters_above_the_pinch_and_coolers_below():
 
     assert offered(above.z_hs_allowed) and not offered(above.z_cs_allowed)
     assert offered(below.z_cs_allowed) and not offered(below.z_hs_allowed)
+
+
+def test_a_side_that_cannot_hold_its_levels_falls_back_with_a_warning(caplog):
+    problem = _problem(HEATING)
+    decompositions = {
+        location: decomposition_module.build_pinch_design_decomposition(
+            problem, D_TMIN, pinch_location=location
+        )
+        for location in ("above", "below")
+    }
+    # Levels the above side cannot meet: none of its 40 kW on any level.
+    above = decompositions["above"]
+    decompositions["above"] = above.model_copy(
+        update={
+            "period_targets": tuple(
+                target.model_copy(
+                    update={
+                        "hot_utility_level_targets": tuple(
+                            0.0 for _ in target.hot_utility_level_targets
+                        )
+                    }
+                )
+                for target in above.period_targets
+            )
+        }
+    )
+    pdm = InternalHeatExchangerNetworkProblem(
+        solver_arrays=problem_to_solver_arrays(problem, D_TMIN),
+        name="staged-pdm",
+        framework="PDM",
+        solver="highs",
+        dTmin=D_TMIN,
+        minimisation_goal="total utility",
+        pinch_decompositions=decompositions,
+        staged_utilities=True,
+    )
+
+    with caplog.at_level("WARNING"):
+        case = pdm.get_solution(print_output=False)
+
+    assert case is not None, getattr(pdm, "solution_failure_reason", None)
+    assert "cannot hold its utility levels" in caplog.text
+    network = pdm.extract_network(run_id="staged-pdm")
+    duties = _network_duties(network)
+    assert duties.get("LPS", 0.0) + duties.get("HPS", 0.0) == pytest.approx(
+        40.0, rel=1e-6
+    )
+    assert verify_network_feasibility(network) == ()
+
+
+def test_a_stream_absent_from_a_side_has_no_staged_units_there():
+    # H1 (220 to 150 C) lies wholly above the pinch.
+    below = _side(_problem(HEATING), "below", staged_utilities=True)
+
+    (h1,) = [i for i in range(below.I) if not below.z_i_active[i]]
+    assert not any(flag for by_k in below.z_cs_allowed[h1] for flag in by_k)
+
+
+def test_an_amalgamated_mid_temperature_without_a_staged_unit_is_the_boundarys():
+    problem = _problem(HEATING)
+    pdm = InternalHeatExchangerNetworkProblem(
+        solver_arrays=problem_to_solver_arrays(problem, D_TMIN),
+        name="staged-pdm",
+        framework="PDM",
+        solver="highs",
+        dTmin=D_TMIN,
+        minimisation_goal="total utility",
+        pinch_decompositions={
+            location: decomposition_module.build_pinch_design_decomposition(
+                problem, D_TMIN, pinch_location=location
+            )
+            for location in ("above", "below")
+        },
+        staged_utilities=True,
+    )
+    case = pdm.get_solution(print_output=False)
+
+    on = stagewise_staged.staged_units_on(case)
+    for side, mids, boundaries in (
+        ("hot", case.T_c_mid_by_period, case.T_c_by_period),
+        ("cold", case.T_h_mid_by_period, case.T_h_by_period),
+    ):
+        for s, row in enumerate(mids[0]):
+            for k in range(1, case.S):
+                if any(
+                    unit[0] == side and unit[1] == s and unit[3] == k for unit in on
+                ):
+                    continue
+                assert _value(row[k]) == pytest.approx(
+                    _value(boundaries[0][s][k]), abs=1e-9
+                )
+
+
+def test_the_workflow_holds_levels_only_with_more_than_one_utility_on_a_side():
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    levels = decomposition_module.build_pinch_design_decomposition(
+        _problem(HEATING), D_TMIN, pinch_location="above"
+    )
+    single = decomposition_module.build_pinch_design_decomposition(
+        _problem(
+            [
+                _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+                _utility("CW", "Cold", 20.0, 25.0, 5.0),
+            ]
+        ),
+        D_TMIN,
+        pinch_location="above",
+    )
+
+    assert executor._has_utility_levels(levels)
+    assert not executor._has_utility_levels(single)

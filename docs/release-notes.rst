@@ -28,6 +28,23 @@ Heat exchanger network synthesis
   first, so a stream spanning several levels gets utility exchangers in
   series. The network is built without a solver and serves every period;
   overdesign is not available for it.
+- With more than one hot or cold utility, the pinch design method (MILP and
+  heuristic) now holds each utility level at the duty targeting gives it,
+  rather than choosing levels by price. To place a level where it serves,
+  the stage-wise model can put a heater or cooler between stages, in series
+  between them; such units are reported as
+  ``hot-utility:<utility>-><stream>:S<stage>`` (or
+  ``cold-utility:...:S<stage>``), with ``stage`` the stage the stream has
+  just left, and the grid view draws them on that stage boundary. A side
+  that cannot hold its levels (for example hot water, whose fixed outlet
+  can face a stream entering above it) is solved as before, choosing levels
+  by price, with a warning. The heuristic method's proposals often cannot
+  hold the levels and then fall back the same way. Networks are still
+  ranked by total annual cost, and the later stages (temperature-driven
+  method, network evolution) do not yet hold the levels, so the selected
+  network may still differ from the targeted levels. A network with
+  staged units keeps its stages: stage reduction does not yet relocate
+  them.
 
 0.9.3 (2026-11-18)
 ------------------

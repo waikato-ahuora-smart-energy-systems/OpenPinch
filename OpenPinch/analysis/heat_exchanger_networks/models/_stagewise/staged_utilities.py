@@ -196,27 +196,35 @@ def _allowed(owner, side: str) -> list:
 
 
 def _reachable(owner, side: str, s: int, u: int) -> bool:
+    """Whether utility ``u`` can serve stream ``s`` in every period it runs.
+
+    A stream that runs in no period (one absent from a pinch side) has no
+    staged unit. Segmentation is read from the solver arrays: the model's
+    own flags are set after the staged grids.
+    """
+    stream_side = "cold" if side == "hot" else "hot"
+    if _piecewise._solver_parent_is_segmented(
+        owner, stream_side, s
+    ) or _piecewise._utility_is_segmented(owner, side, u):
+        return False
+    periods = [
+        n
+        for n in range(owner.N_periods)
+        if _approach._stream_active(owner, stream_side, n, s)
+    ]
+    if not periods:
+        return False
     if side == "hot":
-        if _piecewise._cold_parent_segmented(
-            owner, s
-        ) or _piecewise._utility_is_segmented(owner, "hot", u):
-            return False
         return all(
             owner.T_hu_in_period[n][u] - owner.T_c_in_period[n][s]
             > _approach._hot_utility_inlet_approach_temperature(owner, s, u, n)
             + owner.tol
-            for n in range(owner.N_periods)
-            if _approach._stream_active(owner, "cold", n, s)
+            for n in periods
         )
-    if _piecewise._hot_parent_segmented(owner, s) or _piecewise._utility_is_segmented(
-        owner, "cold", u
-    ):
-        return False
     return all(
         owner.T_h_in_period[n][s] - owner.T_cu_in_period[n][u]
         > _approach._cold_utility_inlet_approach_temperature(owner, s, u, n) + owner.tol
-        for n in range(owner.N_periods)
-        if _approach._stream_active(owner, "hot", n, s)
+        for n in periods
     )
 
 

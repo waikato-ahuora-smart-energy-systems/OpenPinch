@@ -311,9 +311,11 @@ class InternalHeatExchangerNetworkProblem:
 
         if self.above.side_required:
             self.above.optimise(print_output=print_output)
+            self.above = self._side_without_levels_if_failed("above", self.above)
             self.above = self._fewest_units_side("above", self.above)
         if self.below.side_required:
             self.below.optimise(print_output=print_output)
+            self.below = self._side_without_levels_if_failed("below", self.below)
             self.below = self._fewest_units_side("below", self.below)
         self.case = self.above.amalgamate_networks(
             below_case=self.below,
@@ -330,6 +332,60 @@ class InternalHeatExchangerNetworkProblem:
                 "tol": self.tol,
             }
         )
+
+    def _side_args(self, name: str) -> dict[str, Any]:
+        """Model arguments for a side, without staging if it fell back."""
+        args = dict(self.args)
+        if name in getattr(self, "_sides_without_levels", ()):
+            args.pop("staged_utilities", None)
+        return args
+
+    def _drop_levels(self, name: str) -> None:
+        self._sides_without_levels = {
+            *getattr(self, "_sides_without_levels", ()),
+            name,
+        }
+
+    def _side_without_levels_if_failed(self, name: str, side):
+        """Re-solve a side that cannot hold its utility levels without them.
+
+        Targeting splits utility between levels over the composite curves;
+        one exchanger may not be able to use a level there (a utility with a
+        fixed outlet, such as hot water, facing a stream that enters above
+        it). The side is then solved as before staging, with levels chosen
+        by price, and later sides for it (fewest units, variants) follow.
+        """
+
+        if side.mSuccess == 1 or not getattr(side, "staged_utilities", False):
+            return side
+        logger.warning(
+            "[%s] The %s pinch side cannot hold its utility levels at their "
+            "targets; it is solved without them, choosing levels by price.",
+            self.name,
+            name,
+        )
+        self._drop_levels(name)
+        factory = self._model_factory(
+            getattr(self, "_model_factories", None),
+            "pinch_design_method",
+            default="PinchDecompModel",
+        )
+        retry = factory(
+            **(
+                self._side_args(name)
+                | {
+                    "name": f"{side.name} without levels",
+                    "pinch_loc": name,
+                    "minimisation_goal": side.minimisation_goal,
+                    "pinch_decomposition": self.pinch_decompositions[name],
+                    "stage_selection": self.stage_selection,
+                    "solver_options": side.solver_options,
+                }
+            )
+        )
+        retry.optimise(print_output=False)
+        _cleanup_model(side)
+        return retry
 
     def _fewest_units_side(self, name: str, side):
         """Re-solve a side for the fewest units among the matches it used.
@@ -351,7 +407,7 @@ class InternalHeatExchangerNetworkProblem:
         )
         sparse = factory(
             **(
-                dict(self.args)
+                self._side_args(name)
                 | {
                     "name": f"{name} pinch {self.dTmin} fewest units",
                     "pinch_loc": name,
@@ -506,7 +562,7 @@ class InternalHeatExchangerNetworkProblem:
         def solve(floor: int | None):
             side = factory(
                 **(
-                    dict(self.args)
+                    self._side_args(name)
                     | {
                         "name": f"{name} pinch {self.dTmin} min units {len(found)}",
                         "pinch_loc": name,
@@ -604,24 +660,17 @@ class InternalHeatExchangerNetworkProblem:
                 sides[name] = [template]
                 continue
             proposals = propose_side_topologies(pinch_side(template), limit=limit)
-            realised = []
-            first_by_topology: dict[tuple, Any] = {}
-            for rank, proposal in enumerate(proposals):
-                side = self._realise_side(name, proposal, rank)
-                if side is None:
-                    continue
-                # Proposals often realise the same side network, and every
-                # pairing of a repeat would amalgamate into a repeated
-                # network: pair the first. A repeat may differ in duties, so
-                # it stands in only where the first's pairing fails.
-                topology = _side_topology(side)
-                if topology in first_by_topology:
-                    alternates[id(first_by_topology[topology])].append(side)
-                    report["repeated_sides"][name] += 1
-                    continue
-                first_by_topology[topology] = side
-                alternates[id(side)] = []
-                realised.append(side)
+            realised = self._realise_proposals(name, proposals, alternates, report)
+            if not realised and self._side_args(name).get("staged_utilities"):
+                logger.warning(
+                    "[%s] No %s pinch side proposal holds the utility levels "
+                    "at their targets; they are realised without them, "
+                    "choosing levels by price.",
+                    self.name,
+                    name,
+                )
+                self._drop_levels(name)
+                realised = self._realise_proposals(name, proposals, alternates, report)
             report["proposed"][name] = len(proposals)
             report["realised"][name] = len(realised)
             sides[name] = realised
@@ -667,6 +716,29 @@ class InternalHeatExchangerNetworkProblem:
         self.above, self.below, self.case = first.above, first.below, first.case
         self.pdm_variants = rest
 
+    def _realise_proposals(self, name: str, proposals, alternates, report) -> list:
+        """Realise a side's proposals, keeping the first of each repeat."""
+
+        realised = []
+        first_by_topology: dict[tuple, Any] = {}
+        for rank, proposal in enumerate(proposals):
+            side = self._realise_side(name, proposal, rank)
+            if side is None:
+                continue
+            # Proposals often realise the same side network, and every
+            # pairing of a repeat would amalgamate into a repeated network:
+            # pair the first. A repeat may differ in duties, so it stands in
+            # only where the first's pairing fails.
+            topology = _side_topology(side)
+            if topology in first_by_topology:
+                alternates[id(first_by_topology[topology])].append(side)
+                report["repeated_sides"][name] += 1
+                continue
+            first_by_topology[topology] = side
+            alternates[id(side)] = []
+            realised.append(side)
+        return realised
+
     def _verified_heuristic_variant(self, above, below, alternates):
         """Amalgamate a side pair, or failing that a pair of their repeats.
 
@@ -689,6 +761,14 @@ class InternalHeatExchangerNetworkProblem:
 
         template = getattr(self, name)
         stages = proposal.stages
+        restriction = proposal.z_restriction(
+            hot_count=template.I,
+            cold_count=template.J,
+            hot_utilities=template.NHU,
+            cold_utilities=template.NCU,
+        )
+        if self._side_args(name).get("staged_utilities"):
+            stages, restriction = _with_pinch_end_stage(name, stages, restriction)
         factory = self._model_factory(
             getattr(self, "_model_factories", None),
             "pinch_design_method",
@@ -697,7 +777,7 @@ class InternalHeatExchangerNetworkProblem:
         try:
             side = factory(
                 **(
-                    dict(self.args)
+                    self._side_args(name)
                     | {
                         "name": f"{name} pinch {self.dTmin} heuristic {rank}",
                         "pinch_loc": name,
@@ -719,12 +799,7 @@ class InternalHeatExchangerNetworkProblem:
                             self.args.get("solver_options"),
                             seconds=backend.HEURISTIC_SIDE_TIME_LIMIT,
                         ),
-                        "z_restriction": proposal.z_restriction(
-                            hot_count=template.I,
-                            cold_count=template.J,
-                            hot_utilities=template.NHU,
-                            cold_utilities=template.NCU,
-                        ),
+                        "z_restriction": restriction,
                     }
                 )
             )
@@ -1016,6 +1091,25 @@ def _start_from_side(sparse, side) -> None:
     sparse.m.warm_start = True
 
 
+def _with_pinch_end_stage(name: str, stages: int, restriction: list):
+    """A side proposal with one more, empty, stage at its pinch end.
+
+    A staged heater (or cooler) there serves the level nearest the pinch.
+    Cold streams enter the above side at the pinch, after its last stage;
+    hot streams enter the below side at the pinch, before its first.
+    """
+    recovery, heaters, coolers = restriction
+    empty = [0]
+    recovery = [
+        [
+            (list(by_k) + empty) if name == "above" else (empty + list(by_k))
+            for by_k in row
+        ]
+        for row in recovery
+    ]
+    return stages + 1, [recovery, heaters, coolers]
+
+
 def _with_time_limit(
     solver: str, options, *, seconds: float = backend.FEWEST_UNITS_TIME_LIMIT
 ) -> Any:
@@ -1089,6 +1183,7 @@ def _side_topology(side) -> tuple:
         tuple(map(tuple, heaters)),
         tuple(map(tuple, coolers)),
         len(used) < side.S,
+        _staged.staged_units_on(side),
     )
 
 

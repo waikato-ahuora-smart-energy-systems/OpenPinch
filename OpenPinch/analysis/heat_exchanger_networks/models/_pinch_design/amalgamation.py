@@ -41,7 +41,10 @@ def amalgamate_networks(
         # The amalgamated network holds the sides' solved values and is read,
         # never solved: no constraints or objective are built.
         values_only=True,
-        staged_utilities=bool(getattr(owner, "staged_utilities", False)),
+        staged_utilities=bool(
+            getattr(above_case, "staged_utilities", False)
+            or getattr(below_case, "staged_utilities", False)
+        ),
     )
     if (above_required and above_case.mSuccess == 0) or (
         below_required and below_case.mSuccess == 0
@@ -145,6 +148,7 @@ def amalgamate_networks(
         amalgamated.S = above_case.S + below_case.S
 
     amalgamated.K = amalgamated.S + 1
+    _settle_unused_mid_temperatures(amalgamated)
     amalgamated.z_allowed = [
         [
             [
@@ -297,3 +301,39 @@ def _copy_staged_units(target: StageWiseModel, source, *, offset: int) -> None:
                         _assign_value(
                             mids[n][s][offset + k], [_value(mid_source[n][s][k])]
                         )
+
+
+def _settle_unused_mid_temperatures(target: StageWiseModel) -> None:
+    """Set each mid temperature with no staged unit on to its boundary's.
+
+    No side writes the pinch boundary's mid temperature, and a side's
+    unused staged units leave theirs at the initial value, so the stage
+    outlet is otherwise wrong where the stream passes no staged unit.
+    """
+    if not getattr(target, "staged_utilities", False):
+        return
+    for flags, allowed, mids, boundaries in (
+        (
+            target.z_hs,
+            target.z_hs_allowed,
+            target.T_c_mid_by_period,
+            target.T_c_by_period,
+        ),
+        (
+            target.z_cs,
+            target.z_cs_allowed,
+            target.T_h_mid_by_period,
+            target.T_h_by_period,
+        ),
+    ):
+        for s, row in enumerate(allowed):
+            for k in range(1, target.S):
+                if any(
+                    by_k[k] and _value(flags[s][u][k]) > 0.5
+                    for u, by_k in enumerate(row)
+                ):
+                    continue
+                for n in range(target.N_periods):
+                    if mids[n][s][k] is boundaries[n][s][k]:
+                        continue
+                    _assign_value(mids[n][s][k], [_value(boundaries[n][s][k])])
