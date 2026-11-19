@@ -68,6 +68,12 @@ Heat exchanger network synthesis
   when no move improves, down to ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K);
   ``HENS_SITE_LEVEL_STEP: 0`` turns the moves off. Every move tried is
   listed in the result's provenance (``HENS_SITE_LEVEL_MOVES``).
+- A total site seed no longer takes a process network designed at a
+  smaller dt_cont multiplier than its own: such a network can need more
+  recovery than the seed's approach allows. Each process gives its nearest
+  network at or above the seed's multiplier, and there is no seed at a
+  multiplier some process has nothing at or above. A process zone whose
+  pinch design found no network is named in the error.
 - A placed site level is one main: its hot and cold utility share one name
   (``iso_1`` rather than ``hot_iso_1`` and ``cold_iso_1``), so site utility
   accounting credits steam raised on a placed level against its use.
