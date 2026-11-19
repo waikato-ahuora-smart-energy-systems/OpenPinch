@@ -28,6 +28,11 @@ Heat exchanger network synthesis
   stage outlet and understated its area (by 30% in one two-branch case);
   the same profile skewed the dQ/dA rankings of the thermal derivative
   method and evolution, and the extracted area slices.
+- A multiperiod pinch design (MILP or heuristic, design basis ``"all"``)
+  no longer fails when a stream has no flow in one period. Its matches
+  carry no duty in that period; before, joining the two sides of the pinch
+  raised "Cannot set a disallowed match's constant" and no network was
+  designed.
 - ``design.retrofit`` no longer defaults ``min_approach_temperature`` to
   1 K, which let new matches recover heat the design rules out and
   overstated savings. Without it each exchanger keeps the sum of its two
