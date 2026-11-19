@@ -604,7 +604,7 @@ class _DesignAccessor:
         counts in a row cost more than the cheapest before them.
         """
         from ....domain.configuration_fields import _site_level_counts
-        from ... import site_levels
+        from ...site_levels import level_sweep_view, run_level_counts
 
         processes = self._process_zones()
         if len(processes) < 2:
@@ -623,7 +623,7 @@ class _DesignAccessor:
             if level_counts is None
             else _site_level_counts("level_counts", level_counts)
         )
-        runs = site_levels.run_level_counts(
+        runs = run_level_counts(
             self._problem,
             counts,
             design=lambda case: case.design._site_design(
@@ -632,7 +632,7 @@ class _DesignAccessor:
             early_stop=hens.site_level_early_stop,
             placement=placement,
         )
-        return site_levels.level_sweep_view(
+        return level_sweep_view(
             self._problem,
             runs,
             settings={
