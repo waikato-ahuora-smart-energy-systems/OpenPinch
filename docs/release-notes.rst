@@ -7,6 +7,9 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The median design basis (the default for multiperiod designs) works when
+  streams are given by heat capacity flowrate rather than heat flow. Before,
+  it read no heat flow, found no operating period and raised.
 - A multiperiod network from duty optimisation (``optimise_duties``, a fit
   to every period, overdesign rating) now records each period's stream
   temperatures, duties and heat transfer coefficients, so verification
