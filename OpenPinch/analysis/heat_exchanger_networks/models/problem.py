@@ -31,6 +31,7 @@ from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
 from ._stagewise import staged_utilities as _staged
 from ._stagewise.level_targets import site_level_targets
+from ._stagewise.site_utilities import SiteUtilities, site_balance, with_site_cost
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -102,6 +103,10 @@ class InternalHeatExchangerNetworkProblem:
     # process's levels and matches streams only within a process
     # (``_stagewise/level_targets.py:site_level_targets``).
     site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
+    # A site task's utility levels (``../site/levels.py``): its stage-wise
+    # model carries the site utility balance, so the site pays only for
+    # its net utility use (``_stagewise/site_utilities.py``).
+    site_utility_system: Any = None
 
     def load_model(
         self,
@@ -137,6 +142,11 @@ class InternalHeatExchangerNetworkProblem:
             )
             self.args["level_targets"] = targets
             self.args["stream_groups"] = groups
+        if self.site_utility_system is not None and self.framework != "PDM":
+            self.args["site_utilities"] = SiteUtilities(
+                self.site_utility_system.levels,
+                *self.site_utility_system.members(self.solver_arrays),
+            )
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)
             return
@@ -311,6 +321,9 @@ class InternalHeatExchangerNetworkProblem:
                 candidate, "stages", getattr(candidate, "S", self.stages)
             ),
         )
+        balance = site_balance(candidate)
+        if balance is not None:
+            network = with_site_cost(network, balance)
         if self.utility_level_targets is None:
             return network
         return network.model_copy(

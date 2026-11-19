@@ -304,6 +304,7 @@ def _shared_solved_topologies(owner, store: dict | None) -> dict | None:
         # Children inherit the level holds and the stream groups too.
         getattr(owner, "level_targets", ()),
         getattr(owner, "stream_groups", None),
+        getattr(owner, "site_utilities", None),
     )
     return store.setdefault(key, {})
 
@@ -767,6 +768,7 @@ def _build_and_solve_evolution(
         staged_utilities=getattr(prev_case, "staged_utilities", False),
         level_targets=getattr(prev_case, "level_targets", ()),
         stream_groups=getattr(prev_case, "stream_groups", None),
+        site_utilities=getattr(prev_case, "site_utilities", None),
     )
 
     # Start from the parent's solution, then apply the move over it.

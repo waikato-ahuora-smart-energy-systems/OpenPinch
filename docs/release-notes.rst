@@ -19,6 +19,27 @@ Heat exchanger network synthesis
   with more than one process zone now emits a ``UserWarning`` that it pools
   every process's streams (any inter-process match, no piping cost) and
   names the site method.
+- ``design.total_site_heat_exchanger_network`` pays only for the site's net
+  utility use. The network evolution model of a site carries the site
+  utility balance: per period each utility level (a boiler, a steam main or
+  hot water circuit, cooling water) closes with imports, letdown from a
+  hotter level and dumps, and the model costs those instead of pricing each
+  heater and cooler. Steam a process raises on a main that another process
+  uses is no longer charged as a cooler. A ``Both`` utility is one main; a
+  hot and a cold utility that only share a name stay apart; letdown follows
+  each period's temperatures; and a hot utility's ``maximum_heat_flow`` caps
+  what the site buys into its level. Each site network carries
+  ``site_capital_cost``, ``site_operating_cost`` and
+  ``site_total_annual_cost`` in its summary metrics and the balance in
+  ``source_metadata["site_utility_balance"]``; the record and the result
+  rank site networks by site total annual cost.
+- ``design.total_site_heat_exchanger_network`` designs each process twice,
+  with its utility levels chosen by price and held at their targets, and
+  seeds network evolution from both: at each dt_cont multiplier a
+  lowest-cost and a level-held site seed, each taking every process's
+  fewest-unit network (then the lowest total annual cost). The site design
+  may now select a network whose levels follow price where that is cheaper
+  for the site; the level-held networks stay among the ranked results.
 - ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
   each process is designed over every period at once, so each level carries
   its targeted duty in every period, and network evolution holds those

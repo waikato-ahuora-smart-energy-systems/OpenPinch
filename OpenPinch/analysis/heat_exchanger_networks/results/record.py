@@ -18,7 +18,12 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTaskOutcome
-from ..reporting.ranking import holds_utility_levels, network_structure_signature
+from ..reporting.ranking import (
+    SITE_TOTAL_ANNUAL_COST,
+    holds_utility_levels,
+    network_structure_signature,
+    ranking_cost,
+)
 from ..reporting.verification import _count_active
 
 
@@ -111,10 +116,11 @@ class HeatExchangerNetworkRecord:
     def _insert(self, outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
         signature = network_structure_signature(outcome.network)
         key = hashlib.sha1(repr(signature).encode()).hexdigest()[:16]
-        # Networks that hold their utility levels first, then cheapest.
+        # Networks that hold their utility levels first, then cheapest (by
+        # site total annual cost for a site network).
         sort_key = (
             not holds_utility_levels(outcome.network),
-            float(outcome.network.total_annual_cost),
+            float(ranking_cost(outcome.network, outcome.network.total_annual_cost)),
             outcome.task.task_id or "",
             key,
         )
@@ -141,7 +147,11 @@ def _entry_json(key: str, outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> 
         "holds_utility_levels": holds_utility_levels(network),
         "unit_count": _count_active(network.exchangers, None),
         "network": network.model_dump(mode="json"),
-    }
+    } | (
+        {SITE_TOTAL_ANNUAL_COST: ranking_cost(network, None)}
+        if ranking_cost(network, None) is not None
+        else {}
+    )
 
 
 Finalise = Callable[

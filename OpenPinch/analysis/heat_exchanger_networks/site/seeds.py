@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from ...domain.enums import HeatExchangerKind
-from ...domain.heat_exchanger_network import HeatExchangerNetwork
-from .reporting.ranking import holds_utility_levels
+from ....domain.enums import HeatExchangerKind
+from ....domain.heat_exchanger_network import HeatExchangerNetwork
+from ..reporting.ranking import holds_utility_levels
 
 
 def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]]:
@@ -48,21 +48,62 @@ def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]
 
 def site_seeds(
     pools: Mapping[str, Sequence[HeatExchangerNetwork]],
+    *,
+    level_held: Mapping[str, Sequence[HeatExchangerNetwork]] | None = None,
 ) -> tuple[HeatExchangerNetwork, ...]:
-    """One seed per dt_cont multiplier, in ascending order.
+    """Seeds per dt_cont multiplier, in ascending order of multiplier.
 
-    ``pools`` maps each process (its stream-key prefix) to its networks,
-    best first. A seed takes each process's best network at the multiplier,
-    or at the nearest one the process has.
+    ``pools`` maps each process (its stream-key prefix) to the networks of
+    its pinch design with levels chosen by price; ``level_held`` to those of
+    its pinch design holding its utility level targets. At each multiplier
+    (or the nearest one a process has) a ``"lowest_cost"`` seed takes each
+    process's network with the fewest units, then the lowest total annual
+    cost, from ``pools``; a ``"level_held"`` seed takes the same from the
+    networks of ``level_held`` that hold their targets, and a process
+    without one there takes its lowest-cost network. ``summary_metrics``
+    record the kind as ``"site_seed"``; a seed equal to another is dropped.
     """
 
+    level_held = level_held or {}
+    held = {
+        process: tuple(network for network in pool if _holds_targets(network))
+        for process, pool in level_held.items()
+    }
     multipliers = sorted(
-        {_multiplier(network) for pool in pools.values() for network in pool}
+        {
+            _multiplier(network)
+            for family in (pools, held)
+            for pool in family.values()
+            for network in pool
+        }
     )
-    seeds = tuple(
-        _seed({process: _nearest(pool, m) for process, pool in pools.items()}, m)
-        for m in multipliers
-    )
+    seeds: list[HeatExchangerNetwork] = []
+    seen: set[tuple] = set()
+    for m in multipliers:
+        cheapest = {process: _fewest_units(pool, m) for process, pool in pools.items()}
+        kinds = [("lowest_cost", cheapest)]
+        if any(held.values()):
+            kinds.insert(
+                0,
+                (
+                    "level_held",
+                    {
+                        process: _fewest_units(held[process], m)
+                        if held.get(process)
+                        else network
+                        for process, network in cheapest.items()
+                    },
+                ),
+            )
+        for kind, networks in kinds:
+            seed = _seed(networks, m, kind)
+            key = (
+                tuple(sorted(e.exchanger_id for e in seed.exchangers)),
+                repr(seed.source_metadata["site_processes"]),
+            )
+            if key not in seen:
+                seen.add(key)
+                seeds.append(seed)
     if not any(_recovery(seed) for seed in seeds):
         raise ValueError(
             "no process network recovers heat, so there is no site network to "
@@ -71,8 +112,39 @@ def site_seeds(
     return tuple(seed for seed in seeds if _recovery(seed))
 
 
+def _holds_targets(network: HeatExchangerNetwork) -> bool:
+    targets = (network.source_metadata or {}).get("utility_level_targets")
+    return bool(targets) and holds_utility_levels(network)
+
+
+def _fewest_units(
+    pool: Sequence[HeatExchangerNetwork], m: float
+) -> HeatExchangerNetwork:
+    """At the multiplier nearest ``m``: the network with the fewest units,
+    then the lowest total annual cost (the first on a tie)."""
+    distance = min(abs(_multiplier(network) - m) for network in pool)
+    nearest = [network for network in pool if abs(_multiplier(network) - m) == distance]
+    return min(nearest, key=lambda network: (_units(network), _cost(network)))
+
+
+def _units(network: HeatExchangerNetwork) -> int:
+    units = (network.summary_metrics or {}).get("total_units")
+    if isinstance(units, int | float) and not isinstance(units, bool):
+        return int(units)
+    return sum(
+        1
+        for exchanger in network.exchangers
+        if any(state.active for state in exchanger.period_states)
+    )
+
+
+def _cost(network: HeatExchangerNetwork) -> float:
+    tac = network.total_annual_cost
+    return float("inf") if tac is None else float(tac)
+
+
 def _seed(
-    networks: Mapping[str, HeatExchangerNetwork], m: float
+    networks: Mapping[str, HeatExchangerNetwork], m: float, kind: str
 ) -> HeatExchangerNetwork:
     recovery = [
         exchanger for network in networks.values() for exchanger in _recovery(network)
@@ -88,7 +160,7 @@ def _seed(
         run_id="site-seed",
         method="site_pinch_design",
         stage_count=max(stages, default=None) or None,
-        summary_metrics={"dt_cont_multiplier": m},
+        summary_metrics={"dt_cont_multiplier": m, "site_seed": kind},
         source_metadata={
             "site_processes": {
                 process: process_level_duties(network)
@@ -114,14 +186,6 @@ def _multiplier(network: HeatExchangerNetwork) -> float:
         if isinstance(value, int | float):
             return float(value)
     return 1.0
-
-
-def _nearest(pool: Sequence[HeatExchangerNetwork], m: float) -> HeatExchangerNetwork:
-    """The first (best) network at the multiplier nearest ``m``."""
-    distance = min(abs(_multiplier(network) - m) for network in pool)
-    return next(
-        network for network in pool if abs(_multiplier(network) - m) == distance
-    )
 
 
 __all__ = ["process_level_duties", "site_seeds"]

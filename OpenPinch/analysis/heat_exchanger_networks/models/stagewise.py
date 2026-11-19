@@ -11,9 +11,11 @@ from ._stagewise import evolution as _evolution
 from ._stagewise import objectives as _objectives
 from ._stagewise import postprocess as _postprocess
 from ._stagewise import setup as _setup
+from ._stagewise import site_utilities as _site
 from ._stagewise import verification as _verification
 from ._stagewise import warm_start as _warm_start
 from ._stagewise.level_targets import UtilityLevelTarget
+from ._stagewise.site_utilities import SiteUtilities
 from .base import BaseHeatExchangerNetworkModel
 
 
@@ -49,8 +51,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         staged_utilities: bool = False,
         level_targets: Sequence[UtilityLevelTarget] = (),
         stream_groups: tuple[Sequence[str], Sequence[str]] | None = None,
+        site_utilities: SiteUtilities | None = None,
     ) -> None:
         self.stages = stages
+        # A site network's levels: the model closes each level per period
+        # and costs the site's imports, letdowns and dumps instead of each
+        # heater and cooler (``_stagewise/site_utilities.py``).
+        self.site_utilities = site_utilities
         # Each level held at a duty over a group of streams, as a site
         # network holds each process's levels (``_stagewise/level_targets.py``).
         self.level_targets = tuple(level_targets)
@@ -212,6 +219,18 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Return inactive feasible exchangers sorted by descending alpha-dQ/dA."""
 
         return _postprocess.get_max_benefit_HX_candidates(self, limit)
+
+    def _utilities_cost_value(
+        self,
+        side: str,
+        period_index: int,
+        duties_by_utility,
+    ) -> float:
+        "The solved site cost of a side when the model carries the balance."
+        value = _site.site_cost_value(self, side, period_index)
+        if value is not None:
+            return value
+        return super()._utilities_cost_value(side, period_index, duties_by_utility)
 
     def verify(self) -> tuple[bool, list[str]]:
         """Run the source solution checks used by topology evolution."""
