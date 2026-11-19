@@ -34,6 +34,17 @@ Heat exchanger network synthesis
   load from one level to another by price (LPS to HPS), and still reported
   the levels as held. When a period's targets cannot be met exactly (as for
   a design on the median period), the fit warns and releases the levels.
+- A stage-wise network whose matches split a segmented stream in one stage
+  sizes each match on its branch's share of the flow. Before, each branch
+  was sized on the whole stream's profile, which ended it short of the
+  stage outlet and understated its area (by 30% in one two-branch case);
+  the same profile skewed the dQ/dA rankings of the thermal derivative
+  method and evolution, and the extracted area slices.
+- A multiperiod pinch design (MILP or heuristic, design basis ``"all"``)
+  no longer fails when a stream has no flow in one period. Its matches
+  carry no duty in that period; before, joining the two sides of the pinch
+  raised "Cannot set a disallowed match's constant" and no network was
+  designed.
 - ``design.retrofit`` no longer defaults ``min_approach_temperature`` to
   1 K, which let new matches recover heat the design rules out and
   overstated savings. Without it each exchanger keeps the sum of its two

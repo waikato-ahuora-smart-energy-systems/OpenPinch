@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ...solver.piecewise import branch_fractions
 from .._base import alpha as _alpha
 from .._base import area as _area
 from .._base import piecewise as _piecewise
@@ -168,6 +169,13 @@ def _get_multiperiod_post_process(owner) -> None:
                     owner.dqda[i][j][k] = 0.0
                 if not (hot_segmented[i] or cold_segmented[j]):
                     continue
+                hot_share, cold_share = (
+                    branch_fractions(
+                        lambda a, b, c: q_r[0][a][b][c], owner.I, owner.J, i, j, k
+                    )
+                    if q_r[0][i][j][k] > 0.0
+                    else (1.0, 1.0)
+                )
                 exact_dqda = _area._segment_exact_dqda(
                     owner,
                     period_index=0,
@@ -176,6 +184,8 @@ def _get_multiperiod_post_process(owner) -> None:
                     duty=float(q_r[0][i][j][k]),
                     hot_inlet_temperature=hot_temperatures[i][k],
                     cold_inlet_temperature=cold_temperatures[j][k + 1],
+                    hot_share=hot_share,
+                    cold_share=cold_share,
                 )
                 if exact_dqda is not None:
                     owner.dqda[i][j][k] = exact_dqda

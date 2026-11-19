@@ -206,6 +206,45 @@ class PiecewiseThermalProfile:
         )
 
 
+def branch_profile(
+    profile: PiecewiseThermalProfile, fraction: float
+) -> PiecewiseThermalProfile:
+    """``profile`` on ``fraction`` of the stream's flow (a split branch)."""
+    if fraction >= 1.0:
+        return profile
+    fraction = max(fraction, 1e-9)
+    return PiecewiseThermalProfile(
+        identities=profile.identities,
+        temperatures_in=profile.temperatures_in,
+        temperatures_out=profile.temperatures_out,
+        duties=np.asarray(profile.duties, dtype=float) * fraction,
+        heat_capacity_flowrates=np.asarray(profile.heat_capacity_flowrates, dtype=float)
+        * fraction,
+        heat_transfer_coefficients=profile.heat_transfer_coefficients,
+        prices=profile.prices,
+        temperature_contributions=profile.temperature_contributions,
+    )
+
+
+def branch_fractions(
+    duty_of, hot_count: int, cold_count: int, i: int, j: int, k: int
+) -> tuple[float, float]:
+    """The hot and cold branch shares of match ``(i, j)`` in stage ``k``.
+
+    In an isothermal-mixing stage every match on a stream spans the
+    stream's whole temperature change there, so a branch's share of the
+    flow is its share of the stream's recovery duty in the stage.
+    ``duty_of(i, j, k)`` gives a match's duty.
+    """
+    duty = max(float(duty_of(i, j, k)), 0.0)
+    hot_total = sum(max(float(duty_of(i, c, k)), 0.0) for c in range(cold_count))
+    cold_total = sum(max(float(duty_of(h, j, k)), 0.0) for h in range(hot_count))
+    return (
+        duty / hot_total if hot_total > 0.0 else 1.0,
+        duty / cold_total if cold_total > 0.0 else 1.0,
+    )
+
+
 def profile_from_solver_arrays(
     arrays: PreparedSolverArrays,
     *,
