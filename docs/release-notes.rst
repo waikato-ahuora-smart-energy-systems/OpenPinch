@@ -162,6 +162,14 @@ Heat exchanger network synthesis
   a threshold problem. Before, that side's matches were left out of the
   network, which then failed verification.
 
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The solver tests now run on every pull request into ``develop`` and must
+  pass for "CI OK"; before, they ran only for pull requests into ``main``.
+  The packaged HEN notebook runs, about 8 of the lane's 14 minutes, still
+  run only for pull requests into ``main`` and releases.
+
 0.9.3 (2026-11-18)
 ------------------
 
