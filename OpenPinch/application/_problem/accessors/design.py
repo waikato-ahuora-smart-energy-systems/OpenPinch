@@ -597,9 +597,10 @@ class _DesignAccessor:
         (``HENS_SITE_LEVEL_COUNTS``, default 2 to 5), each level serving
         heating and cooling, designs the site with each set, and selects the
         cheapest design. A count whose placement is infeasible or whose
-        design fails is skipped. The result ranks each designed count's best
-        network, tagged ``summary_metrics["utility_level_count"]``, and its
-        provenance records every count (``HENS_SITE_LEVEL_SWEEP``).
+        design fails is skipped. The result ranks every network of each
+        designed count by site cost, each tagged
+        ``summary_metrics["utility_level_count"]``, and its provenance
+        records every count (``HENS_SITE_LEVEL_SWEEP``).
         ``HENS_SITE_LEVEL_EARLY_STOP`` ends the sweep once two designed
         counts in a row cost more than the cheapest before them. The
         cheapest count's design is then refined by level-temperature moves:
@@ -686,6 +687,8 @@ class _DesignAccessor:
             "HENS_PDM_MILP": search.milp,
             # Over every period, so each level holds its duty per period.
             "HENS_DESIGN_BASIS": "all",
+            # Rating at a margin re-prices the network and drops its levels.
+            "HENS_OVERDESIGN_PERCENTAGE": None,
         }
 
         def pool(name: str, placement: str):
@@ -1105,7 +1108,7 @@ class _DesignAccessor:
             hens.basis_clusters if basis_clusters is None else basis_clusters
         )
         basis = median_basis(
-            self._problem.to_problem_json(),
+            self._with_prepared_heat_flows(self._problem.to_problem_json()),
             tuple(self._problem.period_ids),
             tuple(self._problem.master_zone.weights),
             clusters=clusters,
@@ -1125,6 +1128,36 @@ class _DesignAccessor:
                 stacklevel=3,
             )
         return basis, clusters
+
+    def _with_prepared_heat_flows(self, source: dict) -> dict:
+        """``source`` with each stream's heat flow given.
+
+        A stream given by its heat capacity flowrate has no ``heat_flow`` in
+        the source; the prepared stream's heat flow (per period) is used,
+        matched by ``<zone>.<name>`` and else by a unique name.
+        """
+        zone = self._problem.master_zone
+        prepared = [
+            (key, stream)
+            for collection in (zone.hot_streams, zone.cold_streams)
+            for key, stream in collection.items()
+        ]
+        for record in source.get("streams", []):
+            if record.get("heat_flow") is not None:
+                continue
+            name = record.get("name")
+            key = f"{str(record.get('zone', '')).split('/')[-1]}.{name}"
+            matches = [stream for k, stream in prepared if k == key] or [
+                stream for _k, stream in prepared if stream.name == name
+            ]
+            if len(matches) != 1:
+                continue
+            value = matches[0].heat_flow
+            record["heat_flow"] = {
+                "values": [abs(float(v)) for v in value.period_values],
+                "unit": str(value.unit),
+            }
+        return source
 
     def _design_on_median_basis(self, basis_clusters, hens, *, source, **arguments):
         """Synthesise on each candidate cluster's median case.
@@ -1686,6 +1719,12 @@ class _DesignAccessor:
 
         if isinstance(network, Mapping):
             network = self._network_from_structure(network)
+        if "site_processes" in (network.source_metadata or {}):
+            raise ValueError(
+                "optimise_duties does not take a site network: the fixed-structure "
+                "model neither holds each process's utility levels nor keeps the "
+                "site utility balance. Optimise each process's network on its own."
+            )
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,

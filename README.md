@@ -157,9 +157,9 @@ git config core.hooksPath .githooks
 ```
 
 Before pushing work meant for `main`, also run `scripts/ci_local.sh all`, which adds the
-TESPy, performance, solver and notebook lanes. CI runs the solver lane only for
-pull requests into `main`, and the performance lane with it; it runs the others on
-every pull request.
+TESPy, performance, solver and notebook lanes. CI runs the solver lane on every
+pull request, without the packaged notebook runs except for pull requests into
+`main`; it runs the performance lane only for pull requests into `main`.
 
 The script does not run every CI lane. CI also runs the Pyodide lane (the test suite
 inside WebAssembly against the built wheel), the lowest-allowed-versions `floors` lane
@@ -175,7 +175,8 @@ nvm use 22 && (cd scripts/pyodide && npm ci) && uv build --out-dir dist && node 
 Ubuntu runs the complete CI suite. Windows and macOS install the generated
 wheel and verify the core import, CLI, and packaged resources. Tests marked
 `solver` require external solver binaries; CI installs the IDAES extensions
-and runs them for pull requests into `main` and for every release.
+and runs them on every pull request and release (the packaged notebook runs
+only for pull requests into `main` and releases).
 
 ## Release Process
 

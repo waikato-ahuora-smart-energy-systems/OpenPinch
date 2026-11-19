@@ -33,9 +33,12 @@ utility duty, and ``utility(name)``. Serialize the complete result with
 ``design.result.model_dump(mode="json")``.
 
 The ranked networks are every network the run verified and costed, one per
-topology (the cheapest), in ascending total annual cost: the networks each
-task ends with, and every network an evolution search finds that improves on
-its best so far.
+topology (the cheapest): the networks each task ends with, and every network
+an evolution search finds that improves on its best so far. Networks that
+hold their utility levels at the targeted duties rank first, then the rest,
+each group in ascending total annual cost; a total site network ranks by the
+site's total annual cost (its net utility use after the site utility
+balance).
 
 Networks as They Are Found
 --------------------------
@@ -147,13 +150,16 @@ finished by the cheapest utility that reaches its target. In
 
 - A utility whose inlet cannot meet its approach at a stream's target in some
   period is never matched with that stream.
-- Heaters and coolers on one stream run in parallel between the same stream
-  temperatures. Synthesis does not place one utility after another along a
-  stream, for example cooling water first and then glycol; each unit spans
-  the stream's whole utility duty range.
+- Heaters and coolers at a stream's end run in parallel between the same
+  stream temperatures, each with its share of the duty (reported as a split
+  of the stream). With several hot or cold utilities, synthesis can also
+  place a heater or cooler between two stages, so one utility follows
+  another along a stream, and a sliding utility such as hot water is cut
+  into slices that run in series.
 - The pinch design method solves each side of the pinch at its utility
-  target and, where a side has a choice of utilities, prefers the cheaper
-  ones. Heuristic networks and the extra MILP networks keep those targets.
+  target. With ``HENS_UTILITY_PLACEMENT: "price"`` a side with a choice of
+  utilities prefers the cheaper ones; with ``"temperature"`` each utility
+  level carries the duty targeting gives it. Heuristic networks and the extra MILP networks keep those targets.
   The main MILP network then drops stages that carry a small share of its
   recovery, which can move that recovery to utility (about 10% more utility
   on the ten-stream Ahmad case).
@@ -268,7 +274,7 @@ rules by default. On each side of the pinch it:
 It enumerates the alternatives at each decision (pinch matches, optional
 splits and partners away from the pinch), streams of similar CP first, up to
 ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier (default
-10). Each proposal is then solved by the pinch design side model with
+50). Each proposal is then solved by the pinch design side model with
 only its matches allowed, so its duties and temperatures are consistent and
 it meets the utility targets; the sides are joined, stage-reduced and
 verified like the pinch design networks. Proposals the model cannot solve or
@@ -387,18 +393,34 @@ chosen by price instead, with a warning.
 as one process, so any two streams may match, and it warns when the problem
 has more than one process zone. For a site of several
 process zones, ``design.total_site_heat_exchanger_network(width=, depth=,
-options=)`` designs each process alone with the pinch design method, its
-utilities placed by temperature, then joins one network per process at each
-dt_cont multiplier and refines the joined networks with network evolution
-as one problem, with no thermal derivative step. Every process keeps each
-utility level at its targeted duty, and heat is recovered only between
-streams of one process. ``depth`` sets the evolution's breadth, and from 2
+options=)`` designs each process alone with the pinch design method twice,
+with its utilities chosen by price and held at the duties targeting gives
+each level. At each dt_cont multiplier it joins one network per process from
+each run into a lowest-cost and a level-held site seed, and refines the
+seeds with network evolution as one problem, with no thermal derivative
+step. Every process keeps each utility level at its seed's duty, heat is
+recovered only between streams of one process, and the site pays for its
+net utility use after the site utility balance, so the selected network may
+follow price where that is cheaper for the site. ``depth`` sets the evolution's breadth, and from 2
 the MILP pinch design method joins the heuristic for the process networks.
 On a multiperiod site each process is designed over every period at once
 (design basis ``"all"``, whatever ``HENS_DESIGN_BASIS`` says), so each level
 carries its targeted duty in every period; the evolution holds those duties
 period by period, with one area per exchanger sized for the period that
 needs most, and no fit to the periods follows.
+
+A site network carries the site utility balance. On each utility level, use
+plus heat let down to lower levels plus heat dumped equals generation plus
+heat let down from above plus imports, period by period. Imports enter hot
+levels and mains (a hot and a cold utility of one name) at the import price,
+within the hot utility's ``maximum_heat_flow`` when it has one; dumps leave
+cold levels and mains at the dump price. So steam a process raises on a main
+offsets steam another process uses there. The selected network's
+``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
+``site_total_annual_cost``, and its ``source_metadata["site_utility_balance"]``
+holds each level's use, generation, imports, letdowns and dumps per period.
+To design one process zone of a site alone, pass its name:
+``design.heat_exchanger_network(zone="Food Plant[S]")``.
 
 The site design uses the case's own utilities by default (``levels="given"``,
 ``HENS_SITE_LEVELS``). With ``levels="placed"`` it places the site's utility
@@ -546,6 +568,12 @@ Utility exchangers
    Only a positive
    approach is required at both ends of every exchanger;
    ``min_approach_temperature`` defaults to 1 K.
+``"rating"``
+   Minimise utility cost with every recovery exchanger's area fixed at the
+   network's installed ``area`` (each needs one). Every period's duty must
+   fit that area; a period needing less runs with a bypass. The approach
+   defaults to 1 K, as for ``"cost"``. Overdesign and the fit of a design to
+   every period rate networks this way.
 
 Zero-duty exchangers
    Every listed exchanger carries its approach constraint even at zero duty.
@@ -666,8 +694,10 @@ It was the first version of the method and finds less on both validation
 cases below.
 
 Each design lists its ``modifications`` (``"new_match"``,
-``"area_addition"`` or ``"relocation"``, the exchanger, the added area, fixed and area cost, and
-any new splits), the rated network, hot and cold utility (kW), utility cost,
+``"area_addition"``, ``"relocation"``, ``"enhancement"`` or ``"heat_pump"``,
+the exchanger, the added area, fixed and area cost, any new splits, and for
+a heat pump its ``heat_pump_cop``, ``heat_pump_capacity`` and
+``heat_pump_refrigerant``), the rated network, hot and cold utility (kW), utility cost,
 annual savings, capital cost ($), annualised capital and net annual benefit
 ($/y), and the simple payback in years.
 

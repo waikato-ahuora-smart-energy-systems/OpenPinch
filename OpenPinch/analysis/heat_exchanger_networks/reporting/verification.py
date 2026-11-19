@@ -485,26 +485,25 @@ def _check_area_consistency(
     failures = _check_segment_contribution_areas(network.exchangers, period_id)
     if _uses_isothermal_stage_boundaries(metadata):
         return failures
-    hot_htc = _stream_value_map(
-        network,
-        "hot_process_streams",
-        metadata.get("hot_stream_heat_transfer_coefficients"),
+    period_idx = (
+        network.period_ids.index(period_id) if period_id in network.period_ids else None
     )
-    cold_htc = _stream_value_map(
-        network,
-        "cold_process_streams",
-        metadata.get("cold_stream_heat_transfer_coefficients"),
-    )
-    hot_utility_htc = _stream_value_map(
-        network,
-        "hot_utilities",
-        metadata.get("hot_utility_heat_transfer_coefficients"),
-    )
-    cold_utility_htc = _stream_value_map(
-        network,
-        "cold_utilities",
-        metadata.get("cold_utility_heat_transfer_coefficients"),
-    )
+
+    def htc(axis_name: str, key: str) -> dict[str, float]:
+        # Each period's coefficients when recorded, else the scalar ones.
+        by_period = metadata.get(f"{key}_by_period")
+        if (
+            period_idx is not None
+            and isinstance(by_period, list | tuple)
+            and period_idx < len(by_period)
+        ):
+            return _stream_value_map(network, axis_name, by_period[period_idx])
+        return _stream_value_map(network, axis_name, metadata.get(key))
+
+    hot_htc = htc("hot_process_streams", "hot_stream_heat_transfer_coefficients")
+    cold_htc = htc("cold_process_streams", "cold_stream_heat_transfer_coefficients")
+    hot_utility_htc = htc("hot_utilities", "hot_utility_heat_transfer_coefficients")
+    cold_utility_htc = htc("cold_utilities", "cold_utility_heat_transfer_coefficients")
     if not any((hot_htc, cold_htc, hot_utility_htc, cold_utility_htc)):
         return failures
 

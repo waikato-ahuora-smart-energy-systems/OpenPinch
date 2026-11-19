@@ -116,10 +116,7 @@ def execute_open_hens_method(
                     "Couenne is unavailable for the heat exchanger network "
                     "thermal-derivative-method topology stage",
                 )
-                seeded = {task.parent_task_id for task in esm_tasks}
-                after_tasks, after_outcomes = evolve_from_pinch_design(
-                    tuple(o for o in pdm_outcomes if o.task.task_id not in seeded)
-                )
+                after_tasks, after_outcomes = (), ()
             else:
                 after_tasks, after_outcomes = execute_network_evolution_method_stage(
                     problem=problem,
@@ -128,6 +125,22 @@ def execute_open_hens_method(
                     parent_outcomes=pdm_outcome_map | _outcome_map(tdm_outcomes),
                     executor=executor,
                 )
+            # A MILP network none of whose derivative tasks succeeded (Couenne
+            # missing, a time limit without an incumbent, a failed check) is
+            # evolved directly rather than left unevolved.
+            refined = {
+                o.task.parent_task_id for o in tdm_outcomes if o.status == "success"
+            }
+            seeded = {task.parent_task_id for task in esm_tasks}
+            unrefined = tuple(
+                o
+                for o in pdm_outcomes
+                if o.task.task_id not in refined and o.task.task_id not in seeded
+            )
+            if unrefined:
+                direct_tasks, direct_outcomes = evolve_from_pinch_design(unrefined)
+                after_tasks = tuple(after_tasks) + tuple(direct_tasks)
+                after_outcomes = tuple(after_outcomes) + tuple(direct_outcomes)
             esm_tasks = tuple(esm_tasks + after_tasks)
             esm_outcomes = tuple(esm_outcomes + after_outcomes)
 
