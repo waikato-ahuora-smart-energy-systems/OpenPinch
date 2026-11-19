@@ -132,6 +132,10 @@ class InternalHeatExchangerNetworkProblem:
             "tol": self.tol,
             "solver_options": self.solver_options,
         }
+        if self.framework == "TDM":
+            self.args["solver_options"] = _with_time_limit(
+                self.solver, self.solver_options, seconds=backend.TDM_TIME_LIMIT
+            )
         if self.staged_utilities or getattr(
             getattr(self.parent, "case", None), "staged_utilities", False
         ):
@@ -1340,8 +1344,9 @@ def _with_time_limit(
     """The PDM solver options with a time limit added.
 
     The fewest-units limit applies to every fewest-units and minimum-unit
-    solve; the primary sides take ``backend.PDM_TIME_LIMIT`` and heuristic
-    side proposals ``backend.HEURISTIC_SIDE_TIME_LIMIT``.
+    solve; the primary sides take ``backend.PDM_TIME_LIMIT``, heuristic
+    side proposals ``backend.HEURISTIC_SIDE_TIME_LIMIT`` and thermal
+    derivative tasks ``backend.TDM_TIME_LIMIT``.
 
     A limit the user set is kept, as are options given as option lines.
     """

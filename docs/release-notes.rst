@@ -7,6 +7,11 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Each thermal derivative task now stops at 300 s unless
+  ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
+  Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run
+  for hours in Couenne. A task stopped there keeps its best network when it
+  has one and that network verifies; otherwise the task fails.
 - ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
   designs one network for a site of several process zones. Each process is
   designed alone with the pinch design method, its utilities placed by
