@@ -115,6 +115,21 @@ def shifted_case(
     return type(case)(source, project_name=case.project_name)
 
 
+def _level_key(case: "PinchProblem") -> tuple:
+    """The placed levels' temperatures, as a key for a designed case."""
+    return tuple(
+        (
+            u["name"],
+            u["type"],
+            *(round(t, 9) for k in ("t_supply", "t_target") for t in _values(u[k])),
+        )
+        for u in sorted(
+            case.to_problem_json()["utilities"], key=lambda u: (u["name"], u["type"])
+        )
+        if _PLACED.fullmatch(u["name"])
+    )
+
+
 def level_duties(
     case: "PinchProblem", multiplier: float
 ) -> dict[str, dict[str, list[float]]]:
@@ -186,6 +201,7 @@ def refine_levels(
     step: float,
     step_min: float,
     levels: Sequence[str] | None = None,
+    expired: Callable[[], bool] | None = None,
 ):
     """Move ``case``'s placed levels while the site cost falls.
 
@@ -195,7 +211,11 @@ def refine_levels(
     evaluated the same way, as the baseline the moves must beat (the
     start's network may come from a seed no move builds). The cheapest
     move below the current cost is adopted; with none, the step halves,
-    and the moves stop once it is below ``step_min``. A missing synthesis
+    and the moves stop once it is below ``step_min``. Levels already
+    designed are not designed again: a move back to them is ``"rejected"``
+    with message ``"already designed"``. Before each design ``expired()``
+    is checked; once it is true the moves end with a ``"stopped"`` entry
+    (message ``"time limit"``) and the best levels so far. A missing synthesis
     solver or dependency is raised; any other failure of a design is
     recorded. Returns the final case and view, or the start's when no
     adopted move costs less than it, and every move tried.
@@ -210,6 +230,16 @@ def refine_levels(
     start = (case, view, site_cost(view.selected_network))
     if not (step > 0 and step >= step_min):
         return case, view, ()
+
+    def stopped() -> bool:
+        if expired is not None and expired():
+            log.append(LevelMove("", 0.0, None, "stopped", "time limit"))
+            return True
+        return False
+
+    if stopped():
+        return case, view, tuple(log)
+    designed = {_level_key(case)}
     # The start's network may come from a seed no move builds, so moves are
     # judged against the unshifted levels evaluated the way a move is.
     try:
@@ -222,13 +252,24 @@ def refine_levels(
     else:
         cost = site_cost(baseline.selected_network)
         log.append(LevelMove("", 0.0, cost, "baseline"))
-    while step > 0 and step >= step_min:
+    halted = False
+    while step > 0 and step >= step_min and not halted:
         best = None
         for level in levels:
             for shift in (step, -step):
                 shifted = shifted_case(case, level, shift)
                 if shifted is None:
                     continue
+                key = _level_key(shifted)
+                if key in designed:
+                    log.append(
+                        LevelMove(level, shift, None, "rejected", "already designed")
+                    )
+                    continue
+                if stopped():
+                    halted = True
+                    break
+                designed.add(key)
                 try:
                     moved = evaluate(shifted, view)
                 except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
@@ -240,17 +281,19 @@ def refine_levels(
                 log.append(LevelMove(level, shift, moved_cost, "rejected"))
                 if best is None or moved_cost < best[2]:
                     best = (len(log) - 1, shifted, moved_cost, moved)
+            if halted:
+                break
         if best is not None and best[2] < cost - _GAIN * abs(cost):
             index, case, cost, view = best
             log[index] = replace(log[index], status="adopted")
-        else:
+        elif not halted:
             step /= 2
     if start[2] <= cost:
         return start[0], start[1], tuple(log)
     return case, view, tuple(log)
 
 
-def refine_selected(runs, *, evaluate, step: float, step_min: float):
+def refine_selected(runs, *, evaluate, step: float, step_min: float, expired=None):
     """``runs`` with the cheapest designed count refined by level moves.
 
     Returns the runs, the refined one replaced by its moved case, view and
@@ -260,7 +303,12 @@ def refine_selected(runs, *, evaluate, step: float, step_min: float):
 
     selected = select_level_count(runs)
     case, view, log = refine_levels(
-        selected.case, selected.view, evaluate=evaluate, step=step, step_min=step_min
+        selected.case,
+        selected.view,
+        evaluate=evaluate,
+        step=step,
+        step_min=step_min,
+        expired=expired,
     )
     refined = replace(
         selected,

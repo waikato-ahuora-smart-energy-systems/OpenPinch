@@ -256,7 +256,7 @@ def test_the_sweep_refines_the_cheapest_counts_design(monkeypatch):
 
     refined = []
 
-    def refine(case, view, *, evaluate, step, step_min):
+    def refine(case, view, *, evaluate, step, step_min, expired=None):
         refined.append((case, step, step_min))
         return "case", _view(10.0), (moves.LevelMove("iso_1", 5.0, 10.0, "adopted"),)
 
@@ -333,3 +333,78 @@ def test_level_moves_never_raise_the_placed_designs_cost():
     assert moved.selected_network.summary_metrics[
         "site_total_annual_cost"
     ] == pytest.approx(cost)
+
+
+def test_a_level_vector_already_designed_is_not_designed_again():
+    """Adopting +5 K makes the next round's -5 K the levels just left; the
+    moves are judged by site cost, so that design is not repeated."""
+    evaluated = []
+
+    def evaluate(case, view):
+        evaluated.append(_hot_supply(case, "iso_1"))
+        return _view(_cost_by_level(case))
+
+    _, _, log = moves.refine_levels(
+        _mains_site(),
+        _view(_cost_by_level(_mains_site())),
+        evaluate=evaluate,
+        step=5.0,
+        step_min=1.0,
+        levels=("iso_1",),
+    )
+
+    assert len(evaluated) == len(set(evaluated))
+    revisits = [move for move in log if move.message == "already designed"]
+    assert revisits and all(move.status == "rejected" for move in revisits)
+
+
+def test_the_moves_stop_when_the_time_runs_out():
+    evaluated = []
+
+    def evaluate(case, view):
+        evaluated.append(_hot_supply(case, "iso_1"))
+        return _view(_cost_by_level(case))
+
+    case, view, log = moves.refine_levels(
+        _mains_site(),
+        _view(_cost_by_level(_mains_site())),
+        evaluate=evaluate,
+        step=5.0,
+        step_min=1.0,
+        levels=("iso_1",),
+        expired=lambda: len(evaluated) >= 3,
+    )
+
+    # The baseline (180 C), then 185 C and 175 C: 185 C is kept.
+    assert evaluated == [180.0, 185.0, 175.0]
+    assert _hot_supply(case, "iso_1") == pytest.approx(185.0)
+    assert view.selected_network.total_annual_cost == pytest.approx(1010.0)
+    assert log[-1].status == "stopped"
+    assert log[-1].message == "time limit"
+
+
+def test_no_move_is_designed_when_the_time_has_run_out():
+    case = _mains_site()
+    start = _view(1.0)
+
+    found, view, log = moves.refine_levels(
+        case,
+        start,
+        evaluate=pytest.fail,
+        step=5.0,
+        step_min=1.0,
+        expired=lambda: True,
+    )
+
+    assert (found, view) == (case, start)
+    assert [move.status for move in log] == ["stopped"]
+
+
+def test_the_site_time_limit_is_a_configuration_key():
+    from OpenPinch.domain.configuration_fields import USER_CONFIG_FIELD_SPECS
+
+    assert USER_CONFIG_FIELD_SPECS["HENS_SITE_TIME_LIMIT"].default is None
+    with pytest.raises(ValueError, match="HENS_SITE_TIME_LIMIT"):
+        _site().design.total_site_heat_exchanger_network(
+            options={"HENS_SITE_LEVELS": "placed", "HENS_SITE_TIME_LIMIT": 0.0}
+        )
