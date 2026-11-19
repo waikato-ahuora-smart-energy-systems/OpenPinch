@@ -29,6 +29,8 @@ class UtilityLevelTarget:
     utilities: tuple[int, ...]
     streams: tuple[int, ...]
     duties: tuple[float, ...]
+    # Relative slack on each duty (of at least 1 kW).
+    band: float = LEVEL_BAND
 
 
 def set_level_target_equations(owner) -> None:
@@ -38,7 +40,7 @@ def set_level_target_equations(owner) -> None:
         for n in range(owner.N_periods):
             duty = _level_duty(owner, target, n)
             level = float(target.duties[n])
-            band = LEVEL_BAND * max(1.0, abs(level))
+            band = target.band * max(1.0, abs(level))
             if isinstance(duty, int | float):
                 if abs(duty - level) > band:
                     raise ValueError(
@@ -71,14 +73,17 @@ def _level_duty(owner, target: UtilityLevelTarget, n: int):
 
 
 def site_level_targets(
-    solver_arrays, processes: Mapping[str, Mapping[str, Sequence[float]]]
+    solver_arrays,
+    processes: Mapping[str, Mapping[str, Sequence[float]]],
+    *,
+    band: float = LEVEL_BAND,
 ) -> tuple[tuple[UtilityLevelTarget, ...], tuple[tuple[str, ...], tuple[str, ...]]]:
     """Each process's levels as targets, and each stream's process as its group.
 
     ``processes`` maps a process's stream-key prefix (``"<process>.<stream>"``)
     to its targeted duty per period by utility name (``"Hot Utility.LPS"``).
     A sliced utility's slices count as their parent. A stream of no listed
-    process is in the group ``""``.
+    process is in the group ``""``. Each target takes ``band``.
     """
 
     identities = solver_arrays.stream_identities
@@ -108,7 +113,11 @@ def site_level_targets(
                     continue
                 targets.append(
                     UtilityLevelTarget(
-                        side, utilities, streams, tuple(float(d) for d in duties)
+                        side,
+                        utilities,
+                        streams,
+                        tuple(float(d) for d in duties),
+                        band,
                     )
                 )
     return tuple(targets), groups

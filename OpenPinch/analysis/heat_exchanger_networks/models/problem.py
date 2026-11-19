@@ -102,6 +102,11 @@ class InternalHeatExchangerNetworkProblem:
     # process's levels and matches streams only within a process
     # (``_stagewise/level_targets.py:site_level_targets``).
     site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
+    # A pooled site design (several processes' streams in one network): its
+    # TDM and EVM hold the levels it inherits (``utility_level_targets``)
+    # over every stream, as its pinch design did, instead of trading a
+    # level for a cheaper one.
+    hold_utility_levels: bool = False
 
     def load_model(
         self,
@@ -131,10 +136,18 @@ class InternalHeatExchangerNetworkProblem:
             getattr(self.parent, "case", None), "staged_utilities", False
         ):
             self.args["staged_utilities"] = True
-        if self.site_processes is not None and self.framework != "PDM":
-            targets, groups = site_level_targets(
-                self.solver_arrays, self.site_processes
+        processes, band = self.site_processes, {}
+        if processes is None and self.hold_utility_levels:
+            from ..heuristic.enumeration import LOAD_FRACTION_TOLERANCE
+
+            # Pooled: one group of every stream holds the inherited levels,
+            # within the load fraction its heuristic parent held them to.
+            processes = (
+                {"": self.utility_level_targets} if self.utility_level_targets else None
             )
+            band = {"band": LOAD_FRACTION_TOLERANCE}
+        if processes is not None and self.framework != "PDM":
+            targets, groups = site_level_targets(self.solver_arrays, processes, **band)
             self.args["level_targets"] = targets
             self.args["stream_groups"] = groups
         if self.framework == "PDM":

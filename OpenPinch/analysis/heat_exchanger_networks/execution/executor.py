@@ -464,6 +464,8 @@ class LocalSynthesisExecutor:
             ),
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
             site_processes=site_processes,
+            hold_utility_levels=_utility_placement(problem) == "temperature"
+            and _process_zone_count(problem.master_zone) > 1,
         )
 
     def _parent_problem(

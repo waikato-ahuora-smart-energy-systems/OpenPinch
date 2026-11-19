@@ -37,6 +37,18 @@ Heat exchanger network synthesis
   between them, as the model sizes them, so such networks pass the
   exchanger heat balance checks. The recovery area check now allows for the
   model's own area smoothing, so a tiny match is no longer rejected for it.
+- ``design.heat_exchanger_network()`` on a site of several process zones
+  (a pooled design, utilities placed by temperature) now holds each utility
+  level at its targeted duty in the thermal derivative and network evolution
+  steps too, over all the pooled streams, as its pinch design already did.
+  Before, those steps could move a level's duty to a cheaper or equally
+  priced utility (on ``zonal_site``, all steam raising to cooling water),
+  and the networks they found were then ranked below the pinch design for
+  missing the levels. Each level is held within 0.1% of its target, as the
+  heuristic pinch design holds it. On ``zonal_site`` at depth 1 network
+  evolution is now selected (27 units instead of 29, total annual cost 41
+  lower) in about half the time. A single process zone keeps cost-based
+  thermal derivative and network evolution steps.
 
 - ``design.retrofit_heat_pumps`` gives an existing network's ideal
   and as-piped heat pump targets from the HPR service: the ideal against
