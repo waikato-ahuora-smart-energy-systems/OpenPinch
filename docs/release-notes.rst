@@ -28,6 +28,12 @@ Heat exchanger network synthesis
   1 K, so a default multiperiod design could sit below ΔTmin (8.1 K against
   10 K in one case) and still verify. Where the minimum approach cannot be
   met, the fit warns and falls back to 1 K.
+- The fit to every period holds a design's utility levels where it can.
+  A network that holds its levels keeps each level at its target in every
+  period, and records the targets. Before, the fit dropped them, could move
+  load from one level to another by price (LPS to HPS), and still reported
+  the levels as held. When a period's targets cannot be met exactly (as for
+  a design on the median period), the fit warns and releases the levels.
 - ``design.retrofit`` no longer defaults ``min_approach_temperature`` to
   1 K, which let new matches recover heat the design rules out and
   overstated savings. Without it each exchanger keeps the sum of its two

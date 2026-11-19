@@ -486,3 +486,55 @@ def test_a_fit_that_cannot_keep_the_minimum_approach_warns_and_fits_at_1_k(
 
     assert result == "fitted at 1 K"
     assert calls == [True, False]
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_the_fit_to_every_period_holds_the_utility_levels():
+    """A network that holds its utility levels in every period (designed
+    over all periods with temperature placement) keeps them through the fit
+    to every period: the levels are recorded and met, so LPS is not traded
+    for HPS by price."""
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+        holds_utility_levels,
+    )
+    from tests.application.test_site_heat_exchanger_network import _site
+
+    problem = _site(periods=True)
+    options = {"HENS_UTILITY_PLACEMENT": "temperature"}
+    designed = problem.design.heat_exchanger_network(
+        width=0, depth=0, design_basis="all", options=options
+    ).selected_network
+
+    fitted = problem.design._fit_to_all_periods(
+        designed, options=options
+    ).selected_network
+
+    held = designed.source_metadata["utility_level_targets"]
+    kept = fitted.source_metadata["utility_level_targets"]
+    assert kept.keys() == held.keys()
+    for name, duties in held.items():
+        assert kept[name] == pytest.approx(duties)
+    assert holds_utility_levels(fitted)
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_fit_that_cannot_hold_the_levels_says_so():
+    """A design on the median period cannot meet every period's level
+    targets exactly; the fit warns that it releases the levels instead of
+    releasing them silently."""
+    from tests.application.test_site_heat_exchanger_network import _site
+
+    with pytest.warns(UserWarning, match="cannot hold the design's utility levels"):
+        _site(periods=True).design.heat_exchanger_network(
+            width=0,
+            depth=0,
+            options={"HENS_UTILITY_PLACEMENT": "temperature"},
+        )

@@ -133,6 +133,10 @@ class FixedStructureSpec:
     # by index in ``utilities``, whose duties the COP links in every period
     # (the condenser delivers the evaporator's heat plus the work).
     heat_pumps: tuple[tuple[int, int, float], ...] = ()
+    # Utility levels held at their targets, each (utilities, per-period
+    # duties): the duties of those utility exchangers, by index in
+    # ``utilities``, sum to the level's target in every period.
+    level_holds: tuple[tuple[tuple[int, ...], tuple[float, ...]], ...] = ()
 
 
 @dataclass
@@ -804,6 +808,8 @@ def build_fixed_structure_equations(owner) -> None:
                 owner.q_u[n][condenser] * (float(cop) - 1.0),
                 owner.q_u[n][evaporator] * float(cop),
             )
+        for units, targets in owner.spec.level_holds:
+            owner._equal(sum(owner.q_u[n][e] for e in units), float(targets[n]))
     if owner.minimisation_goal in {"total area", "total cost"}:
         _common_areas(owner)
     elif owner.minimisation_goal == "rating":
