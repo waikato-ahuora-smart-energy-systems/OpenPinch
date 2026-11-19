@@ -63,7 +63,8 @@ def site_seeds(
     process's network with the fewest units, then the lowest total annual
     cost, from ``pools``; a ``"level_held"`` seed takes the same from the
     networks of ``level_held`` that hold their targets, and a process
-    without one there takes its lowest-cost network. ``summary_metrics``
+    without one there at or above the multiplier takes its lowest-cost
+    network. ``summary_metrics``
     record the kind as ``"site_seed"``; a seed equal to another is dropped.
     """
 
@@ -89,11 +90,7 @@ def site_seeds(
     # A network designed at a smaller multiplier can need more recovery
     # than a larger one's approach allows: no seed where a process has
     # nothing at or above its multiplier (unless that leaves none).
-    covered = [
-        m
-        for m in multipliers
-        if all(max(_multiplier(n) for n in pool) >= m for pool in pools.values())
-    ]
+    covered = [m for m in multipliers if all(_covers(p, m) for p in pools.values())]
     seeds: list[HeatExchangerNetwork] = []
     seen: set[tuple] = set()
     for m in covered or multipliers:
@@ -106,7 +103,7 @@ def site_seeds(
                     "level_held",
                     {
                         process: _fewest_units(held[process], m)
-                        if held.get(process)
+                        if _covers(held.get(process, ()), m)
                         else network
                         for process, network in cheapest.items()
                     },
@@ -132,6 +129,11 @@ def site_seeds(
 def _holds_targets(network: HeatExchangerNetwork) -> bool:
     targets = (network.source_metadata or {}).get("utility_level_targets")
     return bool(targets) and holds_utility_levels(network)
+
+
+def _covers(pool: Sequence[HeatExchangerNetwork], m: float) -> bool:
+    """Whether ``pool`` has a network at the multiplier ``m`` or above."""
+    return any(_multiplier(network) >= m for network in pool)
 
 
 def _fewest_units(

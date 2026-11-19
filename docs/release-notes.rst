@@ -150,6 +150,10 @@ Heat exchanger network synthesis
   network at or above the seed's multiplier, and there is no seed at a
   multiplier some process has nothing at or above. A process zone whose
   pinch design found no network is named in the error.
+- A level-held total site seed no longer takes a process's level-held
+  network from a smaller dt_cont multiplier when only its lowest-cost
+  networks reach the seed's multiplier; that process gives its lowest-cost
+  network instead.
 - ``design.optimise_duties`` refuses a total site network with a
   ``ValueError``: its fixed-structure model neither holds each process's
   utility levels nor keeps the site utility balance, so it re-priced each
