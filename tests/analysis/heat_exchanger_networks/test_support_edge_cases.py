@@ -908,6 +908,101 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
     assert stagewise_verification._check_area_costs(bad_cold_utility) is False
 
 
+def test_shared_area_costs_treat_a_slightly_negative_unused_area_as_none():
+    """A solver leaves an unused shared area a hair below zero; raised to a
+    fractional cost exponent it would be NaN and fail the cost check."""
+    import numpy as np
+
+    case = SimpleNamespace(
+        N_periods=1,
+        I=1,
+        J=1,
+        S=1,
+        NHU=1,
+        NCU=1,
+        Q_r_by_period=[[[[0.0]]]],
+        Q_h_by_period=[[[0.0]]],
+        Q_c_by_period=[[[0.0]]],
+        area_r_shared=[[[np.float64(-1e-9)]]],
+        area_hu_shared=[[np.float64(-1e-9)]],
+        area_cu_shared=[[np.float64(-1e-9)]],
+        A_coeff=[1000.0],
+        A_exp=[0.83],
+        hu_coeff=[1000.0],
+        hu_exp=[0.83],
+        cu_coeff=[1000.0],
+        cu_exp=[0.83],
+        recovery_area_cost_total=0.0,
+        hu_area_cost_total=0.0,
+        cu_area_cost_total=0.0,
+    )
+
+    assert stagewise_verification._check_area_costs(case) is True
+
+
+def test_shared_area_costs_leave_out_a_match_evolution_removed():
+    """Evolution removes a match by disallowing it; its area variable keeps
+    the value it was warm-started with, but the model no longer costs it."""
+    case = SimpleNamespace(
+        N_periods=1,
+        I=1,
+        J=1,
+        S=2,
+        NHU=1,
+        NCU=1,
+        z_allowed=[[[1, 0]]],
+        Q_r_by_period=[[[[0.0, 0.0]]]],
+        Q_h_by_period=[[[0.0]]],
+        Q_c_by_period=[[[0.0]]],
+        area_r_shared=[[[1.0, 6.0]]],
+        area_hu_shared=[[0.0]],
+        area_cu_shared=[[0.0]],
+        A_coeff=[1000.0],
+        A_exp=[1.0],
+        hu_coeff=[1000.0],
+        hu_exp=[1.0],
+        cu_coeff=[1000.0],
+        cu_exp=[1.0],
+        recovery_area_cost_total=1000.0,
+        hu_area_cost_total=0.0,
+        cu_area_cost_total=0.0,
+    )
+
+    assert stagewise_verification._check_area_costs(case) is True
+
+
+def test_a_period_that_does_not_set_a_shared_area_may_approach_wider():
+    """Over several periods one area serves every period, so the model only
+    bounds each period's approach difference by the actual one: a lighter
+    period, with bypass, has more approach than its theta. A theta above the
+    actual approach still fails."""
+
+    def case(theta_1):
+        return SimpleNamespace(
+            N_periods=2,
+            I=1,
+            J=1,
+            S=1,
+            Q_r_by_period=[[[[5.0]]], [[[5.0]]]],
+            non_isothermal_model=True,
+            T_h_by_period=[[[90.0, 60.0]], [[90.0, 60.0]]],
+            T_c_by_period=[[[80.0, 50.0]], [[80.0, 50.0]]],
+            T_c_out_y_by_period=[[[[80.0]]], [[[75.0]]]],
+            theta_1_by_period=[[[[10.0]]], [[[theta_1]]]],
+            T_h_out_x_by_period=[[[[60.0]]], [[[60.0]]]],
+            theta_2_by_period=[[[[10.0]]], [[[10.0]]]],
+        )
+
+    def check(state):
+        return stagewise_verification._check_state_temperatures(
+            state, rel_tol=1e-3, abs_tol=1e-2, q_tol=1e-2
+        )
+
+    assert check(case(10.0)) is True
+    assert check(case(15.0)) is True
+    assert check(case(16.0)) is False
+
+
 def test_seed_networks_accept_network_json():
     # JSON clients (the engine command layer) pass networks as they received
     # them in a design result.
