@@ -85,6 +85,10 @@ class Zone:
         # cold collections was placed on this zone itself.
         self._imported_hot_keys: set[str] = set()
         self._imported_cold_keys: set[str] = set()
+        # The name each imported stream had when this zone first imported
+        # it; a key collision further up renames the shared stream, so the
+        # import key comes from this stable name instead.
+        self._import_names: dict[int, tuple[Stream, str]] = {}
 
     # === Properties ===
 
@@ -511,6 +515,7 @@ class Zone:
                     (z.cold_streams, cs_dst, self._imported_cold_keys),
                 ):
                     for s in list(src):
+                        s.name = self._import_name(s)
                         imported.add(dst.add(s, f"{z.name}.{s.name}"))
                 continue
 
@@ -521,6 +526,14 @@ class Zone:
             for s in z.net_cold_streams:
                 key = f"{z.name}.{s.name}"
                 cs_dst.add(s, key)
+
+    def _import_name(self, stream: Stream) -> str:
+        """The name ``stream`` had when this zone first imported it."""
+        entry = self._import_names.get(id(stream))
+        if entry is None or entry[0] is not stream:
+            entry = (stream, stream.name)
+            self._import_names[id(stream)] = entry
+        return entry[1]
 
     def _own_streams(
         self, streams: StreamCollection, imported: set[str]

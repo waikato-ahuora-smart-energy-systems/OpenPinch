@@ -272,6 +272,30 @@ def test_an_own_cold_stream_survives_a_hot_import_under_the_same_key():
     assert [key for key, _ in parent.hot_streams.items()] == ["C.x"]
 
 
+def test_repeated_imports_keep_the_keys_of_a_renamed_nested_stream():
+    """A zone's own stream and a deeper subzone's stream sharing a name
+    collide at the site, which renames the nested stream; importing again
+    keeps every key the first import gave."""
+    site = Zone(name="Site")
+    process = Zone(name="A")
+    unit = Zone(name="U")
+    process.hot_streams.add(_plain_stream("H1", 250.0, 60.0, 190.0), key="Site/A.H1")
+    unit.hot_streams.add(_plain_stream("H1", 180.0, 90.0, 90.0), key="Site/A/U.H1")
+    process.add_zone(unit)
+    site.add_zone(process)
+
+    site.import_hot_and_cold_streams_from_sub_zones()
+    first_process_keys = sorted(key for key, _ in process.hot_streams.items())
+    first_site_keys = sorted(key for key, _ in site.hot_streams.items())
+    first_names = sorted(s.name for s in site.hot_streams)
+    site.import_hot_and_cold_streams_from_sub_zones()
+
+    assert first_process_keys == ["Site/A.H1", "U.H1"]
+    assert sorted(key for key, _ in process.hot_streams.items()) == first_process_keys
+    assert sorted(key for key, _ in site.hot_streams.items()) == first_site_keys
+    assert sorted(s.name for s in site.hot_streams) == first_names
+
+
 # === New Tests for Zone ===
 
 

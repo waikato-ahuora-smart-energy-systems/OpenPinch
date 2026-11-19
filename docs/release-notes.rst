@@ -14,6 +14,10 @@ Zones and targeting
 - Re-importing subzone streams no longer drops a zone's own cold stream
   whose key matches an imported hot stream's key (or the reverse): hot and
   cold imported keys are now tracked separately.
+- Re-importing subzone streams keeps their keys and names when a zone's own
+  stream and a deeper subzone's stream share a name. Before, the collision
+  rename at the site leaked into the next import, so ``U.H1`` became
+  ``U.H1_1``.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
