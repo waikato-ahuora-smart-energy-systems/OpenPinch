@@ -3786,6 +3786,9 @@ def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
     assert approach_calls == []
 
 
+@pytest.mark.skipif(
+    sys.platform == "emscripten", reason="Pyodide cannot start threads"
+)
 def test_a_pooled_stage_that_raises_cancels_its_waiting_solves():
     """An error from one solve ends the stage without running the solves
     still waiting for a worker."""
