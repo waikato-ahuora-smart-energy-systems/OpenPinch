@@ -18,6 +18,22 @@ Heat exchanger network synthesis
 - Two networks that differ only in the stage boundary of a heater or cooler
   (or a staged against a stream-end unit) are no longer ranked as one
   structure, which dropped one of them as a repeat.
+- A multiperiod stage-wise model no longer starts infeasible when a match
+  that can run in one period cannot run in another (its supply temperatures
+  there are closer than its approach): in such a period the match carries
+  no duty and has no approach constraints. A multiperiod warm start also
+  leaves a heater or cooler that evolution removed switched off, instead of
+  charging its unit cost at no duty.
+- The median design basis (the default for multiperiod designs) works when
+  streams are given by heat capacity flowrate rather than heat flow. Before,
+  it read no heat flow, found no operating period and raised.
+- A multiperiod network from duty optimisation (``optimise_duties``, a fit
+  to every period, overdesign rating) now records each period's stream
+  temperatures, duties and heat transfer coefficients, so verification
+  checks every stream's heat balance in every period. Before, it found no
+  per-period data and passed a stream left short of its target. The area
+  check also uses each period's coefficients rather than the first
+  period's.
 - At search depth 2, a MILP pinch design network none of whose thermal
   derivative tasks succeeded is now evolved directly. Before, only a
   missing Couenne for every task sent the MILP networks to evolution; any

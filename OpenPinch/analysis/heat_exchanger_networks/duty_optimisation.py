@@ -909,10 +909,15 @@ def _weighted_load(model, exchangers: Sequence[HeatExchanger], side: str) -> flo
 
 
 def _profile_totals(model, attribute: str) -> list[float] | None:
+    by_period = _profile_totals_by_period(model, attribute)
+    return None if by_period is None else by_period[0]
+
+
+def _profile_totals_by_period(model, attribute: str) -> list[list[float]] | None:
     profiles = getattr(model, attribute, None)
     if not profiles:
         return None
-    return [float(profile.total) for profile in profiles[0]]
+    return [[float(profile.total) for profile in row] for row in profiles]
 
 
 def _source_metadata(model, solver_arrays) -> dict[str, Any]:
@@ -943,15 +948,29 @@ def _source_metadata(model, solver_arrays) -> dict[str, Any]:
         "cold_stream_heat_capacity_flowrates": first("f_c_period"),
         "cold_stream_heat_capacity_flowrates_by_period": by_period("f_c_period"),
         "hot_stream_heat_transfer_coefficients": first("htc_h_period"),
+        "hot_stream_heat_transfer_coefficients_by_period": by_period("htc_h_period"),
         "cold_stream_heat_transfer_coefficients": first("htc_c_period"),
+        "cold_stream_heat_transfer_coefficients_by_period": by_period("htc_c_period"),
         "hot_utility_heat_transfer_coefficients": first("htc_hu_period"),
+        "hot_utility_heat_transfer_coefficients_by_period": by_period("htc_hu_period"),
         "cold_utility_heat_transfer_coefficients": first("htc_cu_period"),
+        "cold_utility_heat_transfer_coefficients_by_period": by_period("htc_cu_period"),
         "hot_stream_supply_temperatures": first("T_h_in_period"),
+        "hot_stream_supply_temperatures_by_period": by_period("T_h_in_period"),
         "hot_stream_target_temperatures": first("T_h_out_period"),
+        "hot_stream_target_temperatures_by_period": by_period("T_h_out_period"),
         "cold_stream_supply_temperatures": first("T_c_in_period"),
+        "cold_stream_supply_temperatures_by_period": by_period("T_c_in_period"),
         "cold_stream_target_temperatures": first("T_c_out_period"),
+        "cold_stream_target_temperatures_by_period": by_period("T_c_out_period"),
         "hot_stream_total_duties": _profile_totals(model, "hot_profiles"),
+        "hot_stream_total_duties_by_period": _profile_totals_by_period(
+            model, "hot_profiles"
+        ),
         "cold_stream_total_duties": _profile_totals(model, "cold_profiles"),
+        "cold_stream_total_duties_by_period": _profile_totals_by_period(
+            model, "cold_profiles"
+        ),
     }
 
 
