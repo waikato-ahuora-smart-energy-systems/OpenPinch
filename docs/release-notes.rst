@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Zones and targeting
+~~~~~~~~~~~~~~~~~~~
+
+- A process zone that holds a unit operation kept only the unit
+  operation's streams: the streams placed on the process zone itself
+  vanished from it and from the site, so their targets left them out. Both
+  are now kept.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
