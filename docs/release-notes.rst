@@ -15,6 +15,9 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Two networks that differ only in the stage boundary of a heater or cooler
+  (or a staged against a stream-end unit) are no longer ranked as one
+  structure, which dropped one of them as a repeat.
 - A multiperiod stage-wise model no longer starts infeasible when a match
   that can run in one period cannot run in another (its supply temperatures
   there are closer than its approach): in such a period the match carries
