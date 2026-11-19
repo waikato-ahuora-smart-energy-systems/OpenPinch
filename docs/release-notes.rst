@@ -75,6 +75,13 @@ Heat exchanger network synthesis
   network at or above the seed's multiplier, and there is no seed at a
   multiplier some process has nothing at or above. A process zone whose
   pinch design found no network is named in the error.
+- ``design.optimise_duties`` refuses a total site network with a
+  ``ValueError``: its fixed-structure model neither holds each process's
+  utility levels nor keeps the site utility balance, so it re-priced each
+  heater and cooler alone and dropped the levels. A stored
+  ``HENS_OVERDESIGN_PERCENTAGE`` no longer reaches a site design's process
+  designs, where rating each network at the margin dropped its level
+  targets and turned the level-held seeds into duty-based ones.
 - A placed site level is one main: its hot and cold utility share one name
   (``iso_1`` rather than ``hot_iso_1`` and ``cold_iso_1``), so site utility
   accounting credits steam raised on a placed level against its use.

@@ -449,3 +449,46 @@ def test_a_process_whose_designs_both_fail_fails_the_site_design(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Heating by temperature failed"):
         _site().design.total_site_heat_exchanger_network()
+
+
+def test_duty_optimisation_refuses_a_site_network():
+    """The fixed-structure model neither holds each process's levels nor
+    keeps the site utility balance, so a site network is refused rather
+    than re-priced unit by unit."""
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    site = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="site",
+        source_metadata={"site_processes": {"Site/Heating": {}}},
+    )
+
+    with pytest.raises(ValueError, match="site network"):
+        _site().design.optimise_duties(site)
+
+
+def test_a_stored_overdesign_margin_does_not_reach_the_process_designs(monkeypatch):
+    """Rating a process network at a margin drops its level targets, so the
+    site's process designs run without the stored margin."""
+    from OpenPinch.application._problem.accessors import design
+
+    seen = []
+
+    def process_design(self, *, zone=None, options=None, **kwargs):
+        seen.append(dict(options or {}))
+        raise ValueError("stop after the first process design")
+
+    monkeypatch.setattr(
+        design._DesignAccessor, "heat_exchanger_network", process_design
+    )
+    source = _site().to_problem_json()
+    source["options"] = dict(source.get("options") or {}) | {
+        "HENS_OVERDESIGN_PERCENTAGE": 10.0
+    }
+    problem = PinchProblem(source=source)
+
+    with pytest.raises(ValueError, match="stop after"):
+        problem.design.total_site_heat_exchanger_network()
+
+    assert seen
+    assert all(options["HENS_OVERDESIGN_PERCENTAGE"] is None for options in seen)

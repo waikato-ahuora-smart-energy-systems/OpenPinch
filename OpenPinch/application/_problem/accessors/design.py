@@ -687,6 +687,8 @@ class _DesignAccessor:
             "HENS_PDM_MILP": search.milp,
             # Over every period, so each level holds its duty per period.
             "HENS_DESIGN_BASIS": "all",
+            # Rating at a margin re-prices the network and drops its levels.
+            "HENS_OVERDESIGN_PERCENTAGE": None,
         }
 
         def pool(name: str, placement: str):
@@ -1674,6 +1676,12 @@ class _DesignAccessor:
 
         if isinstance(network, Mapping):
             network = self._network_from_structure(network)
+        if "site_processes" in (network.source_metadata or {}):
+            raise ValueError(
+                "optimise_duties does not take a site network: the fixed-structure "
+                "model neither holds each process's utility levels nor keeps the "
+                "site utility balance. Optimise each process's network on its own."
+            )
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
