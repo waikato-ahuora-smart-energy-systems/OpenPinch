@@ -10,6 +10,9 @@ on a main another process uses is credited rather than charged.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import replace
+
+import numpy as np
 
 from ....contracts.synthesis.site import (
     LevelLoad,
@@ -163,6 +166,37 @@ def priced_site_network(
     )
 
 
+def with_site_prices(solver_arrays, balance):
+    """``solver_arrays`` with each utility priced at its level's site price.
+
+    A hot utility costs its level's ``use_price`` and a cold utility its
+    level's ``generation_price`` negated, per period: heat raised on a main
+    that is short is a credit, and heat raised into a level in surplus
+    costs the dump it reaches. A side without a price keeps its own. Use
+    never costs less than generation saves, so the priced utility cost of
+    the loads ``balance`` was solved at is never below the balance's cost.
+    """
+
+    values = dict(solver_arrays.arrays)
+    for side, prefix, axis, key in (
+        ("use", HOT_PREFIX, "hot_utilities", "hu_cost_period"),
+        ("generation", COLD_PREFIX, "cold_utilities", "cu_cost_period"),
+    ):
+        prices = np.array(values[key], dtype=float, copy=True)
+        for u, identity in enumerate(solver_arrays.utility_identities[axis]):
+            name = identity.removeprefix(prefix)
+            for n in range(prices.shape[0]):
+                try:
+                    row = balance.level(name, n)
+                except KeyError:
+                    continue
+                price = row.use_price if side == "use" else row.generation_price
+                if price is not None:
+                    prices[n][u] = price if side == "use" else -price
+        values[key] = prices
+    return replace(solver_arrays, arrays=values)
+
+
 def _process_of(stream: str, processes: Sequence[str]) -> str:
     matches = [process for process in processes if stream.startswith(f"{process}.")]
     return max(matches, key=len, default="")
@@ -175,4 +209,5 @@ __all__ = [
     "site_loads",
     "site_metrics",
     "site_utility_levels",
+    "with_site_prices",
 ]

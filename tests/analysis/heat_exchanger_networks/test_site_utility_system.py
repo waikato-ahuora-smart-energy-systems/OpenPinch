@@ -45,6 +45,10 @@ def _levels(**overrides) -> SiteUtilityLevels:
     return SiteUtilityLevels(levels=tuple(levels.values()))
 
 
+# Prices come from a second HiGHS solve over the optimal duals, accurate
+# to its tolerances (about 1e-9 relative), so they are compared at 1e-7.
+
+
 def _closes(balance) -> None:
     for row in balance.balances:
         assert row.use + row.letdown_out + row.dump == pytest.approx(
@@ -70,7 +74,7 @@ def test_a_short_main_imports_and_credits_generation_at_its_price():
     assert lps.imported == pytest.approx(20.0, abs=1e-9)
     assert lps.dump == pytest.approx(0.0, abs=1e-9)
     assert lps.cost == pytest.approx(600.0, abs=1e-6)
-    assert lps.marginal_price == pytest.approx(30.0, abs=1e-9)
+    assert lps.marginal_price == pytest.approx(30.0, rel=1e-7)
     assert balance.operating_cost == pytest.approx(600.0, abs=1e-6)
     assert balance.hot_utility == pytest.approx((20.0,), abs=1e-9)
     assert balance.cold_utility == pytest.approx((0.0,), abs=1e-9)
@@ -94,8 +98,8 @@ def test_a_surplus_on_a_main_is_let_down_to_the_cheapest_dump():
     assert cw.letdown_in == pytest.approx(15.0, abs=1e-9)
     assert cw.dump == pytest.approx(15.0, abs=1e-9)
     assert balance.operating_cost == pytest.approx(75.0, abs=1e-6)
-    assert lps.marginal_price == pytest.approx(-5.0, abs=1e-9)
-    assert cw.marginal_price == pytest.approx(-5.0, abs=1e-9)
+    assert lps.marginal_price == pytest.approx(-5.0, rel=1e-7)
+    assert cw.marginal_price == pytest.approx(-5.0, rel=1e-7)
     _closes(balance)
 
 
@@ -125,8 +129,8 @@ def test_each_period_balances_on_its_own_and_costs_are_weighted():
 
     assert balance.period_costs == pytest.approx((600.0, 75.0), abs=1e-6)
     assert balance.operating_cost == pytest.approx((3 * 600.0 + 75.0) / 4, abs=1e-6)
-    assert balance.level("LPS", 0).marginal_price == pytest.approx(30.0, abs=1e-9)
-    assert balance.level("LPS", 1).marginal_price == pytest.approx(-5.0, abs=1e-9)
+    assert balance.level("LPS", 0).marginal_price == pytest.approx(30.0, rel=1e-7)
+    assert balance.level("LPS", 1).marginal_price == pytest.approx(-5.0, rel=1e-7)
     _closes(balance)
 
 
@@ -148,7 +152,7 @@ def test_an_import_capacity_sends_the_rest_down_from_a_hotter_level():
     assert balance.level("LPS").imported == pytest.approx(5.0, abs=1e-9)
     assert balance.level("VHPS").letdown_out == pytest.approx(15.0, abs=1e-9)
     assert balance.operating_cost == pytest.approx(5 * 30.0 + 15 * 40.0, abs=1e-6)
-    assert balance.level("LPS").marginal_price == pytest.approx(40.0, abs=1e-9)
+    assert balance.level("LPS").marginal_price == pytest.approx(40.0, rel=1e-7)
     _closes(balance)
 
 
@@ -276,3 +280,37 @@ def test_with_prices_rising_with_temperature_the_balance_is_the_site_cascade(cas
     assert balance.hot_utility[0] == pytest.approx(hot, rel=1e-7, abs=1e-6)
     assert balance.cold_utility[0] == pytest.approx(cold, rel=1e-7, abs=1e-6)
     _closes(balance)
+
+
+def test_a_balanced_main_prices_use_and_generation_on_either_side():
+    """LPS uses exactly what it raises. One more kW of use must be bought
+    (30 $); one more kW raised goes down to cooling water (5 $), so it is
+    charged 5. The dual reported is their midpoint. Cooling water, with no
+    load, prices heat raised into it at its dump price; a hot level has no
+    generation price and a cold one no use price."""
+    balance = account_utility_system(
+        _levels(), {"A": {"LPS": LevelLoad(use=(10.0,), generation=(10.0,))}}
+    )
+
+    lps, cw, vhps = (balance.level(name) for name in ("LPS", "CW", "VHPS"))
+    assert lps.use_price == pytest.approx(30.0, rel=1e-7)
+    assert lps.generation_price == pytest.approx(-5.0, rel=1e-7)
+    assert lps.marginal_price == pytest.approx(12.5, rel=1e-7)
+    assert cw.generation_price == pytest.approx(-5.0, rel=1e-7)
+    assert cw.use_price is None
+    assert vhps.use_price == pytest.approx(40.0, rel=1e-7)
+    assert vhps.generation_price is None
+
+
+def test_without_degeneracy_both_prices_are_the_dual():
+    balance = account_utility_system(
+        _levels(),
+        {
+            "A": {"LPS": LevelLoad(use=(30.0,), generation=(0.0,))},
+            "B": {"LPS": LevelLoad(use=(0.0,), generation=(10.0,))},
+        },
+    )
+
+    lps = balance.level("LPS")
+    assert lps.use_price == pytest.approx(30.0, rel=1e-7)
+    assert lps.generation_price == pytest.approx(30.0, rel=1e-7)

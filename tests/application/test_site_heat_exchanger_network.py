@@ -309,3 +309,24 @@ def test_a_site_network_is_costed_with_site_utility_accounting():
     for outcome in view.result.ranked_networks[1:]:
         other = outcome.network.summary_metrics.get("site_total_annual_cost")
         assert other is None or other >= metrics["site_total_annual_cost"] - 1e-6
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_site_networks_own_cost_credits_steam_raised_on_a_main():
+    """Evolution prices each utility at its level's site price: LPS that
+    Cooling raises saves what LPS costs to buy, so the network's own total
+    annual cost is its site total annual cost, not one that charges the
+    raised steam as a cooler."""
+    network = (
+        _steam_main_site()
+        .design.total_site_heat_exchanger_network(
+            width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
+        )
+        .selected_network
+    )
+
+    assert network.total_annual_cost == pytest.approx(
+        network.summary_metrics["site_total_annual_cost"], rel=1e-6
+    )

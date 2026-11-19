@@ -36,6 +36,13 @@ Heat exchanger network synthesis
   and the result rank site networks by site total annual cost (other
   networks by total annual cost as before). Steam raised on a main that
   another process uses is now credited rather than charged as a cooler.
+- Network evolution of a site prices each utility at its level's site
+  price at the targeted level duties: a heater pays the cost of one more kW
+  of use on its level, and a cooler on a main is credited what one more kW
+  raised there saves (or charged the dump it reaches when the main is in
+  surplus). The levels stay held at their targets, so these prices cost the
+  design and do not choose the levels, and a site network's own total
+  annual cost now equals its site total annual cost.
 - ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
   each process is designed over every period at once, so each level carries
   its targeted duty in every period, and network evolution holds those

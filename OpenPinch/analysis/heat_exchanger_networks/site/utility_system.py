@@ -138,6 +138,8 @@ def _solve_period(levels, use, generation, n: int) -> list[UtilityLevelBalance]:
         )
     x = solution.x
     duals = solution.eqlin.marginals
+    capped = [(c, bound[1]) for c, bound in enumerate(bounds) if bound[1] is not None]
+    prices = _OptimalDuals(balance, costs, use - generation, capped, solution.fun)
     rows = []
     for i, level in enumerate(items):
         imported = sum(x[c] for c, j in enumerate(imports) if j == i)
@@ -150,6 +152,9 @@ def _solve_period(levels, use, generation, n: int) -> list[UtilityLevelBalance]:
             + (level.dump_price[n] * dump if level.dumps else 0.0)
             + levels.letdown_price * letdown_in
         )
+        use_price = prices.extreme(i, highest=True) if level.imports else None
+        generation_price = prices.extreme(i, highest=False) if level.dumps else None
+        sides = [p for p in (use_price, generation_price) if p is not None]
         rows.append(
             UtilityLevelBalance(
                 level=level.name,
@@ -161,10 +166,54 @@ def _solve_period(levels, use, generation, n: int) -> list[UtilityLevelBalance]:
                 letdown_out=float(letdown_out),
                 dump=float(dump),
                 cost=float(cost),
-                marginal_price=float(duals[i]),
+                marginal_price=float(sum(sides) / len(sides) if sides else duals[i]),
+                use_price=use_price,
+                generation_price=generation_price,
             )
         )
     return rows
+
+
+class _OptimalDuals:
+    """The set of optimal duals of one period's balance.
+
+    Duals ``lambda`` (one per level) and ``mu <= 0`` (one per capped
+    column) with ``A' lambda + mu <= c`` and an objective within a hair of
+    the optimum. The largest ``lambda_l`` over the set is the cost of one
+    more kW of use on level l; the smallest, what one more kW of generation
+    there saves. They differ only where the balance is degenerate.
+    """
+
+    def __init__(self, balance, costs, rhs, capped, optimum: float) -> None:
+        levels, columns = balance.shape
+        size = levels + len(capped)
+        rows = np.zeros((columns + 1, size))
+        rows[:columns, :levels] = balance.T
+        for k, (c, _bound) in enumerate(capped):
+            rows[c, levels + k] = 1.0
+        # Objective at least the optimum (weak duality caps it there).
+        rows[columns, :levels] = -rhs
+        rows[columns, levels:] = [-bound for _c, bound in capped]
+        self._rows = rows
+        self._limits = np.append(costs, -optimum + 1e-9 * max(1.0, abs(optimum)))
+        self._bounds = [(None, None)] * levels + [(None, 0.0)] * len(capped)
+        self._size = size
+
+    def extreme(self, level: int, *, highest: bool) -> float | None:
+        """The largest (or smallest) optimal dual of ``level``; ``None``
+        when it is unbounded (no more use, or generation, can be taken)."""
+        objective = np.zeros(self._size)
+        objective[level] = -1.0 if highest else 1.0
+        solution = linprog(
+            objective,
+            A_ub=self._rows,
+            b_ub=self._limits,
+            bounds=self._bounds,
+            method="highs",
+        )
+        if solution.status != 0:
+            return None
+        return float(-solution.fun if highest else solution.fun)
 
 
 __all__ = ["account_utility_system"]

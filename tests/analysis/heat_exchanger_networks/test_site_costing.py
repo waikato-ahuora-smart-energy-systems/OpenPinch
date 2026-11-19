@@ -150,3 +150,36 @@ def test_a_site_network_costs_its_capital_plus_the_site_balance():
     balance = priced.source_metadata["site_utility_balance"]
     assert balance.level("LPS").imported == pytest.approx(20.0, abs=1e-9)
     assert priced.total_annual_cost == pytest.approx(2200.0, abs=1e-9)
+
+
+def test_site_prices_put_each_levels_marginal_price_on_its_utilities():
+    """zonal_site with 10 kW of LPS used and 4 raised: LPS is short, so its
+    use costs and its generation saves 249 $/kW/y; cooling water takes no
+    load but would cost 249 per kW raised into it, so its cooler price stays
+    249. Every period of the arrays is replaced; the original is unchanged."""
+    from OpenPinch.analysis.heat_exchanger_networks.site.costing import (
+        loads_from_level_duties,
+        with_site_prices,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.site.utility_system import (
+        account_utility_system,
+    )
+
+    arrays = problem_to_solver_arrays(PinchProblem(source=str(ZONAL_SITE)), 10.0)
+    levels = site_utility_levels(arrays)
+    balance = account_utility_system(
+        levels,
+        loads_from_level_duties(
+            {"A": {"Hot Utility.LPS": [10.0]}, "B": {"Cold Utility.LPS": [4.0]}}
+        ),
+    )
+
+    priced = with_site_prices(arrays, balance)
+
+    hot = arrays.utility_identities["hot_utilities"].index("Hot Utility.LPS")
+    cold = arrays.utility_identities["cold_utilities"].index("Cold Utility.LPS")
+    cw = arrays.utility_identities["cold_utilities"].index("Cold Utility.CW")
+    assert priced.arrays["hu_cost_period"][0][hot] == pytest.approx(249.0)
+    assert priced.arrays["cu_cost_period"][0][cold] == pytest.approx(-249.0)
+    assert priced.arrays["cu_cost_period"][0][cw] == pytest.approx(249.0)
+    assert arrays.arrays["cu_cost_period"][0][cold] == pytest.approx(249.0)

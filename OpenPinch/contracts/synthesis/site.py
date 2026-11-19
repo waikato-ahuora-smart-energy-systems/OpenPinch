@@ -129,8 +129,11 @@ class UtilityLevelBalance(BaseModel):
 
     ``use + letdown_out + dump == generation + letdown_in + imported``.
     ``cost`` is what the level's import, dump and letdown in cost.
-    ``marginal_price`` is the dual of the balance: the cost of one more kW
-    of use on the level (so one more kW of generation saves it).
+    ``use_price`` is the cost of one more kW of use on the level (hot and
+    both levels) and ``generation_price`` what one more kW of generation
+    there saves (cold and both levels; negative when it is dumped).
+    ``marginal_price`` is the dual of the balance: their midpoint, equal to
+    both unless the balance is degenerate.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -145,6 +148,8 @@ class UtilityLevelBalance(BaseModel):
     dump: float
     cost: float
     marginal_price: float
+    use_price: float | None = None
+    generation_price: float | None = None
 
 
 class UtilitySystemBalance(BaseModel):

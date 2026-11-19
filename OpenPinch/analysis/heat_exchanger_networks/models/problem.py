@@ -15,7 +15,13 @@ from ..extraction.service import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
-from ..site.costing import priced_site_network, site_utility_levels
+from ..site.costing import (
+    loads_from_level_duties,
+    priced_site_network,
+    site_utility_levels,
+    with_site_prices,
+)
+from ..site.utility_system import account_utility_system
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.dependencies import (
@@ -117,7 +123,7 @@ class InternalHeatExchangerNetworkProblem:
         self._model_factories = model_factories
         self._record_level_targets()
         if self.site_processes is not None and self.site_levels is None:
-            self.site_levels = site_utility_levels(self.solver_arrays)
+            self._price_site_utilities()
         self._slice_utilities()
         self.args = {
             "name": self.name,
@@ -147,6 +153,20 @@ class InternalHeatExchangerNetworkProblem:
             self._build_pdm(model_factories=model_factories)
             return
         self._build_stage_wise(model_factories=model_factories)
+
+    def _price_site_utilities(self) -> None:
+        """Keep the site's levels and price each utility at its site price.
+
+        The prices are the site balance's at the targeted level duties
+        (``../site/costing.py:with_site_prices``). The levels are held at
+        those duties, so the prices cost the design and do not choose the
+        levels; heat raised on a short main is a credit.
+        """
+        self.site_levels = site_utility_levels(self.solver_arrays)
+        balance = account_utility_system(
+            self.site_levels, loads_from_level_duties(self.site_processes)
+        )
+        self.solver_arrays = with_site_prices(self.solver_arrays, balance)
 
     def _record_level_targets(self) -> None:
         """Keep the levels a design holds, or its parent's, by utility name."""
