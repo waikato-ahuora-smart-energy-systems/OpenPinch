@@ -39,12 +39,16 @@ def _quantity(value, unit):
 
 
 def _stream(zone, name, supply, target, heat_flow):
+    if isinstance(heat_flow, list):
+        flow = {"values": heat_flow, "unit": "kW"}
+    else:
+        flow = _quantity(heat_flow, "kW")
     return {
         "zone": f"Site/{zone}",
         "name": name,
         "t_supply": _quantity(supply, "degC"),
         "t_target": _quantity(target, "degC"),
-        "heat_flow": _quantity(heat_flow, "kW"),
+        "heat_flow": flow,
         "dt_cont": _quantity(D_TMIN / 2, "delta_degC"),
         "htc": _quantity(1.0, "kW/m^2/delta_degC"),
     }
@@ -63,18 +67,20 @@ def _utility(name, kind, supply, target, price):
     }
 
 
-def _site(processes=("Heating", "Cooling")) -> PinchProblem:
+def _site(processes=("Heating", "Cooling"), *, periods=False) -> PinchProblem:
     """Heating needs 40 kW from LPS between two matches; Cooling raises 40 kW
     of LP steam between two. By price HPS and cooling water would take
-    both."""
+    both. With ``periods``, a second period carries more on C1 and H3."""
+    c1 = [140.0, 168.0] if periods else 140.0
+    h3 = [140.0, 168.0] if periods else 140.0
     streams = {
         "Heating": [
             _stream("Heating", "H1", 220.0, 150.0, 70.0),
             _stream("Heating", "H2", 100.0, 70.0, 30.0),
-            _stream("Heating", "C1", 60.0, 200.0, 140.0),
+            _stream("Heating", "C1", 60.0, 200.0, c1),
         ],
         "Cooling": [
-            _stream("Cooling", "H3", 200.0, 60.0, 140.0),
+            _stream("Cooling", "H3", 200.0, 60.0, h3),
             _stream("Cooling", "C2", 50.0, 120.0, 70.0),
             _stream("Cooling", "C3", 160.0, 190.0, 30.0),
         ],
@@ -95,6 +101,14 @@ def _site(processes=("Heating", "Cooling")) -> PinchProblem:
                     {"name": zone, "type": "Process Zone"} for zone in processes
                 ],
             },
+            "options": (
+                {
+                    "PROBLEM_PERIOD_IDS": ["base", "peak"],
+                    "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5],
+                }
+                if periods
+                else {}
+            ),
         }
     )
 
@@ -140,6 +154,56 @@ def test_a_site_network_holds_each_processs_levels_and_matches_within_it():
     assert duties.get((cooling, "Cold Utility.LPG"), 0.0) == pytest.approx(
         40.0, rel=1e-3
     )
+    assert verify_network_feasibility(network) == ()
+
+
+def _level_duties(network) -> dict[tuple[str, str], list[float]]:
+    """Each process's heater and cooler duty per period, by utility."""
+    duties: dict[tuple[str, str], list[float]] = {}
+    for exchanger in network.exchangers:
+        if exchanger.kind is HeatExchangerKind.HOT_UTILITY:
+            key = (_process(exchanger.sink_stream), exchanger.source_stream)
+        elif exchanger.kind is HeatExchangerKind.COLD_UTILITY:
+            key = (_process(exchanger.source_stream), exchanger.sink_stream)
+        else:
+            continue
+        by_period = duties.setdefault(key, [0.0] * len(exchanger.period_states))
+        for state in exchanger.period_states:
+            if state.active:
+                by_period[state.period_idx] += float(state.duty)
+    return duties
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_multiperiod_site_network_holds_each_processs_levels_in_every_period():
+    """In the peak period C1 and H3 carry 20% more: Heating then needs 57 kW
+    of LPS (C1 below LPS's reach, less H2) and 11 kW of HPS, and Cooling
+    raises 54.5 kW of LP steam with 13.5 kW to cooling water. Each process
+    is designed over both periods, so its levels hold in each."""
+    problem = _site(periods=True)
+
+    view = problem.design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
+    )
+    network = view.selected_network
+
+    for exchanger in network.exchangers:
+        if exchanger.kind is HeatExchangerKind.RECOVERY:
+            assert _process(exchanger.source_stream) == _process(exchanger.sink_stream)
+    duties = _level_duties(network)
+    heating = next(p for p, _ in duties if "Heating" in p)
+    cooling = next(p for p, _ in duties if "Cooling" in p)
+    expected = {
+        (heating, "Hot Utility.LPS"): [40.0, 57.0],
+        (heating, "Hot Utility.HPS"): [0.0, 11.0],
+        (cooling, "Hot Utility.HPS"): [0.0, 0.0],
+        (cooling, "Cold Utility.LPG"): [40.0, 54.5],
+        (cooling, "Cold Utility.CW"): [0.0, 13.5],
+    }
+    for key, levels in expected.items():
+        assert duties.get(key, [0.0, 0.0]) == pytest.approx(levels, abs=1e-3), key
     assert verify_network_feasibility(network) == ()
 
 

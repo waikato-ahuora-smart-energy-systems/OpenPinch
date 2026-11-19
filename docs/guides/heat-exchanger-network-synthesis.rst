@@ -394,6 +394,11 @@ as one problem, with no thermal derivative step. Every process keeps each
 utility level at its targeted duty, and heat is recovered only between
 streams of one process. ``depth`` sets the evolution's breadth, and from 2
 the MILP pinch design method joins the heuristic for the process networks.
+On a multiperiod site each process is designed over every period at once
+(design basis ``"all"``, whatever ``HENS_DESIGN_BASIS`` says), so each level
+carries its targeted duty in every period; the evolution holds those duties
+period by period, with one area per exchanger sized for the period that
+needs most, and no fit to the periods follows.
 
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
