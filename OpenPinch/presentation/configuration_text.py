@@ -471,6 +471,19 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "more than the cheapest before them."
         ),
     ),
+    "HENS_SITE_LEVEL_STEP": FieldText(
+        "Total site level step", "delta_degC",
+        (
+            "First step (K) by which a placed total site design moves each "
+            "placed level's temperature to lower the site total annual cost; it "
+            "halves when no move improves, down to HENS_SITE_LEVEL_STEP_MIN. 0 "
+            "moves no level."
+        ),
+    ),
+    "HENS_SITE_LEVEL_STEP_MIN": FieldText(
+        "Total site level minimum step", "delta_degC",
+        "Smallest level-temperature step (K) a placed total site design tries.",
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (

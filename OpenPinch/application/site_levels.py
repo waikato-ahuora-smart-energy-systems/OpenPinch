@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 # A count needs two isothermal levels: utility placement places no fewer.
 _MIN_ISOTHERMAL = 2
+# Generated level names, after their side: ``hot_iso_1``, ``cold_sensible_2``.
+_PLACED_KINDS = ("iso_", "sensible_")
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,8 @@ class LevelCountRun:
     view: Any = None
     total_annual_cost: float | None = None
     message: str | None = None
+    # The case the count was designed on, for level moves.
+    case: Any = None
 
     def row(self) -> dict[str, Any]:
         """The run as a JSON-safe record."""
@@ -101,8 +105,11 @@ def placed_case(
 ) -> "PinchProblem":
     """The case with ``count`` site levels placed by utility placement.
 
-    Each placed level is a generated pair, serving heating and cooling.
-    Placement runs over every period of the site.
+    Each placed level is a generated pair, serving heating and cooling. Its
+    hot and cold utility are renamed to one name (``hot_iso_1`` and
+    ``cold_iso_1`` to ``iso_1``), so the site accounts the pair as one main
+    (``../analysis/heat_exchanger_networks/site/levels.py``). Placement runs
+    over every period of the site.
     """
     from .case_derivation import with_utilities_from
 
@@ -113,7 +120,12 @@ def placed_case(
         period_ids=tuple(problem.period_ids),
         options=placement,
     )
-    return with_utilities_from(problem, placed)
+    source = with_utilities_from(problem, placed).to_problem_json()
+    for utility in source["utilities"]:
+        side, _, name = utility["name"].partition("_")
+        if side == utility["type"].casefold() and name.startswith(_PLACED_KINDS):
+            utility["name"] = name
+    return type(problem)(source, project_name=problem.project_name)
 
 
 def site_cost(network) -> float:
@@ -168,7 +180,13 @@ def run_level_counts(
             continue
         cost = site_cost(view.selected_network)
         runs.append(
-            LevelCountRun(**split, status="designed", view=view, total_annual_cost=cost)
+            LevelCountRun(
+                **split,
+                status="designed",
+                view=view,
+                total_annual_cost=cost,
+                case=case,
+            )
         )
         rises = rises + 1 if cost > best else 0
         best = min(best, cost)
