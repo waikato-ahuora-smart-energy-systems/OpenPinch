@@ -221,7 +221,8 @@ def _cheapest_heuristic_seeds(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
     limit: int,
 ) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
-    """Drop all but the ``limit`` cheapest heuristic networks per multiplier."""
+    """Drop all but the ``limit`` cheapest heuristic networks per multiplier
+    (a network without an objective value counts as the dearest)."""
     groups: dict[tuple, list[HeatExchangerNetworkSynthesisTaskOutcome]] = {}
     for outcome in outcomes:
         if _successful_method(
@@ -238,11 +239,14 @@ def _cheapest_heuristic_seeds(
     dropped = {
         id(outcome)
         for group in groups.values()
-        for outcome in sorted(group, key=lambda outcome: outcome.objective_value)[
-            limit:
-        ]
+        for outcome in sorted(group, key=_objective_or_inf)[limit:]
     }
     return tuple(outcome for outcome in outcomes if id(outcome) not in dropped)
+
+
+def _objective_or_inf(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> float:
+    value = outcome.objective_value
+    return float("inf") if value is None else float(value)
 
 
 def _standard_evolution_task(
