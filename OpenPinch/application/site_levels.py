@@ -36,6 +36,8 @@ class LevelCountRun:
     view: Any = None
     total_annual_cost: float | None = None
     message: str | None = None
+    # The case the count was designed on, for level moves.
+    case: Any = None
 
     def row(self) -> dict[str, Any]:
         """The run as a JSON-safe record."""
@@ -178,7 +180,13 @@ def run_level_counts(
             continue
         cost = site_cost(view.selected_network)
         runs.append(
-            LevelCountRun(**split, status="designed", view=view, total_annual_cost=cost)
+            LevelCountRun(
+                **split,
+                status="designed",
+                view=view,
+                total_annual_cost=cost,
+                case=case,
+            )
         )
         rises = rises + 1 if cost > best else 0
         best = min(best, cost)

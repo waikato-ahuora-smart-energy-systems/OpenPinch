@@ -56,6 +56,15 @@ Heat exchanger network synthesis
   count (``HENS_SITE_LEVEL_SWEEP``). ``HENS_SITE_LEVEL_EARLY_STOP`` ends the
   sweep after two counts in a row that cost more. ``levels="given"``
   (``HENS_SITE_LEVELS``, the default) keeps the case's utilities.
+- A placed total site design (``levels="placed"``) refines the cheapest
+  count's design by level-temperature moves: each placed level is shifted up
+  or down by ``HENS_SITE_LEVEL_STEP`` (default 5 K), within the order of the
+  levels and the site's stream temperatures, each process's level duties are
+  re-targeted, and the site is evolved again from the current best network;
+  a move is adopted only on a lower site total annual cost. The step halves
+  when no move improves, down to ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K);
+  ``HENS_SITE_LEVEL_STEP: 0`` turns the moves off. Every move tried is
+  listed in the result's provenance (``HENS_SITE_LEVEL_MOVES``).
 - A placed site level is one main: its hot and cold utility share one name
   (``iso_1`` rather than ``hot_iso_1`` and ``cold_iso_1``), so site utility
   accounting credits steam raised on a placed level against its use.

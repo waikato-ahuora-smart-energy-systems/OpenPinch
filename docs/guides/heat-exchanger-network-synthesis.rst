@@ -421,6 +421,25 @@ run``), its split and its cost. ``HENS_SITE_LEVEL_EARLY_STOP: true`` ends the
 sweep once two designed counts in a row cost more than the cheapest before
 them.
 
+A placed level is a main: its hot and cold utility share one name
+(``iso_1``, ``sensible_1``), so site utility accounting credits steam raised
+on it against its use. The cheapest count's design is then refined by
+level-temperature moves. A move shifts one placed level by
+``HENS_SITE_LEVEL_STEP`` (default 5 K) up or down; it is refused if the
+level would touch or pass another placed level or leave the range of the
+site's stream temperatures. Each process's level duties are re-targeted at
+the shifted level, and network evolution designs the site again from the
+current best network's recovery matches, with the call's width, depth and
+options. A round tries every placed level both ways and adopts the cheapest
+move that lowers the site total annual cost; a move whose design fails is
+recorded and skipped. When no move improves, the step halves, and the moves
+stop once it falls below ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K).
+``HENS_SITE_LEVEL_STEP: 0`` moves no level. Every move tried, with its cost
+and whether it was adopted, rejected or failed, is listed in
+``result.provenance.effective_settings["HENS_SITE_LEVEL_MOVES"]``. The level
+count stays fixed while levels move. Each move runs a site evolution, so the
+moves can take several times as long as the sweep's design of one count.
+
 .. code-block:: python
 
     view = site.design.total_site_heat_exchanger_network(

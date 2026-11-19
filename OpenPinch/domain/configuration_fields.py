@@ -453,6 +453,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_SITE_LEVELS": _spec(str, "given", "hens", "site_levels", validator=partial(_string_choice, choices=HENS_SITE_LEVELS_VALUES)),
     "HENS_SITE_LEVEL_COUNTS": _spec(List[int], [2, 3, 4, 5], "hens", "site_level_counts", validator=_site_level_counts),
     "HENS_SITE_LEVEL_EARLY_STOP": _spec(bool, False, "hens", "site_level_early_stop"),
+    "HENS_SITE_LEVEL_STEP": _spec(float, 5.0, "hens", "site_level_step", numeric_min=0.0),
+    "HENS_SITE_LEVEL_STEP_MIN": _spec(float, 1.0, "hens", "site_level_step_min", numeric_min=0.0, validator=_positive_float),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),

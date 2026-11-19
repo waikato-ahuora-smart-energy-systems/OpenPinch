@@ -601,9 +601,18 @@ class _DesignAccessor:
         network, tagged ``summary_metrics["utility_level_count"]``, and its
         provenance records every count (``HENS_SITE_LEVEL_SWEEP``).
         ``HENS_SITE_LEVEL_EARLY_STOP`` ends the sweep once two designed
-        counts in a row cost more than the cheapest before them.
+        counts in a row cost more than the cheapest before them. The
+        cheapest count's design is then refined by level-temperature moves:
+        each placed level (a main, its hot and cold utility of one name)
+        moves up or down by ``HENS_SITE_LEVEL_STEP`` (default 5 K) within
+        the levels' order and the streams' temperatures, the site is evolved
+        again with each process's levels re-targeted, and a move is kept
+        only on a lower site cost; the step halves down to
+        ``HENS_SITE_LEVEL_STEP_MIN`` (1 K). The moves are recorded as
+        ``HENS_SITE_LEVEL_MOVES``.
         """
         from ....domain.configuration_fields import _site_level_counts
+        from ...site_level_moves import move_seed, refine_selected
         from ...site_levels import level_sweep_view, run_level_counts
 
         processes = self._process_zones()
@@ -632,6 +641,17 @@ class _DesignAccessor:
             early_stop=hens.site_level_early_stop,
             placement=placement,
         )
+        runs, moves = refine_selected(
+            runs,
+            evaluate=lambda case, view: case.design.network_evolution(
+                [move_seed(case, view.selected_network)],
+                options=options,
+                width=width,
+                depth=depth,
+            ),
+            step=hens.site_level_step,
+            step_min=hens.site_level_step_min,
+        )
         return level_sweep_view(
             self._problem,
             runs,
@@ -640,6 +660,7 @@ class _DesignAccessor:
                 "HENS_SITE_LEVELS": "placed",
                 "HENS_SITE_LEVEL_COUNTS": list(counts),
                 "placement": dict(placement or {}),
+                "HENS_SITE_LEVEL_MOVES": [move.row() for move in moves],
             },
         )
 
