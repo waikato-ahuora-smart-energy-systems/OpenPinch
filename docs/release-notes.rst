@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A multiperiod network from duty optimisation (``optimise_duties``, a fit
+  to every period, overdesign rating) now records each period's stream
+  temperatures, duties and heat transfer coefficients, so verification
+  checks every stream's heat balance in every period. Before, it found no
+  per-period data and passed a stream left short of its target. The area
+  check also uses each period's coefficients rather than the first
+  period's.
 - ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
   designs one network for a site of several process zones. Each process is
   designed alone with the pinch design method, its utilities placed by
