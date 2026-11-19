@@ -484,6 +484,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Total site level minimum step", "delta_degC",
         "Smallest level-temperature step (K) a placed total site design tries.",
     ),
+    "HENS_SITE_TIME_LIMIT": FieldText(
+        "Total site time limit", "s",
+        (
+            "Wall-clock budget (s) for a placed total site design. Once it runs "
+            "out, no further level count or level move is started and the best "
+            "design so far is returned; a design already running finishes. At "
+            "least one level count is always designed. None sets no limit."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (

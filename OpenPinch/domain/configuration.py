@@ -207,6 +207,7 @@ class HensConfig:
     site_level_early_stop: bool
     site_level_step: float
     site_level_step_min: float
+    site_time_limit: float | None
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]
