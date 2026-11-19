@@ -20,6 +20,10 @@ Heat exchanger network synthesis
   after selection; before, the final selection swapped in the ranked
   network without them, so a design for one period returned a network with
   no ``period_id``.
+- A design run no longer stops with a ``TypeError`` when a heuristic pinch
+  design network has no objective value; it counts as the dearest. When one
+  solve in a parallel stage raises, the solves still waiting for a worker
+  are cancelled instead of all being run before the error is reported.
 - Each thermal derivative task now stops at 300 s unless
   ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
   Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run
