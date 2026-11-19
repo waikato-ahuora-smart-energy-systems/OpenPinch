@@ -16,10 +16,6 @@ Heat exchanger network synthesis
   the thermal derivative step refines, cheapest first; before, it was only
   recorded. A repeated ``HENS_DERIVATIVE_THRESHOLDS`` value no longer
   solves the same task twice.
-- A design's selected network keeps its period id, method and task id
-  after selection; before, the final selection swapped in the ranked
-  network without them, so a design for one period returned a network with
-  no ``period_id``.
 - A design run no longer stops with a ``TypeError`` when a heuristic pinch
   design network has no objective value; it counts as the dearest. When one
   solve in a parallel stage raises, the solves still waiting for a worker
