@@ -270,3 +270,44 @@ def _seed_network(*, method: str) -> HeatExchangerNetwork:
         stage_count=1,
         summary_metrics={"dt_cont_multiplier": 1.0},
     )
+
+
+def _milp_outcome(multiplier: float, objective: float):
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="method-test",
+        method="pinch_design_method",
+        dt_cont_multiplier=multiplier,
+    )
+    return HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task,
+        status="success",
+        objective_value=objective,
+        network=_seed_network(method="pinch_design_method"),
+    )
+
+
+def test_a_repeated_threshold_gives_one_derivative_task_per_parent():
+    tasks = thermal_derivative_method.build_thermal_derivative_method_tasks(
+        _settings(derivative_thresholds=(0.25, 0.25, 0.5)),
+        [_milp_outcome(1.0, 10.0)],
+    )
+
+    assert [task.derivative_threshold for task in tasks] == [0.25, 0.5]
+
+
+def test_the_parent_limit_keeps_the_cheapest_milp_networks():
+    dear, cheap, mid = (
+        _milp_outcome(1.0, 30.0),
+        _milp_outcome(1.5, 10.0),
+        _milp_outcome(2.0, 20.0),
+    )
+
+    tasks = thermal_derivative_method.build_thermal_derivative_method_tasks(
+        _settings(derivative_thresholds=(0.25,), tdm_parent_limit=2),
+        [dear, cheap, mid],
+    )
+
+    assert [task.parent_task_id for task in tasks] == [
+        cheap.task.task_id,
+        mid.task.task_id,
+    ]

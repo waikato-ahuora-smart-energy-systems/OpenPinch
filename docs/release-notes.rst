@@ -12,6 +12,10 @@ Heat exchanger network synthesis
   missing Couenne for every task sent the MILP networks to evolution; any
   other failure (a crash, a time limit, a failed check) left them as
   unevolved final candidates with no warning.
+- ``HENS_TDM_PARENT_LIMIT`` now limits how many MILP pinch design networks
+  the thermal derivative step refines, cheapest first; before, it was only
+  recorded. A repeated ``HENS_DERIVATIVE_THRESHOLDS`` value no longer
+  solves the same task twice.
 - Each thermal derivative task now stops at 300 s unless
   ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
   Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run

@@ -530,7 +530,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
         "Thermal derivative parent limit", None,
-        "Recorded in the synthesis manifest; no current synthesis step reads it.",
+        (
+            "The most MILP pinch design networks the thermal derivative step"
+            " refines, cheapest first; unset refines every one."
+        ),
     ),
     "HENS_STAGE_PACKING": FieldText(
         "Stage packing", None,
