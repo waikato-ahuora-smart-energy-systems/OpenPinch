@@ -7,6 +7,9 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Two networks that differ only in the stage boundary of a heater or cooler
+  (or a staged against a stream-end unit) are no longer ranked as one
+  structure, which dropped one of them as a repeat.
 - ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
   designs one network for a site of several process zones. Each process is
   designed alone with the pinch design method, its utilities placed by

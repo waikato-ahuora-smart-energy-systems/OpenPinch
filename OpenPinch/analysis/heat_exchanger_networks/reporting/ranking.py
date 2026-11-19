@@ -85,18 +85,28 @@ def network_structure_signature(
         )
     ]
     links.extend(
-        ("hot_utility", exchanger.source_stream, exchanger.sink_stream, None)
+        ("hot_utility", exchanger.source_stream, exchanger.sink_stream, exchanger.stage)
         for exchanger in network.exchangers
         if exchanger.kind.value == "hot_utility"
         and any(state.active for state in exchanger.period_states)
     )
     links.extend(
-        ("cold_utility", exchanger.source_stream, exchanger.sink_stream, None)
+        (
+            "cold_utility",
+            exchanger.source_stream,
+            exchanger.sink_stream,
+            exchanger.stage,
+        )
         for exchanger in network.exchangers
         if exchanger.kind.value == "cold_utility"
         and any(state.active for state in exchanger.period_states)
     )
-    return tuple(sorted(links))
+    # An end heater (stage None) sorts before a staged one on the same pair.
+    return tuple(sorted(links, key=lambda link: (*link[:3], _stage_order(link[3]))))
+
+
+def _stage_order(stage) -> int:
+    return -1 if stage is None else int(stage)
 
 
 # A utility's duty within this fraction of its level target (or this many
