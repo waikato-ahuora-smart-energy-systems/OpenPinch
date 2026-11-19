@@ -29,6 +29,13 @@ Heat exchanger network synthesis
   a steam main or hot water circuit that is short is credited at that price.
   With import prices rising with temperature it reproduces the Total Site
   utility cascade.
+- ``design.total_site_heat_exchanger_network`` costs site networks with that
+  accounting: each network carries ``site_capital_cost``,
+  ``site_operating_cost`` and ``site_total_annual_cost`` in its summary
+  metrics, the seeds are priced from their process networks, and the record
+  and the result rank site networks by site total annual cost (other
+  networks by total annual cost as before). Steam raised on a main that
+  another process uses is now credited rather than charged as a cooler.
 - ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
   each process is designed over every period at once, so each level carries
   its targeted duty in every period, and network evolution holds those

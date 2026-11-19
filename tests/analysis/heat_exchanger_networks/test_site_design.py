@@ -173,3 +173,70 @@ def test_site_seeds_take_one_network_per_process_at_each_multiplier():
 def test_site_seeds_need_some_heat_recovery():
     with pytest.raises(ValueError, match="no process network recovers heat"):
         site_seeds({"R": (_network([_heater(LPS, "R.C1", 3.0)]),)})
+
+
+def test_priced_site_seeds_carry_their_site_cost_and_come_cheapest_first():
+    """At 0.75 A uses 10 kW of LPS that B's 10 kW of raised LPS covers, so
+    the site buys none; at 1.0 A uses 12 kW and the site buys 2 kW (200 $).
+    The 0.75 seed saves that but costs 300 $ more capital, so the 1.0 seed
+    comes first."""
+    from OpenPinch.contracts.synthesis.site import SiteUtilityLevel, SiteUtilityLevels
+
+    lps = "Cold Utility.LPS"
+
+    def priced(network, capital):
+        return network.model_copy(
+            update={"capital_cost": capital, "total_annual_cost": capital}
+        )
+
+    a_fine = priced(
+        _network(
+            [_recovery("A.H1", "A.C1", 1), _heater(LPS, "A.C1", 10.0)],
+            multiplier=0.75,
+            stages=1,
+            targets={LPS: [10.0]},
+        ),
+        700.0,
+    )
+    a_nominal = priced(
+        _network(
+            [_recovery("A.H1", "A.C1", 1), _heater(LPS, "A.C1", 12.0)],
+            multiplier=1.0,
+            stages=1,
+            targets={LPS: [12.0]},
+        ),
+        400.0,
+    )
+    b = priced(
+        _network(
+            [_recovery("B.H1", "B.C1", 1), _cooler("B.H1", lps, 10.0)],
+            stages=1,
+            targets={lps: [10.0]},
+        ),
+        100.0,
+    )
+    levels = SiteUtilityLevels(
+        levels=(
+            SiteUtilityLevel(
+                name="LPS",
+                kind="both",
+                t_high=150.1,
+                t_low=150.0,
+                import_price=(100.0,),
+                dump_price=(100.0,),
+            ),
+        )
+    )
+
+    seeds = site_seeds({"A": (a_nominal, a_fine), "B": (b,)}, levels=levels)
+
+    assert [seed.summary_metrics["dt_cont_multiplier"] for seed in seeds] == [
+        1.0,
+        0.75,
+    ]
+    nominal, fine = seeds
+    assert fine.summary_metrics["site_capital_cost"] == pytest.approx(800.0)
+    assert fine.summary_metrics["site_operating_cost"] == pytest.approx(0.0, abs=1e-6)
+    assert nominal.summary_metrics["site_total_annual_cost"] == pytest.approx(
+        500.0 + 200.0, abs=1e-6
+    )

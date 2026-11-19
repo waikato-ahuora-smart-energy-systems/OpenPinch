@@ -237,3 +237,75 @@ def test_a_single_process_design_does_not_warn(monkeypatch, recwarn):
     site.design.heat_exchanger_network(zone=next(iter(site.master_zone.subzones)))
 
     assert not [w for w in recwarn if "total_site" in str(w.message)]
+
+
+def _steam_main_site() -> PinchProblem:
+    """``_site`` with LP steam as a main: Cooling raises it and Heating
+    uses it, so the site buys only what Cooling does not raise."""
+    streams = [
+        _stream("Heating", "H1", 220.0, 150.0, 70.0),
+        _stream("Heating", "H2", 100.0, 70.0, 30.0),
+        _stream("Heating", "C1", 60.0, 200.0, 140.0),
+        _stream("Cooling", "H3", 200.0, 60.0, 140.0),
+        _stream("Cooling", "C2", 50.0, 120.0, 70.0),
+        _stream("Cooling", "C3", 160.0, 190.0, 30.0),
+    ]
+    return PinchProblem(
+        source={
+            "streams": streams,
+            "utilities": [
+                _utility("HPS", "Hot", 250.0, 249.9, 40.0),
+                _utility("LPS", "Both", 140.0, 139.9, 30.0),
+                _utility("CW", "Cold", 20.0, 25.0, 5.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [
+                    {"name": zone, "type": "Process Zone"}
+                    for zone in ("Heating", "Cooling")
+                ],
+            },
+        }
+    )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_site_network_is_costed_with_site_utility_accounting():
+    """Steam Cooling raises on the LPS main meets Heating's use, so the site
+    buys less LPS than Heating uses; the site cost is the network's capital
+    plus that balance, and the design ranks by it."""
+    from OpenPinch.analysis.heat_exchanger_networks.site.costing import (
+        site_loads,
+    )
+
+    problem = _steam_main_site()
+
+    view = problem.design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
+    )
+    network = view.selected_network
+
+    metrics = network.summary_metrics
+    balance = network.source_metadata["site_utility_balance"]
+    lps = balance.level("LPS")
+    assert lps.generation > 0.0
+    assert lps.use > 0.0
+    assert lps.imported == pytest.approx(max(0.0, lps.use - lps.generation), abs=1e-6)
+    for row in balance.balances:
+        assert row.use + row.letdown_out + row.dump == pytest.approx(
+            row.generation + row.letdown_in + row.imported, abs=1e-6
+        )
+    loads = site_loads(network, ("Heating", "Cooling"))
+    assert loads["Cooling"]["LPS"].generation[0] == pytest.approx(
+        lps.generation, abs=1e-9
+    )
+    assert metrics["site_capital_cost"] == pytest.approx(network.capital_cost)
+    assert metrics["site_total_annual_cost"] == pytest.approx(
+        network.capital_cost + balance.operating_cost, rel=1e-9
+    )
+    for outcome in view.result.ranked_networks[1:]:
+        other = outcome.network.summary_metrics.get("site_total_annual_cost")
+        assert other is None or other >= metrics["site_total_annual_cost"] - 1e-6

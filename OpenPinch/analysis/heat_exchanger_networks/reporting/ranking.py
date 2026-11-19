@@ -136,17 +136,34 @@ def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
     return True
 
 
+# A site network's total annual cost with site utility accounting
+# (``../site/costing.py``): steam raised on a main is credited, not charged.
+SITE_TOTAL_ANNUAL_COST = "site_total_annual_cost"
+
+
+def ranking_cost(network: HeatExchangerNetwork | None, fallback):
+    """The cost a network ranks by: its site total annual cost when it has
+    one, else ``fallback`` (its total annual cost or objective)."""
+    value = (network.summary_metrics if network is not None else {}).get(
+        SITE_TOTAL_ANNUAL_COST
+    )
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    return fallback
+
+
 def outcome_ranking_key(
     outcome: "HeatExchangerNetworkSynthesisTaskOutcome",
 ) -> tuple[bool, float, str]:
     """Return the one key used both to accept and to rank outcomes.
 
     Networks that hold their utility levels first (``holds_utility_levels``),
-    then lowest objective; ties go to the task id, so the choice never
-    depends on the order in which tasks finished.
+    then lowest objective (a site network's site total annual cost,
+    ``ranking_cost``); ties go to the task id, so the choice never depends
+    on the order in which tasks finished.
     """
-    objective = outcome.objective_value
     network = getattr(outcome, "network", None)
+    objective = ranking_cost(network, outcome.objective_value)
     held = network is None or holds_utility_levels(network)
     return (
         not held,
@@ -173,6 +190,8 @@ __all__ = [
     "LEVEL_TOLERANCE",
     "holds_utility_levels",
     "network_structure_signature",
+    "SITE_TOTAL_ANNUAL_COST",
     "outcome_ranking_key",
+    "ranking_cost",
     "rank_unique_network_outcomes",
 ]
