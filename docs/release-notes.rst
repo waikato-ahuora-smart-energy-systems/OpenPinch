@@ -22,6 +22,15 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Stage packing (``HENS_STAGE_PACKING``, and the minimum-unit pinch
+  design search) counts each match's duty in every period. Before, it read
+  the first period alone, so a match that carries load only in later
+  periods was forced off and a packed multiperiod MILP pinch design could
+  fail.
+- Network evolution ranks a match for removal by the utility cost its
+  recovery saves in every period, averaged by the period weights. Before,
+  it used the first period's duty and price, so a match that recovers heat
+  only in later periods looked like pure capital and was removed first.
 - The fit of a design to every period (the default for multiperiod
   designs) keeps every exchanger at the case's minimum approach, its
   streams' temperature contributions, in every period. Before, it fitted at

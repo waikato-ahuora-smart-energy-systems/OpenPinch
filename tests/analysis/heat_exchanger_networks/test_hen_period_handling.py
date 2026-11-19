@@ -240,3 +240,34 @@ def test_a_stream_idle_in_one_period_does_not_break_the_pinch_design(method):
     assert all(
         e.period_states[0].duty == pytest.approx(0.0, abs=1e-6) for e in condensate
     )
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(not _highs_available(), reason="HiGHS is not installed")
+def test_stage_packing_counts_a_matchs_duty_in_every_period():
+    """Stage packing reads every period's duty: a match that carries load
+    only in later periods is not forced off, so the packed MILP pinch
+    design of a multiperiod case solves as the unpacked one does."""
+    from importlib.resources import files
+
+    source = (
+        files("OpenPinch.tutorials.sample_cases")
+        / "crude_preheat_train_multiperiod.json"
+    )
+    problem = PinchProblem(
+        source=json.loads(source.read_text(encoding="utf-8")), project_name="crude"
+    )
+
+    view = problem.design.pinch_design(
+        options={
+            "HENS_DESIGN_BASIS": "all",
+            "HENS_PDM_MILP": True,
+            "HENS_HEURISTIC_PDM_NETWORKS": 0,
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
+            "HENS_STAGE_PACKING": "pdm",
+            "HENS_OUTPUT_FORMATS": [],
+            "HENS_MAX_PARALLEL": 1,
+        }
+    )
+
+    assert view.selected_network.exchangers

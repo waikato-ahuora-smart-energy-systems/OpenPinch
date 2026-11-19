@@ -163,11 +163,12 @@ def used_utility_matches(model, q_h, q_c) -> tuple[list, list]:
     )
 
 
-def recovered_utility_price(model) -> float:
+def recovered_utility_price(model, period: int = 0) -> float:
     """Return the price of the utility heat one unit of recovery saves.
 
     Recovery saves heat from the hot and the cold utility in use; where
-    several are in use, each counts by its share of the solved period-0 duty.
+    several are in use, each counts by its share of the solved duty in
+    ``period``.
     """
 
     def price(prices, totals) -> float:
@@ -176,9 +177,31 @@ def recovered_utility_price(model) -> float:
             return float(min(prices))
         return float(sum(p * q for p, q in zip(prices, totals, strict=True)) / used)
 
-    return price(model.hu_cost_period[0], model.Q_hu_by_utility_by_period[0]) + price(
-        model.cu_cost_period[0], model.Q_cu_by_utility_by_period[0]
-    )
+    return price(
+        model.hu_cost_period[period], model.Q_hu_by_utility_by_period[period]
+    ) + price(model.cu_cost_period[period], model.Q_cu_by_utility_by_period[period])
+
+
+def recovered_value(model, i: int, j: int, k: int) -> float:
+    """The utility cost a match's recovery saves, weighted over periods.
+
+    Each period's duty is priced at that period's recovered utility price
+    and averaged by the period weights, as the operating cost is; without
+    per-period duties and weights, period 0's duty and price.
+    """
+    from .execution import _value
+
+    by_period = getattr(model, "Q_r_by_period", None)
+    weights = getattr(model, "period_weights", None)
+    if by_period is None or weights is None:
+        return _value(model.Q_r[i][j][k]) * recovered_utility_price(model)
+    total = float(sum(float(weight) for weight in weights))
+    return sum(
+        float(weights[n])
+        * _value(by_period[n][i][j][k])
+        * recovered_utility_price(model, n)
+        for n in range(len(by_period))
+    ) / (total if total > 0.0 else 1.0)
 
 
 def set_utility_lmtd_and_areas(model, q_h, q_c) -> None:
