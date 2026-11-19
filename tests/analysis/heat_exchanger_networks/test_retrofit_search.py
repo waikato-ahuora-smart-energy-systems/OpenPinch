@@ -1342,3 +1342,36 @@ def test_a_bare_stream_name_one_zone_has_maps_to_it():
         "B.H2": "B.H2",
         "A.C1": "C1",
     }
+
+
+def test_a_heat_pump_whose_machine_cannot_be_priced_is_dropped(
+    fake_solver, monkeypatch
+):
+    """The HPR cycle can fail at the heat pump's solved capacity; that
+    candidate is dropped and the search goes on, rather than stopping."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    def unpriceable(*args, **kwargs):
+        raise ValueError("the cycle does not solve at this capacity")
+
+    monkeypatch.setattr(search, "vapour_compression_capital", unpriceable)
+    result = _problem().design.retrofit(
+        _existing_network(),
+        max_modifications=1,
+        heat_pump_cycle="vapour_compression",
+        heat_pump_cost=300.0,
+        repiping_cost=1_000.0,
+        min_approach_temperature=1.0,
+        options={
+            "HPR_REFRIGERANTS": ["water"],
+            "HPR_MAX_PRESSURE_RATIO": 200.0,
+            "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.1,
+        },
+    )
+
+    assert not [
+        modification
+        for design in result.frontier
+        for modification in design.modifications
+        if modification.kind == "heat_pump"
+    ]

@@ -13,6 +13,9 @@ Heat exchanger network synthesis
   retrofit that prices new units but leaves ``area_addition_cost``,
   ``split_cost`` and ``repiping_cost`` at 0 now warns, since the search
   then favours those modifications.
+- A retrofit no longer stops when a real-fluid heat pump's cycle cannot be
+  solved at its duty to price the machine; that candidate is dropped and
+  the search goes on.
 - A retrofit whose existing network names a stream without its zone
   (``H1``) when several zones have a stream of that name (``A.H1`` and
   ``B.H1``) now raises a ``ValueError`` naming them. Before, both mapped to
