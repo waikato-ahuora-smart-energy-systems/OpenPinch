@@ -220,18 +220,16 @@ def _copy_recovery_match(
     if target.N_periods != source.N_periods:
         raise ValueError("PDM side period counts must match during amalgamation.")
     for n in range(target.N_periods):
-        _assign_value(
-            target.Q_r_by_period[n][i][j][target_stage],
-            [_value(source.Q_r_by_period[n][i][j][source_stage])],
-        )
-        _assign_value(
-            target.theta_1_by_period[n][i][j][target_stage],
-            [_value(source.theta_1_by_period[n][i][j][source_stage])],
-        )
-        _assign_value(
-            target.theta_2_by_period[n][i][j][target_stage],
-            [_value(source.theta_2_by_period[n][i][j][source_stage])],
-        )
+        duty = _value(source.Q_r_by_period[n][i][j][source_stage])
+        _assign_value(target.Q_r_by_period[n][i][j][target_stage], [duty])
+        for name in ("theta_1_by_period", "theta_2_by_period"):
+            slot = getattr(target, name)[n][i][j][target_stage]
+            # A match that cannot run in this period has a constant approach
+            # in the joined model; the side's approach there means nothing
+            # while it carries no duty (a stream idle in that period).
+            if slot.__class__ is float and abs(duty or 0.0) <= target.tol:
+                continue
+            _assign_value(slot, [_value(getattr(source, name)[n][i][j][source_stage])])
     if source.non_isothermal_model:
         for n in range(target.N_periods):
             _assign_value(

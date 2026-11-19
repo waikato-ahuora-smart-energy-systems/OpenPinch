@@ -192,3 +192,53 @@ def test_the_median_basis_matches_cp_streams_by_their_full_zone():
         assert loads[("Site/P2/Area", name)] == pytest.approx(
             2 * loads[("Site/P1/Area", name)]
         )
+
+
+def _dairy_with_an_idle_period() -> PinchProblem:
+    """The multiperiod dairy case with its condensate cooling off in the
+    first period."""
+    from importlib.resources import files
+
+    source = (
+        files("OpenPinch.tutorials.sample_cases") / "dairy_chilling_multiperiod.json"
+    )
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    for record in payload["streams"]:
+        if record["name"] == "Condensate cooling":
+            record["heat_flow"]["values"] = [0, 200, 250]
+    payload["options"].update({"HENS_OUTPUT_FORMATS": [], "HENS_MAX_PARALLEL": 1})
+    return PinchProblem(source=payload, project_name="idle-period")
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(not _highs_available(), reason="HiGHS is not installed")
+@pytest.mark.parametrize(
+    "method",
+    [
+        {"HENS_PDM_MILP": True, "HENS_HEURISTIC_PDM_NETWORKS": 0},
+        {"HENS_PDM_MILP": False},
+    ],
+    ids=["milp", "heuristic"],
+)
+def test_a_stream_idle_in_one_period_does_not_break_the_pinch_design(method):
+    """A stream with no flow in one period is still above and below the
+    pinch by temperature; its matches carry no duty in that period, and
+    the two sides of the pinch join into one network."""
+    view = _dairy_with_an_idle_period().design.pinch_design(
+        options={
+            "HENS_DESIGN_BASIS": "all",
+            "HENS_DT_CONT_MULTIPLIERS": [1.0],
+            **method,
+        }
+    )
+
+    network = view.selected_network
+    condensate = [
+        e
+        for e in network.exchangers
+        if e.source_stream.endswith("Condensate cooling")
+    ]
+    assert condensate
+    assert all(
+        e.period_states[0].duty == pytest.approx(0.0, abs=1e-6) for e in condensate
+    )
