@@ -122,6 +122,27 @@ def test_each_processs_level_duties_are_retargeted_at_the_levels_temperatures():
     assert set(duties) == {"Heating", "Cooling"}
 
 
+def test_a_one_sided_processs_level_duties_are_retargeted_too():
+    """A process of cold streams alone takes all its heat from utilities."""
+    source = _site().to_problem_json()
+    source["streams"] = [
+        stream for stream in source["streams"] if stream["name"] != "H2"
+    ] + [
+        {**stream, "zone": "Site/Boiling", "name": "C4"}
+        for stream in source["streams"]
+        if stream["name"] == "C2"
+    ]
+    source["zone_tree"]["children"].append({"name": "Boiling", "type": "Process Zone"})
+
+    duties = moves.level_duties(PinchProblem(source), 1.0)
+
+    boiling = duties["Boiling"]
+    assert sum(d[0] for name, d in boiling.items() if name.startswith("Hot")) == (
+        pytest.approx(70.0)
+    )
+    assert all(d == [0.0] for name, d in boiling.items() if name.startswith("Cold"))
+
+
 def _view(cost):
     return SimpleNamespace(
         selected_network=SimpleNamespace(total_annual_cost=cost, summary_metrics={})

@@ -121,10 +121,14 @@ def level_duties(
     As a process's level-held pinch design targets its levels: each process
     alone, with every utility of the site, at the dt_cont multiplier's
     approach (``seeds.process_level_duties`` reads the same from a network).
+    A process of only hot or only cold streams is targeted the same way.
     """
+    from ..analysis.heat_exchanger_networks.site.levels import (
+        COLD_PREFIX,
+        HOT_PREFIX,
+    )
     from ..analysis.heat_exchanger_networks.solver.arrays import (
         nominal_approach_temperature,
-        problem_to_solver_arrays,
     )
     from ..analysis.heat_exchanger_networks.solver.pinch_design_decomposition import (
         _calculate_openpinch_targets,
@@ -134,11 +138,12 @@ def level_duties(
     duties = {}
     for name in case.design._process_zones():
         process = _zone_case(case, case._resolve_target_zone(name))
-        config = process._require_prepared_root_zone().config
-        approach = nominal_approach_temperature(config, multiplier)
-        identities = problem_to_solver_arrays(process, approach).utility_identities
-        hot = tuple(identities["hot_utilities"])
-        cold = tuple(identities["cold_utilities"])
+        root = process._require_prepared_root_zone()
+        approach = nominal_approach_temperature(root.config, multiplier)
+        # From the zone, not solver arrays: a process of only hot or only
+        # cold streams has none.
+        hot = tuple(HOT_PREFIX + utility.name for utility in root.hot_utilities)
+        cold = tuple(COLD_PREFIX + utility.name for utility in root.cold_utilities)
         periods = _calculate_openpinch_targets(
             process, dTmin=approach, hot_utilities=hot, cold_utilities=cold
         )
