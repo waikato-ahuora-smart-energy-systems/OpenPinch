@@ -60,7 +60,8 @@ Heat exchanger network synthesis
   utilities kept sensible while two isothermal levels remain; the site is
   designed with each set and the cheapest design is selected. A count whose
   placement is infeasible or whose design fails is recorded and skipped; the
-  result ranks every count's best network and its provenance lists each
+  result ranks every network of each designed count (so the level-held
+  networks stay among them) and its provenance lists each
   count (``HENS_SITE_LEVEL_SWEEP``). ``HENS_SITE_LEVEL_EARLY_STOP`` ends the
   sweep after two counts in a row that cost more. ``levels="given"``
   (``HENS_SITE_LEVELS``, the default) keeps the case's utilities.
@@ -69,10 +70,26 @@ Heat exchanger network synthesis
   or down by ``HENS_SITE_LEVEL_STEP`` (default 5 K), within the order of the
   levels and the site's stream temperatures, each process's level duties are
   re-targeted, and the site is evolved again from the current best network;
-  a move is adopted only on a lower site total annual cost. The step halves
+  a move is adopted only on a lower site total annual cost than the
+  unshifted levels evaluated the same way (the sweep's best network can
+  come from a seed a move never builds), and the sweep's network is kept
+  when no adopted move costs less than it. The step halves
   when no move improves, down to ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K);
   ``HENS_SITE_LEVEL_STEP: 0`` turns the moves off. Every move tried is
   listed in the result's provenance (``HENS_SITE_LEVEL_MOVES``).
+- A total site seed no longer takes a process network designed at a
+  smaller dt_cont multiplier than its own: such a network can need more
+  recovery than the seed's approach allows. Each process gives its nearest
+  network at or above the seed's multiplier, and there is no seed at a
+  multiplier some process has nothing at or above. A process zone whose
+  pinch design found no network is named in the error.
+- ``design.optimise_duties`` refuses a total site network with a
+  ``ValueError``: its fixed-structure model neither holds each process's
+  utility levels nor keeps the site utility balance, so it re-priced each
+  heater and cooler alone and dropped the levels. A stored
+  ``HENS_OVERDESIGN_PERCENTAGE`` no longer reaches a site design's process
+  designs, where rating each network at the margin dropped its level
+  targets and turned the level-held seeds into duty-based ones.
 - A placed site level is one main: its hot and cold utility share one name
   (``iso_1`` rather than ``hot_iso_1`` and ``cold_iso_1``), so site utility
   accounting credits steam raised on a placed level against its use.
