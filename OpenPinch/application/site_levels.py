@@ -48,11 +48,13 @@ class LevelCountRun:
 
 
 def _sensible_utilities(problem: "PinchProblem") -> int:
-    """How many of the case's utilities are sensible levels.
+    """How many sensible levels the case has on its busier side.
 
     A utility with segments or a profile, or whose temperature changes by
     more than synthesis's ``MINIMUM_SLICED_RANGE`` (1 K) in some period, is
-    sensible: steam's nominal 0.1 K span is isothermal.
+    sensible: steam's nominal 0.1 K span is isothermal. A ``Both`` utility
+    counts on each side. Each placed level serves both sides, so the count
+    is the larger side's, as utility placement infers its counts.
     """
     from ..analysis.heat_exchanger_networks.solver.utility_slices import (
         MINIMUM_SLICED_RANGE,
@@ -61,17 +63,24 @@ def _sensible_utilities(problem: "PinchProblem") -> int:
         UtilityLevelKind,
         UtilityPlacementOptions,
     )
+    from ..domain.enums import StreamType
     from .utility_placement import _utility_kind
 
     options = UtilityPlacementOptions(
         default_isothermal_span={"value": MINIMUM_SLICED_RANGE, "unit": "delta_degC"}
     )
     config = problem._require_prepared_root_zone().config
-    return sum(
-        _utility_kind(utility, options=options, config=config)
-        is UtilityLevelKind.SENSIBLE
+    sensible = [
+        utility.type
         for utility in problem.validate().utilities
-        if utility.active and utility.name.strip().casefold() not in {"hu", "cu"}
+        if utility.active
+        and utility.name.strip().casefold() not in {"hu", "cu"}
+        and _utility_kind(utility, options=options, config=config)
+        is UtilityLevelKind.SENSIBLE
+    ]
+    return max(
+        sum(kind in (side, StreamType.Both.value) for kind in sensible)
+        for side in (StreamType.Hot.value, StreamType.Cold.value)
     )
 
 

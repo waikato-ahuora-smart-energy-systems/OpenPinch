@@ -73,6 +73,18 @@ def test_cooling_water_over_5_k_is_the_sensible_level_of_the_unit_site(count):
     )
 
 
+def test_sensible_levels_are_counted_per_side_as_placement_infers_them():
+    """Each placed level serves both sides, so hot water (hot) and cooling
+    water (cold) are one sensible level on each side, not two."""
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    source = _site().to_problem_json()
+    source["utilities"].append(_utility("HW", "Hot", 90.0, 70.0, 30.0))
+    problem = PinchProblem(source)
+
+    assert site_levels.level_split(problem, 4) == (3, 1)
+
+
 def test_a_count_below_two_is_refused():
     with pytest.raises(ValueError, match="at least 2"):
         site_levels.level_split(_site(), 1)
