@@ -56,6 +56,9 @@ Heat exchanger network synthesis
   count (``HENS_SITE_LEVEL_SWEEP``). ``HENS_SITE_LEVEL_EARLY_STOP`` ends the
   sweep after two counts in a row that cost more. ``levels="given"``
   (``HENS_SITE_LEVELS``, the default) keeps the case's utilities.
+- A placed site level is one main: its hot and cold utility share one name
+  (``iso_1`` rather than ``hot_iso_1`` and ``cold_iso_1``), so site utility
+  accounting credits steam raised on a placed level against its use.
 - A total site network design no longer fails when one process's pinch
   design with utility placed by price fails: that process seeds evolution
   from its level-held networks (and the reverse), and the design fails only

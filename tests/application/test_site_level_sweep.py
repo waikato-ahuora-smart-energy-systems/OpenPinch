@@ -92,7 +92,8 @@ def test_a_count_below_two_is_refused():
 
 def test_each_counts_placed_levels_reach_its_design():
     """The design for a count sees the site's streams with that count's
-    placed levels, each serving both heating and cooling."""
+    placed levels. Each level serves both heating and cooling: its hot and
+    cold utility share its name, so the site accounts it as one main."""
     problem = _site()
     seen = {}
 
@@ -108,13 +109,32 @@ def test_each_counts_placed_levels_reach_its_design():
     for count, source in seen.items():
         assert sorted(s["name"] for s in source["streams"]) == streams
         isothermal, sensible = site_levels.level_split(problem, count)
-        names = {u["name"] for u in source["utilities"]} - {"HU", "CU"}
-        assert names == {
-            f"{side}_{kind}_{level}"
-            for side in ("hot", "cold")
+        placed = {
+            (u["name"], u["type"])
+            for u in source["utilities"]
+            if u["name"] not in {"HU", "CU"}
+        }
+        assert placed == {
+            (f"{kind}_{level}", side)
+            for side in ("Hot", "Cold")
             for kind, levels in (("iso", isothermal), ("sensible", sensible))
             for level in range(1, levels + 1)
         }
+
+
+def test_a_placed_level_is_a_main_of_the_site_utility_system():
+    from OpenPinch.analysis.heat_exchanger_networks.site.levels import (
+        site_utility_system,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    case = site_levels.placed_case(_site(), 2, placement=SHORT_PLACEMENT)
+    levels = site_utility_system(problem_to_solver_arrays(case, 10.0)).levels
+
+    kinds = {level.name: level.kind for level in levels.levels}
+    assert kinds["iso_1"] == kinds["iso_2"] == "both"
 
 
 def test_an_infeasible_count_is_recorded_and_skipped():
@@ -326,11 +346,11 @@ def test_a_placed_site_network_is_the_cheapest_over_the_counts():
     }
     assert sorted(by_count) == sorted(row["count"] for row in designed)
     for count, counted in by_count.items():
-        placed = {
-            f"{side}_iso_{level}"
-            for side in ("hot", "cold")
-            for level in range(1, count + 1)
-        } | {"HU", "CU"}
+        placed = (
+            {f"iso_{level}" for level in range(1, count + 1)}
+            | {f"sensible_{level}" for level in range(1, count + 1)}
+            | {"HU", "CU"}
+        )
         used = _utility_names(counted)
         assert len(used) == 2
         assert set().union(*used.values()) <= placed
