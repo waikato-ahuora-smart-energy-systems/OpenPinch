@@ -446,6 +446,31 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "each heater and cooler on the utility's whole range."
         ),
     ),
+    "HENS_SITE_LEVELS": FieldText(
+        "Total site utility levels", None,
+        (
+            "Utility levels a total site network design uses: given uses the "
+            "case's own utilities; placed places them by utility placement once "
+            "per count in HENS_SITE_LEVEL_COUNTS, designs the site with each set "
+            "and keeps the cheapest design."
+        ),
+    ),
+    "HENS_SITE_LEVEL_COUNTS": FieldText(
+        "Total site level counts", None,
+        (
+            "Numbers of utility levels a placed total site design sweeps, each at "
+            "least 2. Each level serves heating and cooling, as a steam main does; "
+            "the case's sensible utilities (hot water, say) stay sensible while "
+            "two isothermal levels remain."
+        ),
+    ),
+    "HENS_SITE_LEVEL_EARLY_STOP": FieldText(
+        "Total site level early stop", None,
+        (
+            "End the level count sweep once two designed counts in a row cost "
+            "more than the cheapest before them."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (

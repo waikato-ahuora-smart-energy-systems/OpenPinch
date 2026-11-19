@@ -400,6 +400,37 @@ carries its targeted duty in every period; the evolution holds those duties
 period by period, with one area per exchanger sized for the period that
 needs most, and no fit to the periods follows.
 
+The site design uses the case's own utilities by default (``levels="given"``,
+``HENS_SITE_LEVELS``). With ``levels="placed"`` it places the site's utility
+levels by utility placement instead, once for each count in
+``level_counts`` (``HENS_SITE_LEVEL_COUNTS``, default ``[2, 3, 4, 5]``), with
+``placement`` passed on as the placement options. Each placed level serves
+heating and cooling, as a steam main does. The case's sensible utilities (a
+utility whose temperature changes by more than 1 K, such as hot water) stay
+sensible while two isothermal levels remain, so on ``zonal_site``, with hot
+water as its one sensible utility, count 2 places two isothermal levels and
+count 4 three isothermal and one sensible. The site is designed with each
+count's levels, and the cheapest design over the counts is selected (the
+site total annual cost when the network reports one). A count whose
+placement is infeasible, or whose design fails, is recorded and skipped.
+The result ranks each designed count's best network, tagged
+``summary_metrics["utility_level_count"]``, and
+``result.provenance.effective_settings["HENS_SITE_LEVEL_SWEEP"]`` lists every
+count with its status (``designed``, ``infeasible``, ``failed`` or ``not
+run``), its split and its cost. ``HENS_SITE_LEVEL_EARLY_STOP: true`` ends the
+sweep once two designed counts in a row cost more than the cheapest before
+them.
+
+.. code-block:: python
+
+    view = site.design.total_site_heat_exchanger_network(
+        levels="placed",
+        level_counts=[2, 3],
+        placement={"evaluation_limit": 300},
+        width=0,
+        depth=1,
+    )
+
 An option set explicitly overrides the level that would set it:
 ``HENS_DT_CONT_MULTIPLIERS`` (the ``dt_cont_multipliers`` argument) the width,
 and ``HENS_HEURISTIC_PDM_NETWORKS``, ``HENS_HEURISTIC_PDM_EVOLUTION_SEEDS``,
