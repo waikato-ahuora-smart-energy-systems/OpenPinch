@@ -137,7 +137,8 @@ def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
 
 
 # A site network's total annual cost with site utility accounting
-# (``../site/costing.py``): steam raised on a main is credited, not charged.
+# (``../models/_stagewise/site_utilities.py``): the site pays only for its
+# net utility use.
 SITE_TOTAL_ANNUAL_COST = "site_total_annual_cost"
 
 

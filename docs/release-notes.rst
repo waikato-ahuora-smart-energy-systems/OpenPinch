@@ -19,30 +19,20 @@ Heat exchanger network synthesis
   with more than one process zone now emits a ``UserWarning`` that it pools
   every process's streams (any inter-process match, no piping cost) and
   names the site method.
-- Site utility accounting
-  (``analysis.heat_exchanger_networks.site.utility_system.account_utility_system``):
-  given each process's heater and cooler duty on each utility level, it
-  finds the site's cheapest balance of imports, letdowns between levels and
-  dumps per period, with a linear programme solved by SciPy's HiGHS (no
-  optional solver, so it runs in Pyodide). It reports each level's use,
-  generation, import, letdown, dump, cost and marginal price; generation on
-  a steam main or hot water circuit that is short is credited at that price.
-  With import prices rising with temperature it reproduces the Total Site
-  utility cascade.
-- ``design.total_site_heat_exchanger_network`` costs site networks with that
-  accounting: each network carries ``site_capital_cost``,
-  ``site_operating_cost`` and ``site_total_annual_cost`` in its summary
-  metrics, the seeds are priced from their process networks, and the record
-  and the result rank site networks by site total annual cost (other
-  networks by total annual cost as before). Steam raised on a main that
-  another process uses is now credited rather than charged as a cooler.
-- Network evolution of a site prices each utility at its level's site
-  price at the targeted level duties: a heater pays the cost of one more kW
-  of use on its level, and a cooler on a main is credited what one more kW
-  raised there saves (or charged the dump it reaches when the main is in
-  surplus). The levels stay held at their targets, so these prices cost the
-  design and do not choose the levels, and a site network's own total
-  annual cost now equals its site total annual cost.
+- ``design.total_site_heat_exchanger_network`` pays only for the site's net
+  utility use. The network evolution model of a site carries the site
+  utility balance: per period each utility level (a boiler, a steam main or
+  hot water circuit, cooling water) closes with imports, letdown from a
+  hotter level and dumps, and the model costs those instead of pricing each
+  heater and cooler. Steam a process raises on a main that another process
+  uses is no longer charged as a cooler. A ``Both`` utility is one main; a
+  hot and a cold utility that only share a name stay apart; letdown follows
+  each period's temperatures; and a hot utility's ``maximum_heat_flow`` caps
+  what the site buys into its level. Each site network carries
+  ``site_capital_cost``, ``site_operating_cost`` and
+  ``site_total_annual_cost`` in its summary metrics and the balance in
+  ``source_metadata["site_utility_balance"]``; the record and the result
+  rank site networks by site total annual cost.
 - ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
   each process is designed over every period at once, so each level carries
   its targeted duty in every period, and network evolution holds those

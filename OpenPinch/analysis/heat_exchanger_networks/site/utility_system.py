@@ -1,219 +1,189 @@
-"""Site utility accounting: the cheapest balance of a site's utility levels.
+"""The site utility balance, as rows and variables of a network's own model.
 
 Each process draws heat from a level (its heaters, ``use``) and supplies it
-(its coolers, ``generation``). Per period the site closes every level ``l``:
+(its coolers, ``generation``). In each period the site closes every level
+``l``:
 
 ``use_l + sum_m F[l->m] + X_l = generation_l + sum_h F[h->l] + B_l``
 
-with ``B_l`` bought at the level's import price (hot and both levels),
-``X_l`` rejected at its dump price (cold and both levels) and ``F[h->l]``
-let down from a level ``h`` wholly above ``l`` at the letdown price. The
-linear programme is solved with ``scipy.optimize.linprog`` (HiGHS), which
-needs no optional solver and runs in Pyodide. Its dual on a level's balance
-is the level's marginal price: what one more kW of use there costs, and so
-what one more kW of generation saves.
+with ``B_l`` bought at the level's import price (hot and both levels,
+within its import capacity), ``X_l`` rejected at its dump price (cold and
+both levels) and ``F[h->l]`` let down from a level ``h`` wholly above
+``l`` in that period, at the letdown price. The block adds ``B``, ``X`` and
+``F`` and these rows to the model that holds the heater and cooler duties,
+and its cost replaces the heaters' and coolers' prices: the site pays only
+for its net utility use. There is no separate accounting problem.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
-import numpy as np
-from scipy.optimize import linprog
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from ....contracts.synthesis.site import (
-    LevelLoad,
     SiteUtilityLevels,
     UtilityLevelBalance,
     UtilitySystemBalance,
 )
 
 
-def account_utility_system(
-    levels: SiteUtilityLevels,
-    loads: Mapping[str, Mapping[str, LevelLoad]],
-) -> UtilitySystemBalance:
-    """The site's cheapest utility balance for the processes' ``loads``.
+@dataclass(frozen=True)
+class SiteBalancePeriod:
+    """One period's balance in a model: its loads, variables and costs.
 
-    ``loads`` maps each process to its load on each level it uses, by level
-    name. Raises ``ValueError`` for an unknown level, a load the level
-    cannot take (use of a cold level, generation on a hot one), a wrong
-    period count, or a balance the levels cannot close (an import capacity
-    too small).
+    ``use`` and ``generation`` are the model's expressions per level;
+    ``imports`` and ``dumps`` map a level index to its variable, ``flows`` a
+    ``(hotter, colder)`` pair to its letdown variable. ``hot_cost`` is what
+    the imports cost, ``cold_cost`` the dumps and letdowns.
     """
 
-    periods = len(levels.period_weights)
-    use, generation = _totals(levels, loads, periods)
+    period_idx: int
+    use: tuple[Any, ...]
+    generation: tuple[Any, ...]
+    imports: dict[int, Any]
+    dumps: dict[int, Any]
+    flows: dict[tuple[int, int], Any]
+    hot_cost: Any
+    cold_cost: Any
+
+
+def letdowns(levels: SiteUtilityLevels, n: int) -> list[tuple[int, int]]:
+    """Each pair ``(h, l)`` where level h lies wholly above level l in
+    period ``n``."""
+    items = levels.levels
+    return [
+        (h, low)
+        for h, upper in enumerate(items)
+        for low, lower in enumerate(items)
+        if h != low and upper.t_low[n] >= lower.t_high[n]
+    ]
+
+
+def add_site_balance(
+    m,
+    levels: SiteUtilityLevels,
+    n: int,
+    use: Sequence[Any],
+    generation: Sequence[Any],
+) -> SiteBalancePeriod:
+    """Add period ``n``'s balance rows to model ``m``.
+
+    ``use`` and ``generation`` give each level's heater and cooler duty, in
+    the order of ``levels.levels``, as expressions of ``m``.
+    """
+
+    items = levels.levels
+    imports = {}
+    dumps = {}
+    for i, level in enumerate(items):
+        if level.imports:
+            capacity = level.import_capacity
+            bound = None if capacity is None else capacity[n]
+            imports[i] = m.Var(value=0.0, lb=0.0, ub=bound)
+        if level.dumps:
+            dumps[i] = m.Var(value=0.0, lb=0.0)
+    flows = {pair: m.Var(value=0.0, lb=0.0) for pair in letdowns(levels, n)}
+    for i in range(len(items)):
+        out = [flow for (h, _low), flow in flows.items() if h == i]
+        into = [flow for (_h, low), flow in flows.items() if low == i]
+        m.Equation(
+            use[i] + sum(out) + (dumps[i] if i in dumps else 0.0)
+            == generation[i] + sum(into) + (imports[i] if i in imports else 0.0)
+        )
+    hot_cost = sum(items[i].import_price[n] * var for i, var in imports.items())
+    cold_cost = sum(items[i].dump_price[n] * var for i, var in dumps.items()) + sum(
+        levels.letdown_price * flow for flow in flows.values()
+    )
+    return SiteBalancePeriod(
+        period_idx=n,
+        use=tuple(use),
+        generation=tuple(generation),
+        imports=imports,
+        dumps=dumps,
+        flows=flows,
+        hot_cost=hot_cost,
+        cold_cost=cold_cost,
+    )
+
+
+def period_cost(levels: SiteUtilityLevels, block: SiteBalancePeriod) -> tuple:
+    """The solved hot (import) and cold (dump and letdown) cost of a period."""
+    n = block.period_idx
+    items = levels.levels
+    hot = sum(items[i].import_price[n] * _value(v) for i, v in block.imports.items())
+    cold = sum(items[i].dump_price[n] * _value(v) for i, v in block.dumps.items())
+    cold += sum(levels.letdown_price * _value(f) for f in block.flows.values())
+    return float(hot), float(cold)
+
+
+def solved_balance(
+    levels: SiteUtilityLevels, blocks: Sequence[SiteBalancePeriod]
+) -> UtilitySystemBalance:
+    """The balance a solved model reached, per level and period."""
+
     rows: list[UtilityLevelBalance] = []
     period_costs: list[float] = []
     hot: list[float] = []
     cold: list[float] = []
-    for n in range(periods):
-        period_rows = _solve_period(levels, use[:, n], generation[:, n], n)
+    for block in blocks:
+        n = block.period_idx
+        period_rows = []
+        for i, level in enumerate(levels.levels):
+            imported = _value(block.imports[i]) if i in block.imports else 0.0
+            dump = _value(block.dumps[i]) if i in block.dumps else 0.0
+            letdown_in = sum(
+                _value(f) for (_h, low), f in block.flows.items() if low == i
+            )
+            letdown_out = sum(
+                _value(f) for (h, _low), f in block.flows.items() if h == i
+            )
+            cost = (
+                (level.import_price[n] * imported if level.imports else 0.0)
+                + (level.dump_price[n] * dump if level.dumps else 0.0)
+                + levels.letdown_price * letdown_in
+            )
+            period_rows.append(
+                UtilityLevelBalance(
+                    level=level.name,
+                    period_idx=n,
+                    use=_value(block.use[i]),
+                    generation=_value(block.generation[i]),
+                    imported=imported,
+                    letdown_in=letdown_in,
+                    letdown_out=letdown_out,
+                    dump=dump,
+                    cost=float(cost),
+                )
+            )
         rows += period_rows
         period_costs.append(sum(row.cost for row in period_rows))
         hot.append(sum(row.imported for row in period_rows))
         cold.append(sum(row.dump for row in period_rows))
-    weights = np.asarray(levels.period_weights, dtype=float)
+    weights = [float(levels.period_weights[block.period_idx]) for block in blocks]
     return UtilitySystemBalance(
         balances=tuple(rows),
         period_costs=tuple(period_costs),
-        operating_cost=float(weights @ np.asarray(period_costs) / weights.sum()),
+        operating_cost=sum(w * c for w, c in zip(weights, period_costs, strict=True))
+        / sum(weights),
         hot_utility=tuple(hot),
         cold_utility=tuple(cold),
     )
 
 
-def _totals(levels, loads, periods: int) -> tuple[np.ndarray, np.ndarray]:
-    names = [level.name for level in levels.levels]
-    use = np.zeros((len(names), periods))
-    generation = np.zeros((len(names), periods))
-    for process, by_level in loads.items():
-        for name, load in by_level.items():
-            if name not in names:
-                raise ValueError(f"process {process} names an unknown level {name}")
-            if len(load.use) != periods:
-                raise ValueError(
-                    f"process {process} needs {periods} period values on {name}"
-                )
-            level = levels.level(name)
-            if not level.imports and any(q > 0.0 for q in load.use):
-                raise ValueError(f"cold level {name} cannot supply process {process}")
-            if not level.dumps and any(q > 0.0 for q in load.generation):
-                raise ValueError(
-                    f"hot level {name} cannot take process {process}'s heat"
-                )
-            index = names.index(name)
-            use[index] += load.use
-            generation[index] += load.generation
-    return use, generation
+def _value(expression: Any) -> float:
+    """A solved variable's or expression's number (0 for a plain 0)."""
+    if isinstance(expression, int | float):
+        return float(expression)
+    from pyomo.environ import value
+
+    return float(value(expression, exception=False) or 0.0)
 
 
-def _letdowns(levels) -> list[tuple[int, int]]:
-    """Each pair ``(h, l)`` where level h lies wholly above level l."""
-    return [
-        (h, low)
-        for h, upper in enumerate(levels.levels)
-        for low, lower in enumerate(levels.levels)
-        if h != low and upper.t_low >= lower.t_high
-    ]
-
-
-def _solve_period(levels, use, generation, n: int) -> list[UtilityLevelBalance]:
-    items = levels.levels
-    count = len(items)
-    imports = [i for i, level in enumerate(items) if level.imports]
-    dumps = [i for i, level in enumerate(items) if level.dumps]
-    letdowns = _letdowns(levels)
-    columns = len(imports) + len(dumps) + len(letdowns)
-    costs = np.zeros(columns)
-    balance = np.zeros((count, columns))
-    bounds: list[tuple[float, float | None]] = []
-    for c, i in enumerate(imports):
-        costs[c] = items[i].import_price[n]
-        balance[i, c] = 1.0
-        capacity = items[i].import_capacity
-        bounds.append((0.0, None if capacity is None else capacity[n]))
-    offset = len(imports)
-    for c, i in enumerate(dumps, start=offset):
-        costs[c] = items[i].dump_price[n]
-        balance[i, c] = -1.0
-        bounds.append((0.0, None))
-    offset += len(dumps)
-    for c, (h, low) in enumerate(letdowns, start=offset):
-        costs[c] = levels.letdown_price
-        balance[h, c] = -1.0
-        balance[low, c] = 1.0
-        bounds.append((0.0, None))
-    solution = linprog(
-        costs,
-        A_eq=balance,
-        b_eq=use - generation,
-        bounds=bounds,
-        method="highs",
-    )
-    if solution.status != 0:
-        raise ValueError(
-            f"the site utility levels cannot balance period {n}: {solution.message}"
-        )
-    x = solution.x
-    duals = solution.eqlin.marginals
-    capped = [(c, bound[1]) for c, bound in enumerate(bounds) if bound[1] is not None]
-    prices = _OptimalDuals(balance, costs, use - generation, capped, solution.fun)
-    rows = []
-    for i, level in enumerate(items):
-        imported = sum(x[c] for c, j in enumerate(imports) if j == i)
-        dump = sum(x[c] for c, j in enumerate(dumps, start=len(imports)) if j == i)
-        flows = list(enumerate(letdowns, start=len(imports) + len(dumps)))
-        letdown_in = sum(x[c] for c, (_h, low) in flows if low == i)
-        letdown_out = sum(x[c] for c, (h, _low) in flows if h == i)
-        cost = (
-            (level.import_price[n] * imported if level.imports else 0.0)
-            + (level.dump_price[n] * dump if level.dumps else 0.0)
-            + levels.letdown_price * letdown_in
-        )
-        use_price = prices.extreme(i, highest=True) if level.imports else None
-        generation_price = prices.extreme(i, highest=False) if level.dumps else None
-        sides = [p for p in (use_price, generation_price) if p is not None]
-        rows.append(
-            UtilityLevelBalance(
-                level=level.name,
-                period_idx=n,
-                use=float(use[i]),
-                generation=float(generation[i]),
-                imported=float(imported),
-                letdown_in=float(letdown_in),
-                letdown_out=float(letdown_out),
-                dump=float(dump),
-                cost=float(cost),
-                marginal_price=float(sum(sides) / len(sides) if sides else duals[i]),
-                use_price=use_price,
-                generation_price=generation_price,
-            )
-        )
-    return rows
-
-
-class _OptimalDuals:
-    """The set of optimal duals of one period's balance.
-
-    Duals ``lambda`` (one per level) and ``mu <= 0`` (one per capped
-    column) with ``A' lambda + mu <= c`` and an objective within a hair of
-    the optimum. The largest ``lambda_l`` over the set is the cost of one
-    more kW of use on level l; the smallest, what one more kW of generation
-    there saves. They differ only where the balance is degenerate.
-    """
-
-    def __init__(self, balance, costs, rhs, capped, optimum: float) -> None:
-        levels, columns = balance.shape
-        size = levels + len(capped)
-        rows = np.zeros((columns + 1, size))
-        rows[:columns, :levels] = balance.T
-        for k, (c, _bound) in enumerate(capped):
-            rows[c, levels + k] = 1.0
-        # Objective at least the optimum (weak duality caps it there).
-        rows[columns, :levels] = -rhs
-        rows[columns, levels:] = [-bound for _c, bound in capped]
-        self._rows = rows
-        self._limits = np.append(costs, -optimum + 1e-9 * max(1.0, abs(optimum)))
-        self._bounds = [(None, None)] * levels + [(None, 0.0)] * len(capped)
-        self._size = size
-
-    def extreme(self, level: int, *, highest: bool) -> float | None:
-        """The largest (or smallest) optimal dual of ``level``; ``None``
-        when it is unbounded (no more use, or generation, can be taken)."""
-        objective = np.zeros(self._size)
-        objective[level] = -1.0 if highest else 1.0
-        solution = linprog(
-            objective,
-            A_ub=self._rows,
-            b_ub=self._limits,
-            bounds=self._bounds,
-            method="highs",
-        )
-        if solution.status != 0:
-            return None
-        return float(-solution.fun if highest else solution.fun)
-
-
-__all__ = ["account_utility_system"]
+__all__ = [
+    "SiteBalancePeriod",
+    "add_site_balance",
+    "letdowns",
+    "period_cost",
+    "solved_balance",
+]

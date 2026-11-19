@@ -6,6 +6,7 @@ import math
 
 from .._base import costing as _costing
 from .._base.execution import _value
+from . import site_utilities as _site
 from . import staged_utilities as _staged
 
 
@@ -23,6 +24,7 @@ def verify(owner) -> tuple[bool, list[str]]:
     failures = []
     if not _check_temperatures(owner):
         failures.append("temperature")
+    failures.extend(_site.balance_misses(owner))
     if owner.minimisation_goal in {"total cost", "variable total cost"}:
         if not _check_utility_costs(owner):
             failures.append("cost")

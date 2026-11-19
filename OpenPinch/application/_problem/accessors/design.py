@@ -620,23 +620,8 @@ class _DesignAccessor:
             for name in processes
         }
         return self.network_evolution(
-            site_seeds(pools, levels=self._site_utility_levels()),
-            options=options,
-            width=width,
-            depth=depth,
+            site_seeds(pools), options=options, width=width, depth=depth
         )
-
-    def _site_utility_levels(self):
-        """The site's utility levels, priced per kW and year."""
-        from ....analysis.heat_exchanger_networks.site.costing import (
-            site_utility_levels,
-        )
-        from ....analysis.heat_exchanger_networks.solver.arrays import (
-            problem_to_solver_arrays,
-        )
-
-        # Utility temperatures and prices do not depend on the approach.
-        return site_utility_levels(problem_to_solver_arrays(self._problem, 1.0))
 
     def _process_zones(self) -> list[str]:
         """The master zone's immediate subzones of type ``Process Zone``."""

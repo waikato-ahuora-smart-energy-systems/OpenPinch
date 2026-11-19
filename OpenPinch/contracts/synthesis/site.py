@@ -22,26 +22,29 @@ class SiteUtilityLevel(BaseModel):
     both levels); ``dump_price`` that of rejecting a surplus from it (cold
     and both levels). ``import_capacity`` bounds the duty bought per period
     (``None`` for no bound). ``t_high`` and ``t_low`` span the level's
-    temperatures; heat is let down from one level to another only when the
-    first lies wholly above the second.
+    temperatures per period; in a period heat is let down from one level to
+    another only when the first lies wholly above the second.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
     kind: Literal["hot", "cold", "both"]
-    t_high: float
-    t_low: float
+    t_high: tuple[float, ...] = Field(min_length=1)
+    t_low: tuple[float, ...] = Field(min_length=1)
     import_price: tuple[float, ...] | None = None
     dump_price: tuple[float, ...] | None = None
     import_capacity: tuple[float | None, ...] | None = None
 
     @model_validator(mode="after")
     def _check(self) -> SiteUtilityLevel:
-        if not (math.isfinite(self.t_high) and math.isfinite(self.t_low)):
-            raise ValueError("level temperatures must be finite")
-        if self.t_high < self.t_low:
-            raise ValueError("t_high must not be below t_low")
+        if len(self.t_high) != len(self.t_low):
+            raise ValueError("t_high and t_low need one value per period each")
+        for high, low in zip(self.t_high, self.t_low, strict=True):
+            if not (math.isfinite(high) and math.isfinite(low)):
+                raise ValueError("level temperatures must be finite")
+            if high < low:
+                raise ValueError("t_high must not be below t_low")
         imports = self.kind in ("hot", "both")
         dumps = self.kind in ("cold", "both")
         if imports != (self.import_price is not None):
@@ -89,6 +92,7 @@ class SiteUtilityLevels(BaseModel):
             raise ValueError("period weights must not all be zero")
         for level in self.levels:
             for values in (
+                level.t_high,
                 level.import_price,
                 level.dump_price,
                 level.import_capacity,
@@ -106,34 +110,11 @@ class SiteUtilityLevels(BaseModel):
         raise KeyError(name)
 
 
-class LevelLoad(BaseModel):
-    """A process's duty per period on one level: heaters (use) and coolers
-    (generation), in kW."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    use: tuple[float, ...]
-    generation: tuple[float, ...]
-
-    @model_validator(mode="after")
-    def _check(self) -> LevelLoad:
-        if len(self.use) != len(self.generation):
-            raise ValueError("use and generation need one value per period each")
-        if any(not math.isfinite(q) or q < 0.0 for q in self.use + self.generation):
-            raise ValueError("level loads must be finite and non-negative")
-        return self
-
-
 class UtilityLevelBalance(BaseModel):
     """One level's balance in one period.
 
     ``use + letdown_out + dump == generation + letdown_in + imported``.
     ``cost`` is what the level's import, dump and letdown in cost.
-    ``use_price`` is the cost of one more kW of use on the level (hot and
-    both levels) and ``generation_price`` what one more kW of generation
-    there saves (cold and both levels; negative when it is dumped).
-    ``marginal_price`` is the dual of the balance: their midpoint, equal to
-    both unless the balance is degenerate.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -147,9 +128,6 @@ class UtilityLevelBalance(BaseModel):
     letdown_out: float
     dump: float
     cost: float
-    marginal_price: float
-    use_price: float | None = None
-    generation_price: float | None = None
 
 
 class UtilitySystemBalance(BaseModel):
@@ -174,17 +152,8 @@ class UtilitySystemBalance(BaseModel):
                 return row
         raise KeyError((name, period_idx))
 
-    def marginal_prices(self, period_idx: int = 0) -> dict[str, float]:
-        """Each level's marginal price in one period."""
-        return {
-            row.level: row.marginal_price
-            for row in self.balances
-            if row.period_idx == period_idx
-        }
-
 
 __all__ = [
-    "LevelLoad",
     "SiteUtilityLevel",
     "SiteUtilityLevels",
     "UtilityLevelBalance",

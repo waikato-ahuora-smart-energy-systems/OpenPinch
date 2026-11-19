@@ -24,6 +24,7 @@ from ..errors import WorkflowContractError
 from ..models._stagewise.evolution import reporting_improvements
 from ..models.problem import InternalHeatExchangerNetworkProblem
 from ..results.record import admit, recording_active
+from ..site.levels import site_utility_system, utility_capacities
 from ..solver.arrays import (
     PreparedSolverArrays,
     nominal_approach_temperature,
@@ -464,6 +465,13 @@ class LocalSynthesisExecutor:
             ),
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
             site_processes=site_processes,
+            site_utility_system=(
+                None
+                if site_processes is None
+                else site_utility_system(
+                    arrays, capacities=utility_capacities(problem.master_zone)
+                )
+            ),
         )
 
     def _parent_problem(

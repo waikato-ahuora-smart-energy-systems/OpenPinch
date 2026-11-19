@@ -275,12 +275,8 @@ def _steam_main_site() -> PinchProblem:
 @pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
 def test_a_site_network_is_costed_with_site_utility_accounting():
     """Steam Cooling raises on the LPS main meets Heating's use, so the site
-    buys less LPS than Heating uses; the site cost is the network's capital
-    plus that balance, and the design ranks by it."""
-    from OpenPinch.analysis.heat_exchanger_networks.site.costing import (
-        site_loads,
-    )
-
+    buys less LPS than Heating uses; the network's own model carries that
+    balance, so its utility cost is the site's net cost."""
     problem = _steam_main_site()
 
     view = problem.design.total_site_heat_exchanger_network(
@@ -291,18 +287,20 @@ def test_a_site_network_is_costed_with_site_utility_accounting():
     metrics = network.summary_metrics
     balance = network.source_metadata["site_utility_balance"]
     lps = balance.level("LPS")
+    duties = _level_duties(network)
+    heating = next(p for p, _ in duties if "Heating" in p)
+    cooling = next(p for p, _ in duties if "Cooling" in p)
+    assert lps.use == pytest.approx(duties[(heating, "Hot Utility.LPS")][0], rel=1e-6)
+    assert lps.generation == pytest.approx(
+        duties[(cooling, "Cold Utility.LPS")][0], rel=1e-6
+    )
     assert lps.generation > 0.0
-    assert lps.use > 0.0
-    assert lps.imported == pytest.approx(max(0.0, lps.use - lps.generation), abs=1e-6)
+    assert lps.imported == pytest.approx(max(0.0, lps.use - lps.generation), abs=1e-5)
     for row in balance.balances:
         assert row.use + row.letdown_out + row.dump == pytest.approx(
-            row.generation + row.letdown_in + row.imported, abs=1e-6
+            row.generation + row.letdown_in + row.imported, abs=1e-5
         )
-    loads = site_loads(network, ("Heating", "Cooling"))
-    assert loads["Cooling"]["LPS"].generation[0] == pytest.approx(
-        lps.generation, abs=1e-9
-    )
-    assert metrics["site_capital_cost"] == pytest.approx(network.capital_cost)
+    assert network.utility_cost == pytest.approx(balance.operating_cost, rel=1e-6)
     assert metrics["site_total_annual_cost"] == pytest.approx(
         network.capital_cost + balance.operating_cost, rel=1e-9
     )

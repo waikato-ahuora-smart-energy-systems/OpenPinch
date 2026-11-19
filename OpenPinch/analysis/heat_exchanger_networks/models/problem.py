@@ -15,13 +15,6 @@ from ..extraction.service import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
-from ..site.costing import (
-    loads_from_level_duties,
-    priced_site_network,
-    site_utility_levels,
-    with_site_prices,
-)
-from ..site.utility_system import account_utility_system
 from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.dependencies import (
@@ -38,6 +31,7 @@ from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
 from ._stagewise import staged_utilities as _staged
 from ._stagewise.level_targets import site_level_targets
+from ._stagewise.site_utilities import SiteUtilities, site_balance, with_site_cost
 from .stage_packing import add_recovery_stage_packing_constraints
 from .stagewise import StageWiseModel
 
@@ -109,9 +103,10 @@ class InternalHeatExchangerNetworkProblem:
     # process's levels and matches streams only within a process
     # (``_stagewise/level_targets.py:site_level_targets``).
     site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
-    # A site task's utility levels, from its arrays before slicing; every
-    # network it extracts is priced with site utility accounting.
-    site_levels: Any = field(default=None, init=False)
+    # A site task's utility levels (``../site/levels.py``): its stage-wise
+    # model carries the site utility balance, so the site pays only for
+    # its net utility use (``_stagewise/site_utilities.py``).
+    site_utility_system: Any = None
 
     def load_model(
         self,
@@ -122,8 +117,6 @@ class InternalHeatExchangerNetworkProblem:
 
         self._model_factories = model_factories
         self._record_level_targets()
-        if self.site_processes is not None and self.site_levels is None:
-            self._price_site_utilities()
         self._slice_utilities()
         self.args = {
             "name": self.name,
@@ -149,24 +142,15 @@ class InternalHeatExchangerNetworkProblem:
             )
             self.args["level_targets"] = targets
             self.args["stream_groups"] = groups
+        if self.site_utility_system is not None and self.framework != "PDM":
+            self.args["site_utilities"] = SiteUtilities(
+                self.site_utility_system.levels,
+                *self.site_utility_system.members(self.solver_arrays),
+            )
         if self.framework == "PDM":
             self._build_pdm(model_factories=model_factories)
             return
         self._build_stage_wise(model_factories=model_factories)
-
-    def _price_site_utilities(self) -> None:
-        """Keep the site's levels and price each utility at its site price.
-
-        The prices are the site balance's at the targeted level duties
-        (``../site/costing.py:with_site_prices``). The levels are held at
-        those duties, so the prices cost the design and do not choose the
-        levels; heat raised on a short main is a credit.
-        """
-        self.site_levels = site_utility_levels(self.solver_arrays)
-        balance = account_utility_system(
-            self.site_levels, loads_from_level_duties(self.site_processes)
-        )
-        self.solver_arrays = with_site_prices(self.solver_arrays, balance)
 
     def _record_level_targets(self) -> None:
         """Keep the levels a design holds, or its parent's, by utility name."""
@@ -337,10 +321,9 @@ class InternalHeatExchangerNetworkProblem:
                 candidate, "stages", getattr(candidate, "S", self.stages)
             ),
         )
-        if self.site_levels is not None:
-            network = priced_site_network(
-                network, tuple(self.site_processes), self.site_levels
-            )
+        balance = site_balance(candidate)
+        if balance is not None:
+            network = with_site_cost(network, balance)
         if self.utility_level_targets is None:
             return network
         return network.model_copy(

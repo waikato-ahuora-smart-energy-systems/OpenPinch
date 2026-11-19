@@ -12,12 +12,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from ....contracts.synthesis.site import SiteUtilityLevels
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..reporting.ranking import holds_utility_levels
-from .costing import capital_cost, loads_from_level_duties, site_metrics
-from .utility_system import account_utility_system
 
 
 def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]]:
@@ -51,19 +48,12 @@ def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]
 
 def site_seeds(
     pools: Mapping[str, Sequence[HeatExchangerNetwork]],
-    *,
-    levels: SiteUtilityLevels | None = None,
 ) -> tuple[HeatExchangerNetwork, ...]:
     """One seed per dt_cont multiplier, in ascending order.
 
     ``pools`` maps each process (its stream-key prefix) to its networks,
     best first. A seed takes each process's best network at the multiplier,
     or at the nearest one the process has.
-
-    With the site's ``levels`` each seed is priced: its capital is its
-    process networks' and its operating cost the site utility balance of
-    their level duties (``costing.site_metrics``), and the seeds come
-    cheapest first by site total annual cost.
     """
 
     multipliers = sorted(
@@ -78,27 +68,7 @@ def site_seeds(
             "no process network recovers heat, so there is no site network to "
             "evolve; design each process with heat_exchanger_network(zone=...)."
         )
-    seeds = tuple(seed for seed in seeds if _recovery(seed))
-    if levels is None:
-        return seeds
-    priced = [_priced(seed, pools, levels) for seed in seeds]
-    return tuple(
-        sorted(priced, key=lambda seed: seed.summary_metrics["site_total_annual_cost"])
-    )
-
-
-def _priced(seed, pools, levels: SiteUtilityLevels) -> HeatExchangerNetwork:
-    m = seed.summary_metrics["dt_cont_multiplier"]
-    capital = sum(capital_cost(_nearest(pool, m)) for pool in pools.values())
-    balance = account_utility_system(
-        levels, loads_from_level_duties(seed.source_metadata["site_processes"])
-    )
-    return seed.model_copy(
-        update={
-            "summary_metrics": seed.summary_metrics | site_metrics(capital, balance),
-            "source_metadata": seed.source_metadata | {"site_utility_balance": balance},
-        }
-    )
+    return tuple(seed for seed in seeds if _recovery(seed))
 
 
 def _seed(

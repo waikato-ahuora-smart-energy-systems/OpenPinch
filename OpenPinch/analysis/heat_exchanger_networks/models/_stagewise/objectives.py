@@ -5,6 +5,7 @@ from __future__ import annotations
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
+from . import site_utilities as _site
 from . import staged_utilities as _staged
 
 # m^2 added to a shared area under its cost exponent: a unit with no duty has
@@ -170,7 +171,17 @@ def _utility_totals(owner, side: str, n: int) -> list:
 
 
 def _utilities_cost_expression(owner, side: str, n: int, totals):
-    """Return the summed cost expression of each utility's total duty."""
+    """Return the summed cost expression of each utility's total duty.
+
+    A site model costs the period's site utility balance instead: its
+    imports on the hot side, its dumps and letdowns on the cold side
+    (``site_utilities.py``).
+    """
+    if getattr(owner, "site_utilities", None) is not None:
+        hot = totals if side == "hot" else _utility_totals(owner, "hot", n)
+        cold = totals if side == "cold" else _utility_totals(owner, "cold", n)
+        hot_cost, cold_cost = _site.site_costs(owner, n, hot, cold)
+        return hot_cost if side == "hot" else cold_cost
     return sum(
         _piecewise._utility_cost_expression(owner, side, n, total, utility=u)
         for u, total in enumerate(totals)
