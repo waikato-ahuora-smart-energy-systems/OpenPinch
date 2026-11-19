@@ -293,9 +293,7 @@ def test_a_level_held_seed_takes_no_held_network_from_a_smaller_multiplier():
     b_low = _network([_recovery("B.H2", "B.C1", 1)], multiplier=0.75, stages=1)
     b = _network([_recovery("B.H1", "B.C1", 1)], multiplier=1.0, stages=1)
 
-    seeds = site_seeds(
-        {"A": (a_priced,), "B": (b_low, b)}, level_held={"A": (a_held,)}
-    )
+    seeds = site_seeds({"A": (a_priced,), "B": (b_low, b)}, level_held={"A": (a_held,)})
 
     held_multipliers = [
         seed.summary_metrics["dt_cont_multiplier"]
