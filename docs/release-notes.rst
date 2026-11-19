@@ -15,6 +15,24 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- At search depth 2, a MILP pinch design network none of whose thermal
+  derivative tasks succeeded is now evolved directly. Before, only a
+  missing Couenne for every task sent the MILP networks to evolution; any
+  other failure (a crash, a time limit, a failed check) left them as
+  unevolved final candidates with no warning.
+- ``HENS_TDM_PARENT_LIMIT`` now limits how many MILP pinch design networks
+  the thermal derivative step refines, cheapest first; before, it was only
+  recorded. A repeated ``HENS_DERIVATIVE_THRESHOLDS`` value no longer
+  solves the same task twice.
+- A design run no longer stops with a ``TypeError`` when a heuristic pinch
+  design network has no objective value; it counts as the dearest. When one
+  solve in a parallel stage raises, the solves still waiting for a worker
+  are cancelled instead of all being run before the error is reported.
+- Each thermal derivative task now stops at 300 s unless
+  ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
+  Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run
+  for hours in Couenne. A task stopped there keeps its best network when it
+  has one and that network verifies; otherwise the task fails.
 - ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
   designs one network for a site of several process zones. Each process is
   designed alone with the pinch design method, its utilities placed by
