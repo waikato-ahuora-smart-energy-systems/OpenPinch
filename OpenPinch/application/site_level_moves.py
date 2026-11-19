@@ -130,6 +130,16 @@ def _level_key(case: "PinchProblem") -> tuple:
     )
 
 
+def _seed_key(view) -> tuple:
+    """The recovery matches a move from ``view`` is seeded with."""
+    from ..analysis.heat_exchanger_networks.site.seeds import _recovery
+
+    network = view.selected_network
+    if not hasattr(network, "exchangers"):
+        return ()
+    return tuple(sorted(e.model_dump_json() for e in _recovery(network)))
+
+
 def level_duties(
     case: "PinchProblem", multiplier: float
 ) -> dict[str, dict[str, list[float]]]:
@@ -207,13 +217,15 @@ def refine_levels(
 
     Each round tries every level of ``levels`` (default: every placed
     level) up and down by ``step``; ``evaluate(shifted, view)`` designs the
-    shifted case from the current view. The unshifted levels are first
+    shifted case from the current view (a move is seeded with its selected
+    network's recovery matches). The unshifted levels are first
     evaluated the same way, as the baseline the moves must beat (the
     start's network may come from a seed no move builds). The cheapest
     move below the current cost is adopted; with none, the step halves,
     and the moves stop once it is below ``step_min``. Levels already
-    designed are not designed again: a move back to them is ``"rejected"``
-    with message ``"already designed"``. Before each design ``expired()``
+    designed from the same seed are not designed again: a move back to them
+    is ``"rejected"`` with message ``"already designed"``; a failed design
+    may be tried again. Before each design ``expired()``
     is checked; once it is true the moves end with a ``"stopped"`` entry
     (message ``"time limit"``) and the best levels so far. A missing synthesis
     solver or dependency is raised; any other failure of a design is
@@ -239,7 +251,7 @@ def refine_levels(
 
     if stopped():
         return case, view, tuple(log)
-    designed = {_level_key(case)}
+    designed = {(_level_key(case), _seed_key(view))}
     # The start's network may come from a seed no move builds, so moves are
     # judged against the unshifted levels evaluated the way a move is.
     try:
@@ -260,7 +272,7 @@ def refine_levels(
                 shifted = shifted_case(case, level, shift)
                 if shifted is None:
                     continue
-                key = _level_key(shifted)
+                key = (_level_key(shifted), _seed_key(view))
                 if key in designed:
                     log.append(
                         LevelMove(level, shift, None, "rejected", "already designed")
@@ -269,7 +281,6 @@ def refine_levels(
                 if stopped():
                     halted = True
                     break
-                designed.add(key)
                 try:
                     moved = evaluate(shifted, view)
                 except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
@@ -277,6 +288,7 @@ def refine_levels(
                 except (ValueError, RuntimeError) as exc:
                     log.append(LevelMove(level, shift, None, "failed", str(exc)))
                     continue
+                designed.add(key)
                 moved_cost = site_cost(moved.selected_network)
                 log.append(LevelMove(level, shift, moved_cost, "rejected"))
                 if best is None or moved_cost < best[2]:

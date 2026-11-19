@@ -408,3 +408,64 @@ def test_the_site_time_limit_is_a_configuration_key():
         _site().design.total_site_heat_exchanger_network(
             options={"HENS_SITE_LEVELS": "placed", "HENS_SITE_TIME_LIMIT": 0.0}
         )
+
+
+def _seeded_view(cost, tag):
+    """A view whose selected network seeds a move with recovery ``tag``."""
+    recovery = SimpleNamespace(
+        kind=HeatExchangerKind.RECOVERY,
+        stage=1,
+        period_states=(SimpleNamespace(active=True),),
+        model_dump_json=lambda: tag,
+    )
+    return SimpleNamespace(
+        selected_network=SimpleNamespace(
+            total_annual_cost=cost, summary_metrics={}, exchangers=(recovery,)
+        )
+    )
+
+
+def test_levels_are_designed_again_from_a_different_seed():
+    """A move designs from the current network's recovery matches, so levels
+    met again after another move was adopted are designed again."""
+    evaluated = []
+
+    def evaluate(case, view):
+        evaluated.append(_hot_supply(case, "iso_1"))
+        return _seeded_view(_cost_by_level(case), str(_hot_supply(case, "iso_1")))
+
+    moves.refine_levels(
+        _mains_site(),
+        _seeded_view(_cost_by_level(_mains_site()), "start"),
+        evaluate=evaluate,
+        step=5.0,
+        step_min=5.0,
+        levels=("iso_1",),
+    )
+
+    # 185 C is adopted; its -5 K move returns to 180 C from 185 C's network.
+    assert evaluated[:4] == [180.0, 185.0, 175.0, 190.0]
+    assert evaluated[4] == 180.0
+
+
+def test_levels_whose_design_failed_are_tried_again():
+    evaluated = []
+
+    def evaluate(case, view):
+        level = _hot_supply(case, "iso_1")
+        evaluated.append(level)
+        if level == 185.0 and evaluated.count(185.0) == 1:
+            raise WorkflowContractError("no successful task outcomes")
+        return _view(_cost_by_level(case))
+
+    moves.refine_levels(
+        _mains_site(),
+        _view(_cost_by_level(_mains_site())),
+        evaluate=evaluate,
+        step=5.0,
+        step_min=2.5,
+        levels=("iso_1",),
+    )
+
+    # 185 C fails at the 5 K step; after 182.5 C is adopted it is tried again.
+    assert evaluated.count(185.0) == 2

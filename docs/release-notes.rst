@@ -128,7 +128,8 @@ Heat exchanger network synthesis
   when no move improves, down to ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K);
   ``HENS_SITE_LEVEL_STEP: 0`` turns the moves off. Every move tried is
   listed in the result's provenance (``HENS_SITE_LEVEL_MOVES``). Levels
-  already designed are not designed again when a move returns to them.
+  already designed from the same seed network are not designed again when a
+  move returns to them.
 - ``HENS_SITE_TIME_LIMIT`` (seconds, default no limit) bounds a placed
   total site design: once it runs out no further level count or level move
   is started, and the cheapest design so far is returned. The first count
