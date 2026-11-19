@@ -19,6 +19,11 @@ Heat exchanger network synthesis
   with more than one process zone now emits a ``UserWarning`` that it pools
   every process's streams (any inter-process match, no piping cost) and
   names the site method.
+- ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
+  each process is designed over every period at once, so each level carries
+  its targeted duty in every period, and network evolution holds those
+  duties period by period with recovery only within a process. On
+  ``zonal_site_multiperiod`` every process meets each level in each period.
 - Network evolution over several periods no longer rejects every network it
   evolves: verification now accepts a period whose approach is wider than
   the model's approach variable (the shared area is set by another period,

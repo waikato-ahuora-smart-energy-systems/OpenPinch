@@ -579,6 +579,12 @@ class _DesignAccessor:
         ``depth`` sets the evolution's breadth as in
         ``heat_exchanger_network``, and at 2 and above the MILP pinch
         design method joins the heuristic for the process networks.
+
+        On a multiperiod site each process is designed over every period at
+        once (design basis ``"all"``), so its levels carry their targeted
+        duty in each period, and the evolution holds them per period with
+        one area per exchanger over all periods; no fit to the periods
+        follows.
         """
 
         from ....analysis.heat_exchanger_networks.execution.search import (
@@ -601,6 +607,8 @@ class _DesignAccessor:
             "HENS_SEARCH_DEPTH": 0,
             "HENS_PDM_MILP": search.milp,
             "HENS_UTILITY_PLACEMENT": "temperature",
+            # Over every period, so each level holds its duty per period.
+            "HENS_DESIGN_BASIS": "all",
         }
         pools = {
             name: tuple(
