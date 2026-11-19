@@ -569,8 +569,8 @@ Utility exchangers
    approach is required at both ends of every exchanger;
    ``min_approach_temperature`` defaults to 1 K.
 ``"rating"``
-   Minimise utility cost with every recovery exchanger's area fixed at the
-   network's installed ``area`` (each needs one). Every period's duty must
+   Minimise utility cost with every exchanger's area (heaters and coolers
+   included) fixed at the network's installed ``area`` (each needs one). Every period's duty must
    fit that area; a period needing less runs with a bypass. The approach
    defaults to 1 K, as for ``"cost"``. Overdesign and the fit of a design to
    every period rate networks this way.

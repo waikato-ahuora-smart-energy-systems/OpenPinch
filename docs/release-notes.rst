@@ -266,6 +266,17 @@ Testing and CI
   The packaged HEN notebook runs, about 8 of the lane's 14 minutes, still
   run only for pull requests into ``main`` and releases.
 
+Documentation
+~~~~~~~~~~~~~
+
+- The HEN synthesis guide and the ``PinchProblem`` API page cover
+  ``design.retrofit_heat_pumps`` and ``design.design_basis``. The API page
+  notes that ``retrofit_heat_pumps`` stores the first period's direct
+  target when none is cached and needs the HEN solver to rate a network
+  whose heaters or coolers lack solved temperatures; the guide notes that
+  the ``"rating"`` objective needs an installed area on every exchanger,
+  heaters and coolers included.
+
 0.9.3 (2026-11-18)
 ------------------
 
