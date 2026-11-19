@@ -15,9 +15,12 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``design.retrofit`` defaults ``min_approach_temperature`` to the case's
-  minimum approach (twice ``THERMAL_DT_CONT``) rather than 1 K, which let
-  new matches recover heat the design rules out and overstated savings. A
+- ``design.retrofit`` no longer defaults ``min_approach_temperature`` to
+  1 K, which let new matches recover heat the design rules out and
+  overstated savings. Without it each exchanger keeps the sum of its two
+  sides' temperature contributions, so per-stream ``dt_cont`` and zone
+  multipliers hold; new matches and heat pumps are screened at twice
+  ``THERMAL_DT_CONT``. A given value still applies to every exchanger. A
   retrofit that prices new units but leaves ``area_addition_cost``,
   ``split_cost`` and ``repiping_cost`` at 0 now warns, since the search
   then favours those modifications.

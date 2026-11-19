@@ -87,7 +87,9 @@ class RetrofitSettings:
     ``max_modifications`` is the search depth, ``beam_width`` the designs kept
     per depth and ``new_match_candidates`` the screened new matches tried from
     each. ``area_tolerance`` widens every installed area (a fraction) and
-    ``approach`` is the minimum approach (K) on every exchanger.
+    ``approach`` is the minimum approach (K) on every exchanger; ``None``
+    gives each exchanger the sum of its two sides' temperature contributions
+    and screens new matches and heat pumps at twice ``THERMAL_DT_CONT``.
     ``max_added_area_fraction`` caps the area added to an existing exchanger
     as a fraction of its installed area (None: no cap).
     ``new_unit_cost`` ($ per new exchanger), ``area_addition_cost`` ($ per
@@ -136,7 +138,7 @@ class RetrofitSettings:
     new_match_candidates: int = 4
     area_tolerance: float = 0.02
     max_added_area_fraction: float | None = None
-    approach: float = DEFAULT_FEASIBILITY_APPROACH
+    approach: float | None = DEFAULT_FEASIBILITY_APPROACH
     new_unit_cost: float = 0.0
     area_addition_cost: float = 0.0
     split_cost: float = 0.0
@@ -395,7 +397,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
     matches = screen_new_matches(
         parent.solved,
         evaluator.ends,
-        approach=settings.approach,
+        approach=evaluator.screen_approach,
         limit=settings.new_match_candidates,
     )
     for match in matches:
@@ -411,7 +413,11 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
     if settings.relocation_cost is None:
         return
     for unit, match in _relocations(
-        parent, evaluator.ends, settings, evaluator.existing
+        parent,
+        evaluator.ends,
+        settings,
+        evaluator.existing,
+        approach=evaluator.screen_approach,
     ):
         remaining = network.model_copy(
             update={
@@ -491,7 +497,9 @@ def _relocation_repiping(
     return tuple(s for s in dict.fromkeys(before + after) if s not in kept)
 
 
-def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing):
+def _relocations(
+    parent: _Evaluated, ends, settings: RetrofitSettings, existing, *, approach
+):
     """The relocations from ``parent``, most promising first.
 
     Each existing recovery unit not yet moved may go to any screened match
@@ -521,12 +529,10 @@ def _relocations(parent: _Evaluated, ends, settings: RetrofitSettings, existing)
         for stream in (e.source_stream, e.sink_stream)
     )
     # Every screened match, not just the best few.
-    pool = screen_new_matches(
-        solved, ends, approach=settings.approach, limit=sys.maxsize
-    )
+    pool = screen_new_matches(solved, ends, approach=approach, limit=sys.maxsize)
     scored = []
     for match in pool:
-        potential = match_potential(solved, ends, match, approach=settings.approach)
+        potential = match_potential(solved, ends, match, approach=approach)
         for unit, (hot, cold, duty) in duties.items():
             stranded = (match.hot != hot and served[hot] == 1) or (
                 match.cold != cold and served[cold] == 1
@@ -623,6 +629,11 @@ class _Evaluator:
             e.exchanger_id: float(e.area) for e in _structural_exchangers(existing)
         }
         self.arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
+        self.screen_approach = (
+            2.0 * float(config.thermal.dt_cont)
+            if settings.approach is None
+            else float(settings.approach)
+        )
         hens = config.hens
         self.solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")
         self.solver_options = stage_solver_options(hens, "evm", self.solver)
@@ -667,7 +678,7 @@ class _Evaluator:
             self.heat_pumps = [
                 candidate
                 for candidate in heat_pump_candidates(
-                    self.ends, approach=settings.approach, rating=rating
+                    self.ends, approach=self.screen_approach, rating=rating
                 )
                 if not any(
                     key == name or key.endswith("." + name)

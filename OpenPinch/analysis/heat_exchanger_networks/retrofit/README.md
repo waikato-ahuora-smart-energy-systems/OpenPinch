@@ -10,6 +10,7 @@ Retrofit of an existing heat exchanger network: a search, derived from the netwo
 - `apply_relocation(network, exchanger_id, move)` (`moves.py`): the network with that recovery exchanger moved to the match, keeping its id and installed area.
 - `NewUtility`, `new_utility_candidates(network, *, hot_streams, cold_streams, hot_utilities, cold_utilities)`, `apply_new_utility(network, move, exchanger_id)` (`moves.py`): a new end-of-stream heater or cooler, the ones a network lacks, and the network with one added (no installed area).
 - `new_splits(network, move)` (`moves.py`): the streams the match splits.
+- `RetrofitSettings.approach` is the minimum approach (K) on every exchanger; `None` gives each exchanger the sum of its two sides' temperature contributions in the fixed-structure model and its check, and the screens (new matches, relocations, heat pump placement) one approach, twice `THERMAL_DT_CONT` [search.py:RetrofitSettings, _Evaluator.screen_approach].
 - `match_potential(network, ends, move, approach=...)`, `utility_relief(network, move, potential)`, `screen_new_matches(network, ends, approach=..., limit=...)` (`moves.py`): the heat a new match could recover at its position in a solved network, the utility it could cut at first order, and the most promising new matches.
 - `stage_count(network)` (`moves.py`): the stage count, or the deepest recovery stage.
 - `mark_dominated(designs)` (`frontier.py`): the designs with `dominated` set.

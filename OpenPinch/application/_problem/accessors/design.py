@@ -1408,7 +1408,9 @@ class _DesignAccessor:
         prices new units but leaves ``area_addition_cost``, ``split_cost``
         and ``repiping_cost`` at 0 warns, since the search then favours
         those modifications. Every exchanger keeps at least
-        ``min_approach_temperature`` (default: the case's minimum approach,
+        ``min_approach_temperature`` (default: the sum of its two sides'
+        temperature contributions, per-stream ``dt_cont`` and zone
+        multipliers included; new matches and heat pumps are screened at
         twice ``THERMAL_DT_CONT``).
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
@@ -1516,11 +1518,7 @@ class _DesignAccessor:
                     new_match_candidates=new_match_candidates,
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
-                    approach=(
-                        2.0 * float(isolated.master_zone.config.thermal.dt_cont)
-                        if min_approach_temperature is None
-                        else min_approach_temperature
-                    ),
+                    approach=min_approach_temperature,
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),
                     split_cost=float(split_cost),
