@@ -55,8 +55,11 @@ def site_seeds(
 
     ``pools`` maps each process (its stream-key prefix) to the networks of
     its pinch design with levels chosen by price; ``level_held`` to those of
-    its pinch design holding its utility level targets. At each multiplier
-    (or the nearest one a process has) a ``"lowest_cost"`` seed takes each
+    its pinch design holding its utility level targets. A process with no
+    network raises ``ValueError``. Seeds are made at each multiplier every
+    process has a network at or above (all of them when there is none).
+    At each multiplier (or, for a process without one, its nearest above)
+    a ``"lowest_cost"`` seed takes each
     process's network with the fewest units, then the lowest total annual
     cost, from ``pools``; a ``"level_held"`` seed takes the same from the
     networks of ``level_held`` that hold their targets, and a process
@@ -64,6 +67,12 @@ def site_seeds(
     record the kind as ``"site_seed"``; a seed equal to another is dropped.
     """
 
+    for process, pool in pools.items():
+        if not pool:
+            raise ValueError(
+                f"process {process!r} has no network to seed the site network; "
+                "its pinch design found none."
+            )
     level_held = level_held or {}
     held = {
         process: tuple(network for network in pool if _holds_targets(network))
@@ -77,9 +86,17 @@ def site_seeds(
             for network in pool
         }
     )
+    # A network designed at a smaller multiplier can need more recovery
+    # than a larger one's approach allows: no seed where a process has
+    # nothing at or above its multiplier (unless that leaves none).
+    covered = [
+        m
+        for m in multipliers
+        if all(max(_multiplier(n) for n in pool) >= m for pool in pools.values())
+    ]
     seeds: list[HeatExchangerNetwork] = []
     seen: set[tuple] = set()
-    for m in multipliers:
+    for m in covered or multipliers:
         cheapest = {process: _fewest_units(pool, m) for process, pool in pools.items()}
         kinds = [("lowest_cost", cheapest)]
         if any(held.values()):
@@ -120,10 +137,16 @@ def _holds_targets(network: HeatExchangerNetwork) -> bool:
 def _fewest_units(
     pool: Sequence[HeatExchangerNetwork], m: float
 ) -> HeatExchangerNetwork:
-    """At the multiplier nearest ``m``: the network with the fewest units,
-    then the lowest total annual cost (the first on a tie)."""
-    distance = min(abs(_multiplier(network) - m) for network in pool)
-    nearest = [network for network in pool if abs(_multiplier(network) - m) == distance]
+    """At the multiplier nearest ``m`` at or above it (or nearest at all when
+    there is none above): the network with the fewest units, then the
+    lowest total annual cost (the first on a tie)."""
+    candidates = [network for network in pool if _multiplier(network) >= m] or list(
+        pool
+    )
+    distance = min(abs(_multiplier(network) - m) for network in candidates)
+    nearest = [
+        network for network in candidates if abs(_multiplier(network) - m) == distance
+    ]
     return min(nearest, key=lambda network: (_units(network), _cost(network)))
 
 

@@ -207,9 +207,9 @@ def select_level_count(runs: Sequence[LevelCountRun]) -> LevelCountRun:
 
 
 def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
-    """The selected count's view, holding every count's best network.
+    """The selected count's view, holding every count's networks.
 
-    The result ranks each designed count's selected network by site cost,
+    The result ranks every network of each designed count by site cost,
     each tagged with ``summary_metrics["utility_level_count"]``, and selects
     the cheapest. Its provenance names the problem's root zone and records
     ``settings`` with the sweep (``HENS_SITE_LEVEL_SWEEP``, one row per
@@ -223,22 +223,22 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
     from ._problem.targeting.provenance import make_provenance
 
     selected = select_level_count(runs)
-    best = []
+    ranked = []
     for run in runs:
         if run.status != "designed":
             continue
-        (outcome,) = ranked_networks(run.view.result, 1)
-        network = outcome.network.model_copy(
-            update={
-                "summary_metrics": dict(outcome.network.summary_metrics)
-                | {"utility_level_count": run.count}
-            }
-        )
-        best.append(
-            outcome.model_copy(
-                update={"network": network, "objective_value": run.total_annual_cost}
+        for outcome in ranked_networks(run.view.result):
+            network = outcome.network.model_copy(
+                update={
+                    "summary_metrics": dict(outcome.network.summary_metrics)
+                    | {"utility_level_count": run.count}
+                }
             )
-        )
+            ranked.append(
+                outcome.model_copy(
+                    update={"network": network, "objective_value": site_cost(network)}
+                )
+            )
     result = selected.view.result
     result.provenance = make_provenance(
         problem,
@@ -248,7 +248,7 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
         settings=dict(settings)
         | {"HENS_SITE_LEVEL_SWEEP": [run.row() for run in runs]},
     )
-    result.ranked_networks = tuple(best)
+    result.ranked_networks = tuple(ranked)
     select_network(result)
     if problem._results is not None:
         problem._results.design = result

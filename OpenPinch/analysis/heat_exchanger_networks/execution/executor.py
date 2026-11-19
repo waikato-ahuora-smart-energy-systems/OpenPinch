@@ -600,10 +600,19 @@ _CANDIDATE_SINK: ContextVar[Callable[[Any], None] | None] = ContextVar(
 
 
 def _as_completed(pool, func, inputs):
-    """``func`` over ``inputs`` in ``pool``, each result as its task finishes."""
+    """``func`` over ``inputs`` in ``pool``, each result as its task finishes.
+
+    When the caller stops early (a solve raised, or the generator is
+    closed), the solves still waiting for a worker are cancelled, so the
+    pool's shutdown waits only for those already running.
+    """
     futures = [pool.submit(func, worker_args) for worker_args in inputs]
-    for future in as_completed(futures):
-        yield future.result()
+    try:
+        for future in as_completed(futures):
+            yield future.result()
+    finally:
+        for future in futures:
+            future.cancel()
 
 
 def _handed_off(worker_args: tuple[Callable, Any, Any]):

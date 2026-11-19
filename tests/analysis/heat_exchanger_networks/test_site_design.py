@@ -170,6 +170,34 @@ def test_site_seeds_take_one_network_per_process_at_each_multiplier():
     assert nominal.source_metadata["site_processes"]["A"] == {LPS: [12.0]}
 
 
+def test_a_seed_takes_no_process_network_from_a_smaller_multiplier():
+    """A network designed at a smaller dt_cont multiplier recovers more heat
+    than a larger one's approach allows, so a seed at m takes each process's
+    nearest network at m or above, and there is no seed at a multiplier some
+    process has nothing at or above."""
+    a_low = _network([_recovery("A.H1", "A.C1", 1)], multiplier=0.75, stages=1)
+    a_high = _network([_recovery("A.H2", "A.C1", 1)], multiplier=1.25, stages=1)
+    b = _network([_recovery("B.H1", "B.C1", 1)], multiplier=1.0, stages=1)
+
+    seeds = site_seeds({"A": (a_low, a_high), "B": (b,)})
+
+    assert [seed.summary_metrics["dt_cont_multiplier"] for seed in seeds] == [
+        0.75,
+        1.0,
+    ]
+    assert {e.exchanger_id for e in seeds[1].exchangers} == {
+        "recovery:A.H2->A.C1:S1",
+        "recovery:B.H1->B.C1:S1",
+    }
+
+
+def test_a_process_with_no_network_is_named():
+    b = _network([_recovery("B.H1", "B.C1", 1)], stages=1)
+
+    with pytest.raises(ValueError, match="'A' has no network"):
+        site_seeds({"A": (), "B": (b,)})
+
+
 def test_site_seeds_need_some_heat_recovery():
     with pytest.raises(ValueError, match="no process network recovers heat"):
         site_seeds({"R": (_network([_heater(LPS, "R.C1", 3.0)]),)})

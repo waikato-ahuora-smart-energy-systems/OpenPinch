@@ -3784,3 +3784,31 @@ def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
     # Never per cell: the unused dTAC/dA grid that read it is gone.
     assert len(price_calls) <= 1
     assert approach_calls == []
+
+
+@pytest.mark.skipif(sys.platform == "emscripten", reason="Pyodide cannot start threads")
+def test_a_pooled_stage_that_raises_cancels_its_waiting_solves():
+    """An error from one solve ends the stage without running the solves
+    still waiting for a worker."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    release = threading.Event()
+    ran = []
+
+    def solve(index):
+        ran.append(index)
+        if index == 0:
+            raise RuntimeError("solve failed")
+        release.wait(5)
+        return index
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    with pytest.raises(RuntimeError, match="solve failed"):
+        list(executor._as_completed(pool, solve, range(4)))
+    release.set()
+    pool.shutdown(wait=True)
+
+    assert 3 not in ran

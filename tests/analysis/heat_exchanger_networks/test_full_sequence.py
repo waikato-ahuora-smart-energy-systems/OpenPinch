@@ -240,6 +240,61 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution(
     assert esm_success.task.derivative_threshold is None
 
 
+def test_a_milp_network_whose_derivative_tasks_all_fail_is_evolved_directly(
+    monkeypatch,
+) -> None:
+    """A thermal derivative task can fail for reasons other than a missing
+    Couenne (a time limit with no incumbent, a crash, a verification
+    failure). Its MILP parent is then evolved directly, so it is not left
+    as an unevolved final candidate."""
+
+    class FailingDerivativeExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            if tasks and tasks[0].method == "thermal_derivative_method":
+                return tuple(
+                    HeatExchangerNetworkSynthesisTaskOutcome(
+                        task=task,
+                        status="failed",
+                        solver_status="failed",
+                        error="maxTimeLimit with no incumbent",
+                    )
+                    for task in tasks
+                )
+            return super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+
+    result = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FailingDerivativeExecutor()
+    )
+
+    outcomes = result.outcomes
+    milp_parents = {
+        outcome.task.task_id
+        for outcome in outcomes
+        if outcome.status == "success"
+        and outcome.task.method == "pinch_design_method"
+        and any(
+            child.task.parent_task_id == outcome.task.task_id
+            and child.task.method == "thermal_derivative_method"
+            for child in outcomes
+        )
+    }
+    evolved = {
+        outcome.task.parent_task_id
+        for outcome in outcomes
+        if outcome.task.method == "network_evolution_method"
+    }
+    assert milp_parents
+    assert milp_parents <= evolved
+
+
 def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     class MissingCouenneForPdmExecutor(FakeSynthesisExecutor):
         def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
