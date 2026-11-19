@@ -302,3 +302,91 @@ def test_a_heat_pump_condenser_delivers_its_evaporator_heat_and_its_work():
     assert delivered > 100.0
     assert delivered == pytest.approx(lifted * cop / (cop - 1.0), rel=1e-4)
     assert model.utility_results[steam].periods[0].duty == pytest.approx(0.0, abs=1e-3)
+
+
+def test_a_held_level_is_met_within_its_band():
+    """A held level's duty stays within a small band of its target, not on
+    it exactly: an equality would pin a level held at zero on duties bounded
+    at zero, which some Ipopt builds cannot solve. Here the steam heater
+    must carry 1000 kW, 0.3 kW below a target the band reaches."""
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.context import (
+        ensure_target_results,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        build_duty_optimisation_request,
+        fixed_network_structure,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+    from OpenPinch.application.problem import PinchProblem
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+    from tests.support.scipy_nlp import scipy_fixed_structure_model
+
+    def stream(name, cp, supply, target):
+        return {
+            "zone": "Site",
+            "name": name,
+            "t_supply": supply,
+            "t_target": target,
+            "heat_capacity_flowrate": cp,
+            "htc": 1.0,
+        }
+
+    def utility(name, kind, supply, target, price):
+        return {
+            "name": name,
+            "type": kind,
+            "t_supply": supply,
+            "t_target": target,
+            "price": price,
+            "htc": 1.0,
+        }
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                stream("H1", 10.0, 500.0, 300.0),
+                stream("C1", 5.0, 450.0, 650.0),
+            ],
+            "utilities": [
+                utility("HPS", "Hot", 700.0, 700.0, 80.0),
+                utility("CW", "Cold", 290.0, 310.0, 15.0),
+            ],
+            "options": {"HENS_DT_CONT_MULTIPLIERS": [1.0]},
+        }
+    )
+    ensure_target_results(problem, {}, None)
+    arrays = problem_to_solver_arrays(problem, 10.0)
+    names = {
+        name.rsplit(".", 1)[-1]: name
+        for axis in ("hot_utilities", "cold_utilities")
+        for name in arrays.axis_maps[axis]
+    }
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[],
+        heaters=[("C1", names["HPS"])],
+        coolers=[("H1", names["CW"])],
+        stage_count=1,
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", min_approach_temperature=10.0
+    )
+    structure = fixed_network_structure(request, arrays.axis_maps)
+    steam = next(e for e, m in enumerate(structure.spec.utilities) if m.side == "hot")
+    spec = replace(structure.spec, level_holds=(((steam,), (1000.3,)),))
+
+    model = scipy_fixed_structure_model()(
+        name="banded level",
+        solver="ipopt-pyomo",
+        solver_arrays=arrays,
+        spec=spec,
+        minimisation_goal="utility cost",
+        default_approach=10.0,
+    )
+    model.optimise()
+
+    assert model.mSuccess == 1
+    assert model.utility_results[steam].periods[0].duty == pytest.approx(1000.0)
