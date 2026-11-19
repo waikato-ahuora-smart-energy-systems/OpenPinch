@@ -53,6 +53,8 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
         return
 
     from ...solver.piecewise import (
+        branch_fractions,
+        branch_profile,
         duty_aligned_area_contributions,
         profile_from_solver_arrays,
     )
@@ -95,9 +97,12 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
                     duty = float(q_r[n][i][j][k])
                     if duty <= model.tol:
                         continue
+                    hot_share, cold_share = branch_fractions(
+                        lambda a, b, c: q_r[n][a][b][c], model.I, model.J, i, j, k
+                    )
                     contributions = duty_aligned_area_contributions(
-                        hot_profile,
-                        cold_profile,
+                        branch_profile(hot_profile, hot_share),
+                        branch_profile(cold_profile, cold_share),
                         duty=duty,
                         hot_inlet_temperature=model._active_binary_value(
                             model.T_h_by_period[n][i][k]
@@ -410,8 +415,14 @@ def _segment_exact_dqda(
     duty: float,
     hot_inlet_temperature: float,
     cold_inlet_temperature: float,
+    hot_share: float = 1.0,
+    cold_share: float = 1.0,
 ) -> float | None:
-    """Return a local numerical dQ/dA from ordered segment-summed area."""
+    """Return a local numerical dQ/dA from ordered segment-summed area.
+
+    ``hot_share`` and ``cold_share`` are the match's branch shares of its
+    streams' flow (``branch_fractions``).
+    """
     if not (
         _piecewise._solver_parent_is_segmented(model, "hot", hot_parent_index)
         or _piecewise._solver_parent_is_segmented(model, "cold", cold_parent_index)
@@ -419,21 +430,28 @@ def _segment_exact_dqda(
         return None
 
     from ...solver.piecewise import (
+        branch_profile,
         duty_aligned_area_contributions,
         profile_from_solver_arrays,
     )
 
-    hot_profile = profile_from_solver_arrays(
-        model.solver_arrays,
-        side="hot",
-        parent_index=hot_parent_index,
-        period_index=period_index,
+    hot_profile = branch_profile(
+        profile_from_solver_arrays(
+            model.solver_arrays,
+            side="hot",
+            parent_index=hot_parent_index,
+            period_index=period_index,
+        ),
+        hot_share,
     )
-    cold_profile = profile_from_solver_arrays(
-        model.solver_arrays,
-        side="cold",
-        parent_index=cold_parent_index,
-        period_index=period_index,
+    cold_profile = branch_profile(
+        profile_from_solver_arrays(
+            model.solver_arrays,
+            side="cold",
+            parent_index=cold_parent_index,
+            period_index=period_index,
+        ),
+        cold_share,
     )
     hot_start = hot_profile.heat_at_temperature(hot_inlet_temperature)
     cold_start = cold_profile.heat_at_temperature(cold_inlet_temperature)

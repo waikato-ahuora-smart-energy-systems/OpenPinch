@@ -22,6 +22,12 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A stage-wise network whose matches split a segmented stream in one stage
+  sizes each match on its branch's share of the flow. Before, each branch
+  was sized on the whole stream's profile, which ended it short of the
+  stage outlet and understated its area (by 30% in one two-branch case);
+  the same profile skewed the dQ/dA rankings of the thermal derivative
+  method and evolution, and the extracted area slices.
 - A multiperiod pinch design (MILP or heuristic, design basis ``"all"``)
   no longer fails when a stream has no flow in one period. Its matches
   carry no duty in that period; before, joining the two sides of the pinch

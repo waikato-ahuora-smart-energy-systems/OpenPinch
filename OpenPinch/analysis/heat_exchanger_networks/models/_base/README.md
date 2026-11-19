@@ -42,6 +42,7 @@ The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise
 - A failed solve sets `mSuccess` to 0 and is logged at ERROR, or at the model's `failure_log_level` when a caller that expects failures (heuristic proposals, the minimum-unit search) sets one. A passing status with no objective value is a failure (`solver returned no objective value`). [execution.py:_solve_and_post_process]
 - `get_alpha_values` writes the flow-fraction grids onto the model as NumPy arrays (`P_h`, `P_c`, `beta_h`, `beta_c` over (hot, cold, stage); `z_j` over (hot, stage); `z_i` over (cold, stage)) and `alpha` as a `[value]` grid. [alpha.py:get_alpha_values] [alpha.py:_set_postoptimisation_flow_fractions]
 - Writes solver results, logs and many attributes onto the model passed in (`mSuccess`, `solver_run`, `area_*`, `LMTD_*`, `z_allowed`). [execution.py:_solve_and_post_process] [area.py:set_utility_lmtd_and_areas]
+- Segmented recovery areas and their dQ/dA size each match on its branch share of each stream's flow, so matches that split a stream in one stage are not sized on the whole stream's profile. [area.py:_apply_segment_recovery_areas, _segment_exact_dqda]
 - Lazy imports of `OpenPinch.analysis.heat_exchanger_networks.solver.piecewise` inside segmented-stream branches. [area.py:_apply_segment_recovery_areas] [piecewise.py:_utility_cost_expression]
 - Emits log records at info, warning and error level. [execution.py:output_to_cmd_line] [alpha.py:get_alpha_values]
 
