@@ -1184,29 +1184,29 @@ def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]
     """Each solver stream name mapped to the name ``existing`` uses for it.
 
     The existing network may name a stream without its zone prefix
-    (``H1`` for ``Process A.H1``); streams it does not name keep theirs. A
-    bare name that fits streams of several zones raises ``ValueError``.
+    (``H1`` for ``Process A.H1``) unless a stream has that name exactly;
+    streams it does not name keep theirs. A bare name that fits streams of
+    several zones, and no stream exactly, raises ``ValueError``.
     """
 
     used = {
         name for e in existing.exchangers for name in (e.source_stream, e.sink_stream)
     }
-    names: dict[str, str] = {}
-    for axis in axis_maps.values():
-        for key in axis:
-            key = str(key)
-            matches = [n for n in used if n == key or key.endswith("." + n)]
-            names[key] = matches[0] if len(matches) == 1 else key
-    keys_by_name: dict[str, list[str]] = {}
-    for key, name in names.items():
-        keys_by_name.setdefault(name, []).append(key)
-    for name, keys in keys_by_name.items():
-        if len(keys) > 1:
+    keys = [str(key) for axis in axis_maps.values() for key in axis]
+    for name in used:
+        tails = [key for key in keys if key.endswith("." + name)]
+        if name not in keys and len(tails) > 1:
             raise ValueError(
                 f"the existing network names stream {name!r}, which could be "
-                + " or ".join(sorted(keys))
+                + " or ".join(sorted(tails))
                 + "; name it with its zone."
             )
+    names: dict[str, str] = {}
+    for key in keys:
+        matches = [
+            n for n in used if n == key or (key.endswith("." + n) and n not in keys)
+        ]
+        names[key] = matches[0] if len(matches) == 1 else key
     return names
 
 

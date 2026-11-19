@@ -26,9 +26,11 @@ Heat exchanger network synthesis
   the search goes on.
 - A retrofit whose existing network names a stream without its zone
   (``H1``) when several zones have a stream of that name (``A.H1`` and
-  ``B.H1``) now raises a ``ValueError`` naming them. Before, both mapped to
-  ``H1`` and one stream's temperatures and heat capacity flowrate silently
-  stood for the other's in the move screens and heat pump targets.
+  ``B.H1``) now raises a ``ValueError`` naming them, also when another
+  exchanger names one of them in full. Before, both mapped to ``H1`` and
+  one stream's temperatures and heat capacity flowrate silently stood for
+  the other's in the move screens and heat pump targets. A name one stream
+  has exactly (``H1``) no longer also stands for ``B.H1``.
 - Two networks that differ only in where a heater or cooler sits among the
   recovery stages (or a staged against a stream-end unit) are no longer
   ranked as one structure, which dropped one of them as a repeat. Utility
