@@ -80,16 +80,16 @@ def _problem() -> PinchProblem:
     )
 
 
-def _model() -> StageWiseModel:
+def _model(framework: str = "ESM", min_dqda: float = 0.0) -> StageWiseModel:
     return StageWiseModel(
         name="period-pairs",
-        framework="ESM",
+        framework=framework,
         solver="ipopt-pyomo",
         solver_arrays=problem_to_solver_arrays(_problem(), D_TMIN),
         stages=2,
         dTmin=D_TMIN,
         z_restriction=None,
-        min_dqda=0.0,
+        min_dqda=min_dqda,
         minimisation_goal="total cost",
         non_isothermal_model=True,
         integers=False,
@@ -114,6 +114,34 @@ def test_a_match_that_cannot_run_in_a_period_has_no_crossed_approach_bounds():
                         lower, upper = _bounds(grid[n][i][j][k])
                         if lower is not None and upper is not None:
                             assert lower <= upper, (n, i, j, k, lower, upper)
+
+
+def test_a_match_that_cannot_run_in_a_period_has_no_dqda_constraint_there():
+    """The topology binary is shared over periods, so a dQ/dA constraint in
+    a period where the match cannot run would bind once another period
+    chooses it."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.equations import (
+        _runs,
+    )
+
+    model = _model(framework="TDM", min_dqda=0.5)
+
+    cells = [
+        (n, i, j, k)
+        for n in range(model.N_periods)
+        for i in range(model.I)
+        for j in range(model.J)
+        for k in range(model.S)
+        if model.z_allowed[i][j][k] > 0
+    ]
+    idle = [cell for cell in cells if not _runs(model, *cell)]
+    assert idle and len(idle) < len(cells)
+    for n, i, j, k in cells:
+        assert (model.min_dqda_int[n][i][j][k] is None) == (
+            not _runs(model, n, i, j, k)
+        ), (n, i, j, k)
+    equations = [item for item in model.min_dQ_dA_eqn if item is not None]
+    assert len(equations) == len(cells) - len(idle)
 
 
 def test_a_multiperiod_warm_start_leaves_a_disallowed_utility_off():

@@ -599,6 +599,8 @@ def test_stagewise_multiperiod_dqda_equations_use_period_recovery_stage_grid():
     model.z_allowed = [[[1, 0]]]
     model.M_ij_period = [[[10.0]], [[20.0]]]
     model.z = [[[1.0, 0.0]]]
+    model.Q_max_period = [[[50.0]], [[50.0]]]
+    model.tol = 1e-6
 
     model.set_dqda_equations()
 

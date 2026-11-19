@@ -554,7 +554,7 @@ def set_dqda_equations(owner) -> None:
                     * owner.theta_2_by_period[n][i][j][k]
                     * owner.U_r_period[n][i][j],
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             ),
             (owner.N_periods, owner.I, owner.J, owner.S),
@@ -567,7 +567,7 @@ def set_dqda_equations(owner) -> None:
                     * owner.M_ij_period[n][i][j]
                     * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for n in range(owner.N_periods)
