@@ -53,6 +53,9 @@ HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
 HENS_UTILITY_PLACEMENT_VALUES = frozenset({"auto", "temperature", "price"})
 # What a multiperiod HEN is synthesised from before it is fitted to every period.
 HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period", "median"})
+# Which utility levels a total site network design uses: the case's own, or
+# placed by utility placement over a sweep of level counts.
+HENS_SITE_LEVELS_VALUES = frozenset({"given", "placed"})
 # Which median-basis clusters a design is synthesised from.
 HENS_BASIS_CANDIDATES_VALUES = frozenset({"dominant", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
@@ -135,6 +138,14 @@ def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
     if len(set(stages)) != len(stages):
         raise ValueError(f"{name} values must be unique.")
     return stages
+
+
+def _site_level_counts(name: str, value: Any) -> list[int]:
+    """Unique level counts of at least two, in ascending order."""
+    counts = _positive_unique_int_grid(name, value)
+    if min(counts) < 2:
+        raise ValueError(f"{name} values must be at least 2.")
+    return sorted(counts)
 
 
 def _string_choice_grid(
@@ -439,6 +450,9 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_PDM_MILP": _spec(bool | None, None, "hens", "pdm_milp"),
     "HENS_UTILITY_PLACEMENT": _spec(str, "auto", "hens", "utility_placement", validator=partial(_string_choice, choices=HENS_UTILITY_PLACEMENT_VALUES)),
     "HENS_UTILITY_SLICES": _spec(bool, True, "hens", "utility_slices"),
+    "HENS_SITE_LEVELS": _spec(str, "given", "hens", "site_levels", validator=partial(_string_choice, choices=HENS_SITE_LEVELS_VALUES)),
+    "HENS_SITE_LEVEL_COUNTS": _spec(List[int], [2, 3, 4, 5], "hens", "site_level_counts", validator=_site_level_counts),
+    "HENS_SITE_LEVEL_EARLY_STOP": _spec(bool, False, "hens", "site_level_early_stop"),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),

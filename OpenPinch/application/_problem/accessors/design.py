@@ -563,6 +563,9 @@ class _DesignAccessor:
         width: int | None = None,
         depth: int | None = None,
         options: Mapping[str, Any] | None = None,
+        levels: str | None = None,
+        level_counts: Sequence[int] | None = None,
+        placement: Mapping[str, Any] | None = None,
     ) -> HeatExchangerNetworkDesignView:
         """Design one network for a site of several process zones.
 
@@ -587,12 +590,21 @@ class _DesignAccessor:
         duty in each period, and the evolution holds them per period with
         one area per exchanger over all periods; no fit to the periods
         follows.
-        """
 
-        from ....analysis.heat_exchanger_networks.execution.search import (
-            resolve_search,
-        )
-        from ....analysis.heat_exchanger_networks.site import site_seeds
+        ``levels`` (``HENS_SITE_LEVELS``) ``"given"`` designs with the case's
+        utilities. ``"placed"`` places the site's levels by utility placement
+        (``placement`` holds its options) once per count in ``level_counts``
+        (``HENS_SITE_LEVEL_COUNTS``, default 2 to 5), each level serving
+        heating and cooling, designs the site with each set, and selects the
+        cheapest design. A count whose placement is infeasible or whose
+        design fails is skipped. The result ranks each designed count's best
+        network, tagged ``summary_metrics["utility_level_count"]``, and its
+        provenance records every count (``HENS_SITE_LEVEL_SWEEP``).
+        ``HENS_SITE_LEVEL_EARLY_STOP`` ends the sweep once two designed
+        counts in a row cost more than the cheapest before them.
+        """
+        from ....domain.configuration_fields import _site_level_counts
+        from ...site_levels import level_sweep_view, run_level_counts
 
         processes = self._process_zones()
         if len(processes) < 2:
@@ -600,6 +612,49 @@ class _DesignAccessor:
                 "a site network needs more than one process zone; design a "
                 "single process with heat_exchanger_network()."
             )
+        hens = self._effective_hens(options)
+        levels = hens.site_levels if levels is None else levels
+        if levels == "given":
+            return self._site_design(width=width, depth=depth, options=options)
+        if levels != "placed":
+            raise ValueError('levels must be "given" or "placed".')
+        counts = tuple(
+            hens.site_level_counts
+            if level_counts is None
+            else _site_level_counts("level_counts", level_counts)
+        )
+        runs = run_level_counts(
+            self._problem,
+            counts,
+            design=lambda case: case.design._site_design(
+                width=width, depth=depth, options=options
+            ),
+            early_stop=hens.site_level_early_stop,
+            placement=placement,
+        )
+        return level_sweep_view(
+            self._problem,
+            runs,
+            settings={
+                **dict(options or {}),
+                "HENS_SITE_LEVELS": "placed",
+                "HENS_SITE_LEVEL_COUNTS": list(counts),
+                "placement": dict(placement or {}),
+            },
+        )
+
+    def _site_design(self, *, width, depth, options) -> HeatExchangerNetworkDesignView:
+        """The site design with the case's utilities (``levels="given"``)."""
+        from ....analysis.heat_exchanger_networks.execution.search import (
+            resolve_search,
+        )
+        from ....analysis.heat_exchanger_networks.site import site_seeds
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
+
+        processes = self._process_zones()
         _runtime, configuration = self._arguments(
             options=options, period_id=None, width=width, depth=depth
         )
@@ -612,22 +667,37 @@ class _DesignAccessor:
             "HENS_DESIGN_BASIS": "all",
         }
 
-        def pools(placement: str):
-            return {
-                name: tuple(
-                    outcome.network
-                    for outcome in self.heat_exchanger_network(
-                        zone=name,
-                        options=process_options | {"HENS_UTILITY_PLACEMENT": placement},
-                    ).top(_SITE_POOL)
-                )
-                for name in processes
-            }
+        def pool(name: str, placement: str):
+            return tuple(
+                outcome.network
+                for outcome in self.heat_exchanger_network(
+                    zone=name,
+                    options=process_options | {"HENS_UTILITY_PLACEMENT": placement},
+                ).top(_SITE_POOL)
+            )
 
         # Levels chosen by price (the lowest cost) and held at their
-        # targets: evolution starts from both.
+        # targets: evolution starts from both. A process whose design fails
+        # one way takes the other way's networks for it.
+        priced, held = {}, {}
+        for name in processes:
+            failure = None
+            for designs, placement in ((priced, "price"), (held, "temperature")):
+                try:
+                    designs[name] = pool(name, placement)
+                except (
+                    MissingSynthesisDependencyError,
+                    MissingSynthesisSolverError,
+                ):
+                    raise
+                except (ValueError, RuntimeError) as exc:
+                    failure = exc
+            if name not in priced and name not in held:
+                raise failure
+            priced.setdefault(name, held.get(name))
+            held.setdefault(name, priced[name])
         return self.network_evolution(
-            site_seeds(pools("price"), level_held=pools("temperature")),
+            site_seeds(priced, level_held=held),
             options=options,
             width=width,
             depth=depth,

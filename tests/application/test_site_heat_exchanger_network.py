@@ -9,6 +9,8 @@ within itself. There is no thermal derivative step.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
@@ -383,3 +385,67 @@ def test_each_process_is_designed_by_price_and_by_its_level_targets(monkeypatch)
         ("Heating", "temperature"),
     ]
     assert set(captured["pools"]) == set(captured["held"]) == {"Heating", "Cooling"}
+
+
+def _fake_process_designs(monkeypatch, failing):
+    """Each process design returns its (process, placement) as its networks;
+    the pairs in ``failing`` raise. Returns the pools site seeding receives."""
+    from OpenPinch.analysis.heat_exchanger_networks import site
+    from OpenPinch.application._problem.accessors import design
+
+    def heat_exchanger_network(self, *, zone=None, options=None, **kwargs):
+        placement = options["HENS_UTILITY_PLACEMENT"]
+        if (zone, placement) in failing:
+            raise RuntimeError(f"{zone} by {placement} failed")
+        return SimpleNamespace(
+            top=lambda n: [SimpleNamespace(network=(zone, placement))]
+        )
+
+    seeded = {}
+
+    def site_seeds(pools, *, level_held=None):
+        seeded.update(pools=pools, level_held=level_held)
+        return ("seed",)
+
+    monkeypatch.setattr(
+        design._DesignAccessor, "heat_exchanger_network", heat_exchanger_network
+    )
+    monkeypatch.setattr(site, "site_seeds", site_seeds)
+    monkeypatch.setattr(
+        design._DesignAccessor,
+        "network_evolution",
+        lambda self, seeds, **kwargs: seeds,
+    )
+    return seeded
+
+
+def test_a_process_whose_design_by_price_fails_seeds_from_its_level_held_networks(
+    monkeypatch,
+):
+    seeded = _fake_process_designs(monkeypatch, failing={("Heating", "price")})
+
+    assert _site().design.total_site_heat_exchanger_network() == ("seed",)
+    assert seeded["pools"] == {
+        "Heating": (("Heating", "temperature"),),
+        "Cooling": (("Cooling", "price"),),
+    }
+    assert seeded["level_held"]["Heating"] == (("Heating", "temperature"),)
+
+
+def test_a_process_whose_level_held_design_fails_seeds_from_its_price_networks(
+    monkeypatch,
+):
+    seeded = _fake_process_designs(monkeypatch, failing={("Cooling", "temperature")})
+
+    _site().design.total_site_heat_exchanger_network()
+
+    assert seeded["level_held"]["Cooling"] == (("Cooling", "price"),)
+
+
+def test_a_process_whose_designs_both_fail_fails_the_site_design(monkeypatch):
+    _fake_process_designs(
+        monkeypatch, failing={("Heating", "price"), ("Heating", "temperature")}
+    )
+
+    with pytest.raises(RuntimeError, match="Heating by temperature failed"):
+        _site().design.total_site_heat_exchanger_network()

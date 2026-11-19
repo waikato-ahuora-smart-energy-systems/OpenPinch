@@ -45,6 +45,21 @@ Heat exchanger network synthesis
   its targeted duty in every period, and network evolution holds those
   duties period by period with recovery only within a process. On
   ``zonal_site_multiperiod`` every process meets each level in each period.
+- ``design.total_site_heat_exchanger_network(levels="placed")`` sweeps the
+  number of site utility levels. For each count in ``level_counts``
+  (``HENS_SITE_LEVEL_COUNTS``, default 2 to 5) utility placement places that
+  many levels, each serving heating and cooling, with the case's sensible
+  utilities kept sensible while two isothermal levels remain; the site is
+  designed with each set and the cheapest design is selected. A count whose
+  placement is infeasible or whose design fails is recorded and skipped; the
+  result ranks every count's best network and its provenance lists each
+  count (``HENS_SITE_LEVEL_SWEEP``). ``HENS_SITE_LEVEL_EARLY_STOP`` ends the
+  sweep after two counts in a row that cost more. ``levels="given"``
+  (``HENS_SITE_LEVELS``, the default) keeps the case's utilities.
+- A total site network design no longer fails when one process's pinch
+  design with utility placed by price fails: that process seeds evolution
+  from its level-held networks (and the reverse), and the design fails only
+  when both fail for a process.
 - Network evolution over several periods no longer rejects every network it
   evolves: verification now accepts a period whose approach is wider than
   the model's approach variable (the shared area is set by another period,

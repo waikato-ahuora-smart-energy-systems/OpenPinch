@@ -202,6 +202,9 @@ class HensConfig:
     pdm_milp: bool | None
     utility_placement: str
     utility_slices: bool
+    site_levels: str
+    site_level_counts: list[int]
+    site_level_early_stop: bool
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]
