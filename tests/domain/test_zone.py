@@ -255,6 +255,23 @@ def test_a_zone_with_subzones_keeps_its_own_streams():
     assert [key for key, _ in site.cold_streams.items()] == ["A.C1"]
 
 
+def test_an_own_cold_stream_survives_a_hot_import_under_the_same_key():
+    """Hot and cold keys are separate namespaces: importing a child's hot
+    stream ``C.x`` does not mark the parent's own cold stream ``C.x`` as
+    imported, so a second import keeps it."""
+    parent = Zone(name="P")
+    child = Zone(name="C")
+    parent.cold_streams.add(_plain_stream("x", 50.0, 150.0, 100.0), key="C.x")
+    child.hot_streams.add(_plain_stream("x", 200.0, 60.0, 140.0), key="P/C.x")
+    parent.add_zone(child)
+
+    parent.import_hot_and_cold_streams_from_sub_zones()
+    parent.import_hot_and_cold_streams_from_sub_zones()
+
+    assert [key for key, _ in parent.cold_streams.items()] == ["C.x"]
+    assert [key for key, _ in parent.hot_streams.items()] == ["C.x"]
+
+
 # === New Tests for Zone ===
 
 

@@ -11,6 +11,9 @@ Zones and targeting
   operation's streams: the streams placed on the process zone itself
   vanished from it and from the site, so their targets left them out. Both
   are now kept.
+- Re-importing subzone streams no longer drops a zone's own cold stream
+  whose key matches an imported hot stream's key (or the reverse): hot and
+  cold imported keys are now tracked separately.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -80,9 +80,11 @@ class Zone:
         self._subzone_net_cold_streams: StreamCollection = self._new_stream_collection()
         self._hot_utilities: StreamCollection = self._new_stream_collection()
         self._cold_utilities: StreamCollection = self._new_stream_collection()
-        # Keys of the streams imported from subzones; every other stream in
-        # the hot and cold collections was placed on this zone itself.
-        self._imported_stream_keys: set[str] = set()
+        # Keys of the streams imported from subzones, per side (hot and cold
+        # keys are separate namespaces); every other stream in the hot and
+        # cold collections was placed on this zone itself.
+        self._imported_hot_keys: set[str] = set()
+        self._imported_cold_keys: set[str] = set()
 
     # === Properties ===
 
@@ -482,9 +484,14 @@ class Zone:
         s: Stream
         if not get_net_streams:
             if is_new_stream_collection:
-                self._hot_streams = self._own_streams(self._hot_streams)
-                self._cold_streams = self._own_streams(self._cold_streams)
-                self._imported_stream_keys = set()
+                self._hot_streams = self._own_streams(
+                    self._hot_streams, self._imported_hot_keys
+                )
+                self._cold_streams = self._own_streams(
+                    self._cold_streams, self._imported_cold_keys
+                )
+                self._imported_hot_keys = set()
+                self._imported_cold_keys = set()
             hs_dst = self._hot_streams
             cs_dst = self._cold_streams
         else:
@@ -499,10 +506,12 @@ class Zone:
                 z.import_hot_and_cold_streams_from_sub_zones(get_net_streams)
 
             if not get_net_streams:
-                for src, dst in ((z.hot_streams, hs_dst), (z.cold_streams, cs_dst)):
+                for src, dst, imported in (
+                    (z.hot_streams, hs_dst, self._imported_hot_keys),
+                    (z.cold_streams, cs_dst, self._imported_cold_keys),
+                ):
                     for s in list(src):
-                        key = dst.add(s, f"{z.name}.{s.name}")
-                        self._imported_stream_keys.add(key)
+                        imported.add(dst.add(s, f"{z.name}.{s.name}"))
                 continue
 
             for s in z.net_hot_streams:
@@ -513,10 +522,11 @@ class Zone:
                 key = f"{z.name}.{s.name}"
                 cs_dst.add(s, key)
 
-    def _own_streams(self, streams: StreamCollection) -> StreamCollection:
+    def _own_streams(
+        self, streams: StreamCollection, imported: set[str]
+    ) -> StreamCollection:
         """A new collection of the streams placed on this zone itself."""
         own = self._new_stream_collection()
-        imported = getattr(self, "_imported_stream_keys", set())
         for key, stream in list(streams.items()):
             if key not in imported:
                 own.add(stream, key, prevent_overwrite=False)
