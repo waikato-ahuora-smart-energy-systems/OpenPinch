@@ -1723,12 +1723,42 @@ class _DesignAccessor:
         Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
+        if isinstance(network, Mapping):
+            network = self._network_from_structure(network)
+        return self._optimise_duties(
+            network,
+            objective=objective,
+            min_approach_temperature=min_approach_temperature,
+            exchanger_approach_temperatures=exchanger_approach_temperatures,
+            max_hot_utility=max_hot_utility,
+            max_cold_utility=max_cold_utility,
+            options=options,
+            period_id=period_id,
+            solver=solver,
+            solve_tolerance=solve_tolerance,
+        )
+
+    def _optimise_duties(
+        self,
+        network: "HeatExchangerNetwork",
+        *,
+        objective: str,
+        min_approach_temperature: float | None = None,
+        exchanger_approach_temperatures: Mapping[str, float] | None = None,
+        max_hot_utility: float | None = None,
+        max_cold_utility: float | None = None,
+        options: Mapping[str, Any] | None = None,
+        period_id: str | None = None,
+        solver=None,
+        solve_tolerance=None,
+        problem_approach: bool = False,
+    ) -> HeatExchangerNetworkDesignView:
+        """``optimise_duties`` on a network; ``problem_approach`` keeps the
+        ``"cost"`` objective at the case's minimum approach, not 1 K."""
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             heat_exchanger_network_duty_optimisation_service,
         )
 
-        if isinstance(network, Mapping):
-            network = self._network_from_structure(network)
         if "site_processes" in (network.source_metadata or {}):
             raise ValueError(
                 "optimise_duties does not take a site network: the fixed-structure "
@@ -1754,6 +1784,7 @@ class _DesignAccessor:
             max_hot_utility=max_hot_utility,
             max_cold_utility=max_cold_utility,
             workspace_variant=None,
+            problem_approach=problem_approach,
         )
 
     def _fit_to_all_periods(
@@ -1771,6 +1802,9 @@ class _DesignAccessor:
         fit, with the call's ``options``, ``solver`` and ``solve_tolerance``,
         then gives every exchanger one area over all periods, with bypass
         where a period needs less, and removes the exchangers no period uses.
+        Every exchanger keeps the case's minimum approach (its streams'
+        temperature contributions). When the fit cannot meet it, a
+        ``UserWarning`` says so and the fit is repeated at 1 K.
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             DEFAULT_FEASIBILITY_APPROACH,
@@ -1778,17 +1812,33 @@ class _DesignAccessor:
         from ....analysis.heat_exchanger_networks.period_fit import (
             with_stream_end_utilities,
         )
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
 
         padded = with_stream_end_utilities(
             self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
         )
-        return self.optimise_duties(
-            padded,
-            objective="cost",
-            options=options,
-            solver=solver,
-            solve_tolerance=solve_tolerance,
-        )
+        arguments = {
+            "objective": "cost",
+            "options": options,
+            "solver": solver,
+            "solve_tolerance": solve_tolerance,
+        }
+        try:
+            return self._optimise_duties(padded, problem_approach=True, **arguments)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            raise
+        except (ValueError, RuntimeError) as exc:
+            warnings.warn(
+                "the fit to every period cannot keep the case's minimum "
+                f"approach ({exc}); it is fitted at "
+                f"{DEFAULT_FEASIBILITY_APPROACH:g} K instead.",
+                UserWarning,
+                stacklevel=3,
+            )
+        return self._optimise_duties(padded, **arguments)
 
 
 class _DesignAccessorDescriptor:

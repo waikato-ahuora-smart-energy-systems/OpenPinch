@@ -22,6 +22,12 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The fit of a design to every period (the default for multiperiod
+  designs) keeps every exchanger at the case's minimum approach, its
+  streams' temperature contributions, in every period. Before, it fitted at
+  1 K, so a default multiperiod design could sit below ΔTmin (8.1 K against
+  10 K in one case) and still verify. Where the minimum approach cannot be
+  met, the fit warns and falls back to 1 K.
 - ``design.retrofit`` no longer defaults ``min_approach_temperature`` to
   1 K, which let new matches recover heat the design rules out and
   overstated savings. Without it each exchanger keeps the sum of its two

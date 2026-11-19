@@ -121,8 +121,14 @@ def build_duty_optimisation_request(
     exchanger_approach_temperatures: Mapping[str, float] | None = None,
     max_hot_utility: float | None = None,
     max_cold_utility: float | None = None,
+    problem_approach: bool = False,
 ) -> DutyOptimisationRequest:
-    """Validate public arguments without touching the problem or a solver."""
+    """Validate public arguments without touching the problem or a solver.
+
+    With ``problem_approach`` and no ``min_approach_temperature``, the
+    ``"cost"`` objective keeps each exchanger at its streams' temperature
+    contributions (the case's minimum approach) instead of 1 K.
+    """
 
     if not isinstance(network, HeatExchangerNetwork):
         raise TypeError("network must be a HeatExchangerNetwork.")
@@ -167,7 +173,7 @@ def build_duty_optimisation_request(
                 "the 'cost' objective trades utility against area itself; "
                 "utility caps apply to the 'area' objective only."
             )
-        if approach is None:
+        if approach is None and not problem_approach:
             approach = DEFAULT_FEASIBILITY_APPROACH
     if objective == "utility" and (hot_cap is not None or cold_cap is not None):
         raise ValueError(
@@ -669,6 +675,7 @@ def heat_exchanger_network_duty_optimisation_service(
     options: dict[str, Any] | None = None,
     workspace_variant: str | None = None,
     executor: SynthesisExecutor | None = None,
+    problem_approach: bool = False,
 ) -> HeatExchangerNetworkSynthesisResult:
     """Optimise exchanger duties on a fixed, user-defined network structure."""
 
@@ -679,6 +686,7 @@ def heat_exchanger_network_duty_optimisation_service(
         exchanger_approach_temperatures=exchanger_approach_temperatures,
         max_hot_utility=max_hot_utility,
         max_cold_utility=max_cold_utility,
+        problem_approach=problem_approach,
     )
     target_output, settings = prepare_service_context(
         problem,
