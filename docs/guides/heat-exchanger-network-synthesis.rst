@@ -567,13 +567,15 @@ Utility exchangers
    $/kW/y and $/y, set 1000 h/y, a zero discount rate and a one-year life.
    Only a positive
    approach is required at both ends of every exchanger;
-   ``min_approach_temperature`` defaults to 1 K.
+   ``min_approach_temperature`` defaults to 1 K. The fit of a design to
+   every period uses this objective, but keeps each exchanger at the case's
+   minimum approach (its streams' temperature contributions); where that
+   cannot be met it warns and fits at 1 K.
 ``"rating"``
    Minimise utility cost with every exchanger's area (heaters and coolers
    included) fixed at the network's installed ``area`` (each needs one). Every period's duty must
    fit that area; a period needing less runs with a bypass. The approach
-   defaults to 1 K, as for ``"cost"``. Overdesign and the fit of a design to
-   every period rate networks this way.
+   defaults to 1 K, as for ``"cost"``. Overdesign rates networks this way.
 
 Zero-duty exchangers
    Every listed exchanger carries its approach constraint even at zero duty.
