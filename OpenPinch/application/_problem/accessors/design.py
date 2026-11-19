@@ -571,13 +571,15 @@ class _DesignAccessor:
 
         Each process zone (an immediate subzone of type ``Process Zone``) is
         designed alone with the pinch design method at the search width's
-        dt_cont multipliers, its utilities placed by temperature, so each
-        level carries the duty targeting gives it. The process networks are
-        then joined, one per process at each multiplier, into site seeds,
-        and network evolution refines the seeds as one problem: every
-        process keeps each utility level at its duty, and heat is recovered
-        only between streams of one process. There is no thermal derivative
-        step.
+        dt_cont multipliers twice: with its utility levels chosen by price,
+        and held at the duties targeting gives them. At each multiplier the
+        fewest-unit network of each run (then the lowest total annual cost)
+        is joined, one per process, into a lowest-cost and a level-held site
+        seed, and network evolution refines the seeds as one problem: every
+        process keeps each utility level at its seed's duty, heat is
+        recovered only between streams of one process, and the model
+        carries the site utility balance, so the site pays only for its net
+        utility use. There is no thermal derivative step.
 
         ``depth`` sets the evolution's breadth as in
         ``heat_exchanger_network``, and at 2 and above the MILP pinch
@@ -647,6 +649,10 @@ class _DesignAccessor:
             resolve_search,
         )
         from ....analysis.heat_exchanger_networks.site import site_seeds
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
 
         processes = self._process_zones()
         _runtime, configuration = self._arguments(
@@ -657,21 +663,44 @@ class _DesignAccessor:
             **configuration,
             "HENS_SEARCH_DEPTH": 0,
             "HENS_PDM_MILP": search.milp,
-            "HENS_UTILITY_PLACEMENT": "temperature",
             # Over every period, so each level holds its duty per period.
             "HENS_DESIGN_BASIS": "all",
         }
-        pools = {
-            name: tuple(
+
+        def pool(name: str, placement: str):
+            return tuple(
                 outcome.network
                 for outcome in self.heat_exchanger_network(
-                    zone=name, options=process_options
+                    zone=name,
+                    options=process_options | {"HENS_UTILITY_PLACEMENT": placement},
                 ).top(_SITE_POOL)
             )
-            for name in processes
-        }
+
+        # Levels chosen by price (the lowest cost) and held at their
+        # targets: evolution starts from both. A process whose design fails
+        # one way takes the other way's networks for it.
+        priced, held = {}, {}
+        for name in processes:
+            failure = None
+            for designs, placement in ((priced, "price"), (held, "temperature")):
+                try:
+                    designs[name] = pool(name, placement)
+                except (
+                    MissingSynthesisDependencyError,
+                    MissingSynthesisSolverError,
+                ):
+                    raise
+                except (ValueError, RuntimeError) as exc:
+                    failure = exc
+            if name not in priced and name not in held:
+                raise failure
+            priced.setdefault(name, held.get(name))
+            held.setdefault(name, priced[name])
         return self.network_evolution(
-            site_seeds(pools), options=options, width=width, depth=depth
+            site_seeds(priced, level_held=held),
+            options=options,
+            width=width,
+            depth=depth,
         )
 
     def _process_zones(self) -> list[str]:

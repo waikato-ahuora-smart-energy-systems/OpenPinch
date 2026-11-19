@@ -816,3 +816,43 @@ def test_a_network_that_holds_the_utility_levels_ranks_first():
         True,
         False,
     ]
+
+
+def _site_costed(outcome, site_tac: float):
+    network = outcome.network.model_copy(
+        update={
+            "summary_metrics": outcome.network.summary_metrics
+            | {"site_total_annual_cost": site_tac}
+        }
+    )
+    return outcome.model_copy(update={"network": network})
+
+
+def test_site_networks_rank_by_site_total_annual_cost():
+    """A site network's own TAC charges steam raised on a main as a cooler;
+    its site TAC credits it, and ranks it. A network without site metrics
+    ranks by its TAC."""
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+        outcome_ranking_key,
+    )
+
+    record = HeatExchangerNetworkRecord()
+    raises_steam = _site_costed(_outcome("raises", A, 300.0), 80.0)
+    buys_steam = _site_costed(_outcome("buys", B, 200.0), 150.0)
+    plain = _outcome("plain", C, 100.0)
+
+    with recording(record):
+        admit(buys_steam)
+        admit(raises_steam)
+        admit(plain)
+
+    assert [entry.task.task_id for entry in record.outcomes()] == [
+        "raises",
+        "plain",
+        "buys",
+    ]
+    assert [
+        entry.get("site_total_annual_cost") for entry in record.snapshot()["entries"]
+    ] == [80.0, None, 150.0]
+    ranked = sorted((plain, buys_steam, raises_steam), key=outcome_ranking_key)
+    assert [outcome.task.task_id for outcome in ranked] == ["raises", "plain", "buys"]

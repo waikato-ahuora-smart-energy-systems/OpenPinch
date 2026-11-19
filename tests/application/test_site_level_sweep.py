@@ -36,7 +36,7 @@ def _zonal_site() -> PinchProblem:
 
 
 def _designed(cost, *, site_cost=None):
-    metrics = {} if site_cost is None else {"site": {"total_annual_cost": site_cost}}
+    metrics = {} if site_cost is None else {"site_total_annual_cost": site_cost}
     return SimpleNamespace(
         selected_network=SimpleNamespace(
             total_annual_cost=cost, summary_metrics=metrics

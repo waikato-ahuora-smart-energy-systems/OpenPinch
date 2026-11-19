@@ -1,0 +1,32 @@
+# Total Site Heat Exchanger Network Design
+
+## Overview
+Helpers for designing one network for a site of several processes linked by
+shared utilities. `seeds.py` joins each process's pinch design networks into
+site seeds; `levels.py` reads the site's utility levels from its problem;
+`utility_system.py` adds the site utility balance (imports, letdowns and
+dumps per level and period) as rows and variables of the network's own
+model, so the site pays only for its net utility use. There is no separate
+accounting problem: the stage-wise model of a site task carries the block
+(`../models/_stagewise/site_utilities.py`). The public entry point is
+`design.total_site_heat_exchanger_network`
+(`OpenPinch/application/_problem/accessors/design.py`).
+
+## Interface
+- `process_level_duties`, `site_seeds` (`seeds.py`): a process network's utility duties per level (its level targets when it holds them, otherwise its own heater and cooler duties), and site seeds (`site_seeds(pools, level_held=)`): per dt_cont multiplier in ascending order, a `"level_held"` seed from each process's networks in `level_held` that hold their level targets and a `"lowest_cost"` seed from its networks in `pools` (levels chosen by price), each taking per process the network with the fewest units (`summary_metrics["total_units"]`, else its active exchangers), then the lowest total annual cost, at that multiplier or the nearest one it has (a process with no level-held network gives its lowest-cost one to both), recorded as `summary_metrics["site_seed"]`, a seed equal to another dropped; each joins the recovery matches, the largest stage count and `source_metadata["site_processes"]` (each process's level duties); seeds without recovery are dropped, and `ValueError` is raised when none recovers heat.
+- `SiteUtilitySystem`, `site_utility_system(solver_arrays, capacities=, letdown_price=)`, `utility_capacities(zone)` (`levels.py`): the site's `SiteUtilityLevels` (`OpenPinch/contracts/synthesis/site.py`) from its unsliced solver arrays, with the utility identities each level serves; `members(solver_arrays)` gives the level index of each hot and cold utility of (possibly sliced) arrays; `utility_capacities` gives each hot utility's `maximum_heat_flow` per period by identity.
+- `add_site_balance(m, levels, n, use, generation)`, `SiteBalancePeriod`, `letdowns`, `period_cost`, `solved_balance` (`utility_system.py`): add period `n`'s balance rows to model `m` given each level's use and generation as expressions of `m`; the period's handles and its import cost (`hot_cost`) and dump and letdown cost (`cold_cost`); the letdown pairs of a period; the solved costs of a period; and the solved `UtilitySystemBalance` (per level and period use, generation, import, letdown in and out, dump and cost; period costs, the weighted operating cost, and site hot and cold utility per period).
+- Subdirectories: none.
+
+## Invariants
+- A hot utility (`"Hot Utility.<name>"`) and a cold utility (`"Cold Utility.<name>"`) of one name are one main (`"both"`) only when their temperatures match in every period (hot inlet with cold outlet and the reverse, within 1 K), as a `Both` utility splits; otherwise each is its own level, named `"<name> (hot)"` and `"<name> (cold)"` when the names clash. Prices are the arrays' annual prices ($/kW/y); temperatures are degC per period; a hot utility's `maximum_heat_flow` is its level's import capacity [levels.py:site_utility_system, utility_capacities].
+- Per level and period: `use + letdown_out + dump == generation + letdown_in + imported`. Imports go only into hot and both levels, at the import price and within `import_capacity`; dumps leave only cold and both levels, at the dump price; heat is let down from a level to another only when the first lies wholly above the second in that period (`t_low[n] >= t_high[n]`), at `letdown_price` [utility_system.py:add_site_balance, letdowns].
+- The block is linear, so a linear model stays linear. Minimising its cost with the loads fixed gives the cheapest balance; with import prices rising with temperature and one dump price on every level, its cost and site hot and cold utility equal the Total Site cascade's (`OpenPinch/analysis/targeting/indirect.py:_target_site_utilities`), which a Hypothesis property checks under HiGHS.
+- `operating_cost` is `sum(w_n * cost_n) / sum(w_n)` over the period weights, as the stage-wise models weight periods [utility_system.py:solved_balance].
+
+## Errors
+- A balance the levels cannot close (an import capacity too small) makes the model that carries it infeasible; the solver reports the failure.
+- The contracts reject a level whose kind and prices disagree (a hot level needs `import_price` and takes no `dump_price`, a cold level the reverse, a both level both), non-finite prices or temperatures, `t_high < t_low`, duplicate level names, and values not one per period [`OpenPinch/contracts/synthesis/site.py`].
+
+## Side Effects
+- `add_site_balance` adds variables and rows to the model it is given; the rest is pure.

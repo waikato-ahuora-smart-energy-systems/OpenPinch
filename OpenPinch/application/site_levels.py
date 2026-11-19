@@ -109,10 +109,8 @@ def placed_case(
 
 def site_cost(network) -> float:
     """A site design's total annual cost: the site's when it reports one."""
-    site = (network.summary_metrics or {}).get("site")
-    if isinstance(site, Mapping) and site.get("total_annual_cost") is not None:
-        return float(site["total_annual_cost"])
-    return float(network.total_annual_cost)
+    site = (network.summary_metrics or {}).get("site_total_annual_cost")
+    return float(network.total_annual_cost if site is None else site)
 
 
 def run_level_counts(

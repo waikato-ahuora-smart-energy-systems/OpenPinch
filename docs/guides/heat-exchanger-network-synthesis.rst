@@ -410,8 +410,8 @@ utility whose temperature changes by more than 1 K, such as hot water) stay
 sensible while two isothermal levels remain, so on ``zonal_site``, with hot
 water as its one sensible utility, count 2 places two isothermal levels and
 count 4 three isothermal and one sensible. The site is designed with each
-count's levels, and the cheapest design over the counts is selected (the
-site total annual cost when the network reports one). A count whose
+count's levels, and the cheapest design over the counts is selected (its site total annual cost, from site utility
+accounting). A count whose
 placement is infeasible, or whose design fails, is recorded and skipped.
 The result ranks each designed count's best network, tagged
 ``summary_metrics["utility_level_count"]``, and
