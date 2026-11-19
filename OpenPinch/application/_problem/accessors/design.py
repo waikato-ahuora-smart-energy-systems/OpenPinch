@@ -1371,7 +1371,12 @@ class _DesignAccessor:
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
         ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
         added area on an existing exchanger adds ``area_addition_cost``, all
-        in $ and annualised with the capital recovery factor.
+        in $ and annualised with the capital recovery factor. A call that
+        prices new units but leaves ``area_addition_cost``, ``split_cost``
+        and ``repiping_cost`` at 0 warns, since the search then favours
+        those modifications. Every exchanger keeps at least
+        ``min_approach_temperature`` (default: the case's minimum approach,
+        twice ``THERMAL_DT_CONT``).
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
@@ -1435,9 +1440,6 @@ class _DesignAccessor:
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
-        from ....analysis.heat_exchanger_networks.duty_optimisation import (
-            DEFAULT_FEASIBILITY_APPROACH,
-        )
         from ....analysis.heat_exchanger_networks.retrofit.search import (
             RetrofitSettings,
             run_retrofit_search,
@@ -1461,6 +1463,17 @@ class _DesignAccessor:
                 if new_unit_cost is None
                 else new_unit_cost
             )
+            if unit_cost > 0 and not (
+                area_addition_cost or split_cost or repiping_cost
+            ):
+                warnings.warn(
+                    "retrofit prices each new unit at new_unit_cost but area "
+                    "additions, splits and repiping at nothing; set "
+                    "area_addition_cost, split_cost and repiping_cost so the "
+                    "search does not favour them.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             result = run_retrofit_search(
                 isolated,
                 existing,
@@ -1471,7 +1484,7 @@ class _DesignAccessor:
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
                     approach=(
-                        DEFAULT_FEASIBILITY_APPROACH
+                        2.0 * float(isolated.master_zone.config.thermal.dt_cont)
                         if min_approach_temperature is None
                         else min_approach_temperature
                     ),

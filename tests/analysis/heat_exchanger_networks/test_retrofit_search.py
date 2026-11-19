@@ -1213,6 +1213,9 @@ def test_a_real_fluid_heat_pump_is_priced_by_the_hpr_machine_capital(fake_solver
         heat_pump_cycle="vapour_compression",
         heat_pump_cost=300.0,
         repiping_cost=1_000.0,
+        # The cycle below is built at a 1 K approach; the retrofit default
+        # is now the case's minimum approach.
+        min_approach_temperature=1.0,
         options=options,
     )
 

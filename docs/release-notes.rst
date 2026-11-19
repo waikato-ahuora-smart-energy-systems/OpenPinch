@@ -7,6 +7,12 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.retrofit`` defaults ``min_approach_temperature`` to the case's
+  minimum approach (twice ``THERMAL_DT_CONT``) rather than 1 K, which let
+  new matches recover heat the design rules out and overstated savings. A
+  retrofit that prices new units but leaves ``area_addition_cost``,
+  ``split_cost`` and ``repiping_cost`` at 0 now warns, since the search
+  then favours those modifications.
 - A retrofit whose existing network names a stream without its zone
   (``H1``) when several zones have a stream of that name (``A.H1`` and
   ``B.H1``) now raises a ``ValueError`` naming them. Before, both mapped to

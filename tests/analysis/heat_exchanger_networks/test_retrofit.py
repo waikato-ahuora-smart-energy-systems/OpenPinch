@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import json
+import warnings
 
 import pytest
 
@@ -780,3 +781,39 @@ def test_retrofit_search_drops_designs_that_fail_solution_verification(monkeypat
     assert all(
         m.kind == "area_addition" for d in result.frontier for m in d.modifications
     )
+
+
+def _captured_settings(monkeypatch, **kwargs):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    captured = {}
+
+    def capture(problem, existing, settings, *args, **kw):
+        captured["settings"] = settings
+        raise RuntimeError("captured")
+
+    monkeypatch.setattr(search, "run_retrofit_search", capture)
+    with pytest.raises(RuntimeError, match="captured"):
+        _case_problem().design.retrofit(_existing_network(), **kwargs)
+    return captured["settings"]
+
+
+def test_a_retrofit_approach_defaults_to_the_cases_minimum_approach(monkeypatch):
+    """The case's dt_cont is 5 K a stream, so 10 K between two; a 1 K
+    default let new matches recover heat the design basis rules out."""
+    assert _captured_settings(monkeypatch).approach == pytest.approx(10.0)
+    assert _captured_settings(
+        monkeypatch, min_approach_temperature=4.0
+    ).approach == pytest.approx(4.0)
+
+
+def test_a_retrofit_with_unpriced_modifications_warns(monkeypatch):
+    """New units cost COSTING_HX_UNIT_COST but area additions, splits and
+    repiping cost nothing by default, which favours them."""
+    with pytest.warns(UserWarning, match="area_addition_cost"):
+        _captured_settings(monkeypatch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        _captured_settings(
+            monkeypatch, area_addition_cost=1.0, split_cost=1.0, repiping_cost=1.0
+        )
