@@ -19,6 +19,16 @@ Heat exchanger network synthesis
   with more than one process zone now emits a ``UserWarning`` that it pools
   every process's streams (any inter-process match, no piping cost) and
   names the site method.
+- Site utility accounting
+  (``analysis.heat_exchanger_networks.site.utility_system.account_utility_system``):
+  given each process's heater and cooler duty on each utility level, it
+  finds the site's cheapest balance of imports, letdowns between levels and
+  dumps per period, with a linear programme solved by SciPy's HiGHS (no
+  optional solver, so it runs in Pyodide). It reports each level's use,
+  generation, import, letdown, dump, cost and marginal price; generation on
+  a steam main or hot water circuit that is short is credited at that price.
+  With import prices rising with temperature it reproduces the Total Site
+  utility cascade.
 - ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
   each process is designed over every period at once, so each level carries
   its targeted duty in every period, and network evolution holds those

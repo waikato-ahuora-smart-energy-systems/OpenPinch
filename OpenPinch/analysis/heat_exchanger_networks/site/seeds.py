@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from ...domain.enums import HeatExchangerKind
-from ...domain.heat_exchanger_network import HeatExchangerNetwork
-from .reporting.ranking import holds_utility_levels
+from ....domain.enums import HeatExchangerKind
+from ....domain.heat_exchanger_network import HeatExchangerNetwork
+from ..reporting.ranking import holds_utility_levels
 
 
 def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]]:
