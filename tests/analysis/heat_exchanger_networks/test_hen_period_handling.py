@@ -234,9 +234,7 @@ def test_a_stream_idle_in_one_period_does_not_break_the_pinch_design(method):
 
     network = view.selected_network
     condensate = [
-        e
-        for e in network.exchangers
-        if e.source_stream.endswith("Condensate cooling")
+        e for e in network.exchangers if e.source_stream.endswith("Condensate cooling")
     ]
     assert condensate
     assert all(
