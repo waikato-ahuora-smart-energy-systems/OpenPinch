@@ -296,6 +296,33 @@ def test_repeated_imports_keep_the_keys_of_a_renamed_nested_stream():
     assert sorted(s.name for s in site.hot_streams) == first_names
 
 
+def test_a_copied_zone_keeps_the_keys_of_a_renamed_nested_stream():
+    """``PinchProblem.master_zone`` hands out deep copies: importing again
+    on a copy keeps the keys the first import gave."""
+    from copy import deepcopy
+
+    site = Zone(name="Site")
+    process = Zone(name="A")
+    unit = Zone(name="U")
+    process.hot_streams.add(_plain_stream("H1", 250.0, 60.0, 190.0), key="Site/A.H1")
+    unit.hot_streams.add(_plain_stream("H1", 180.0, 90.0, 90.0), key="Site/A/U.H1")
+    process.add_zone(unit)
+    site.add_zone(process)
+    site.import_hot_and_cold_streams_from_sub_zones()
+
+    copy = deepcopy(site)
+    copy.import_hot_and_cold_streams_from_sub_zones()
+
+    copied_process = copy.subzones["A"]
+    assert sorted(key for key, _ in copied_process.hot_streams.items()) == [
+        "Site/A.H1",
+        "U.H1",
+    ]
+    assert sorted(key for key, _ in copy.hot_streams.items()) == sorted(
+        key for key, _ in site.hot_streams.items()
+    )
+
+
 # === New Tests for Zone ===
 
 

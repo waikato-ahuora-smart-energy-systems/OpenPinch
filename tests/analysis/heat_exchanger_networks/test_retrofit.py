@@ -847,6 +847,8 @@ def _recovery_approaches(problem, approach):
     return caught.value.args[0]
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
 def test_a_retrofit_without_an_approach_keeps_each_streams_contribution():
     """H1 contributes 2 K and every other stream 5 K: H1's match needs
     7 K, the others 10 K; an explicit approach still sets them all."""
