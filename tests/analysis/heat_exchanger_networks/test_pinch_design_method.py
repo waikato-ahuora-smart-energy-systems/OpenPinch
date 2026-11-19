@@ -585,7 +585,8 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._utilisation_threshold(5) == 5.0
     assert problem._utilisation_threshold(8) == 8.0
     assert problem._utilisation_threshold(10) == 10.0
-    assert problem._utilisation_threshold(11) == 0.0
+    # Above 10 stages the 10-stage threshold holds; it used to drop to 0.
+    assert problem._utilisation_threshold(11) == 10.0
     assert problem._get_active_stages(case) == [0, 2]
 
 

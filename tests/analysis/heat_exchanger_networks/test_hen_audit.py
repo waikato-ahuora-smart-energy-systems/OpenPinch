@@ -512,6 +512,122 @@ def test_stage_reduction_keeps_the_original_when_the_reduced_network_fails(
     assert reduced is case
 
 
+def _reduction_case():
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+    case.T_h = [[[400.0]] * 4] * 2
+    case.T_c = [[[300.0]] * 4]
+    case.theta_1 = case.theta_2 = [[[[10.0]] * 3]] * 2
+    case.TAC_model = case.TAC = case.solve_time = 1.0
+    case.Q_hu_by_utility_by_period = [[100.0], [100.0]]
+    case.Q_cu_by_utility_by_period = [[50.0], [50.0]]
+    case.solver_run = SimpleNamespace(converged=True)
+    return case
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        {"TAC": 2.0},
+        {"Q_hu_by_utility_by_period": [[100.0], [120.0]]},
+    ],
+    ids=["dearer", "more utility"],
+)
+def test_stage_reduction_keeps_the_original_when_the_reduced_network_is_worse(
+    monkeypatch, outcome
+):
+    """Reduction only simplifies: a reduced network that costs more or uses
+    more utility in some period does not replace the solved one."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Worse(_ReducedModel):
+        valid = True
+
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.Q_hu_by_utility_by_period = [[100.0], [100.0]]
+            self.Q_cu_by_utility_by_period = [[50.0], [50.0]]
+            for name, value in outcome.items():
+                setattr(self, name, value)
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Worse)
+    case = _reduction_case()
+
+    reduced = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    ).remove_unused_stages(case)
+
+    assert reduced is case
+
+
+def test_stage_reduction_keeps_a_reduced_network_no_worse(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Same(_ReducedModel):
+        valid = True
+
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.Q_hu_by_utility_by_period = [[100.0], [100.0]]
+            self.Q_cu_by_utility_by_period = [[50.0], [50.0]]
+            self.solver_run = SimpleNamespace(converged=True)
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Same)
+    case = _reduction_case()
+
+    reduced = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    ).remove_unused_stages(case)
+
+    assert reduced is not case
+
+
+def test_stage_reduction_solves_with_the_tasks_solver_options(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+    case.solver_options = {"time_limit": 30}
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=3
+        ).remove_unused_stages(case)
+
+    assert built["solver_options"] == {"time_limit": 30}
+
+
+def test_more_than_ten_stages_keep_the_ten_stage_threshold():
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    )
+
+    assert problem._utilisation_threshold(11) == problem._utilisation_threshold(10)
+
+
 def test_stage_reduction_sets_shared_flags_from_every_period(monkeypatch):
     # The reduced model is relaxed: a match, heater or cooler flagged 0 has
     # no approach constraint or unit cost however much duty it carries, so a

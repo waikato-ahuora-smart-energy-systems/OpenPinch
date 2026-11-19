@@ -22,6 +22,13 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Stage reduction keeps a network with fewer stages only when it costs no
+  more and uses no more hot or cold utility in any period than the network
+  it reduces. Before, it kept any reduced network that solved and verified,
+  so a pinch design network could quietly lose recovery. The reduced solve
+  also keeps the task's solver options (a time limit, say), and a layout of
+  more than 10 stages now drops stages under 10% of the recovery, as one of
+  9 or 10 does; before, it kept every stage, empty ones included.
 - Stage packing (``HENS_STAGE_PACKING``, and the minimum-unit pinch
   design search) counts each match's duty in every period. Before, it read
   the first period alone, so a match that carries load only in later
