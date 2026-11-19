@@ -227,6 +227,37 @@ def test_an_infeasible_count_does_not_count_toward_the_early_stop():
     assert site_levels.select_level_count(runs).count == 5
 
 
+def test_counts_after_the_time_limit_are_not_run():
+    designed = []
+
+    def design(case):
+        designed.append(case.count)
+        return _designed(100.0)
+
+    runs = site_levels.run_level_counts(
+        _site(), (2, 3, 4), design=design, place=_fake_place(), expired=lambda: True
+    )
+
+    # The first count always runs, so the sweep has a design to return.
+    assert designed == [2]
+    assert [(run.status, run.message) for run in runs[1:]] == [
+        ("not run", "time limit"),
+        ("not run", "time limit"),
+    ]
+
+
+def test_counts_run_until_one_is_designed_whatever_the_time():
+    runs = site_levels.run_level_counts(
+        _site(),
+        (2, 3, 4),
+        design=lambda case: _designed(100.0),
+        place=_fake_place(infeasible=(2,)),
+        expired=lambda: True,
+    )
+
+    assert [run.status for run in runs] == ["infeasible", "designed", "not run"]
+
+
 def test_no_designed_count_raises_naming_each_count():
     runs = site_levels.run_level_counts(
         _site(), (2, 3), design=_designed, place=_fake_place(infeasible=(2, 3))
@@ -257,8 +288,13 @@ def test_given_levels_are_the_default_and_design_with_the_cases_utilities(
 def test_placed_levels_sweep_the_configured_counts(monkeypatch):
     seen = {}
 
-    def run(problem, counts, *, design, early_stop=False, placement=None):
-        seen.update(counts=counts, early_stop=early_stop, placement=placement)
+    def run(problem, counts, *, design, early_stop=False, placement=None, expired=None):
+        seen.update(
+            counts=counts,
+            early_stop=early_stop,
+            placement=placement,
+            expired=None if expired is None else expired(),
+        )
         raise RuntimeError("stop here")
 
     monkeypatch.setattr(site_levels, "run_level_counts", run)
@@ -271,6 +307,7 @@ def test_placed_levels_sweep_the_configured_counts(monkeypatch):
         "counts": (2, 3, 4, 5),
         "early_stop": False,
         "placement": {"evaluation_limit": 10},
+        "expired": None,
     }
 
     with pytest.raises(RuntimeError, match="stop here"):
@@ -289,6 +326,12 @@ def test_placed_levels_sweep_the_configured_counts(monkeypatch):
             levels="placed", level_counts=[4]
         )
     assert seen["counts"] == (4,)
+
+    with pytest.raises(RuntimeError, match="stop here"):
+        _site().design.total_site_heat_exchanger_network(
+            options={"HENS_SITE_LEVELS": "placed", "HENS_SITE_TIME_LIMIT": 3600.0}
+        )
+    assert seen["expired"] is False
 
 
 def test_an_unknown_levels_choice_is_refused():

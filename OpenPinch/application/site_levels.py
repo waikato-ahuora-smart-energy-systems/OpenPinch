@@ -142,6 +142,7 @@ def run_level_counts(
     place: Callable[..., "PinchProblem"] = placed_case,
     early_stop: bool = False,
     placement=None,
+    expired: Callable[[], bool] | None = None,
 ) -> tuple[LevelCountRun, ...]:
     """Design the site once per level count, in order.
 
@@ -149,7 +150,9 @@ def run_level_counts(
     ``design(case)`` its design view. A missing synthesis solver or
     dependency is raised; any other failure is recorded with its count. With
     ``early_stop``, the sweep ends once two designed counts in a row cost
-    more than the cheapest before them.
+    more than the cheapest before them. Once a count is designed, a count
+    is started only while ``expired()`` is false; the rest are ``"not run"``
+    with message ``"time limit"``.
     """
     from ..analysis.heat_exchanger_networks.solver.dependencies import (
         MissingSynthesisDependencyError,
@@ -165,6 +168,9 @@ def run_level_counts(
         split = {"count": count, "isothermal": isothermal, "sensible": sensible}
         if early_stop and rises >= 2:
             runs.append(LevelCountRun(**split, status="not run"))
+            continue
+        if expired is not None and best < float("inf") and expired():
+            runs.append(LevelCountRun(**split, status="not run", message="time limit"))
             continue
         try:
             case = place(problem, count, placement=placement)

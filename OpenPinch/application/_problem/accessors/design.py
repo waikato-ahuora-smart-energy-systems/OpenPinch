@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import warnings
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
@@ -610,7 +611,10 @@ class _DesignAccessor:
         again with each process's levels re-targeted, and a move is kept
         only on a lower site cost; the step halves down to
         ``HENS_SITE_LEVEL_STEP_MIN`` (1 K). The moves are recorded as
-        ``HENS_SITE_LEVEL_MOVES``.
+        ``HENS_SITE_LEVEL_MOVES``. ``HENS_SITE_TIME_LIMIT`` (seconds, default
+        none) bounds the sweep and the moves together: once it runs out no
+        further count or move is started and the cheapest design so far is
+        returned; the first count is always designed.
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected
@@ -628,6 +632,12 @@ class _DesignAccessor:
             return self._site_design(width=width, depth=depth, options=options)
         if levels != "placed":
             raise ValueError('levels must be "given" or "placed".')
+        limit = hens.site_time_limit
+        deadline = None if limit is None else time.monotonic() + limit
+
+        def expired() -> bool:
+            return time.monotonic() >= deadline
+
         counts = tuple(
             hens.site_level_counts
             if level_counts is None
@@ -641,6 +651,7 @@ class _DesignAccessor:
             ),
             early_stop=hens.site_level_early_stop,
             placement=placement,
+            expired=None if deadline is None else expired,
         )
         runs, moves = refine_selected(
             runs,
@@ -652,6 +663,7 @@ class _DesignAccessor:
             ),
             step=hens.site_level_step,
             step_min=hens.site_level_step_min,
+            expired=None if deadline is None else expired,
         )
         return level_sweep_view(
             self._problem,
