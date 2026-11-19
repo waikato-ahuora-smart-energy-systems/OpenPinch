@@ -127,3 +127,23 @@ def test_a_stored_all_periods_basis_designs_as_the_argument_does():
     }
 
     assert len(structures) == 1, structures
+
+
+def test_the_median_basis_reads_heat_flows_of_streams_given_by_cp():
+    """A stream given by its heat capacity flowrate has no ``heat_flow`` in
+    the case's source; the basis takes the prepared streams' heat flows, so
+    each period still runs and the median case has every stream's load."""
+    source = _two_period_problem().to_problem_json()
+    for record in source["streams"]:
+        record["heat_flow"] = None
+    problem = PinchProblem(source=source, project_name="cp-only")
+
+    basis = problem.design.design_basis()
+
+    assert {period for cluster in basis.clusters for period in cluster.period_ids} == (
+        set(PERIODS)
+    )
+    assert all(
+        stream.included and stream.quantities["heat_flow"] > 0
+        for stream in basis.streams
+    )

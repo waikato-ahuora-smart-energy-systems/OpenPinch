@@ -664,8 +664,11 @@ def test_stagewise_multiperiod_initial_values_use_source_fallback_and_shared_are
     assert model.Q_c_by_period[0][0][0].value == pytest.approx(0.0)
     assert model.Q_h_by_period[0][0][0].value == pytest.approx(0.0)
     assert model.z[0][0][0].value == 1
-    assert model.z_cu[0][0].value == 1
-    assert model.z_hu[0][0].value == 1
+    # The fixture disallows its heaters and coolers (z_cu_allowed and
+    # z_hu_allowed are 0), so the warm start leaves them off, as the
+    # single-period path does, rather than copying the source's flags.
+    assert model.z_cu[0][0].value == 0
+    assert model.z_hu[0][0].value == 0
     assert model.area_r_shared[0][0][0].value == pytest.approx(11.0)
     assert model.area_hu_shared[0][0].value == pytest.approx(13.0)
     assert model.area_cu_shared[0][0].value == pytest.approx(14.0)

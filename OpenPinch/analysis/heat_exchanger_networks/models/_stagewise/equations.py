@@ -106,7 +106,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             ),
                             lb=approaches[n][i][j],
                         )
-                        if owner.z_allowed[i][j][k] > 0
+                        if _runs(owner, n, i, j, k)
                         else approaches[n][i][j]
                     )
                     for k in range(owner.S)
@@ -129,7 +129,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             ),
                             lb=approaches[n][i][j],
                         )
-                        if owner.z_allowed[i][j][k] > 0
+                        if _runs(owner, n, i, j, k)
                         else approaches[n][i][j]
                     )
                     for k in range(owner.S)
@@ -285,7 +285,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                     <= (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -299,7 +299,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                     >= (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     - owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -316,7 +316,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -333,7 +333,7 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                     )
                     - owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -451,7 +451,7 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -468,7 +468,7 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -601,3 +601,14 @@ def set_dqda_equations(owner) -> None:
         for j in range(owner.J)
         for i in range(owner.I)
     ]
+
+
+def _runs(owner, n: int, i: int, j: int, k: int) -> bool:
+    """Whether allowed match ``(i, j, k)`` can carry duty in period ``n``.
+
+    A match is allowed when it can run in some period; in a period where
+    its supply temperatures are too close for its approach its duty bound
+    is zero, and its approach temperatures stay constants with no
+    constraints, so their bounds cannot cross.
+    """
+    return owner.z_allowed[i][j][k] > 0 and owner.Q_max_period[n][i][j] > owner.tol
