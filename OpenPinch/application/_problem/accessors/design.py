@@ -1120,7 +1120,7 @@ class _DesignAccessor:
             hens.basis_clusters if basis_clusters is None else basis_clusters
         )
         basis = median_basis(
-            self._problem.to_problem_json(),
+            self._with_prepared_heat_flows(self._problem.to_problem_json()),
             tuple(self._problem.period_ids),
             tuple(self._problem.master_zone.weights),
             clusters=clusters,
@@ -1140,6 +1140,36 @@ class _DesignAccessor:
                 stacklevel=3,
             )
         return basis, clusters
+
+    def _with_prepared_heat_flows(self, source: dict) -> dict:
+        """``source`` with each stream's heat flow given.
+
+        A stream given by its heat capacity flowrate has no ``heat_flow`` in
+        the source; the prepared stream's heat flow (per period) is used,
+        matched by ``<zone>.<name>`` and else by a unique name.
+        """
+        zone = self._problem.master_zone
+        prepared = [
+            (key, stream)
+            for collection in (zone.hot_streams, zone.cold_streams)
+            for key, stream in collection.items()
+        ]
+        for record in source.get("streams", []):
+            if record.get("heat_flow") is not None:
+                continue
+            name = record.get("name")
+            key = f"{str(record.get('zone', '')).split('/')[-1]}.{name}"
+            matches = [stream for k, stream in prepared if k == key] or [
+                stream for _k, stream in prepared if stream.name == name
+            ]
+            if len(matches) != 1:
+                continue
+            value = matches[0].heat_flow
+            record["heat_flow"] = {
+                "values": [abs(float(v)) for v in value.period_values],
+                "unit": str(value.unit),
+            }
+        return source
 
     def _design_on_median_basis(self, basis_clusters, hens, *, source, **arguments):
         """Synthesise on each candidate cluster's median case.
@@ -1386,7 +1416,12 @@ class _DesignAccessor:
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
         ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
         added area on an existing exchanger adds ``area_addition_cost``, all
-        in $ and annualised with the capital recovery factor.
+        in $ and annualised with the capital recovery factor. A call that
+        prices new units but leaves ``area_addition_cost``, ``split_cost``
+        and ``repiping_cost`` at 0 warns, since the search then favours
+        those modifications. Every exchanger keeps at least
+        ``min_approach_temperature`` (default: the case's minimum approach,
+        twice ``THERMAL_DT_CONT``).
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
@@ -1450,9 +1485,6 @@ class _DesignAccessor:
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
-        from ....analysis.heat_exchanger_networks.duty_optimisation import (
-            DEFAULT_FEASIBILITY_APPROACH,
-        )
         from ....analysis.heat_exchanger_networks.retrofit.search import (
             RetrofitSettings,
             run_retrofit_search,
@@ -1476,6 +1508,17 @@ class _DesignAccessor:
                 if new_unit_cost is None
                 else new_unit_cost
             )
+            if unit_cost > 0 and not (
+                area_addition_cost or split_cost or repiping_cost
+            ):
+                warnings.warn(
+                    "retrofit prices each new unit at new_unit_cost but area "
+                    "additions, splits and repiping at nothing; set "
+                    "area_addition_cost, split_cost and repiping_cost so the "
+                    "search does not favour them.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             result = run_retrofit_search(
                 isolated,
                 existing,
@@ -1486,7 +1529,7 @@ class _DesignAccessor:
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
                     approach=(
-                        DEFAULT_FEASIBILITY_APPROACH
+                        2.0 * float(isolated.master_zone.config.thermal.dt_cont)
                         if min_approach_temperature is None
                         else min_approach_temperature
                     ),

@@ -9,6 +9,7 @@ makes the frontier over the number of steps.
 
 from __future__ import annotations
 
+import logging
 import math
 import sys
 import threading
@@ -75,6 +76,8 @@ _MIN_AREA_VALUE = 1e-3
 _MIN_KEPT_AREA = 1.0
 STRATEGIES = ("stepwise", "structure")
 HEAT_PUMP_CYCLES = (None, "carnot", "vapour_compression")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -1066,9 +1069,10 @@ class _Evaluator:
         self, move: _Move, result, stage: int | None, utility=None
     ) -> HeatExchangerNetworkRetrofitModification | None:
         """``move`` priced from its unit's added area; ``None`` when it does
-        nothing (no added area, or a unit with no duty). A relocation adds no
-        area. A new or moved match reports ``stage``, its stage in the
-        design's network. ``utility`` is the result of the new utility
+        nothing (no added area, or a unit with no duty) or, for a real-fluid
+        heat pump, when its machine's cycle cannot be solved at its duty. A
+        relocation adds no area. A new or moved match reports ``stage``, its
+        stage in the design's network. ``utility`` is the result of the new utility
         exchanger paired with the move, priced as one more new unit; it too
         must carry duty."""
 
@@ -1081,12 +1085,17 @@ class _Evaluator:
         elif move.kind == "heat_pump" and move.heat_pump.refrigerant is not None:
             # The HPR machine capital covers the exchangers too.
             added = 0.0
-            fixed = vapour_compression_capital(
-                move.heat_pump,
-                utility.max_duty,
-                (float(result.added_area), float(utility.added_area)),
-                **self.cycle_settings,
-            )
+            try:
+                fixed = vapour_compression_capital(
+                    move.heat_pump,
+                    utility.max_duty,
+                    (float(result.added_area), float(utility.added_area)),
+                    **self.cycle_settings,
+                )
+            except (ValueError, RuntimeError) as exc:
+                # The cycle can fail at the solved capacity: drop this one.
+                logger.debug("Heat pump %s not priced: %s", move.heat_pump, exc)
+                return None
         elif move.kind == "heat_pump":
             added = float(result.added_area)
             fixed = settings.heat_pump_cost * utility.max_duty
@@ -1175,7 +1184,8 @@ def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]
     """Each solver stream name mapped to the name ``existing`` uses for it.
 
     The existing network may name a stream without its zone prefix
-    (``H1`` for ``Process A.H1``); streams it does not name keep theirs.
+    (``H1`` for ``Process A.H1``); streams it does not name keep theirs. A
+    bare name that fits streams of several zones raises ``ValueError``.
     """
 
     used = {
@@ -1187,6 +1197,16 @@ def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]
             key = str(key)
             matches = [n for n in used if n == key or key.endswith("." + n)]
             names[key] = matches[0] if len(matches) == 1 else key
+    keys_by_name: dict[str, list[str]] = {}
+    for key, name in names.items():
+        keys_by_name.setdefault(name, []).append(key)
+    for name, keys in keys_by_name.items():
+        if len(keys) > 1:
+            raise ValueError(
+                f"the existing network names stream {name!r}, which could be "
+                + " or ".join(sorted(keys))
+                + "; name it with its zone."
+            )
     return names
 
 

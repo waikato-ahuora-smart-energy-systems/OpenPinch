@@ -2335,3 +2335,71 @@ def _intermediate_labels(ax, text: str):
         and item.get_ha() == "center"
         and item.get_va() == "bottom"
     ]
+
+
+def test_heaters_at_different_stages_give_different_structures():
+    """A staged heater sits at a stage boundary; the same heater at another
+    boundary, or at the stream end, is another network, not a repeat."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import StreamID
+
+    def network(heater_stage):
+        recovery = HeatExchanger(
+            exchanger_id="recovery:H1->C1:S1",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Process,
+            stage=1,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=5.0),
+            ),
+        )
+        heater = HeatExchanger(
+            exchanger_id="hot-utility:LPS->C1",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="LPS",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            stage=heater_stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+            ),
+        )
+        return HeatExchangerNetwork(exchangers=(recovery, heater), run_id="n")
+
+    signatures = {network_structure_signature(network(stage)) for stage in (None, 2, 3)}
+
+    assert len(signatures) == 3
+
+
+def test_an_end_and_a_staged_heater_on_one_stream_sort_in_a_signature():
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import StreamID
+
+    def heater(stage):
+        return HeatExchanger(
+            exchanger_id=f"hot-utility:LPS->C1:{stage}",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="LPS",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            stage=stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+            ),
+        )
+
+    network = HeatExchangerNetwork(exchangers=(heater(2), heater(None)), run_id="n")
+
+    assert network_structure_signature(network) == (
+        ("hot_utility", "LPS", "C1", None),
+        ("hot_utility", "LPS", "C1", 2),
+    )
