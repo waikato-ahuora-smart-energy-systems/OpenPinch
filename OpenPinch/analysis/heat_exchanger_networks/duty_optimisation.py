@@ -94,6 +94,9 @@ class DutyOptimisationRequest:
     exchanger_approach_temperatures: Mapping[str, float] = field(default_factory=dict)
     max_hot_utility: float | None = None
     max_cold_utility: float | None = None
+    # Utility name to per-period duty: each utility's exchangers together
+    # carry its target in every period.
+    level_targets: Mapping[str, tuple[float, ...]] | None = None
 
     @property
     def minimisation_goal(self) -> str:
@@ -121,8 +124,15 @@ def build_duty_optimisation_request(
     exchanger_approach_temperatures: Mapping[str, float] | None = None,
     max_hot_utility: float | None = None,
     max_cold_utility: float | None = None,
+    problem_approach: bool = False,
+    level_targets: Mapping[str, Sequence[float]] | None = None,
 ) -> DutyOptimisationRequest:
-    """Validate public arguments without touching the problem or a solver."""
+    """Validate public arguments without touching the problem or a solver.
+
+    With ``problem_approach`` and no ``min_approach_temperature``, the
+    ``"cost"`` objective keeps each exchanger at its streams' temperature
+    contributions (the case's minimum approach) instead of 1 K.
+    """
 
     if not isinstance(network, HeatExchangerNetwork):
         raise TypeError("network must be a HeatExchangerNetwork.")
@@ -167,7 +177,7 @@ def build_duty_optimisation_request(
                 "the 'cost' objective trades utility against area itself; "
                 "utility caps apply to the 'area' objective only."
             )
-        if approach is None:
+        if approach is None and not problem_approach:
             approach = DEFAULT_FEASIBILITY_APPROACH
     if objective == "utility" and (hot_cap is not None or cold_cap is not None):
         raise ValueError(
@@ -181,6 +191,14 @@ def build_duty_optimisation_request(
         exchanger_approach_temperatures=per_exchanger,
         max_hot_utility=hot_cap,
         max_cold_utility=cold_cap,
+        level_targets=(
+            None
+            if level_targets is None
+            else {
+                name: tuple(float(duty) for duty in duties)
+                for name, duties in level_targets.items()
+            }
+        ),
     )
 
 
@@ -327,6 +345,7 @@ def fixed_network_structure(
         positions.append(position)
 
     _require_every_stream_served(hot_axis, cold_axis, recovery, utilities)
+    level_holds = _level_holds(request, exchangers, slots, positions)
     return FixedNetworkStructure(
         spec=FixedStructureSpec(
             stage_count=stage_count,
@@ -340,10 +359,43 @@ def fixed_network_structure(
             utility_areas=utility_areas,
             recovery_design_points=recovery_points,
             utility_design_points=utility_points,
+            level_holds=level_holds,
         ),
         positions=tuple(positions),
         slots=tuple(slots),
     )
+
+
+def _level_holds(request, exchangers, slots, positions) -> tuple:
+    """Each held level's utility exchangers (by utility index) and targets.
+
+    A level is matched to the heaters (by source) or coolers (by sink) that
+    name its utility; a level with duty to carry but no exchanger raises.
+    """
+    if not request.level_targets:
+        return ()
+    units: dict[str, list[int]] = {name: [] for name in request.level_targets}
+    for position, (kind, index) in zip(positions, slots, strict=True):
+        if kind != "utility":
+            continue
+        exchanger = exchangers[position]
+        name = (
+            exchanger.source_stream
+            if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            else exchanger.sink_stream
+        )
+        if name in units:
+            units[name].append(index)
+    holds = []
+    for name, targets in request.level_targets.items():
+        if not units[name]:
+            if any(abs(duty) > 1e-9 for duty in targets):
+                raise ValueError(
+                    f"utility level {name!r} has a target but no exchanger."
+                )
+            continue
+        holds.append((tuple(units[name]), tuple(targets)))
+    return tuple(holds)
 
 
 def build_solution_network(
@@ -454,7 +506,16 @@ def build_solution_network(
         capital_cost=float(model.capital_cost_value),
         summary_metrics=summary,
         solver_axis_metadata={"axis_maps": axis_maps},
-        source_metadata=_source_metadata(model, solver_arrays),
+        source_metadata=_source_metadata(model, solver_arrays)
+        | (
+            {
+                "utility_level_targets": {
+                    k: list(v) for k, v in request.level_targets.items()
+                }
+            }
+            if request.level_targets
+            else {}
+        ),
     )
     return network.model_copy(
         update={"objective_value": _objective_value(request.objective, network)}
@@ -669,6 +730,8 @@ def heat_exchanger_network_duty_optimisation_service(
     options: dict[str, Any] | None = None,
     workspace_variant: str | None = None,
     executor: SynthesisExecutor | None = None,
+    problem_approach: bool = False,
+    level_targets: Mapping[str, Sequence[float]] | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
     """Optimise exchanger duties on a fixed, user-defined network structure."""
 
@@ -679,6 +742,8 @@ def heat_exchanger_network_duty_optimisation_service(
         exchanger_approach_temperatures=exchanger_approach_temperatures,
         max_hot_utility=max_hot_utility,
         max_cold_utility=max_cold_utility,
+        problem_approach=problem_approach,
+        level_targets=level_targets,
     )
     target_output, settings = prepare_service_context(
         problem,

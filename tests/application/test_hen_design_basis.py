@@ -390,7 +390,7 @@ def test_the_all_period_fit_runs_with_the_calls_settings(monkeypatch):
     def capture(self, network, **kwargs):
         seen.update(kwargs)
 
-    monkeypatch.setattr(_DesignAccessor, "optimise_duties", capture)
+    monkeypatch.setattr(_DesignAccessor, "_optimise_duties", capture)
     raw, cip = "Process A.Raw Milk", "Process A.CIP Water"
     network = HeatExchangerNetwork.from_structure(
         recovery=[(raw, cip, 1)], stage_count=1
@@ -408,6 +408,7 @@ def test_the_all_period_fit_runs_with_the_calls_settings(monkeypatch):
         "options": {"COSTING_HX_UNIT_COST": 9000.0},
         "solver": "ipopt-pyomo",
         "solve_tolerance": 1e-4,
+        "problem_approach": True,
     }
 
 
@@ -425,3 +426,115 @@ def test_a_basis_designs_provenance_keeps_its_synthesis_settings():
     assert settings["HENS_SEARCH_WIDTH"] == 0
     assert settings["HENS_SEARCH_DEPTH"] == 0
     assert settings["HENS_DESIGN_BASIS"] == "period"
+
+
+def _minimum_recovery_approach(network) -> float:
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    return min(
+        min(
+            state.source_inlet_temperature - state.sink_outlet_temperature,
+            state.source_outlet_temperature - state.sink_inlet_temperature,
+        )
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.RECOVERY
+        for state in exchanger.period_states
+        if state.active and state.duty > 1e-6
+    )
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_the_fit_to_every_period_keeps_the_designs_minimum_approach():
+    """The default multiperiod design (median basis, then the fit) keeps
+    every recovery match at the case's minimum approach (twice
+    THERMAL_DT_CONT, 10 K) in every period; it used to fit at 1 K and
+    report 8.1 K."""
+    network = (
+        _two_period_problem()
+        .design.heat_exchanger_network(width=0, depth=0)
+        .selected_network
+    )
+
+    assert _minimum_recovery_approach(network) >= 10.0 - 1e-3
+
+
+def test_a_fit_that_cannot_keep_the_minimum_approach_warns_and_fits_at_1_k(
+    monkeypatch,
+):
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    calls = []
+
+    def fit(self, network, *, problem_approach=False, **kwargs):
+        calls.append(problem_approach)
+        if problem_approach:
+            raise RuntimeError("infeasible in period peak")
+        return "fitted at 1 K"
+
+    monkeypatch.setattr(_DesignAccessor, "_optimise_duties", fit)
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    )
+
+    with pytest.warns(UserWarning, match="minimum approach.*infeasible in period peak"):
+        result = _two_period_problem().design._fit_to_all_periods(network)
+
+    assert result == "fitted at 1 K"
+    assert calls == [True, False]
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_the_fit_to_every_period_holds_the_utility_levels():
+    """A network that holds its utility levels in every period (designed
+    over all periods with temperature placement) keeps them through the fit
+    to every period: the levels are recorded and met, so LPS is not traded
+    for HPS by price."""
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+        holds_utility_levels,
+    )
+    from tests.application.test_site_heat_exchanger_network import _site
+
+    problem = _site(periods=True)
+    options = {"HENS_UTILITY_PLACEMENT": "temperature"}
+    designed = problem.design.heat_exchanger_network(
+        width=0, depth=0, design_basis="all", options=options
+    ).selected_network
+
+    fitted = problem.design._fit_to_all_periods(
+        designed, options=options
+    ).selected_network
+
+    held = designed.source_metadata["utility_level_targets"]
+    kept = fitted.source_metadata["utility_level_targets"]
+    assert kept.keys() == held.keys()
+    for name, duties in held.items():
+        assert kept[name] == pytest.approx(duties)
+    assert holds_utility_levels(fitted)
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_fit_that_cannot_hold_the_levels_says_so():
+    """A design on the median period cannot meet every period's level
+    targets exactly; the fit warns that it releases the levels instead of
+    releasing them silently."""
+    from tests.application.test_site_heat_exchanger_network import _site
+
+    with pytest.warns(UserWarning, match="cannot hold the design's utility levels"):
+        _site(periods=True).design.heat_exchanger_network(
+            width=0,
+            depth=0,
+            options={"HENS_UTILITY_PLACEMENT": "temperature"},
+        )

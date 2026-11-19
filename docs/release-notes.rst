@@ -22,6 +22,18 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The fit of a design to every period (the default for multiperiod
+  designs) keeps every exchanger at the case's minimum approach, its
+  streams' temperature contributions, in every period. Before, it fitted at
+  1 K, so a default multiperiod design could sit below ΔTmin (8.1 K against
+  10 K in one case) and still verify. Where the minimum approach cannot be
+  met, the fit warns and falls back to 1 K.
+- The fit to every period holds a design's utility levels where it can.
+  A network that holds its levels keeps each level at its target in every
+  period, and records the targets. Before, the fit dropped them, could move
+  load from one level to another by price (LPS to HPS), and still reported
+  the levels as held. When a period's targets cannot be met exactly (as for
+  a design on the median period), the fit warns and releases the levels.
 - A stage-wise network whose matches split a segmented stream in one stage
   sizes each match on its branch's share of the flow. Before, each branch
   was sized on the whole stream's profile, which ended it short of the
