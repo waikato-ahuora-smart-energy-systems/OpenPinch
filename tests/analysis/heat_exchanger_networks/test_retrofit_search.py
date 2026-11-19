@@ -1295,3 +1295,47 @@ def test_a_period_named_like_a_heat_pump_leaves_the_heat_pump_offered(fake_solve
     named.update_options({"PROBLEM_PERIOD_IDS": [f"HP {hot}->{cold}:condenser"]})
 
     assert pump(named) == (hot, cold)
+
+
+def test_a_bare_stream_name_two_zones_share_is_refused():
+    """An existing network naming ``H1`` when ``A.H1`` and ``B.H1`` both
+    exist cannot say which stream it means; mapping both to ``H1`` would
+    let one stream's ends and CP stand for the other's."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _existing_names,
+    )
+
+    existing = SimpleNamespace(
+        exchangers=(SimpleNamespace(source_stream="H1", sink_stream="A.C1"),)
+    )
+    axes = {
+        "hot_process_streams": {"A.H1": 0, "B.H1": 1},
+        "cold_process_streams": {"A.C1": 0},
+    }
+
+    with pytest.raises(ValueError, match="'H1'.*A.H1.*B.H1"):
+        _existing_names(axes, existing)
+
+
+def test_a_bare_stream_name_one_zone_has_maps_to_it():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _existing_names,
+    )
+
+    existing = SimpleNamespace(
+        exchangers=(SimpleNamespace(source_stream="H1", sink_stream="C1"),)
+    )
+    axes = {
+        "hot_process_streams": {"A.H1": 0, "B.H2": 1},
+        "cold_process_streams": {"A.C1": 0},
+    }
+
+    assert _existing_names(axes, existing) == {
+        "A.H1": "H1",
+        "B.H2": "B.H2",
+        "A.C1": "C1",
+    }

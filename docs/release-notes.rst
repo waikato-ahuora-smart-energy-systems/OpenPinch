@@ -7,6 +7,11 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A retrofit whose existing network names a stream without its zone
+  (``H1``) when several zones have a stream of that name (``A.H1`` and
+  ``B.H1``) now raises a ``ValueError`` naming them. Before, both mapped to
+  ``H1`` and one stream's temperatures and heat capacity flowrate silently
+  stood for the other's in the move screens and heat pump targets.
 - ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
   designs one network for a site of several process zones. Each process is
   designed alone with the pinch design method, its utilities placed by

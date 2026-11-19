@@ -204,13 +204,23 @@ def as_piped_profiles(
 
 def _process_stream(streams: StreamCollection, name: str) -> Stream:
     """The process stream ``name`` names, as is or without its zone prefix
-    (``H1`` for ``Process A.H1``)."""
+    (``H1`` for ``Process A.H1``); a bare name several zones share raises
+    ``ValueError``."""
 
+    exact = [stream for key, stream in streams.items() if key == name]
+    if exact:
+        return exact[0]
     matches = [
-        stream
+        (str(key), stream)
         for key, stream in streams.items()
-        if key == name or str(key).endswith("." + name)
+        if str(key).endswith("." + name)
     ]
     if not matches:
         raise ValueError(f"the problem has no process stream {name!r}.")
-    return matches[0]
+    if len(matches) > 1:
+        raise ValueError(
+            f"stream {name!r} could be "
+            + " or ".join(sorted(key for key, _ in matches))
+            + "; name it with its zone."
+        )
+    return matches[0][1]
