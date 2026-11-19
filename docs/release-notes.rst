@@ -7,6 +7,11 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- At search depth 2, a MILP pinch design network none of whose thermal
+  derivative tasks succeeded is now evolved directly. Before, only a
+  missing Couenne for every task sent the MILP networks to evolution; any
+  other failure (a crash, a time limit, a failed check) left them as
+  unevolved final candidates with no warning.
 - Each thermal derivative task now stops at 300 s unless
   ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
   Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run
