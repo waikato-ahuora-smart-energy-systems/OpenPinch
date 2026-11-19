@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Zones and targeting
+~~~~~~~~~~~~~~~~~~~
+
+- A process zone that holds a unit operation kept only the unit
+  operation's streams: the streams placed on the process zone itself
+  vanished from it and from the site, so their targets left them out. Both
+  are now kept.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -23,6 +31,24 @@ Heat exchanger network synthesis
   per-period data and passed a stream left short of its target. The area
   check also uses each period's coefficients rather than the first
   period's.
+- At search depth 2, a MILP pinch design network none of whose thermal
+  derivative tasks succeeded is now evolved directly. Before, only a
+  missing Couenne for every task sent the MILP networks to evolution; any
+  other failure (a crash, a time limit, a failed check) left them as
+  unevolved final candidates with no warning.
+- ``HENS_TDM_PARENT_LIMIT`` now limits how many MILP pinch design networks
+  the thermal derivative step refines, cheapest first; before, it was only
+  recorded. A repeated ``HENS_DERIVATIVE_THRESHOLDS`` value no longer
+  solves the same task twice.
+- A design run no longer stops with a ``TypeError`` when a heuristic pinch
+  design network has no objective value; it counts as the dearest. When one
+  solve in a parallel stage raises, the solves still waiting for a worker
+  are cancelled instead of all being run before the error is reported.
+- Each thermal derivative task now stops at 300 s unless
+  ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
+  Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run
+  for hours in Couenne. A task stopped there keeps its best network when it
+  has one and that network verifies; otherwise the task fails.
 - ``design.total_site_heat_exchanger_network(width=, depth=, options=)``
   designs one network for a site of several process zones. Each process is
   designed alone with the pinch design method, its utilities placed by
@@ -68,7 +94,8 @@ Heat exchanger network synthesis
   utilities kept sensible while two isothermal levels remain; the site is
   designed with each set and the cheapest design is selected. A count whose
   placement is infeasible or whose design fails is recorded and skipped; the
-  result ranks every count's best network and its provenance lists each
+  result ranks every network of each designed count (so the level-held
+  networks stay among them) and its provenance lists each
   count (``HENS_SITE_LEVEL_SWEEP``). ``HENS_SITE_LEVEL_EARLY_STOP`` ends the
   sweep after two counts in a row that cost more. ``levels="given"``
   (``HENS_SITE_LEVELS``, the default) keeps the case's utilities.
@@ -77,10 +104,26 @@ Heat exchanger network synthesis
   or down by ``HENS_SITE_LEVEL_STEP`` (default 5 K), within the order of the
   levels and the site's stream temperatures, each process's level duties are
   re-targeted, and the site is evolved again from the current best network;
-  a move is adopted only on a lower site total annual cost. The step halves
+  a move is adopted only on a lower site total annual cost than the
+  unshifted levels evaluated the same way (the sweep's best network can
+  come from a seed a move never builds), and the sweep's network is kept
+  when no adopted move costs less than it. The step halves
   when no move improves, down to ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K);
   ``HENS_SITE_LEVEL_STEP: 0`` turns the moves off. Every move tried is
   listed in the result's provenance (``HENS_SITE_LEVEL_MOVES``).
+- A total site seed no longer takes a process network designed at a
+  smaller dt_cont multiplier than its own: such a network can need more
+  recovery than the seed's approach allows. Each process gives its nearest
+  network at or above the seed's multiplier, and there is no seed at a
+  multiplier some process has nothing at or above. A process zone whose
+  pinch design found no network is named in the error.
+- ``design.optimise_duties`` refuses a total site network with a
+  ``ValueError``: its fixed-structure model neither holds each process's
+  utility levels nor keeps the site utility balance, so it re-priced each
+  heater and cooler alone and dropped the levels. A stored
+  ``HENS_OVERDESIGN_PERCENTAGE`` no longer reaches a site design's process
+  designs, where rating each network at the margin dropped its level
+  targets and turned the level-held seeds into duty-based ones.
 - A placed site level is one main: its hot and cold utility share one name
   (``iso_1`` rather than ``hot_iso_1`` and ``cold_iso_1``), so site utility
   accounting credits steam raised on a placed level against its use.
@@ -177,6 +220,14 @@ Heat exchanger network synthesis
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the
   network, which then failed verification.
+
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The solver tests now run on every pull request into ``develop`` and must
+  pass for "CI OK"; before, they ran only for pull requests into ``main``.
+  The packaged HEN notebook runs, about 8 of the lane's 14 minutes, still
+  run only for pull requests into ``main`` and releases.
 
 0.9.3 (2026-11-18)
 ------------------

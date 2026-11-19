@@ -357,3 +357,65 @@ def test_a_placed_site_network_is_the_cheapest_over_the_counts():
     assert view.result.provenance.method_id == (
         "design.total_site_heat_exchanger_network"
     )
+
+
+class _Outcome(SimpleNamespace):
+    def model_copy(self, *, update):
+        return _Outcome(**(vars(self) | update))
+
+
+class _Network(SimpleNamespace):
+    def model_copy(self, *, update):
+        return _Network(**(vars(self) | update))
+
+
+def test_the_sweep_ranks_every_counts_networks_not_only_its_best(monkeypatch):
+    """A count's level-held network that lost to its lowest-cost one stays
+    among the ranked results, tagged with its count and site cost."""
+    from OpenPinch.analysis.heat_exchanger_networks.results import selection
+    from OpenPinch.application._problem.targeting import provenance
+
+    def outcome(name, cost):
+        network = _Network(
+            name=name, total_annual_cost=cost, summary_metrics={"tag": name}
+        )
+        return _Outcome(network=network, objective_value=cost)
+
+    by_result = {
+        "two": (outcome("2-cheap", 30.0), outcome("2-held", 35.0)),
+        "three": (outcome("3-cheap", 20.0), outcome("3-held", 25.0)),
+    }
+    monkeypatch.setattr(
+        selection,
+        "ranked_networks",
+        lambda result, n=None: by_result[result.name][:n],
+    )
+    monkeypatch.setattr(selection, "select_network", lambda result: result)
+    monkeypatch.setattr(provenance, "make_provenance", lambda *a, **k: "provenance")
+
+    def run(count, name, cost):
+        view = SimpleNamespace(result=SimpleNamespace(name=name))
+        return site_levels.LevelCountRun(
+            count, count, 0, "designed", view, cost, case=f"c{count}"
+        )
+
+    problem = SimpleNamespace(
+        _require_prepared_root_zone=lambda: None, period_ids=(), _results=None
+    )
+    view = site_levels.level_sweep_view(
+        problem, (run(2, "two", 30.0), run(3, "three", 20.0)), settings={}
+    )
+
+    ranked = {
+        outcome.network.name: (
+            outcome.network.summary_metrics["utility_level_count"],
+            outcome.objective_value,
+        )
+        for outcome in view.result.ranked_networks
+    }
+    assert ranked == {
+        "2-cheap": (2, 30.0),
+        "2-held": (2, 35.0),
+        "3-cheap": (3, 20.0),
+        "3-held": (3, 25.0),
+    }

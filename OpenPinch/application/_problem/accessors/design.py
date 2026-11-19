@@ -597,9 +597,10 @@ class _DesignAccessor:
         (``HENS_SITE_LEVEL_COUNTS``, default 2 to 5), each level serving
         heating and cooling, designs the site with each set, and selects the
         cheapest design. A count whose placement is infeasible or whose
-        design fails is skipped. The result ranks each designed count's best
-        network, tagged ``summary_metrics["utility_level_count"]``, and its
-        provenance records every count (``HENS_SITE_LEVEL_SWEEP``).
+        design fails is skipped. The result ranks every network of each
+        designed count by site cost, each tagged
+        ``summary_metrics["utility_level_count"]``, and its provenance
+        records every count (``HENS_SITE_LEVEL_SWEEP``).
         ``HENS_SITE_LEVEL_EARLY_STOP`` ends the sweep once two designed
         counts in a row cost more than the cheapest before them. The
         cheapest count's design is then refined by level-temperature moves:
@@ -686,6 +687,8 @@ class _DesignAccessor:
             "HENS_PDM_MILP": search.milp,
             # Over every period, so each level holds its duty per period.
             "HENS_DESIGN_BASIS": "all",
+            # Rating at a margin re-prices the network and drops its levels.
+            "HENS_OVERDESIGN_PERCENTAGE": None,
         }
 
         def pool(name: str, placement: str):
@@ -1703,6 +1706,12 @@ class _DesignAccessor:
 
         if isinstance(network, Mapping):
             network = self._network_from_structure(network)
+        if "site_processes" in (network.source_metadata or {}):
+            raise ValueError(
+                "optimise_duties does not take a site network: the fixed-structure "
+                "model neither holds each process's utility levels nor keeps the "
+                "site utility balance. Optimise each process's network on its own."
+            )
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,

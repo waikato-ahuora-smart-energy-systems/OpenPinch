@@ -587,3 +587,32 @@ def test_default_synthesis_finds_escobars_cheapest_network():
 
     assert design.selected_network.total_annual_cost == pytest.approx(352_267, rel=1e-4)
     assert verify_network_feasibility(design.selected_network) == ()
+
+
+def test_a_heuristic_network_without_an_objective_value_sorts_last():
+    """A success with no objective value is dropped before a costed one, and
+    does not stop the run."""
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+        _cheapest_heuristic_seeds,
+    )
+    from OpenPinch.contracts.synthesis.task import (
+        HeatExchangerNetworkSynthesisTask,
+        HeatExchangerNetworkSynthesisTaskOutcome,
+    )
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    def outcome(name, objective):
+        return HeatExchangerNetworkSynthesisTaskOutcome(
+            task=HeatExchangerNetworkSynthesisTask(
+                run_id=name,
+                method="heuristic_pinch_design_method",
+                dt_cont_multiplier=1.0,
+            ),
+            status="success",
+            network=HeatExchangerNetwork(run_id=name),
+            objective_value=objective,
+        )
+
+    uncosted, costed = outcome("uncosted", None), outcome("costed", 10.0)
+
+    assert _cheapest_heuristic_seeds((uncosted, costed), 1) == (costed,)

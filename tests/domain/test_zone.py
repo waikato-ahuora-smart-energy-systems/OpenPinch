@@ -222,6 +222,39 @@ def test_get_hot_and_cold_streams_from_subzones(dummy_zone, sample_streams):
     assert "Sub1.Cold1" in dummy_zone.cold_streams
 
 
+def _plain_stream(name, supply, target, heat_flow):
+    return Stream(
+        name=name,
+        supply_temperature=supply,
+        target_temperature=target,
+        heat_flow=heat_flow,
+    )
+
+
+def test_a_zone_with_subzones_keeps_its_own_streams():
+    """A process zone that also holds a unit operation keeps the streams
+    placed on it, and its parent sees both; importing again changes nothing."""
+    site = Zone(name="Site")
+    process = Zone(name="A")
+    unit = Zone(name="U")
+    process.hot_streams.add(_plain_stream("H1", 200.0, 60.0, 140.0), key="Site/A.H1")
+    process.cold_streams.add(_plain_stream("C1", 50.0, 150.0, 100.0), key="Site/A.C1")
+    unit.hot_streams.add(_plain_stream("H2", 180.0, 90.0, 90.0), key="Site/A/U.H2")
+    process.add_zone(unit)
+    site.add_zone(process)
+
+    site.import_hot_and_cold_streams_from_sub_zones()
+    site.import_hot_and_cold_streams_from_sub_zones()
+
+    assert sorted(key for key, _ in process.hot_streams.items()) == [
+        "Site/A.H1",
+        "U.H2",
+    ]
+    assert [key for key, _ in process.cold_streams.items()] == ["Site/A.C1"]
+    assert sorted(key for key, _ in site.hot_streams.items()) == ["A.H1", "A.H2"]
+    assert [key for key, _ in site.cold_streams.items()] == ["A.C1"]
+
+
 # === New Tests for Zone ===
 
 
