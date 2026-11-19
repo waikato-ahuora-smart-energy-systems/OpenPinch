@@ -174,8 +174,52 @@ def test_an_improving_move_is_adopted_and_the_step_halves_when_none_improves():
     assert view.selected_network.total_annual_cost == pytest.approx(1000.0)
     adopted = [move for move in log if move.status == "adopted"]
     assert [move.shift for move in adopted] == [5.0, 5.0, 5.0]
-    # After 195 C no 5 K or 2.5 K move improves, and 1.25 K is the last.
-    assert sorted({abs(move.shift) for move in log}) == [1.25, 2.5, 5.0]
+    # After 195 C no 5 K or 2.5 K move improves, and 1.25 K is the last;
+    # the first entry is the unshifted baseline.
+    assert log[0].status == "baseline"
+    assert sorted({abs(move.shift) for move in log[1:]}) == [1.25, 2.5, 5.0]
+
+
+def test_moves_are_judged_against_the_unshifted_levels_designed_the_same_way():
+    """The sweep's best network can come from a seed a move never builds, so
+    it can be cheaper than the same levels designed as a move is. Moves are
+    compared with the unshifted levels evaluated as a move; the start's
+    network is kept only if no move beats it."""
+
+    def evaluate(case, view):
+        return _view(_cost_by_level(case))
+
+    case, view, log = moves.refine_levels(
+        _mains_site(),
+        _view(1001.0),
+        evaluate=evaluate,
+        step=5.0,
+        step_min=5.0,
+        levels=("iso_1",),
+    )
+
+    assert log[0].status == "baseline"
+    assert log[0].shift == 0.0
+    assert log[0].total_annual_cost == pytest.approx(1015.0)
+    assert _hot_supply(case, "iso_1") == pytest.approx(195.0)
+    assert view.selected_network.total_annual_cost == pytest.approx(1000.0)
+
+
+def test_the_start_is_kept_when_no_move_beats_it():
+    start = _view(990.0)
+
+    case, view, log = moves.refine_levels(
+        _mains_site(),
+        start,
+        evaluate=lambda case, view: _view(_cost_by_level(case)),
+        step=5.0,
+        step_min=5.0,
+        levels=("iso_1",),
+    )
+
+    assert view is start
+    assert _hot_supply(case, "iso_1") == pytest.approx(180.0)
+    assert [move.status for move in log].count("adopted") == 3
 
 
 def test_a_move_whose_design_fails_is_rejected_and_recorded():

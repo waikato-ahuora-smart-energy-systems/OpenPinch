@@ -31,7 +31,9 @@ _GAIN = 1e-6
 @dataclass(frozen=True)
 class LevelMove:
     """One tried move: ``status`` is ``"adopted"``, ``"rejected"`` (no lower
-    cost) or ``"failed"`` (the design raised)."""
+    cost) or ``"failed"`` (the design raised). The first entry is the
+    unshifted levels evaluated as a move (``"baseline"``, level ``""`` and
+    shift 0, or ``"failed"``)."""
 
     level: str
     shift: float
@@ -189,11 +191,14 @@ def refine_levels(
 
     Each round tries every level of ``levels`` (default: every placed
     level) up and down by ``step``; ``evaluate(shifted, view)`` designs the
-    shifted case from the current view. The cheapest move below the current
-    cost is adopted; with none, the step halves, and the moves stop once it
-    is below ``step_min``. A missing synthesis solver or dependency is
-    raised; any other failure of a design is recorded. Returns the final
-    case, its view and every move tried.
+    shifted case from the current view. The unshifted levels are first
+    evaluated the same way, as the baseline the moves must beat (the
+    start's network may come from a seed no move builds). The cheapest
+    move below the current cost is adopted; with none, the step halves,
+    and the moves stop once it is below ``step_min``. A missing synthesis
+    solver or dependency is raised; any other failure of a design is
+    recorded. Returns the final case and view, or the start's when no
+    adopted move costs less than it, and every move tried.
     """
     from ..analysis.heat_exchanger_networks.solver.dependencies import (
         MissingSynthesisDependencyError,
@@ -202,7 +207,21 @@ def refine_levels(
 
     levels = movable_levels(case) if levels is None else tuple(levels)
     log: list[LevelMove] = []
-    cost = site_cost(view.selected_network)
+    start = (case, view, site_cost(view.selected_network))
+    if not (step > 0 and step >= step_min):
+        return case, view, ()
+    # The start's network may come from a seed no move builds, so moves are
+    # judged against the unshifted levels evaluated the way a move is.
+    try:
+        baseline = evaluate(case, view)
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        raise
+    except (ValueError, RuntimeError) as exc:
+        log.append(LevelMove("", 0.0, None, "failed", str(exc)))
+        cost = start[2]
+    else:
+        cost = site_cost(baseline.selected_network)
+        log.append(LevelMove("", 0.0, cost, "baseline"))
     while step > 0 and step >= step_min:
         best = None
         for level in levels:
@@ -226,6 +245,8 @@ def refine_levels(
             log[index] = replace(log[index], status="adopted")
         else:
             step /= 2
+    if start[2] <= cost:
+        return start[0], start[1], tuple(log)
     return case, view, tuple(log)
 
 

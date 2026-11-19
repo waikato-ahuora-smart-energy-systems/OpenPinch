@@ -61,7 +61,10 @@ Heat exchanger network synthesis
   or down by ``HENS_SITE_LEVEL_STEP`` (default 5 K), within the order of the
   levels and the site's stream temperatures, each process's level duties are
   re-targeted, and the site is evolved again from the current best network;
-  a move is adopted only on a lower site total annual cost. The step halves
+  a move is adopted only on a lower site total annual cost than the
+  unshifted levels evaluated the same way (the sweep's best network can
+  come from a seed a move never builds), and the sweep's network is kept
+  when no adopted move costs less than it. The step halves
   when no move improves, down to ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K);
   ``HENS_SITE_LEVEL_STEP: 0`` turns the moves off. Every move tried is
   listed in the result's provenance (``HENS_SITE_LEVEL_MOVES``).
