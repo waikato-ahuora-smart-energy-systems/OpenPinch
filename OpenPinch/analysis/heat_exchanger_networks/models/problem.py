@@ -1144,6 +1144,7 @@ class InternalHeatExchangerNetworkProblem:
             non_isothermal_model=case.non_isothermal_model,
             integers=False,
             tol=case.tol,
+            solver_options=getattr(case, "solver_options", None),
         )
 
         for new_k, old_k in enumerate(active_stages):
@@ -1204,8 +1205,13 @@ class InternalHeatExchangerNetworkProblem:
 
         f_case.optimise(print_output=False)
         # Reduction only simplifies the solved network: keep the original
-        # unless the reduced one solves and passes the same checks.
-        if f_case.mSuccess != 1 or not f_case.verify()[0]:
+        # unless the reduced one solves, passes the same checks, and costs
+        # and uses no more utility than it.
+        if (
+            f_case.mSuccess != 1
+            or not f_case.verify()[0]
+            or not _no_worse(f_case, case)
+        ):
             return case
         if not case.solver_run.converged:
             # The reduced network rests on the same unproven solve.
@@ -1246,9 +1252,7 @@ class InternalHeatExchangerNetworkProblem:
             return 5.0
         if stage_count <= 8:
             return 8.0
-        if stage_count <= 10:
-            return 10.0
-        return 0.0
+        return 10.0
 
     def _model_factory(
         self,
@@ -1266,6 +1270,25 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _no_worse(reduced, case) -> bool:
+    """Whether ``reduced`` costs no more than ``case`` and uses no more of
+    either utility in any period (within ``case.tol`` or 1e-6 relative)."""
+
+    def within(new, old) -> bool:
+        return float(new) <= float(old) + max(case.tol, 1e-6 * abs(float(old)))
+
+    if not within(reduced.TAC, case.TAC):
+        return False
+    for name in ("Q_hu_by_utility_by_period", "Q_cu_by_utility_by_period"):
+        new, old = getattr(reduced, name, None), getattr(case, name, None)
+        if new is None or old is None:
+            continue
+        for period_new, period_old in zip(new, old, strict=True):
+            if not within(sum(period_new), sum(period_old)):
+                return False
+    return True
 
 
 def _start_from_side(sparse, side) -> None:
