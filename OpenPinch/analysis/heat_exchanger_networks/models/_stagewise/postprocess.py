@@ -241,11 +241,9 @@ def get_lowest_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
         for j in range(owner.J):
             for i in range(owner.I):
                 if owner._active_binary_value(owner.z[i][j][k]) > owner.tol:
-                    owner.net_benefit[i][j][k] = _value(
-                        owner.Q_r[i][j][k]
-                    ) * _alpha.alpha_value(owner, i, j, k) * (
-                        _area.recovered_utility_price(owner)
-                    ) - (
+                    owner.net_benefit[i][j][k] = _area.recovered_value(
+                        owner, i, j, k
+                    ) * _alpha.alpha_value(owner, i, j, k) - (
                         owner.unit_cost[0]
                         + owner.A_coeff[0] * (owner.area_r[i][j][k] ** owner.A_exp[0])
                     )

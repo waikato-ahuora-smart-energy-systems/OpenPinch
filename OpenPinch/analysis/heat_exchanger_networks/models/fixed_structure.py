@@ -133,6 +133,10 @@ class FixedStructureSpec:
     # by index in ``utilities``, whose duties the COP links in every period
     # (the condenser delivers the evaporator's heat plus the work).
     heat_pumps: tuple[tuple[int, int, float], ...] = ()
+    # Utility levels held at their targets, each (utilities, per-period
+    # duties): the duties of those utility exchangers, by index in
+    # ``utilities``, sum to the level's target in every period.
+    level_holds: tuple[tuple[tuple[int, ...], tuple[float, ...]], ...] = ()
 
 
 @dataclass
@@ -770,6 +774,11 @@ def _q_max(owner, n: int, match: RecoveryMatch) -> float:
 # -- equations ----------------------------------------------------------------
 
 
+# A held level's duty stays within this share of its target (or of 1 kW),
+# half the tolerance a network is checked against when it holds its levels.
+LEVEL_BAND = 5e-4
+
+
 def build_fixed_structure_equations(owner) -> None:
     """Create variables and constraints for every period."""
 
@@ -804,6 +813,14 @@ def build_fixed_structure_equations(owner) -> None:
                 owner.q_u[n][condenser] * (float(cop) - 1.0),
                 owner.q_u[n][evaporator] * float(cop),
             )
+        for units, targets in owner.spec.level_holds:
+            # A band, not an equality: a level at zero would otherwise pin
+            # duties bounded at zero, which some Ipopt builds cannot solve.
+            target = float(targets[n])
+            band = LEVEL_BAND * max(1.0, abs(target))
+            duty = sum(owner.q_u[n][e] for e in units)
+            owner._at_least(duty, target - band)
+            owner._at_least(target + band, duty)
     if owner.minimisation_goal in {"total area", "total cost"}:
         _common_areas(owner)
     elif owner.minimisation_goal == "rating":

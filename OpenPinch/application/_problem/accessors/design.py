@@ -1723,12 +1723,45 @@ class _DesignAccessor:
         Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
+        if isinstance(network, Mapping):
+            network = self._network_from_structure(network)
+        return self._optimise_duties(
+            network,
+            objective=objective,
+            min_approach_temperature=min_approach_temperature,
+            exchanger_approach_temperatures=exchanger_approach_temperatures,
+            max_hot_utility=max_hot_utility,
+            max_cold_utility=max_cold_utility,
+            options=options,
+            period_id=period_id,
+            solver=solver,
+            solve_tolerance=solve_tolerance,
+        )
+
+    def _optimise_duties(
+        self,
+        network: "HeatExchangerNetwork",
+        *,
+        objective: str,
+        min_approach_temperature: float | None = None,
+        exchanger_approach_temperatures: Mapping[str, float] | None = None,
+        max_hot_utility: float | None = None,
+        max_cold_utility: float | None = None,
+        options: Mapping[str, Any] | None = None,
+        period_id: str | None = None,
+        solver=None,
+        solve_tolerance=None,
+        problem_approach: bool = False,
+        level_targets: Mapping[str, Sequence[float]] | None = None,
+    ) -> HeatExchangerNetworkDesignView:
+        """``optimise_duties`` on a network; ``problem_approach`` keeps the
+        ``"cost"`` objective at the case's minimum approach, not 1 K, and
+        ``level_targets`` (utility name to per-period duty) holds each
+        utility's exchangers at its level."""
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             heat_exchanger_network_duty_optimisation_service,
         )
 
-        if isinstance(network, Mapping):
-            network = self._network_from_structure(network)
         if "site_processes" in (network.source_metadata or {}):
             raise ValueError(
                 "optimise_duties does not take a site network: the fixed-structure "
@@ -1754,6 +1787,8 @@ class _DesignAccessor:
             max_hot_utility=max_hot_utility,
             max_cold_utility=max_cold_utility,
             workspace_variant=None,
+            problem_approach=problem_approach,
+            level_targets=level_targets,
         )
 
     def _fit_to_all_periods(
@@ -1771,6 +1806,9 @@ class _DesignAccessor:
         fit, with the call's ``options``, ``solver`` and ``solve_tolerance``,
         then gives every exchanger one area over all periods, with bypass
         where a period needs less, and removes the exchangers no period uses.
+        Every exchanger keeps the case's minimum approach (its streams'
+        temperature contributions). When the fit cannot meet it, a
+        ``UserWarning`` says so and the fit is repeated at 1 K.
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             DEFAULT_FEASIBILITY_APPROACH,
@@ -1778,17 +1816,110 @@ class _DesignAccessor:
         from ....analysis.heat_exchanger_networks.period_fit import (
             with_stream_end_utilities,
         )
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
 
+        arguments = {
+            "objective": "cost",
+            "options": options,
+            "solver": solver,
+            "solve_tolerance": solve_tolerance,
+        }
+        levels = self._period_level_targets(network)
         padded = with_stream_end_utilities(
             self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
         )
-        return self.optimise_duties(
-            padded,
-            objective="cost",
-            options=options,
-            solver=solver,
-            solve_tolerance=solve_tolerance,
+        attempts = [
+            *(
+                [
+                    (
+                        with_stream_end_utilities(
+                            self._problem,
+                            network,
+                            approach=DEFAULT_FEASIBILITY_APPROACH,
+                            levels=frozenset(
+                                name for name, duties in levels.items() if any(duties)
+                            ),
+                        ),
+                        {"problem_approach": True, "level_targets": levels},
+                        "hold",
+                    )
+                ]
+                if levels
+                else []
+            ),
+            (padded, {"problem_approach": True}, "approach"),
+        ]
+        for start, extra, kept in attempts:
+            try:
+                return self._optimise_duties(start, **extra, **arguments)
+            except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+                raise
+            except (ValueError, RuntimeError) as exc:
+                released = (
+                    "hold the design's utility levels in every period"
+                    if kept == "hold"
+                    else "keep the case's minimum approach"
+                )
+                fallback = (
+                    "the levels are released"
+                    if kept == "hold"
+                    else f"it is fitted at {DEFAULT_FEASIBILITY_APPROACH:g} K instead"
+                )
+                warnings.warn(
+                    f"the fit to every period cannot {released} ({exc}); {fallback}.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+        return self._optimise_duties(padded, **arguments)
+
+    def _period_level_targets(self, network) -> dict[str, list[float]] | None:
+        """Each utility level's targeted duty in every period of the case.
+
+        Only for a network that holds its levels (``utility_level_targets``):
+        the network's own when they cover every period, else the case
+        targeted at the network's dt_cont multiplier, as the pinch design
+        targets the levels it holds.
+        """
+        from ....analysis.heat_exchanger_networks.site.levels import (
+            COLD_PREFIX,
+            HOT_PREFIX,
         )
+        from ....analysis.heat_exchanger_networks.solver import (
+            pinch_design_decomposition as decomposition,
+        )
+        from ....analysis.heat_exchanger_networks.solver.arrays import (
+            nominal_approach_temperature,
+        )
+
+        held = (network.source_metadata or {}).get("utility_level_targets")
+        if not held:
+            return None
+        periods = len(self._problem.period_ids)
+        if all(len(duties) == periods for duties in held.values()):
+            return {name: list(duties) for name, duties in held.items()}
+        multiplier = (network.summary_metrics or {}).get("dt_cont_multiplier", 1.0)
+        root = self._problem._require_prepared_root_zone()
+        hot = tuple(HOT_PREFIX + utility.name for utility in root.hot_utilities)
+        cold = tuple(COLD_PREFIX + utility.name for utility in root.cold_utilities)
+        targets = decomposition._calculate_openpinch_targets(
+            self._problem,
+            dTmin=nominal_approach_temperature(root.config, float(multiplier)),
+            hot_utilities=hot,
+            cold_utilities=cold,
+        )
+        levels: dict[str, list[float]] = {}
+        for names, field_name in (
+            (hot, "hot_utility_level_targets"),
+            (cold, "cold_utility_level_targets"),
+        ):
+            for u, name in enumerate(names):
+                levels[name] = [
+                    float(getattr(target, field_name)[u]) for target in targets
+                ]
+        return levels
 
 
 class _DesignAccessorDescriptor:

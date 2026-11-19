@@ -3813,3 +3813,30 @@ def test_a_pooled_stage_that_raises_cancels_its_waiting_solves():
     pool.shutdown(wait=True)
 
     assert 3 not in ran
+
+
+def test_removal_ranking_weighs_every_periods_recovery() -> None:
+    """A match that recovers heat only in the second period is not pure
+    capital: the removal ranking prices each period's recovery at that
+    period's weight and utility price."""
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 1
+    model.J = 2
+    model.S = 1
+    model.N_periods = 2
+    model.period_weights = [0.5, 0.5]
+    model.z = [[[1], [1]]]
+    model.Q_r_by_period = [[[[0.0], [10.0]]], [[[100.0], [10.0]]]]
+    model.Q_r = model.Q_r_by_period[0]
+    model.alpha = [[[[1.0]], [[1.0]]]]
+    model.hu_cost_period = [[5.0], [5.0]]
+    model.cu_cost_period = [[5.0], [5.0]]
+    model.Q_hu_by_utility_by_period = [[0.0], [0.0]]
+    model.Q_cu_by_utility_by_period = [[0.0], [0.0]]
+    model.unit_cost = [50.0]
+    model.A_coeff = [2.0]
+    model.A_exp = [1.0]
+    model.area_r = [[[5.0], [5.0]]]
+    model.tol = 1e-3
+
+    assert model.get_lowest_benefit_HX_candidates(2) == [[0, 1, 0], [0, 0, 0]]
