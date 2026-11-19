@@ -365,3 +365,20 @@ def test_an_unsolved_network_is_solved_as_the_retrofit_baseline(monkeypatch):
 
     assert searched == [(unsolved, 0)]
     assert targets.as_piped.hot_utility_before == pytest.approx(17518.7)
+
+
+def test_a_bare_stream_name_two_zones_share_is_refused_by_the_targets():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
+        _process_stream,
+    )
+
+    streams = SimpleNamespace(
+        items=lambda: [("A.H1", "first"), ("B.H1", "second"), ("A.C1", "cold")]
+    )
+
+    assert _process_stream(streams, "A.H1") == "first"
+    assert _process_stream(streams, "C1") == "cold"
+    with pytest.raises(ValueError, match="'H1'.*A.H1.*B.H1"):
+        _process_stream(streams, "H1")

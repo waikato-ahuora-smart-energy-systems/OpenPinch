@@ -1213,6 +1213,9 @@ def test_a_real_fluid_heat_pump_is_priced_by_the_hpr_machine_capital(fake_solver
         heat_pump_cycle="vapour_compression",
         heat_pump_cost=300.0,
         repiping_cost=1_000.0,
+        # The cycle below is built at a 1 K approach; the retrofit default
+        # is now the case's minimum approach.
+        min_approach_temperature=1.0,
         options=options,
     )
 
@@ -1295,3 +1298,80 @@ def test_a_period_named_like_a_heat_pump_leaves_the_heat_pump_offered(fake_solve
     named.update_options({"PROBLEM_PERIOD_IDS": [f"HP {hot}->{cold}:condenser"]})
 
     assert pump(named) == (hot, cold)
+
+
+def test_a_bare_stream_name_two_zones_share_is_refused():
+    """An existing network naming ``H1`` when ``A.H1`` and ``B.H1`` both
+    exist cannot say which stream it means; mapping both to ``H1`` would
+    let one stream's ends and CP stand for the other's."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _existing_names,
+    )
+
+    existing = SimpleNamespace(
+        exchangers=(SimpleNamespace(source_stream="H1", sink_stream="A.C1"),)
+    )
+    axes = {
+        "hot_process_streams": {"A.H1": 0, "B.H1": 1},
+        "cold_process_streams": {"A.C1": 0},
+    }
+
+    with pytest.raises(ValueError, match="'H1'.*A.H1.*B.H1"):
+        _existing_names(axes, existing)
+
+
+def test_a_bare_stream_name_one_zone_has_maps_to_it():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _existing_names,
+    )
+
+    existing = SimpleNamespace(
+        exchangers=(SimpleNamespace(source_stream="H1", sink_stream="C1"),)
+    )
+    axes = {
+        "hot_process_streams": {"A.H1": 0, "B.H2": 1},
+        "cold_process_streams": {"A.C1": 0},
+    }
+
+    assert _existing_names(axes, existing) == {
+        "A.H1": "H1",
+        "B.H2": "B.H2",
+        "A.C1": "C1",
+    }
+
+
+def test_a_heat_pump_whose_machine_cannot_be_priced_is_dropped(
+    fake_solver, monkeypatch
+):
+    """The HPR cycle can fail at the heat pump's solved capacity; that
+    candidate is dropped and the search goes on, rather than stopping."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    def unpriceable(*args, **kwargs):
+        raise ValueError("the cycle does not solve at this capacity")
+
+    monkeypatch.setattr(search, "vapour_compression_capital", unpriceable)
+    result = _problem().design.retrofit(
+        _existing_network(),
+        max_modifications=1,
+        heat_pump_cycle="vapour_compression",
+        heat_pump_cost=300.0,
+        repiping_cost=1_000.0,
+        min_approach_temperature=1.0,
+        options={
+            "HPR_REFRIGERANTS": ["water"],
+            "HPR_MAX_PRESSURE_RATIO": 200.0,
+            "HPR_SCREEN_MIN_SUCTION_PRESSURE": 0.1,
+        },
+    )
+
+    assert not [
+        modification
+        for design in result.frontier
+        for modification in design.modifications
+        if modification.kind == "heat_pump"
+    ]
