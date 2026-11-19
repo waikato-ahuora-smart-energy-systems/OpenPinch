@@ -7,6 +7,12 @@ Unreleased
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A multiperiod stage-wise model no longer starts infeasible when a match
+  that can run in one period cannot run in another (its supply temperatures
+  there are closer than its approach): in such a period the match carries
+  no duty and has no approach constraints. A multiperiod warm start also
+  leaves a heater or cooler that evolution removed switched off, instead of
+  charging its unit cost at no duty.
 - The median design basis (the default for multiperiod designs) works when
   streams are given by heat capacity flowrate rather than heat flow. Before,
   it read no heat flow, found no operating period and raised.
