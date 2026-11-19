@@ -1134,21 +1134,21 @@ class _DesignAccessor:
 
         A stream given by its heat capacity flowrate has no ``heat_flow`` in
         the source; the prepared stream's heat flow (per period) is used,
-        matched by ``<zone>.<name>`` and else by a unique name.
+        matched in the stream's own zone by its full ``<zone path>.<name>``.
         """
         zone = self._problem.master_zone
-        prepared = [
-            (key, stream)
-            for collection in (zone.hot_streams, zone.cold_streams)
-            for key, stream in collection.items()
-        ]
         for record in source.get("streams", []):
             if record.get("heat_flow") is not None:
                 continue
-            name = record.get("name")
-            key = f"{str(record.get('zone', '')).split('/')[-1]}.{name}"
-            matches = [stream for k, stream in prepared if k == key] or [
-                stream for _k, stream in prepared if stream.name == name
+            owner = zone.get_subzone(record.get("zone"))
+            if owner is None:
+                continue
+            key = f"{owner.address}.{record.get('name')}"
+            matches = [
+                stream
+                for collection in (owner.hot_streams, owner.cold_streams)
+                for k, stream in collection.items()
+                if k == key
             ]
             if len(matches) != 1:
                 continue

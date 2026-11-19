@@ -147,3 +147,48 @@ def test_the_median_basis_reads_heat_flows_of_streams_given_by_cp():
         stream.included and stream.quantities["heat_flow"] > 0
         for stream in basis.streams
     )
+
+
+def test_the_median_basis_matches_cp_streams_by_their_full_zone():
+    """Streams given by CP below a nested zone take the heat flow of the
+    prepared stream in that zone, even when another branch has a stream of
+    the same name."""
+    source = _two_period_problem().to_problem_json()
+    source["zone_tree"] = {
+        "name": "Site",
+        "type": "Site",
+        "children": [
+            {
+                "name": branch,
+                "type": "Process Zone",
+                "children": [
+                    {"name": "Area", "type": "Process Zone", "children": None}
+                ],
+            }
+            for branch in ("P1", "P2")
+        ],
+    }
+    streams = []
+    for branch, scale in (("P1", 1.0), ("P2", 2.0)):
+        for record in source["streams"]:
+            copy = json.loads(json.dumps(record))
+            copy["zone"] = f"Site/{branch}/Area"
+            copy["heat_flow"] = None
+            cp = copy["heat_capacity_flowrate"]
+            cp["values"] = [value * scale for value in cp["values"]]
+            streams.append(copy)
+    source["streams"] = streams
+    problem = PinchProblem(source=source, project_name="nested-cp")
+
+    basis = problem.design.design_basis()
+
+    loads = {
+        (stream.zone, stream.name): stream.quantities["heat_flow"]
+        for stream in basis.streams
+    }
+    assert len(loads) == 8
+    for name in ("Raw Milk", "HT Flash", "Milk Concentrate", "CIP Water"):
+        assert loads[("Site/P1/Area", name)] > 0
+        assert loads[("Site/P2/Area", name)] == pytest.approx(
+            2 * loads[("Site/P1/Area", name)]
+        )

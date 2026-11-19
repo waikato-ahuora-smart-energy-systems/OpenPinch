@@ -41,7 +41,8 @@ Heat exchanger network synthesis
   leaves a heater or cooler that evolution removed switched off, instead of
   charging its unit cost at no duty.
 - The median design basis (the default for multiperiod designs) works when
-  streams are given by heat capacity flowrate rather than heat flow. Before,
+  streams are given by heat capacity flowrate rather than heat flow, including
+  streams in nested zones and same-named streams in different zones. Before,
   it read no heat flow, found no operating period and raised.
 - A multiperiod network from duty optimisation (``optimise_duties``, a fit
   to every period, overdesign rating) now records each period's stream
