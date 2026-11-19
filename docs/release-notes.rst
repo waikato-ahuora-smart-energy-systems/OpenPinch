@@ -29,9 +29,11 @@ Heat exchanger network synthesis
   ``B.H1``) now raises a ``ValueError`` naming them. Before, both mapped to
   ``H1`` and one stream's temperatures and heat capacity flowrate silently
   stood for the other's in the move screens and heat pump targets.
-- Two networks that differ only in the stage boundary of a heater or cooler
-  (or a staged against a stream-end unit) are no longer ranked as one
-  structure, which dropped one of them as a repeat.
+- Two networks that differ only in where a heater or cooler sits among the
+  recovery stages (or a staged against a stream-end unit) are no longer
+  ranked as one structure, which dropped one of them as a repeat. Utility
+  stages are renumbered with the recovery stages, so the same grid with its
+  stages shifted is still one structure.
 - A multiperiod stage-wise model no longer starts infeasible when a match
   that can run in one period cannot run in another (its supply temperatures
   there are closer than its approach): in such a period the match carries
