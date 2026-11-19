@@ -121,40 +121,56 @@ def _process(stream: str) -> str:
 @pytest.mark.solver
 @pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
 def test_a_site_network_holds_each_processs_levels_and_matches_within_it():
+    """Heating's targets put 40 kW on LPS and Cooling's 40 kW on LPG; by
+    price HPS (40 $/MWh, against LPS at 60) takes Heating's heat. Both
+    families evolve; the level-held one is among the results, every network
+    matches only within a process, and the cheapest is selected."""
     problem = _site()
 
     view = problem.design.total_site_heat_exchanger_network(
         width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
     )
-    network = view.selected_network
+    networks = [outcome.network for outcome in view.result.ranked_networks]
 
     assert view.result.method == "network_evolution_method"
-    recovery = [
-        exchanger
-        for exchanger in network.exchangers
-        if exchanger.kind is HeatExchangerKind.RECOVERY
+    for network in networks:
+        for exchanger in network.exchangers:
+            if exchanger.kind is HeatExchangerKind.RECOVERY:
+                assert _process(exchanger.source_stream) == _process(
+                    exchanger.sink_stream
+                )
+    held = [
+        network
+        for network in networks
+        if _holds(
+            network,
+            {
+                ("Heating", "Hot Utility.LPS"): [40.0],
+                ("Cooling", "Cold Utility.LPG"): [40.0],
+            },
+        )
     ]
-    assert recovery
-    for exchanger in recovery:
-        assert _process(exchanger.source_stream) == _process(exchanger.sink_stream)
-    duties: dict[tuple[str, str], float] = {}
-    for exchanger in network.exchangers:
-        if exchanger.kind is HeatExchangerKind.HOT_UTILITY:
-            key = (_process(exchanger.sink_stream), exchanger.source_stream)
-        elif exchanger.kind is HeatExchangerKind.COLD_UTILITY:
-            key = (_process(exchanger.source_stream), exchanger.sink_stream)
-        else:
-            continue
-        duties[key] = duties.get(key, 0.0) + exchanger.state().duty
-    heating = next(p for p, _ in duties if "Heating" in p)
-    cooling = next(p for p, _ in duties if "Cooling" in p)
-    assert duties.get((heating, "Hot Utility.LPS"), 0.0) == pytest.approx(
-        40.0, rel=1e-3
+    assert held
+    selected = view.selected_network
+    assert (
+        selected.summary_metrics["site_total_annual_cost"]
+        <= min(network.summary_metrics["site_total_annual_cost"] for network in held)
+        + 1e-6
     )
-    assert duties.get((cooling, "Cold Utility.LPG"), 0.0) == pytest.approx(
-        40.0, rel=1e-3
+    assert verify_network_feasibility(selected) == ()
+
+
+def _holds(network, expected, *, abs_tol=1e-3) -> bool:
+    """Whether each (process, utility) carries the expected duty per period."""
+    duties = {
+        (process.rsplit("/", 1)[-1], utility): levels
+        for (process, utility), levels in _level_duties(network).items()
+    }
+    return all(
+        duties.get(key) is not None
+        and duties[key] == pytest.approx(levels, abs=abs_tol)
+        for key, levels in expected.items()
     )
-    assert verify_network_feasibility(network) == ()
 
 
 def _level_duties(network) -> dict[tuple[str, str], list[float]]:
@@ -181,30 +197,30 @@ def test_a_multiperiod_site_network_holds_each_processs_levels_in_every_period()
     """In the peak period C1 and H3 carry 20% more: Heating then needs 57 kW
     of LPS (C1 below LPS's reach, less H2) and 11 kW of HPS, and Cooling
     raises 54.5 kW of LP steam with 13.5 kW to cooling water. Each process
-    is designed over both periods, so its levels hold in each."""
+    is designed over both periods, so the level-held family holds its
+    levels in each."""
     problem = _site(periods=True)
 
     view = problem.design.total_site_heat_exchanger_network(
         width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
     )
-    network = view.selected_network
+    networks = [outcome.network for outcome in view.result.ranked_networks]
 
-    for exchanger in network.exchangers:
-        if exchanger.kind is HeatExchangerKind.RECOVERY:
-            assert _process(exchanger.source_stream) == _process(exchanger.sink_stream)
-    duties = _level_duties(network)
-    heating = next(p for p, _ in duties if "Heating" in p)
-    cooling = next(p for p, _ in duties if "Cooling" in p)
     expected = {
-        (heating, "Hot Utility.LPS"): [40.0, 57.0],
-        (heating, "Hot Utility.HPS"): [0.0, 11.0],
-        (cooling, "Hot Utility.HPS"): [0.0, 0.0],
-        (cooling, "Cold Utility.LPG"): [40.0, 54.5],
-        (cooling, "Cold Utility.CW"): [0.0, 13.5],
+        ("Heating", "Hot Utility.LPS"): [40.0, 57.0],
+        ("Heating", "Hot Utility.HPS"): [0.0, 11.0],
+        ("Cooling", "Cold Utility.LPG"): [40.0, 54.5],
+        ("Cooling", "Cold Utility.CW"): [0.0, 13.5],
     }
-    for key, levels in expected.items():
-        assert duties.get(key, [0.0, 0.0]) == pytest.approx(levels, abs=1e-3), key
-    assert verify_network_feasibility(network) == ()
+    held = [network for network in networks if _holds(network, expected)]
+    assert held
+    for network in networks:
+        for exchanger in network.exchangers:
+            if exchanger.kind is HeatExchangerKind.RECOVERY:
+                assert _process(exchanger.source_stream) == _process(
+                    exchanger.sink_stream
+                )
+    assert verify_network_feasibility(held[0]) == ()
 
 
 def test_a_site_network_needs_more_than_one_process():
@@ -328,3 +344,42 @@ def test_a_site_networks_own_cost_credits_steam_raised_on_a_main():
     assert network.total_annual_cost == pytest.approx(
         network.summary_metrics["site_total_annual_cost"], rel=1e-6
     )
+
+
+def test_each_process_is_designed_by_price_and_by_its_level_targets(monkeypatch):
+    """The site design runs each process's pinch design twice, with levels
+    chosen by price and with levels held at their targets, and seeds
+    evolution from both."""
+    from types import SimpleNamespace
+
+    from OpenPinch.application._problem.accessors import design
+
+    placements: list[tuple[str, str]] = []
+    captured = {}
+
+    def fake_design(self, *, zone, options):
+        placements.append((zone, options["HENS_UTILITY_PLACEMENT"]))
+        return SimpleNamespace(top=lambda n: ())
+
+    def fake_seeds(pools, *, level_held=None):
+        captured["pools"], captured["held"] = pools, level_held
+        return ("seed",)
+
+    monkeypatch.setattr(design._DesignAccessor, "heat_exchanger_network", fake_design)
+    monkeypatch.setattr(
+        design._DesignAccessor,
+        "network_evolution",
+        lambda self, seeds, **kwargs: seeds,
+    )
+    monkeypatch.setattr(
+        "OpenPinch.analysis.heat_exchanger_networks.site.site_seeds", fake_seeds
+    )
+
+    assert _site().design.total_site_heat_exchanger_network() == ("seed",)
+    assert sorted(placements) == [
+        ("Cooling", "price"),
+        ("Cooling", "temperature"),
+        ("Heating", "price"),
+        ("Heating", "temperature"),
+    ]
+    assert set(captured["pools"]) == set(captured["held"]) == {"Heating", "Cooling"}

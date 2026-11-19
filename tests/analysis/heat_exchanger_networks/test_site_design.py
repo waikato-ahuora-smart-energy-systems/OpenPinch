@@ -173,3 +173,78 @@ def test_site_seeds_take_one_network_per_process_at_each_multiplier():
 def test_site_seeds_need_some_heat_recovery():
     with pytest.raises(ValueError, match="no process network recovers heat"):
         site_seeds({"R": (_network([_heater(LPS, "R.C1", 3.0)]),)})
+
+
+def _costed(network, *, units: int, tac: float):
+    return network.model_copy(
+        update={
+            "total_annual_cost": tac,
+            "summary_metrics": network.summary_metrics | {"total_units": units},
+        }
+    )
+
+
+def test_site_seeds_come_from_the_cheapest_and_the_level_held_fewest_unit_networks():
+    """Each process offers two pinch design runs: one with levels chosen by
+    price, one holding its level targets. From each run a seed takes the
+    network with the fewest units (then the lowest TAC), so at one
+    multiplier there is a lowest-cost seed and a level-held seed."""
+    cheap_few = _costed(
+        _network([_recovery("A.H1", "A.C1", 1), _heater(HPS, "A.C1", 12.0)], stages=1),
+        units=2,
+        tac=900.0,
+    )
+    cheap_many = _costed(
+        _network(
+            [
+                _recovery("A.H1", "A.C1", 1),
+                _recovery("A.H2", "A.C1", 2),
+                _heater(HPS, "A.C1", 8.0),
+            ],
+            stages=2,
+        ),
+        units=3,
+        tac=800.0,
+    )
+    held_few = _costed(
+        _network(
+            [_recovery("A.H2", "A.C1", 1), _heater(LPS, "A.C1", 12.0)],
+            stages=1,
+            targets={LPS: [12.0], HPS: [0.0]},
+        ),
+        units=2,
+        tac=1000.0,
+    )
+    held_missed = _costed(
+        _network([_heater(HPS, "A.C1", 12.0)], targets={LPS: [12.0], HPS: [0.0]}),
+        units=1,
+        tac=700.0,
+    )
+    b = _costed(
+        _network([_recovery("B.H1", "B.C1", 1), _cooler("B.H1", CW, 4.0)], stages=1),
+        units=2,
+        tac=100.0,
+    )
+
+    seeds = site_seeds(
+        {"A": (cheap_many, cheap_few), "B": (b,)},
+        level_held={"A": (held_missed, held_few)},
+    )
+
+    by_kind = {seed.summary_metrics["site_seed"]: seed for seed in seeds}
+    assert set(by_kind) == {"lowest_cost", "level_held"}
+    assert {e.exchanger_id for e in by_kind["lowest_cost"].exchangers} == {
+        "recovery:A.H1->A.C1:S1",
+        "recovery:B.H1->B.C1:S1",
+    }
+    assert {e.exchanger_id for e in by_kind["level_held"].exchangers} == {
+        "recovery:A.H2->A.C1:S1",
+        "recovery:B.H1->B.C1:S1",
+    }
+    assert by_kind["level_held"].source_metadata["site_processes"]["A"] == {
+        LPS: [12.0],
+        HPS: [0.0],
+    }
+    assert by_kind["lowest_cost"].source_metadata["site_processes"]["A"] == {
+        HPS: [12.0]
+    }

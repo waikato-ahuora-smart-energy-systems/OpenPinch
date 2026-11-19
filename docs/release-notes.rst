@@ -33,6 +33,13 @@ Heat exchanger network synthesis
   ``site_total_annual_cost`` in its summary metrics and the balance in
   ``source_metadata["site_utility_balance"]``; the record and the result
   rank site networks by site total annual cost.
+- ``design.total_site_heat_exchanger_network`` designs each process twice,
+  with its utility levels chosen by price and held at their targets, and
+  seeds network evolution from both: at each dt_cont multiplier a
+  lowest-cost and a level-held site seed, each taking every process's
+  fewest-unit network (then the lowest total annual cost). The site design
+  may now select a network whose levels follow price where that is cheaper
+  for the site; the level-held networks stay among the ranked results.
 - ``design.total_site_heat_exchanger_network`` works on multiperiod sites:
   each process is designed over every period at once, so each level carries
   its targeted duty in every period, and network evolution holds those
