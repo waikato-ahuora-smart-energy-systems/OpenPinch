@@ -16,6 +16,10 @@ Heat exchanger network synthesis
   the thermal derivative step refines, cheapest first; before, it was only
   recorded. A repeated ``HENS_DERIVATIVE_THRESHOLDS`` value no longer
   solves the same task twice.
+- A design's selected network keeps its period id, method and task id
+  after selection; before, the final selection swapped in the ranked
+  network without them, so a design for one period returned a network with
+  no ``period_id``.
 - Each thermal derivative task now stops at 300 s unless
   ``HENS_SOLVER_OPTIONS_TDM`` sets a time limit (``time_limit`` for
   Couenne, ``limits/time`` for SCIP). Before, a depth-2 design could run

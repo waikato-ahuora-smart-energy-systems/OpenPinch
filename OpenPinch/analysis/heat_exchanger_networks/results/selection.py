@@ -49,13 +49,23 @@ def select_network(
         return result
 
     selected = ranked[solution_rank - 1]
+    # The stamps assembly gives the accepted network: its task, the result's
+    # period and the task's method.
+    network = network.model_copy(
+        update={
+            "task_id": selected.task.task_id,
+            "period_id": result.period_id or network.period_id,
+            "method": selected.task.method,
+            "stage_count": network.stage_count or selected.task.stage_count,
+        }
+    )
     # ranked_networks keeps every outcome: replacing it with the de-duplicated
     # ranking would change what a later selection can choose from.
     result.network = network
     result.task_id = selected.task.task_id
     result.solver_status = selected.solver_status
     result.method = selected.task.method
-    result.stage_count = network.stage_count or selected.task.stage_count
+    result.stage_count = network.stage_count
     result.objective_values = {
         key: value
         for key, value in {

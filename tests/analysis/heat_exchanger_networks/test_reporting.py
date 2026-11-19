@@ -523,6 +523,18 @@ def test_result_selects_ranked_network() -> None:
     assert result.ranked_networks == ranked
 
 
+def test_a_selected_network_carries_the_results_period_and_its_method() -> None:
+    """Selection swaps in the ranked network; it keeps the stamps assembly
+    gave the accepted one: the result's period and the task's method."""
+    result = _result().model_copy(update={"period_id": "peak"})
+
+    select_network(result, solution_rank=2)
+
+    assert result.network.period_id == "peak"
+    assert result.network.method == "network_evolution_method"
+    assert result.network.task_id == "esm-second"
+
+
 def test_network_feasibility_checks_cost_and_heat_balance() -> None:
     feasible = _feasible_balance_network("feasible")
 
