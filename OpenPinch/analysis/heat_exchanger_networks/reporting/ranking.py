@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..targeting.topology import (
+    canonical_stage_ends,
     canonical_topology_restrictions,
     topology_restriction_signature,
 )
@@ -44,35 +45,55 @@ def network_structure_signature(
     network: HeatExchangerNetwork,
 ) -> tuple[tuple[Any, ...], ...]:
     """Return the stable topology signature used by grid-diagram plotting."""
-    recovery_restrictions = canonical_topology_restrictions(
-        (
-            HeatExchangerNetworkTopologyRestriction(
-                source_stream=exchanger.source_stream,
-                sink_stream=exchanger.sink_stream,
-                stage=int(exchanger.stage),
-                duty=max(state.duty for state in exchanger.period_states),
-            )
-            for exchanger in network.exchangers
-            if exchanger.kind.value == "recovery"
-            and exchanger.stage is not None
-            and exchanger.match_allowed
-            and any(state.active for state in exchanger.period_states)
-        ),
-        hot_stream_order=tuple(
+    original_restrictions = tuple(
+        HeatExchangerNetworkTopologyRestriction(
+            source_stream=exchanger.source_stream,
+            sink_stream=exchanger.sink_stream,
+            stage=int(exchanger.stage),
+            duty=max(state.duty for state in exchanger.period_states),
+        )
+        for exchanger in network.exchangers
+        if exchanger.kind.value == "recovery"
+        and exchanger.stage is not None
+        and exchanger.match_allowed
+        and any(state.active for state in exchanger.period_states)
+    )
+    stream_orders = {
+        "hot_stream_order": tuple(
             dict.fromkeys(
                 exchanger.source_stream
                 for exchanger in network.exchangers
                 if exchanger.kind.value == "recovery"
             )
         ),
-        cold_stream_order=tuple(
+        "cold_stream_order": tuple(
             dict.fromkeys(
                 exchanger.sink_stream
                 for exchanger in network.exchangers
                 if exchanger.kind.value == "recovery"
             )
         ),
+    }
+    recovery_restrictions = canonical_topology_restrictions(
+        original_restrictions, **stream_orders
     )
+    stage_ends = canonical_stage_ends(original_restrictions, **stream_orders)
+
+    def canonical_boundary(boundary: int) -> int:
+        # Canonical stages at or before an original stage boundary.
+        return max(
+            (end for stage, end in stage_ends.items() if stage <= boundary),
+            default=0,
+        )
+
+    def heater_stage(stage):
+        # A heater at stage s sits at boundary s - 1 (extraction convention).
+        return None if stage is None else canonical_boundary(int(stage) - 1) + 1
+
+    def cooler_stage(stage):
+        # A cooler at stage s sits at boundary s.
+        return None if stage is None else canonical_boundary(int(stage))
+
     links = [
         (
             "recovery",
@@ -85,7 +106,12 @@ def network_structure_signature(
         )
     ]
     links.extend(
-        ("hot_utility", exchanger.source_stream, exchanger.sink_stream, exchanger.stage)
+        (
+            "hot_utility",
+            exchanger.source_stream,
+            exchanger.sink_stream,
+            heater_stage(exchanger.stage),
+        )
         for exchanger in network.exchangers
         if exchanger.kind.value == "hot_utility"
         and any(state.active for state in exchanger.period_states)
@@ -95,7 +121,7 @@ def network_structure_signature(
             "cold_utility",
             exchanger.source_stream,
             exchanger.sink_stream,
-            exchanger.stage,
+            cooler_stage(exchanger.stage),
         )
         for exchanger in network.exchangers
         if exchanger.kind.value == "cold_utility"

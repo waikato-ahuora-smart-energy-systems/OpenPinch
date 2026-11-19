@@ -11,13 +11,23 @@ Zones and targeting
   operation's streams: the streams placed on the process zone itself
   vanished from it and from the site, so their targets left them out. Both
   are now kept.
+- Re-importing subzone streams no longer drops a zone's own cold stream
+  whose key matches an imported hot stream's key (or the reverse): hot and
+  cold imported keys are now tracked separately.
+- Re-importing subzone streams keeps their keys and names when a zone's own
+  stream and a deeper subzone's stream share a name. Before, the collision
+  rename at the site leaked into the next import, so ``U.H1`` became
+  ``U.H1_1``.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``design.retrofit`` defaults ``min_approach_temperature`` to the case's
-  minimum approach (twice ``THERMAL_DT_CONT``) rather than 1 K, which let
-  new matches recover heat the design rules out and overstated savings. A
+- ``design.retrofit`` no longer defaults ``min_approach_temperature`` to
+  1 K, which let new matches recover heat the design rules out and
+  overstated savings. Without it each exchanger keeps the sum of its two
+  sides' temperature contributions, so per-stream ``dt_cont`` and zone
+  multipliers hold; new matches and heat pumps are screened at twice
+  ``THERMAL_DT_CONT``. A given value still applies to every exchanger. A
   retrofit that prices new units but leaves ``area_addition_cost``,
   ``split_cost`` and ``repiping_cost`` at 0 now warns, since the search
   then favours those modifications.
@@ -26,20 +36,26 @@ Heat exchanger network synthesis
   the search goes on.
 - A retrofit whose existing network names a stream without its zone
   (``H1``) when several zones have a stream of that name (``A.H1`` and
-  ``B.H1``) now raises a ``ValueError`` naming them. Before, both mapped to
-  ``H1`` and one stream's temperatures and heat capacity flowrate silently
-  stood for the other's in the move screens and heat pump targets.
-- Two networks that differ only in the stage boundary of a heater or cooler
-  (or a staged against a stream-end unit) are no longer ranked as one
-  structure, which dropped one of them as a repeat.
+  ``B.H1``) now raises a ``ValueError`` naming them, also when another
+  exchanger names one of them in full. Before, both mapped to ``H1`` and
+  one stream's temperatures and heat capacity flowrate silently stood for
+  the other's in the move screens and heat pump targets. A name one stream
+  has exactly (``H1``) no longer also stands for ``B.H1``.
+- Two networks that differ only in where a heater or cooler sits among the
+  recovery stages (or a staged against a stream-end unit) are no longer
+  ranked as one structure, which dropped one of them as a repeat. Utility
+  stages are renumbered with the recovery stages, so the same grid with its
+  stages shifted is still one structure.
 - A multiperiod stage-wise model no longer starts infeasible when a match
   that can run in one period cannot run in another (its supply temperatures
   there are closer than its approach): in such a period the match carries
-  no duty and has no approach constraints. A multiperiod warm start also
+  no duty and has no approach or minimum dQ/dA constraints. A multiperiod
+  warm start also
   leaves a heater or cooler that evolution removed switched off, instead of
   charging its unit cost at no duty.
 - The median design basis (the default for multiperiod designs) works when
-  streams are given by heat capacity flowrate rather than heat flow. Before,
+  streams are given by heat capacity flowrate rather than heat flow, including
+  streams in nested zones and same-named streams in different zones. Before,
   it read no heat flow, found no operating period and raised.
 - A multiperiod network from duty optimisation (``optimise_duties``, a fit
   to every period, overdesign rating) now records each period's stream
@@ -141,6 +157,10 @@ Heat exchanger network synthesis
   network at or above the seed's multiplier, and there is no seed at a
   multiplier some process has nothing at or above. A process zone whose
   pinch design found no network is named in the error.
+- A level-held total site seed no longer takes a process's level-held
+  network from a smaller dt_cont multiplier when only its lowest-cost
+  networks reach the seed's multiplier; that process gives its lowest-cost
+  network instead.
 - ``design.optimise_duties`` refuses a total site network with a
   ``ValueError``: its fixed-structure model neither holds each process's
   utility levels nor keeps the site utility balance, so it re-priced each
@@ -252,6 +272,17 @@ Testing and CI
   pass for "CI OK"; before, they ran only for pull requests into ``main``.
   The packaged HEN notebook runs, about 8 of the lane's 14 minutes, still
   run only for pull requests into ``main`` and releases.
+
+Documentation
+~~~~~~~~~~~~~
+
+- The HEN synthesis guide and the ``PinchProblem`` API page cover
+  ``design.retrofit_heat_pumps`` and ``design.design_basis``. The API page
+  notes that ``retrofit_heat_pumps`` stores the first period's direct
+  target when none is cached and needs the HEN solver to rate a network
+  whose heaters or coolers lack solved temperatures; the guide notes that
+  the ``"rating"`` objective needs an installed area on every exchanger,
+  heaters and coolers included.
 
 0.9.3 (2026-11-18)
 ------------------

@@ -799,9 +799,11 @@ def _captured_settings(monkeypatch, **kwargs):
 
 
 def test_a_retrofit_approach_defaults_to_the_cases_minimum_approach(monkeypatch):
-    """The case's dt_cont is 5 K a stream, so 10 K between two; a 1 K
-    default let new matches recover heat the design basis rules out."""
-    assert _captured_settings(monkeypatch).approach == pytest.approx(10.0)
+    """No approach given leaves each match the sum of its streams'
+    temperature contributions (``None``), not a 1 K default that let new
+    matches recover heat the design basis rules out, nor twice the master
+    zone's dt_cont, which overrides per-stream values."""
+    assert _captured_settings(monkeypatch).approach is None
     assert _captured_settings(
         monkeypatch, min_approach_temperature=4.0
     ).approach == pytest.approx(4.0)
@@ -817,3 +819,68 @@ def test_a_retrofit_with_unpriced_modifications_warns(monkeypatch):
         _captured_settings(
             monkeypatch, area_addition_cost=1.0, split_cost=1.0, repiping_cost=1.0
         )
+
+
+def _recovery_approaches(problem, approach):
+    """Each recovery exchanger's minimum approach (K) in the retrofit
+    model the search builds for the existing network."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import fixed_structure
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        _Evaluator,
+        _State,
+    )
+
+    class Built(Exception):
+        pass
+
+    def built(model, *args, **kwargs):
+        raise Built(model.recovery_dt[0])
+
+    problem.target.direct_heat_integration()
+    network = _existing_network()
+    evaluator = _Evaluator(problem, network, RetrofitSettings(approach=approach))
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(fixed_structure.FixedStructureModel, "optimise", built)
+        with pytest.raises(Built) as caught:
+            evaluator.evaluate(_State(network, frozenset(), ()))
+    return caught.value.args[0]
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_a_retrofit_without_an_approach_keeps_each_streams_contribution():
+    """H1 contributes 2 K and every other stream 5 K: H1's match needs
+    7 K, the others 10 K; an explicit approach still sets them all."""
+    data = json.loads(CASE_JSON.read_text(encoding="utf-8"))
+    for stream in data["streams"]:
+        if stream["name"] == "H1":
+            stream["dt_cont"] = {"value": 2.0, "unit": "delta_degC"}
+
+    default = _recovery_approaches(PinchProblem(data), None)
+    explicit = _recovery_approaches(PinchProblem(data), 4.0)
+
+    assert sorted(default) == pytest.approx([7.0, 10.0, 10.0, 10.0])
+    assert explicit == pytest.approx([4.0] * 4)
+
+
+def test_a_retrofit_without_an_approach_screens_at_the_cases_minimum_approach():
+    """The screens take one approach: twice THERMAL_DT_CONT (10 K) when
+    none is given, so a heat pump's evaporator sits 10 K below its hot
+    stream's target."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        _Evaluator,
+    )
+
+    problem = _case_problem()
+    problem.target.direct_heat_integration()
+    evaluator = _Evaluator(
+        problem,
+        _existing_network(),
+        RetrofitSettings(approach=None, heat_pump_cycle="carnot"),
+    )
+
+    assert evaluator.heat_pumps
+    for pump in evaluator.heat_pumps:
+        assert pump.evaporating == pytest.approx(evaluator.ends[pump.hot][1] - 10.0)

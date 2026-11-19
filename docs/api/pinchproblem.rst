@@ -124,8 +124,9 @@ Interaction Matrix
    * - ``design.retrofit_heat_pumps``
      - Heat pump targets for an existing network, ideal and as piped
      - ``RetrofitHeatPumpTargets``
-     - none
-     - HPR
+     - targeted (the first period's direct target, when not cached)
+     - HPR; HEN solver when the network's heaters or coolers lack solved
+       temperatures (it is rated first)
    * - ``design.design_basis``
      - Preview the median design basis of a multiperiod HEN
      - ``HenDesignBasis``

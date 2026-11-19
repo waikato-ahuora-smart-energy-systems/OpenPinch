@@ -1322,6 +1322,53 @@ def test_a_bare_stream_name_two_zones_share_is_refused():
         _existing_names(axes, existing)
 
 
+def test_a_bare_name_beside_its_qualified_name_is_still_refused():
+    """``A.H1`` named in full beside a bare ``H1`` leaves ``B.H1`` the only
+    key the bare name could map to; the bare name still fits both zones."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _existing_names,
+    )
+
+    existing = SimpleNamespace(
+        exchangers=(
+            SimpleNamespace(source_stream="A.H1", sink_stream="A.C1"),
+            SimpleNamespace(source_stream="H1", sink_stream="A.C1"),
+        )
+    )
+    axes = {
+        "hot_process_streams": {"A.H1": 0, "B.H1": 1},
+        "cold_process_streams": {"A.C1": 0},
+    }
+
+    with pytest.raises(ValueError, match="'H1'.*A.H1.*B.H1"):
+        _existing_names(axes, existing)
+
+
+def test_a_name_one_stream_has_exactly_is_not_a_tail_of_another():
+    """``H1`` names the stream keyed ``H1``; ``B.H1`` keeps its own name."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _existing_names,
+    )
+
+    existing = SimpleNamespace(
+        exchangers=(SimpleNamespace(source_stream="H1", sink_stream="C1"),)
+    )
+    axes = {
+        "hot_process_streams": {"H1": 0, "B.H1": 1},
+        "cold_process_streams": {"C1": 0},
+    }
+
+    assert _existing_names(axes, existing) == {
+        "H1": "H1",
+        "B.H1": "B.H1",
+        "C1": "C1",
+    }
+
+
 def test_a_bare_stream_name_one_zone_has_maps_to_it():
     from types import SimpleNamespace
 

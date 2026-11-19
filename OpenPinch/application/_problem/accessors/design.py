@@ -1146,21 +1146,21 @@ class _DesignAccessor:
 
         A stream given by its heat capacity flowrate has no ``heat_flow`` in
         the source; the prepared stream's heat flow (per period) is used,
-        matched by ``<zone>.<name>`` and else by a unique name.
+        matched in the stream's own zone by its full ``<zone path>.<name>``.
         """
         zone = self._problem.master_zone
-        prepared = [
-            (key, stream)
-            for collection in (zone.hot_streams, zone.cold_streams)
-            for key, stream in collection.items()
-        ]
         for record in source.get("streams", []):
             if record.get("heat_flow") is not None:
                 continue
-            name = record.get("name")
-            key = f"{str(record.get('zone', '')).split('/')[-1]}.{name}"
-            matches = [stream for k, stream in prepared if k == key] or [
-                stream for _k, stream in prepared if stream.name == name
+            owner = zone.get_subzone(record.get("zone"))
+            if owner is None:
+                continue
+            key = f"{owner.address}.{record.get('name')}"
+            matches = [
+                stream
+                for collection in (owner.hot_streams, owner.cold_streams)
+                for k, stream in collection.items()
+                if k == key
             ]
             if len(matches) != 1:
                 continue
@@ -1420,7 +1420,9 @@ class _DesignAccessor:
         prices new units but leaves ``area_addition_cost``, ``split_cost``
         and ``repiping_cost`` at 0 warns, since the search then favours
         those modifications. Every exchanger keeps at least
-        ``min_approach_temperature`` (default: the case's minimum approach,
+        ``min_approach_temperature`` (default: the sum of its two sides'
+        temperature contributions, per-stream ``dt_cont`` and zone
+        multipliers included; new matches and heat pumps are screened at
         twice ``THERMAL_DT_CONT``).
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
@@ -1528,11 +1530,7 @@ class _DesignAccessor:
                     new_match_candidates=new_match_candidates,
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
-                    approach=(
-                        2.0 * float(isolated.master_zone.config.thermal.dt_cont)
-                        if min_approach_temperature is None
-                        else min_approach_temperature
-                    ),
+                    approach=min_approach_temperature,
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),
                     split_cost=float(split_cost),

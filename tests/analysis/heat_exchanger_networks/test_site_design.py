@@ -276,3 +276,28 @@ def test_site_seeds_come_from_the_cheapest_and_the_level_held_fewest_unit_networ
     assert by_kind["lowest_cost"].source_metadata["site_processes"]["A"] == {
         HPS: [12.0]
     }
+
+
+def test_a_level_held_seed_takes_no_held_network_from_a_smaller_multiplier():
+    """The level-held pool is checked on its own: when a process's held
+    networks are all below a seed's multiplier, its level-held seed there
+    takes the lowest-cost network instead of a held one designed for a
+    smaller approach."""
+    a_priced = _network([_recovery("A.H1", "A.C1", 1)], multiplier=1.25, stages=1)
+    a_held = _network(
+        [_recovery("A.H3", "A.C1", 1), _heater(LPS, "A.C1", 12.0)],
+        multiplier=0.75,
+        stages=1,
+        targets={LPS: [12.0]},
+    )
+    b_low = _network([_recovery("B.H2", "B.C1", 1)], multiplier=0.75, stages=1)
+    b = _network([_recovery("B.H1", "B.C1", 1)], multiplier=1.0, stages=1)
+
+    seeds = site_seeds({"A": (a_priced,), "B": (b_low, b)}, level_held={"A": (a_held,)})
+
+    held_multipliers = [
+        seed.summary_metrics["dt_cont_multiplier"]
+        for seed in seeds
+        if "recovery:A.H3->A.C1:S1" in {e.exchanger_id for e in seed.exchangers}
+    ]
+    assert held_multipliers == [0.75]
