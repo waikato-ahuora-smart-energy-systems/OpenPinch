@@ -121,6 +121,16 @@ Interaction Matrix
      - ``HeatExchangerNetworkRetrofitResult``
      - none
      - HEN solver
+   * - ``design.retrofit_heat_pumps``
+     - Heat pump targets for an existing network, ideal and as piped
+     - ``RetrofitHeatPumpTargets``
+     - none
+     - HPR
+   * - ``design.design_basis``
+     - Preview the median design basis of a multiperiod HEN
+     - ``HenDesignBasis``
+     - none
+     - base
    * - ``summary_frame``, ``metrics``, ``report`` and state properties
      - Inspect prepared or cached state
      - dataframe, mapping, report, or record
