@@ -52,7 +52,8 @@ Heat exchanger network synthesis
   utilities kept sensible while two isothermal levels remain; the site is
   designed with each set and the cheapest design is selected. A count whose
   placement is infeasible or whose design fails is recorded and skipped; the
-  result ranks every count's best network and its provenance lists each
+  result ranks every network of each designed count (so the level-held
+  networks stay among them) and its provenance lists each
   count (``HENS_SITE_LEVEL_SWEEP``). ``HENS_SITE_LEVEL_EARLY_STOP`` ends the
   sweep after two counts in a row that cost more. ``levels="given"``
   (``HENS_SITE_LEVELS``, the default) keeps the case's utilities.

@@ -597,9 +597,10 @@ class _DesignAccessor:
         (``HENS_SITE_LEVEL_COUNTS``, default 2 to 5), each level serving
         heating and cooling, designs the site with each set, and selects the
         cheapest design. A count whose placement is infeasible or whose
-        design fails is skipped. The result ranks each designed count's best
-        network, tagged ``summary_metrics["utility_level_count"]``, and its
-        provenance records every count (``HENS_SITE_LEVEL_SWEEP``).
+        design fails is skipped. The result ranks every network of each
+        designed count by site cost, each tagged
+        ``summary_metrics["utility_level_count"]``, and its provenance
+        records every count (``HENS_SITE_LEVEL_SWEEP``).
         ``HENS_SITE_LEVEL_EARLY_STOP`` ends the sweep once two designed
         counts in a row cost more than the cheapest before them. The
         cheapest count's design is then refined by level-temperature moves:
