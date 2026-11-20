@@ -1532,6 +1532,7 @@ class _DesignAccessor:
 
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
+        _refuse_site_network(existing, "retrofit")
         _runtime, configuration = self._arguments(
             options=options, period_id=None, solve_tolerance=solve_tolerance
         )
@@ -1654,6 +1655,7 @@ class _DesignAccessor:
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
+        _refuse_site_network(existing, "retrofit_heat_pumps")
         spec = cycle_spec(cycle)
         _runtime, configuration = self._arguments(options=options, period_id=None)
         configuration["HPR_TYPE"] = family_value(
@@ -1798,12 +1800,7 @@ class _DesignAccessor:
             heat_exchanger_network_duty_optimisation_service,
         )
 
-        if "site_processes" in (network.source_metadata or {}):
-            raise ValueError(
-                "optimise_duties does not take a site network: the fixed-structure "
-                "model neither holds each process's utility levels nor keeps the "
-                "site utility balance. Optimise each process's network on its own."
-            )
+        _refuse_site_network(network, "optimise_duties")
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
@@ -1956,6 +1953,27 @@ class _DesignAccessor:
                     float(getattr(target, field_name)[u]) for target in targets
                 ]
         return levels
+
+
+def _refuse_site_network(network, tool: str) -> None:
+    """Raise ``ValueError`` for a total site network.
+
+    A site network carries the site utility balance or site cost (the
+    designed network) or ``site_processes`` (a site seed). The fixed-structure
+    tools neither hold each process's utility levels nor keep the site
+    utility balance, so they would re-price it unit by unit.
+    """
+    metadata = network.source_metadata or {}
+    if (
+        "site_processes" in metadata
+        or "site_utility_balance" in metadata
+        or "site_total_annual_cost" in (network.summary_metrics or {})
+    ):
+        raise ValueError(
+            f"{tool} does not take a site network: the fixed-structure model "
+            "neither holds each process's utility levels nor keeps the site "
+            "utility balance. Use each process's own network."
+        )
 
 
 class _DesignAccessorDescriptor:

@@ -256,8 +256,8 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
     )
     result.ranked_networks = tuple(ranked)
     select_network(result)
-    if problem._results is not None:
-        problem._results.design = result
+    # Not committed as the problem's design: the networks name the placed
+    # case's utilities, which the problem lacks.
     return selected.view
 
 
