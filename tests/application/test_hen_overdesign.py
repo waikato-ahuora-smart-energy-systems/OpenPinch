@@ -167,3 +167,30 @@ def test_a_cost_optimal_single_period_network_needs_no_margin():
     assert margined.summary_metrics["overdesign"]["percentage"] == pytest.approx(
         0.0, abs=1.0
     )
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_overdesign_keeps_a_network_designed_below_1_k():
+    """Evolution can design an approach down to its 0.1 K floor; rating each
+    network for overdesign at 1 K made the cheapest one infeasible and
+    dropped it, even at a margin of 0. Rating at the case's own minimum
+    approach keeps it."""
+    from OpenPinch.application.problem import PinchProblem
+    from tests.analysis.heat_exchanger_networks.test_duty_optimisation import (
+        _small_payload,
+    )
+
+    plain = PinchProblem(_small_payload()).design.heat_exchanger_network(
+        width=0, depth=1
+    )
+    margined = PinchProblem(_small_payload()).design.heat_exchanger_network(
+        width=0, depth=1, overdesign_percentage=0.0
+    )
+
+    assert margined.selected_network.total_annual_cost == pytest.approx(
+        plain.selected_network.total_annual_cost, rel=1e-4
+    )

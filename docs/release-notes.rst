@@ -22,6 +22,13 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Overdesign no longer drops the cheapest networks. It rated every network
+  at the 1 K default approach, while evolution designs down to 0.1 K, and
+  rated each unit at exactly its design area, which left the solver no
+  slack; so even a margin of 0 could make the cheapest network infeasible
+  and select a dearer one (758,193 against 720,517 $/y in one case). Rating
+  for overdesign now uses the approach the network's method designed it
+  to, and the rating cap has a 1e-6 relative slack.
 - Stage reduction keeps a network with fewer stages only when it costs no
   more and uses no more hot or cold utility in any period than the network
   it reduces. Before, it kept any reduced network that solved and verified,

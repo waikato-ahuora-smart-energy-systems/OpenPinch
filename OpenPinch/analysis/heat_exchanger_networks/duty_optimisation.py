@@ -130,8 +130,9 @@ def build_duty_optimisation_request(
     """Validate public arguments without touching the problem or a solver.
 
     With ``problem_approach`` and no ``min_approach_temperature``, the
-    ``"cost"`` objective keeps each exchanger at its streams' temperature
-    contributions (the case's minimum approach) instead of 1 K.
+    ``"cost"`` and ``"rating"`` objectives keep each exchanger at its
+    streams' temperature contributions (the case's minimum approach) instead
+    of 1 K.
     """
 
     if not isinstance(network, HeatExchangerNetwork):
@@ -169,7 +170,7 @@ def build_duty_optimisation_request(
                 "the 'rating' objective needs an installed area on every "
                 "exchanger; none on " + ", ".join(missing) + "."
             )
-        if approach is None:
+        if approach is None and not problem_approach:
             approach = DEFAULT_FEASIBILITY_APPROACH
     if objective == "cost":
         if hot_cap is not None or cold_cap is not None:

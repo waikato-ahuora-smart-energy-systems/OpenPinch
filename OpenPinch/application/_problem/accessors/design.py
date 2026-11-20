@@ -749,6 +749,39 @@ class _DesignAccessor:
             if str(getattr(zone, "type", "")) == ZoneType.P.value
         ]
 
+    def _design_approach(self, network, hens) -> dict[str, Any]:
+        """The minimum approach ``network``'s method designed it to, as
+        duty optimisation arguments.
+
+        A pinch design network keeps its streams' contributions at its
+        dt_cont multiplier: the case's own at 1, else twice
+        ``THERMAL_DT_CONT`` times the multiplier. The thermal derivative and
+        evolution steps design down to 0.1 K, or ``hens``'s
+        ``min_exchanger_approach_share`` of that if larger.
+        """
+        from ....analysis.heat_exchanger_networks.solver.arrays import (
+            nominal_approach_temperature,
+        )
+        from ....domain.enums import HeatExchangerNetworkDesignMethod
+
+        multiplier = float(
+            (network.summary_metrics or {}).get("dt_cont_multiplier")
+            or (network.source_metadata or {}).get("dt_cont_multiplier")
+            or 1.0
+        )
+        root = self._problem._require_prepared_root_zone()
+        nominal = nominal_approach_temperature(root.config, multiplier)
+        if network.method in {
+            "PDM",
+            HeatExchangerNetworkDesignMethod.PinchDesign.value,
+            HeatExchangerNetworkDesignMethod.HeuristicPinchDesign.value,
+        }:
+            if multiplier == 1.0:
+                return {"problem_approach": True}
+            return {"min_approach_temperature": nominal}
+        share = float(hens.min_exchanger_approach_share)
+        return {"min_approach_temperature": max(0.1, share * nominal)}
+
     def _effective_hens(self, options):
         """The HENS configuration a call runs with: its options over the stored."""
         from copy import copy
@@ -1021,12 +1054,15 @@ class _DesignAccessor:
             network,
             margin,
             maximum=float(hens.overdesign_max),
-            rate=lambda installed: self.optimise_duties(
+            # At the approach the network was designed to, not the 1 K
+            # rating default: evolution designs down to 0.1 K.
+            rate=lambda installed: self._optimise_duties(
                 installed,
                 objective="rating",
                 options=options,
                 solver=solver,
                 solve_tolerance=solve_tolerance,
+                **self._design_approach(network, hens),
             ),
         )
         view.selected_network.summary_metrics["overdesign"] = metrics
