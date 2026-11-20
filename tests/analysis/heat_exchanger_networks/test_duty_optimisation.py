@@ -1817,3 +1817,46 @@ def test_the_fit_to_every_period_keeps_a_networks_utility_slices():
     fitted = problem.design._fit_to_all_periods(network).selected_network
 
     assert fitted.exchangers
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_a_rating_off_its_design_point_is_verified_with_its_allowance():
+    """Rating caps a unit's duty by its installed area, calibrated with
+    Chen's LMTD at the design point; off that point the cap can carry duty
+    exact sizing needs a little more area for. The rating is verified with
+    the same allowance retrofit uses, not rejected, and records it."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+
+    problem = PinchProblem(_small_payload())
+    structure = HeatExchangerNetwork.from_structure(
+        recovery=[("H1", "C1", 1)],
+        heaters=["C1"],
+        coolers=["H1"],
+        hot_utility="HPS",
+        cold_utility="CW",
+    )
+    design_point = HeatExchangerPeriodState(
+        period_id="0",
+        period_idx=0,
+        duty=100.0,
+        active=True,
+        approach_temperatures=(40.0, 2.0),
+    )
+    installed = structure.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": 4.0, "period_states": (design_point,)})
+                if e.kind is HeatExchangerKind.RECOVERY
+                else e.model_copy(update={"area": 1.0e3})
+                for e in structure.exchangers
+            )
+        }
+    )
+
+    rated = problem.design.optimise_duties(installed, objective="rating")
+
+    allowance = rated.selected_network.summary_metrics["rating_area_allowance"]
+    assert 1.0 < allowance < 1.1

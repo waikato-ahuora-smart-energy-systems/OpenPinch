@@ -1082,7 +1082,7 @@ class _DesignAccessor:
                 **(approach or self._design_approach(network, hens)),
             ),
         )
-        view.selected_network.summary_metrics["overdesign"] = metrics
+        view.selected_network.overdesign = metrics
         # Rating does not hold the levels: the rated network keeps the ones
         # its design held, to be checked against.
         return _with_released_levels(

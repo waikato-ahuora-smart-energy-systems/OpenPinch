@@ -500,6 +500,9 @@ def _check_area_consistency(
             return _stream_value_map(network, axis_name, by_period[period_idx])
         return _stream_value_map(network, axis_name, metadata.get(key))
 
+    # A rated network's installed areas are judged as its rating capped them
+    # (``rating_area_allowances``: exact over calibrated Chen sizing).
+    allowances = metadata.get("rating_area_allowances") or {}
     hot_htc = htc("hot_process_streams", "hot_stream_heat_transfer_coefficients")
     cold_htc = htc("cold_process_streams", "cold_stream_heat_transfer_coefficients")
     hot_utility_htc = htc("hot_utilities", "hot_utility_heat_transfer_coefficients")
@@ -524,9 +527,10 @@ def _check_area_consistency(
         if overall_htc is None or terminal_lmtd is None:
             continue
         required_area = state.duty / overall_htc / terminal_lmtd
-        if exchanger.area + _AREA_ABS_TOL < required_area and not _close(
+        area = exchanger.area * float(allowances.get(exchanger.exchanger_id, 1.0))
+        if area + _AREA_ABS_TOL < required_area and not _close(
             required_area,
-            exchanger.area,
+            area,
             rel_tol=_AREA_REL_TOL,
             abs_tol=_AREA_ABS_TOL,
         ):
