@@ -1288,6 +1288,18 @@ class _DesignAccessor:
             **(arguments | {"options": basis_options})
         )
 
+    def _refuse_period_scope(self, period_id, tool: str) -> None:
+        """Raise for a ``period_id`` on a multiperiod case: the standalone
+        methods design over every period."""
+        if period_id is None or len(self._problem.period_ids) <= 1:
+            return
+        raise ValueError(
+            f"{tool} designs over every period; to design on period "
+            f"{period_id!r}, use heat_exchanger_network(design_basis='period', "
+            f"period_id={period_id!r}), or {tool} on "
+            f"single_period_case(problem, {period_id!r})."
+        )
+
     def pinch_design(self, *, options=None, period_id=None, **kwargs):
         """Run the pinch design method only.
 
@@ -1301,6 +1313,7 @@ class _DesignAccessor:
             heat_exchanger_network_pinch_design_method_service,
         )
 
+        self._refuse_period_scope(period_id, "pinch_design")
         runtime, configuration = self._arguments(
             options=options, period_id=period_id, **kwargs
         )
@@ -1325,6 +1338,7 @@ class _DesignAccessor:
             heat_exchanger_network_thermal_derivative_method_service,
         )
 
+        self._refuse_period_scope(period_id, "thermal_derivative")
         runtime, configuration = self._arguments(
             options=options, period_id=period_id, **kwargs
         )
@@ -1350,6 +1364,7 @@ class _DesignAccessor:
             heat_exchanger_network_evolution_method_service,
         )
 
+        self._refuse_period_scope(period_id, "network_evolution")
         runtime, configuration = self._arguments(
             options=options, period_id=period_id, **kwargs
         )

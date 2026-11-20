@@ -313,3 +313,15 @@ class _Slot:
 
     def set_value(self, value, skip_validation=False):
         self.value = value
+
+
+@pytest.mark.parametrize(
+    "method", ["pinch_design", "thermal_derivative", "network_evolution"]
+)
+def test_a_standalone_method_refuses_a_period_id_on_a_multiperiod_case(method):
+    """The standalone methods design over every period; a ``period_id``
+    used to be taken as a label only, so the stored targets described one
+    period and the design all of them. It is refused, naming the ways to
+    design one period."""
+    with pytest.raises(ValueError, match="design_basis='period'"):
+        getattr(_two_period_problem().design, method)(period_id="base")
