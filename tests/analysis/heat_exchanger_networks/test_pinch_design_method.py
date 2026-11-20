@@ -3840,3 +3840,20 @@ def test_removal_ranking_weighs_every_periods_recovery() -> None:
     model.tol = 1e-3
 
     assert model.get_lowest_benefit_HX_candidates(2) == [[0, 1, 0], [0, 0, 0]]
+
+
+def test_a_standalone_pinch_design_of_a_one_sided_case_has_its_utility_network():
+    """A case of only hot streams has one network, of coolers alone, as the
+    full design returns; the standalone pinch design used to raise."""
+    from OpenPinch.application.problem import PinchProblem
+    from tests.analysis.heat_exchanger_networks.test_duty_optimisation import (
+        _small_payload,
+    )
+
+    payload = _small_payload()
+    payload["streams"] = payload["streams"][:1]
+
+    view = PinchProblem(payload).design.pinch_design(width=0, depth=0)
+
+    kinds = {e.kind.value for e in view.selected_network.exchangers}
+    assert kinds == {"cold_utility"}
