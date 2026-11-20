@@ -6,6 +6,8 @@ stages and their effort; an option set explicitly overrides the level.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 import OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method as workflow_module
@@ -18,6 +20,7 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
 from OpenPinch.analysis.heat_exchanger_networks.execution.search import (
     DEPTH_LEVELS,
     WIDTH_MULTIPLIERS,
+    scaled_heuristic_networks,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     workflow_settings_from_problem,
@@ -30,6 +33,7 @@ from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
 from tests.analysis.heat_exchanger_networks.test_full_sequence import (
     _small_payload,
 )
+from tests.support.paths import REPOSITORY_ROOT
 
 HEURISTIC = HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
 MILP = HeatExchangerNetworkDesignMethod.PinchDesign
@@ -370,3 +374,47 @@ def test_a_warning_says_when_every_evolution_task_fails():
             workflow_settings_from_problem(problem),
             executor=FailingEvolution(),
         )
+
+
+def test_heuristic_networks_scale_down_with_the_case_size():
+    # Up to 30 streams a case keeps the level's count; above, it falls with
+    # the square of the stream count, to no fewer than 10.
+    assert scaled_heuristic_networks(50, 7) == 50
+    assert scaled_heuristic_networks(50, 30) == 50
+    assert scaled_heuristic_networks(50, 40) == 28
+    assert scaled_heuristic_networks(50, 64) == 10
+    assert scaled_heuristic_networks(50, 200) == 10
+
+
+def _pulp_mill(options: dict) -> PinchProblem:
+    payload = json.loads(
+        (REPOSITORY_ROOT / "OpenPinch/tutorials/sample_cases/pulp_mill.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    payload["options"] = {**payload.get("options", {}), **options}
+    return PinchProblem(source=payload, project_name="pulp_mill")
+
+
+@pytest.mark.parametrize(("depth", "networks"), [(0, 10), (1, 10), (2, 50)])
+def test_a_large_case_proposes_fewer_heuristic_networks_at_depth_0_and_1(
+    depth, networks
+):
+    # The pulp mill's 64 streams took 21 minutes at width 0, depth 0.
+    settings = workflow_settings_from_problem(_pulp_mill({"HENS_SEARCH_DEPTH": depth}))
+
+    assert settings.heuristic_pdm_networks == networks
+
+
+def test_a_small_case_keeps_the_level_heuristic_networks():
+    settings = workflow_settings_from_problem(_problem({"HENS_SEARCH_DEPTH": 0}))
+
+    assert settings.heuristic_pdm_networks == 50
+
+
+def test_an_explicit_heuristic_network_count_is_not_scaled():
+    settings = workflow_settings_from_problem(
+        _pulp_mill({"HENS_SEARCH_DEPTH": 0, "HENS_HEURISTIC_PDM_NETWORKS": 50})
+    )
+
+    assert settings.heuristic_pdm_networks == 50

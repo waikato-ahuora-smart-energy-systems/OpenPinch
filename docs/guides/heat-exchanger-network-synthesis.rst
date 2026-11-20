@@ -281,11 +281,16 @@ rules by default. On each side of the pinch it:
 It enumerates the alternatives at each decision (pinch matches, optional
 splits and partners away from the pinch), streams of similar CP first, up to
 ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier (default
-50). Each proposal is then solved by the pinch design side model with
-only its matches allowed, so its duties and temperatures are consistent and
-it meets the utility targets; the sides are joined, stage-reduced and
-verified like the pinch design networks. Proposals the model cannot solve or
-verify are dropped. With several operating periods, each period is designed
+50). At search depths 0 and 1, when the option is unset, a case of more than
+30 process streams gets fewer: 50 times (30 / streams) squared, at least 10
+(10 for a 64-stream case). Each proposal is then solved by the pinch design
+side model with only its matches allowed, so its duties and temperatures are
+consistent and it meets the utility targets; the sides are joined,
+stage-reduced and verified like the pinch design networks. Proposals the
+model cannot solve or verify are dropped. A heuristic task has a wall-clock
+limit of 300 s: past it, each side stops at its first realised proposal and
+the joining at its first network, and a warning says the task kept the
+networks found so far. With several operating periods, each period is designed
 on its own and a proposal is the union of one design per period, one shared
 topology.
 

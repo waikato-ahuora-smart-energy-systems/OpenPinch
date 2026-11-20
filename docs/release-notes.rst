@@ -36,6 +36,21 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Heuristic-only pinch design (width 0, depth 0) took 21 minutes on the
+  packaged ``pulp_mill`` case. Almost all of it (1,141 of 1,180 s) was
+  the below-pinch side: each of its 50 proposals was solved holding the
+  utility levels, failed, and was solved again without them. At search
+  depths 0 and 1, a case of more than 30 process streams now gets fewer
+  heuristic networks and side proposals per multiplier when
+  ``HENS_HEURISTIC_PDM_NETWORKS`` is unset: 50 times (30 / streams)
+  squared, at least 10. ``pulp_mill`` (64 streams) gets 10 and designs in
+  about 4 minutes, with a total annual cost 0.1 % above the 50-network
+  design's. A heuristic task also stops at a 300 s wall-clock limit: past
+  it, each side stops at its first realised proposal and the joining at
+  its first network, and a warning says the task kept the networks found
+  so far (``heuristic_report["time_limited"]``). ``chocolate_factory``
+  (65 streams) also gets 10; cases of up to 30 streams, including the
+  other sample cases, are unchanged.
 - A fit to every period padded stream-end heaters and coolers at twice
   ``THERMAL_DT_CONT`` times the multiplier (10 K by default), while the fit
   holds each pair's own dt_cont contributions. On the packaged

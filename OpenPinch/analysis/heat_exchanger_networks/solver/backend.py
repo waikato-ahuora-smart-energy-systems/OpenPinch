@@ -61,6 +61,10 @@ PDM_TIME_LIMIT = 600.0
 # MIP over the proposal's matches, unless the user sets a limit. A side
 # stopped there is dropped: its incumbent need not hold the minimum utility.
 HEURISTIC_SIDE_TIME_LIMIT = 10.0
+# Wall-clock seconds for a heuristic pinch design task. Past it, each side
+# stops at its first realised proposal (a side holding its utility levels
+# tries one more, then drops them) and the pairing at its first network.
+HEURISTIC_STAGE_TIME_LIMIT = 300.0
 # Seconds allowed for a thermal derivative task's MINLP, unless the user sets
 # a limit: Couenne can otherwise run for hours on one parent network. A solve
 # stopped there keeps its incumbent when it has one, and that network is

@@ -11,7 +11,9 @@
   network also straight to evolution.
 * 4: as 3 with still more seeds and wider evolution.
 
-An option set explicitly overrides the value its level gives.
+An option set explicitly overrides the value its level gives. At depths 0
+and 1 the level's heuristic network count falls with the case size
+(``scaled_heuristic_networks``).
 """
 
 from __future__ import annotations
@@ -66,6 +68,31 @@ DEPTH_LEVELS: dict[int, DepthLevel] = {
 }
 
 
+# Up to this many streams a case keeps its level's heuristic network count.
+FULL_HEURISTIC_STREAMS = 30
+# The fewest heuristic networks (and side proposals) a scaled count gives.
+MIN_SCALED_HEURISTIC_NETWORKS = 10
+# Depths whose heuristic network count scales with the case size.
+SCALED_HEURISTIC_DEPTHS = frozenset({0, 1})
+
+
+def scaled_heuristic_networks(networks: int, streams: int) -> int:
+    """A depth level's heuristic network count for a case of ``streams``.
+
+    It caps the proposals realised per side and the networks paired. Each
+    side realisation and network costs more on a larger case, so above
+    ``FULL_HEURISTIC_STREAMS`` streams the count falls with the square of the
+    stream count, to no fewer than ``MIN_SCALED_HEURISTIC_NETWORKS``.
+    """
+
+    if streams <= FULL_HEURISTIC_STREAMS:
+        return networks
+    return max(
+        MIN_SCALED_HEURISTIC_NETWORKS,
+        networks * FULL_HEURISTIC_STREAMS**2 // streams**2,
+    )
+
+
 @dataclass(frozen=True)
 class ResolvedSearch:
     """The options a search width and depth set, after explicit overrides."""
@@ -92,11 +119,18 @@ def reference_dt_cont_multiplier(multipliers) -> float:
     return 1.0 if 1.0 in values else values[0]
 
 
-def resolve_search(hens: Any) -> ResolvedSearch:
-    """Return the search options of a HEN configuration group."""
+def resolve_search(hens: Any, *, streams: int | None = None) -> ResolvedSearch:
+    """Return the search options of a HEN configuration group.
+
+    With ``streams``, the case's process stream count, the heuristic network
+    count a depth 0 or 1 level gives is scaled to the case size.
+    """
 
     width, depth = int(hens.search_width), int(hens.search_depth)
     level = DEPTH_LEVELS[depth]
+    level_networks = level.heuristic_networks
+    if streams is not None and depth in SCALED_HEURISTIC_DEPTHS:
+        level_networks = scaled_heuristic_networks(level_networks, streams)
 
     def pick(value, default):
         return default if value is None else value
@@ -109,9 +143,7 @@ def resolve_search(hens: Any) -> ResolvedSearch:
             float(value)
             for value in pick(hens.dt_cont_multipliers, WIDTH_MULTIPLIERS[width])
         ),
-        heuristic_networks=int(
-            pick(hens.heuristic_pdm_networks, level.heuristic_networks)
-        ),
+        heuristic_networks=int(pick(hens.heuristic_pdm_networks, level_networks)),
         heuristic_evolution_seeds=int(
             pick(hens.heuristic_pdm_evolution_seeds, level.heuristic_evolution_seeds)
         ),
@@ -123,9 +155,13 @@ def resolve_search(hens: Any) -> ResolvedSearch:
 
 __all__ = [
     "DEPTH_LEVELS",
+    "FULL_HEURISTIC_STREAMS",
+    "MIN_SCALED_HEURISTIC_NETWORKS",
+    "SCALED_HEURISTIC_DEPTHS",
     "WIDTH_MULTIPLIERS",
     "DepthLevel",
     "ResolvedSearch",
     "reference_dt_cont_multiplier",
     "resolve_search",
+    "scaled_heuristic_networks",
 ]

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.heuristic import enumeration
 from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import _value
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     staged_utilities as stagewise_staged,
@@ -638,3 +639,38 @@ def test_a_level_held_network_records_the_level_targets():
     recorded = network.source_metadata["utility_level_targets"]
     assert recorded["Hot Utility.LPS"] == pytest.approx([targets["LPS"]])
     assert recorded["Cold Utility.CW"] == pytest.approx([targets["CW"]])
+
+
+def test_past_the_heuristic_time_limit_a_side_stops_trying_its_levels(
+    monkeypatch, caplog
+):
+    # Holding levels, every proposal of the pulp mill's below side failed
+    # twice at the side time limit before the side dropped its levels: 1,141
+    # of 1,180 s. Past the stage's limit the level pass tries one proposal.
+    tried: list[bool] = []
+    realise_side = InternalHeatExchangerNetworkProblem._realise_side
+
+    def levels_never_hold(self, name, proposal, rank):
+        holding = bool(self._side_args(name).get("staged_utilities"))
+        tried.append(holding)
+        return None if holding else realise_side(self, name, proposal, rank)
+
+    monkeypatch.setattr(
+        InternalHeatExchangerNetworkProblem, "_realise_side", levels_never_hold
+    )
+    propose = enumeration.propose_side_topologies
+
+    def three_of_each(side, *, limit):
+        # This case proposes one topology per side: try it three times.
+        return propose(side, limit=limit) * 3
+
+    monkeypatch.setattr(enumeration, "propose_side_topologies", three_of_each)
+    monkeypatch.setattr(backend, "HEURISTIC_STAGE_TIME_LIMIT", 0.0)
+
+    with caplog.at_level("WARNING"):
+        _pdm_network(_problem(HEATING), heuristic_network_limit=10)
+
+    # Per required side, one try holding the levels and one without them,
+    # which realises.
+    assert tried == [True, False, True, False]
+    assert "time limit" in caplog.text

@@ -223,7 +223,9 @@ def workflow_settings_from_problem(
         )
     config = zone.config
     hens = config.hens
-    search = resolve_search(hens)
+    search = resolve_search(
+        hens, streams=len(zone.hot_streams) + len(zone.cold_streams)
+    )
     solvers = {
         stage: configured_stage_solver(hens, f"HENS_SOLVER_{stage.upper()}")
         for stage in ("pdm", "tdm", "evm")
