@@ -7,8 +7,9 @@ period-weighted utility cost, with bypass where a period needs less area.
 ``"optimise"`` picks OD in [0, ``maximum``] for the least total annual cost
 (annualised capital on the installed areas plus utility cost) with a bounded
 one-dimensional search over rating solves. A positive margin whose rating
-fails is left out of the search; when none could be rated the margin is 0 %
-with a ``UserWarning``.
+fails is left out of the search; after a failed maximum, bisection finds
+the largest margin that rates, which then bounds the search. When none
+could be rated the margin is 0 % with a ``UserWarning``.
 """
 
 from __future__ import annotations
@@ -115,13 +116,26 @@ def apply_overdesign(
     if margin == OPTIMISE:
         cost(0.0)
         if maximum > 0.0:
-            searched(float(maximum))
-            minimize_scalar(
-                searched,
-                bounds=(0.0, float(maximum)),
-                method="bounded",
-                options={"xatol": _SEARCH_TOLERANCE, "maxiter": _SEARCH_SOLVES},
-            )
+            # After a failed maximum, bisection finds the largest margin that
+            # rates (0 % always does), which bounds the search, so small
+            # feasible margins are not missed.
+            upper, failed_above = 0.0, float(maximum)
+            if not math.isinf(searched(failed_above)):
+                upper = failed_above
+            else:
+                while failed_above - upper > _SEARCH_TOLERANCE:
+                    middle = 0.5 * (upper + failed_above)
+                    if math.isinf(searched(middle)):
+                        failed_above = middle
+                    else:
+                        upper = middle
+            if upper > 0.0:
+                minimize_scalar(
+                    searched,
+                    bounds=(0.0, upper),
+                    method="bounded",
+                    options={"xatol": _SEARCH_TOLERANCE, "maxiter": _SEARCH_SOLVES},
+                )
             if failed and all(point == 0.0 for point in evaluated):
                 warnings.warn(
                     "no positive overdesign margin could be rated (every rating "
