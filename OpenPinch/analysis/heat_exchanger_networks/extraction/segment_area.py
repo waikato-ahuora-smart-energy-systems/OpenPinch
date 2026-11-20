@@ -74,7 +74,9 @@ def _recovery_segment_contributions(
             raise ValueError(
                 "Segment-aware HEN extraction requires stage boundary temperatures."
             )
-        hot_share, cold_share = branch_fractions(
+        hot_share, cold_share = _solved_splits(
+            solved_model, period_index, hot_index, cold_index, stage_index
+        ) or branch_fractions(
             lambda a, b, c, n=period_index: _match_duty(solved_model, n, a, b, c),
             len(arrays["hot_segment_count"]),
             len(arrays["cold_segment_count"]),
@@ -110,6 +112,21 @@ def _recovery_segment_contributions(
             )
         )
     return tuple(contributions)
+
+
+def _solved_splits(solved_model: Any, n: int, i: int, j: int, k: int):
+    """A non-isothermal model's solved hot and cold branch splits, or None."""
+    if not getattr(solved_model, "non_isothermal_model", False):
+        return None
+    hot = _optional_float(
+        _index(getattr(solved_model, "X_by_period", None), n, i, j, k)
+    )
+    cold = _optional_float(
+        _index(getattr(solved_model, "Y_by_period", None), n, j, i, k)
+    )
+    if hot is None or cold is None:
+        return None
+    return (hot if hot > 0.0 else 1.0, cold if cold > 0.0 else 1.0)
 
 
 def _match_duty(solved_model: Any, period_index: int, i: int, j: int, k: int) -> float:

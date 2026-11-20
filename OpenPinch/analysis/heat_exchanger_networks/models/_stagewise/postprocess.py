@@ -170,9 +170,7 @@ def _get_multiperiod_post_process(owner) -> None:
                 if not (hot_segmented[i] or cold_segmented[j]):
                     continue
                 hot_share, cold_share = (
-                    branch_fractions(
-                        lambda a, b, c: q_r[0][a][b][c], owner.I, owner.J, i, j, k
-                    )
+                    _area.split_shares(owner, q_r, 0, i, j, k, branch_fractions)
                     if q_r[0][i][j][k] > 0.0
                     else (1.0, 1.0)
                 )

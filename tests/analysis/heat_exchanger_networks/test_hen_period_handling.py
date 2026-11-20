@@ -271,3 +271,45 @@ def test_stage_packing_counts_a_matchs_duty_in_every_period():
     )
 
     assert view.selected_network.exchangers
+
+
+def test_a_small_active_duty_is_copied_with_its_approaches():
+    """The idle-period skip applies only to duty the side treats as none:
+    below the side's own tolerance, not the joined model's coarser one. A
+    small active match the joined model cannot run is refused, not copied
+    without its approaches."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models._pinch_design import (
+        amalgamation,
+    )
+
+    target = SimpleNamespace(
+        N_periods=1,
+        tol=1e-3,
+        z=[[[_Slot()]]],
+        Q_r_by_period=[[[[_Slot()]]]],
+        theta_1_by_period=[[[[5.0]]]],
+        theta_2_by_period=[[[[5.0]]]],
+    )
+    source = SimpleNamespace(
+        N_periods=1,
+        tol=1e-4,
+        non_isothermal_model=False,
+        z=[[[1.0]]],
+        Q_r_by_period=[[[[5e-4]]]],
+        theta_1_by_period=[[[[47.5]]]],
+        theta_2_by_period=[[[[47.5]]]],
+    )
+
+    with pytest.raises(ValueError, match="disallowed match"):
+        amalgamation._copy_recovery_match(None, target, source, 0, 0, 0, 0)
+
+
+class _Slot:
+    """A Pyomo-shaped variable slot."""
+
+    value = None
+
+    def set_value(self, value, skip_validation=False):
+        self.value = value

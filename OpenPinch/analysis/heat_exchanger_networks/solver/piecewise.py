@@ -212,7 +212,12 @@ def branch_profile(
     """``profile`` on ``fraction`` of the stream's flow (a split branch)."""
     if fraction >= 1.0:
         return profile
-    fraction = max(fraction, 1e-9)
+    # A branch carrying almost nothing keeps every segment's duty and heat
+    # capacity flowrate above the profile's validity floor.
+    smallest = float(
+        min(np.min(profile.duties), np.min(profile.heat_capacity_flowrates))
+    )
+    fraction = max(fraction, 1e-9, 2.0 * tol / smallest)
     return PiecewiseThermalProfile(
         identities=profile.identities,
         temperatures_in=profile.temperatures_in,
@@ -233,7 +238,8 @@ def branch_fractions(
 
     In an isothermal-mixing stage every match on a stream spans the
     stream's whole temperature change there, so a branch's share of the
-    flow is its share of the stream's recovery duty in the stage.
+    flow is its share of the stream's recovery duty in the stage. A
+    non-isothermal model solves its splits instead (``split_shares``).
     ``duty_of(i, j, k)`` gives a match's duty.
     """
     duty = max(float(duty_of(i, j, k)), 0.0)
