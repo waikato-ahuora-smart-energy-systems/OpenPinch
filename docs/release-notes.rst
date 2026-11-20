@@ -36,6 +36,14 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A fit to every period padded stream-end heaters and coolers at twice
+  ``THERMAL_DT_CONT`` times the multiplier (10 K by default), while the fit
+  holds each pair's own dt_cont contributions. On the packaged
+  ``dairy_chilling_multiperiod`` case that dropped the Glycol cooler on
+  Ice-water return (a 3.5 K pair with 7 K end gaps), so every network of
+  the default design warned and was fitted at 1 K. The padding now uses
+  each pair's contributions times the multiplier, and the default design
+  keeps its approach.
 - **Breaking:** an overdesigned network carries its margin in a typed
   ``overdesign`` field (``NetworkOverdesign``), no longer in
   ``summary_metrics["overdesign"]``. Read ``selected_network.overdesign
