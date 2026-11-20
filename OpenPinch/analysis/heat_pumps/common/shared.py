@@ -829,6 +829,21 @@ def subcritical_stage_condensing_temperatures(
     return capped
 
 
+def vapour_seed_evaporating_temperatures(
+    T_evap_carnot: np.ndarray,
+    dt_phase_change: float,
+) -> np.ndarray:
+    """Map Carnot evaporating levels to vapour-cycle saturation temperatures.
+
+    A Carnot evaporator at ``T`` spans ``[T - dt_phase_change, T]``, while a
+    vapour evaporator widens its flat profile upwards from its saturation
+    temperature. Seeding at ``T - dt_phase_change`` starts the vapour stream at
+    the Carnot stream's lower edge, so a Carnot evaporator on a utility band
+    edge stays on it.
+    """
+    return np.asarray(T_evap_carnot, dtype=float) - float(dt_phase_change)
+
+
 # Keeps a floored temperature above Tmin through the degC to K round trip.
 EVAPORATING_FLOOR_MARGIN_K = 1e-6
 
