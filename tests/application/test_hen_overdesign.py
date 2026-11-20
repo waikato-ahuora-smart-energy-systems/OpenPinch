@@ -196,6 +196,39 @@ def test_overdesign_keeps_a_network_designed_below_1_k():
     )
 
 
+def test_an_overdesigned_network_keeps_the_levels_to_check(monkeypatch):
+    """Rating does not hold utility levels; the rated network keeps the
+    levels its design held, so ``holds_utility_levels`` checks them rather
+    than finding no targets to miss."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks import overdesign
+
+    rated = HeatExchangerNetwork(exchangers=(), run_id="rated")
+    monkeypatch.setattr(
+        overdesign,
+        "apply_overdesign",
+        lambda network, margin, **kwargs: (
+            SimpleNamespace(selected_network=rated),
+            {"percentage": 0.0},
+        ),
+    )
+    targets = {"Hot Utility.LPS": [10.0, 12.0]}
+    network = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="designed",
+        source_metadata={"utility_level_targets": targets},
+    )
+    problem = _two_period_problem()
+    hens = problem.design._effective_hens(None)
+
+    view = problem.design._overdesigned(
+        network, 0.0, hens=hens, options=None, solver=None, solve_tolerance=None
+    )
+
+    assert view.selected_network.source_metadata["utility_level_targets"] == targets
+
+
 def test_a_fitted_network_is_rated_at_its_designs_approach(monkeypatch):
     """The fit's result is labelled as a duty optimisation; rating it for
     overdesign keeps the approach the synthesised network was designed to,

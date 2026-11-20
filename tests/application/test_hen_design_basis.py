@@ -409,6 +409,7 @@ def test_the_all_period_fit_runs_with_the_calls_settings(monkeypatch):
         "solver": "ipopt-pyomo",
         "solve_tolerance": 1e-4,
         "problem_approach": True,
+        "dt_cont_multiplier": 1.0,
     }
 
 
@@ -481,7 +482,10 @@ def test_a_fit_that_cannot_keep_the_minimum_approach_warns_and_fits_at_1_k(
         recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
     )
 
-    with pytest.warns(UserWarning, match="minimum approach.*infeasible in period peak"):
+    with pytest.warns(
+        UserWarning,
+        match="approach the network was designed to.*infeasible in period peak",
+    ):
         result = _two_period_problem().design._fit_to_all_periods(network)
 
     assert result == "fitted at 1 K"
@@ -538,3 +542,81 @@ def test_a_fit_that_cannot_hold_the_levels_says_so():
             depth=0,
             options={"HENS_UTILITY_PLACEMENT": "temperature"},
         )
+
+
+@pytest.mark.parametrize(
+    ("method", "multiplier", "expected"),
+    [
+        ("PDM", 0.75, {"problem_approach": True, "dt_cont_multiplier": 0.75}),
+        ("PDM", 1.0, {"problem_approach": True, "dt_cont_multiplier": 1.0}),
+        ("ESM", 1.0, {"min_approach_temperature": 0.1}),
+    ],
+)
+def test_the_fit_keeps_the_approach_the_network_was_designed_to(
+    monkeypatch, method, multiplier, expected
+):
+    """A pinch design network keeps its contributions at its own dt_cont
+    multiplier (7.5 K at 0.75x), not the reference 10 K; an evolved network
+    keeps the 0.1 K floor it was designed to. The padding uses the same
+    approach."""
+    from OpenPinch.analysis.heat_exchanger_networks import period_fit
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    seen, padded = [], []
+
+    def fit(self, network, **kwargs):
+        seen.append(kwargs)
+        return "fitted"
+
+    def pad(problem, network, *, approach, levels=frozenset()):
+        padded.append(approach)
+        return network
+
+    monkeypatch.setattr(_DesignAccessor, "_optimise_duties", fit)
+    monkeypatch.setattr(period_fit, "with_stream_end_utilities", pad)
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    ).model_copy(
+        update={"method": method, "summary_metrics": {"dt_cont_multiplier": multiplier}}
+    )
+
+    _two_period_problem().design._fit_to_all_periods(network)
+
+    for name, value in expected.items():
+        assert seen[0][name] == pytest.approx(value)
+    pad = expected.get(
+        "min_approach_temperature", 10.0 * expected.get("dt_cont_multiplier", 1.0)
+    )
+    assert padded == [pytest.approx(pad)]
+
+
+def test_networks_that_differ_in_design_approach_or_levels_are_fitted_apart():
+    from OpenPinch.application._problem.accessors.design import _finalise_key
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    base = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    )
+
+    def keyed(multiplier, approach, targets=None):
+        return _finalise_key(
+            base.model_copy(
+                update={
+                    "summary_metrics": {"dt_cont_multiplier": multiplier},
+                    "source_metadata": (
+                        {} if targets is None else {"utility_level_targets": targets}
+                    ),
+                }
+            ),
+            approach,
+        )
+
+    seven = {"problem_approach": True, "dt_cont_multiplier": 0.75}
+    floor = {"min_approach_temperature": 0.1}
+    assert keyed(0.75, seven) != keyed(
+        1.0, {"problem_approach": True, "dt_cont_multiplier": 1.0}
+    )
+    # An evolved network's floor does not depend on its multiplier.
+    assert keyed(0.75, floor) == keyed(1.5, floor)
+    assert keyed(1.0, floor) != keyed(1.0, floor, {"Hot Utility.LPS": [10.0]})

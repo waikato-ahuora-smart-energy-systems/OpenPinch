@@ -36,6 +36,17 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The fit to every period keeps the approach each network was designed
+  to: a pinch design network its contributions at its own dt_cont
+  multiplier (7.5 K at 0.75x, not the reference 10 K), an evolved network
+  the 0.1 K floor (or ``HENS_MIN_EXCHANGER_APPROACH_SHARE``). Stream-end
+  padding uses the same approach, so a utility that cannot keep it is not
+  chosen only to fail the fit. Pinch design networks at different
+  multipliers are no longer fitted once and shared.
+- A fitted, rated or overdesigned network that does not hold its design's
+  utility levels keeps them as its targets, so ``holds_utility_levels``
+  checks them. Before, the targets were dropped and every such network
+  reported holding its levels.
 - Duty optimisation, rating, overdesign and the fit to every period keep a
   network's utility slices. Pinch design slices a sliding utility (cooling
   water, hot water) at the streams it must reach, and names each slice in

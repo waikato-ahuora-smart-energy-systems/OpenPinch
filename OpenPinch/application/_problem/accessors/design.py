@@ -56,17 +56,24 @@ def _rounded(value):
     return value
 
 
-def _finalise_key(network) -> str:
+def _finalise_key(network, approach=None) -> str:
     """What fitting and rating ``network`` depend on, as a lookup key.
 
     The task labels (``task_id`` and the ``dt_cont_multiplier`` summary
-    metric) are left out: neither fit nor rating reads them. Values are
+    metric) are left out; in their place is ``approach``, the design
+    approach fit and rating keep (``_design_approach``), which the
+    multiplier sets for a pinch design network only. The level targets stay
+    in: the fit holds them. Values are
     rounded to 9 significant digits, since solves of one network in
     different tasks agree to about 1e-15 relative, not bit for bit.
     """
     data = network.model_dump(mode="json")
     data.pop("task_id", None)
     data.get("summary_metrics", {}).pop("dt_cont_multiplier", None)
+    data["design_approach"] = approach
+    data["utility_level_targets"] = (network.source_metadata or {}).get(
+        "utility_level_targets"
+    )
     return json.dumps(_rounded(data), sort_keys=True)
 
 
@@ -830,7 +837,9 @@ class _DesignAccessor:
         finishing = threading.Lock()
 
         def finalise(outcome):
-            key = _finalise_key(outcome.network)
+            key = _finalise_key(
+                outcome.network, self._design_approach(outcome.network, hens)
+            )
             with finishing:
                 if key not in finished:
                     try:
@@ -1074,7 +1083,13 @@ class _DesignAccessor:
             ),
         )
         view.selected_network.summary_metrics["overdesign"] = metrics
-        return view
+        # Rating does not hold the levels: the rated network keeps the ones
+        # its design held, to be checked against.
+        return _with_released_levels(
+            view,
+            (network.source_metadata or {}).get("utility_level_targets"),
+            held=False,
+        )
 
     def _design_basis(self, design_basis: str | None, period_id: str | None, hens=None):
         """The basis a multiperiod design is synthesised from; None for one period.
@@ -1870,41 +1885,44 @@ class _DesignAccessor:
             "solver": solver,
             "solve_tolerance": solve_tolerance,
         }
-        levels = self._period_level_targets(network)
-        padded = with_stream_end_utilities(
-            self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
+        from ....analysis.heat_exchanger_networks.solver.arrays import (
+            nominal_approach_temperature,
         )
+
+        design = self._design_approach(network, self._effective_hens(options))
+        # The padding keeps the approach the fit solves at: the network's
+        # own floor, or twice THERMAL_DT_CONT at its multiplier for the
+        # case's contributions.
+        approach = design.get(
+            "min_approach_temperature",
+            nominal_approach_temperature(
+                self._problem._require_prepared_root_zone().config,
+                float(design.get("dt_cont_multiplier", 1.0)),
+            ),
+        )
+        levels = self._period_level_targets(network)
+        held = frozenset(name for name, duties in (levels or {}).items() if any(duties))
         attempts = [
             *(
-                [
-                    (
-                        with_stream_end_utilities(
-                            self._problem,
-                            network,
-                            approach=DEFAULT_FEASIBILITY_APPROACH,
-                            levels=frozenset(
-                                name for name, duties in levels.items() if any(duties)
-                            ),
-                        ),
-                        {"problem_approach": True, "level_targets": levels},
-                        "hold",
-                    )
-                ]
+                [(approach, held, design | {"level_targets": levels}, "hold")]
                 if levels
                 else []
             ),
-            (padded, {"problem_approach": True}, "approach"),
+            (approach, frozenset(), design, "approach"),
         ]
-        for start, extra, kept in attempts:
+        for pad, placed, extra, kept in attempts:
             try:
-                return self._optimise_duties(start, **extra, **arguments)
+                start = with_stream_end_utilities(
+                    self._problem, network, approach=pad, levels=placed
+                )
+                view = self._optimise_duties(start, **extra, **arguments)
             except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
                 raise
             except (ValueError, RuntimeError) as exc:
                 released = (
                     "hold the design's utility levels in every period"
                     if kept == "hold"
-                    else "keep the case's minimum approach"
+                    else "keep the approach the network was designed to"
                 )
                 fallback = (
                     "the levels are released"
@@ -1916,7 +1934,14 @@ class _DesignAccessor:
                     UserWarning,
                     stacklevel=3,
                 )
-        return self._optimise_duties(padded, **arguments)
+                continue
+            return _with_released_levels(view, levels, held=kept == "hold")
+        padded = with_stream_end_utilities(
+            self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
+        )
+        return _with_released_levels(
+            self._optimise_duties(padded, **arguments), levels, held=False
+        )
 
     def _period_level_targets(self, network) -> dict[str, list[float]] | None:
         """Each utility level's targeted duty in every period of the case.
@@ -1963,6 +1988,18 @@ class _DesignAccessor:
                     float(getattr(target, field_name)[u]) for target in targets
                 ]
         return levels
+
+
+def _with_released_levels(view, levels, *, held: bool):
+    """``view`` with its network recording ``levels`` when the fit released
+    them: ``holds_utility_levels`` then checks the levels the design held
+    against what the fit carries, rather than finding no targets to miss."""
+    network = getattr(view, "selected_network", None)
+    if levels and not held and network is not None:
+        network.source_metadata["utility_level_targets"] = {
+            name: list(duties) for name, duties in levels.items()
+        }
+    return view
 
 
 def _refuse_site_network(network, tool: str) -> None:
