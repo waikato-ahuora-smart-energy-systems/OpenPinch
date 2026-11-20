@@ -915,7 +915,7 @@ class InternalHeatExchangerNetworkProblem:
         if report["time_limited"]:
             logger.warning(
                 "[%s] Heuristic pinch design reached its %g s time limit; "
-                "it keeps the %d networks found so far.",
+                "it keeps the networks found so far: %d.",
                 self.name,
                 backend.HEURISTIC_STAGE_TIME_LIMIT,
                 len(networks),
