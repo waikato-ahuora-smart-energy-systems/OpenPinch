@@ -37,6 +37,7 @@ from ..common.shared import (
     raise_parallel_lifts_to_floor,
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
+    vapour_seed_evaporating_temperatures,
 )
 from ..common.topology import effective_topology
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
@@ -150,7 +151,12 @@ def _get_vc_mvr_opt_setup(
     n_vc = _num_vc_stages(args)
     n_mvr = _num_mvr_stages(args)
     T_cond_seed = _fit_stage_array(init_res.T_cond, n_vc)
-    T_evap_seed = _fit_stage_array(init_res.T_evap[::-1], n_vc)
+    T_evap_seed = _fit_stage_array(
+        vapour_seed_evaporating_temperatures(
+            init_res.T_evap[::-1], args.dt_phase_change
+        ),
+        n_vc,
+    )
     Q_heat_seed = _fit_stage_array(init_res.Q_cond, n_vc)
     # Seed and decode against the same subcritical range as cascade/parallel.
     x_cond = np.clip(
