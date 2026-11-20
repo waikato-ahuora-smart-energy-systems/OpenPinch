@@ -2,9 +2,69 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import heapq
+from collections.abc import Hashable, Iterable, Sequence
+from typing import NamedTuple
 
 from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
+
+
+class StageNode(NamedTuple):
+    """One exchanger placed on the stage axis.
+
+    ``streams`` are the process streams it sits on, ``position`` orders it
+    along each of them (equal positions on a shared stream are parallel
+    branches), and ``order`` breaks ties between independent exchangers.
+    """
+
+    streams: frozenset[Hashable]
+    position: float
+    order: tuple
+
+
+def canonical_stage_indices(nodes: Sequence[StageNode]) -> tuple[int, ...]:
+    """Return a one-based canonical stage for each node.
+
+    Nodes at one position that share a stream form a group, and each group
+    takes a stage of its own. Groups follow every stream's order, and
+    groups free to go next are placed by ``order``. The stages therefore
+    depend only on the order of groups along each stream, not on how
+    independent groups were numbered.
+    """
+
+    groups = _position_groups(nodes)
+    along_stream: dict[Hashable, list[tuple[float, int]]] = {}
+    for group, members in enumerate(groups):
+        position = nodes[members[0]].position
+        for stream in {stream for index in members for stream in nodes[index].streams}:
+            along_stream.setdefault(stream, []).append((position, group))
+    successors: list[set[int]] = [set() for _ in groups]
+    for entries in along_stream.values():
+        entries.sort()
+        for (_, earlier), (_, later) in zip(entries, entries[1:], strict=False):
+            successors[earlier].add(later)
+    predecessors = [0] * len(groups)
+    for following in successors:
+        for group in following:
+            predecessors[group] += 1
+
+    keys = [min(nodes[index].order for index in members) for members in groups]
+    ready = [
+        (keys[group], group) for group in range(len(groups)) if not predecessors[group]
+    ]
+    heapq.heapify(ready)
+    stages = [0] * len(nodes)
+    stage = 0
+    while ready:
+        _, group = heapq.heappop(ready)
+        stage += 1
+        for index in groups[group]:
+            stages[index] = stage
+        for following in successors[group]:
+            predecessors[following] -= 1
+            if not predecessors[following]:
+                heapq.heappush(ready, (keys[following], following))
+    return tuple(stages)
 
 
 def canonical_topology_restrictions(
@@ -15,45 +75,14 @@ def canonical_topology_restrictions(
 ) -> tuple[HeatExchangerNetworkTopologyRestriction, ...]:
     """Return restrictions in canonical grid-stage form.
 
-    Empty recovery-stage gaps are removed. Within each occupied original stage,
-    independent match groups are split into consecutive stages, while matches
-    that share a process hot or cold stream stay in the same canonical stage.
+    Matches that share a process hot or cold stream in one original stage
+    stay in one canonical stage; every other group of matches takes a stage
+    of its own, numbered by ``canonical_stage_indices``. Two numberings that
+    give every stream the same match order therefore give the same result.
+    Streams missing from the given orders sort by name after them.
     """
 
-    canonical, _ = _canonicalise(
-        tuple(restrictions),
-        hot_stream_order=hot_stream_order,
-        cold_stream_order=cold_stream_order,
-    )
-    return canonical
-
-
-def canonical_stage_ends(
-    restrictions: Iterable[HeatExchangerNetworkTopologyRestriction],
-    *,
-    hot_stream_order: Sequence[str] | None = None,
-    cold_stream_order: Sequence[str] | None = None,
-) -> dict[int, int]:
-    """Map each occupied original stage to the last canonical stage it gives,
-    as ``canonical_topology_restrictions`` numbers them."""
-
-    _, ends = _canonicalise(
-        tuple(restrictions),
-        hot_stream_order=hot_stream_order,
-        cold_stream_order=cold_stream_order,
-    )
-    return ends
-
-
-def _canonicalise(
-    values: tuple[HeatExchangerNetworkTopologyRestriction, ...],
-    *,
-    hot_stream_order: Sequence[str] | None,
-    cold_stream_order: Sequence[str] | None,
-) -> tuple[tuple[HeatExchangerNetworkTopologyRestriction, ...], dict[int, int]]:
-    if not values:
-        return (), {}
-
+    values = tuple(restrictions)
     hot_index = _stream_index(
         hot_stream_order,
         (item.source_stream for item in values),
@@ -62,26 +91,23 @@ def _canonicalise(
         cold_stream_order,
         (item.sink_stream for item in values),
     )
-
-    canonical: list[HeatExchangerNetworkTopologyRestriction] = []
-    ends: dict[int, int] = {}
-    next_stage = 1
-    for stage in sorted({item.stage for item in values}):
-        stage_items = [item for item in values if item.stage == stage]
-        components = _connected_match_components(
-            stage_items,
-            hot_index=hot_index,
-            cold_index=cold_index,
-        )
-        for component in components:
-            for item in sorted(
-                component,
-                key=lambda match: _match_order(match, hot_index, cold_index),
-            ):
-                canonical.append(item.model_copy(update={"stage": next_stage}))
-            next_stage += 1
-        ends[stage] = next_stage - 1
-    return tuple(canonical), ends
+    orders = [_match_order(item, hot_index, cold_index) for item in values]
+    stages = canonical_stage_indices(
+        [
+            StageNode(
+                frozenset({("hot", item.source_stream), ("cold", item.sink_stream)}),
+                item.stage,
+                order,
+            )
+            for item, order in zip(values, orders, strict=True)
+        ]
+    )
+    placed = sorted(
+        zip(stages, orders, range(len(values)), strict=True),
+    )
+    return tuple(
+        values[index].model_copy(update={"stage": stage}) for stage, _, index in placed
+    )
 
 
 def canonical_stage_count(
@@ -112,53 +138,26 @@ def topology_restriction_signature(
     )
 
 
-def _connected_match_components(
-    matches: Sequence[HeatExchangerNetworkTopologyRestriction],
-    *,
-    hot_index: dict[str, int],
-    cold_index: dict[str, int],
-) -> tuple[tuple[HeatExchangerNetworkTopologyRestriction, ...], ...]:
-    unvisited = set(range(len(matches)))
-    components: list[tuple[HeatExchangerNetworkTopologyRestriction, ...]] = []
-    while unvisited:
-        root = min(unvisited)
-        stack = [root]
-        unvisited.remove(root)
-        component_indices = []
-        while stack:
-            index = stack.pop()
-            component_indices.append(index)
-            match = matches[index]
-            neighbours = [
-                other_index
-                for other_index in tuple(unvisited)
-                if _matches_conflict(match, matches[other_index])
-            ]
-            for other_index in neighbours:
-                unvisited.remove(other_index)
-                stack.append(other_index)
+def _position_groups(nodes: Sequence[StageNode]) -> list[list[int]]:
+    """Indices of nodes joined by a shared stream at one position."""
 
-        component = tuple(matches[index] for index in component_indices)
-        components.append(component)
+    parent = list(range(len(nodes)))
 
-    return tuple(
-        sorted(
-            components,
-            key=lambda component: min(
-                _match_order(match, hot_index, cold_index) for match in component
-            ),
-        )
-    )
+    def root(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
 
-
-def _matches_conflict(
-    left: HeatExchangerNetworkTopologyRestriction,
-    right: HeatExchangerNetworkTopologyRestriction,
-) -> bool:
-    return (
-        left.source_stream == right.source_stream
-        or left.sink_stream == right.sink_stream
-    )
+    first_at: dict[tuple[float, Hashable], int] = {}
+    for index, node in enumerate(nodes):
+        for stream in node.streams:
+            other = first_at.setdefault((node.position, stream), index)
+            parent[root(index)] = root(other)
+    groups: dict[int, list[int]] = {}
+    for index in range(len(nodes)):
+        groups.setdefault(root(index), []).append(index)
+    return list(groups.values())
 
 
 def _stream_index(
@@ -168,7 +167,7 @@ def _stream_index(
     ordered: list[str] = []
     if preferred_order is not None:
         ordered.extend(str(item) for item in preferred_order)
-    ordered.extend(str(item) for item in fallback_order)
+    ordered.extend(sorted(str(item) for item in fallback_order))
     return {stream: index for index, stream in enumerate(dict.fromkeys(ordered))}
 
 
@@ -186,7 +185,9 @@ def _match_order(
 
 
 __all__ = [
+    "StageNode",
     "canonical_stage_count",
+    "canonical_stage_indices",
     "canonical_topology_restrictions",
     "topology_restriction_signature",
 ]

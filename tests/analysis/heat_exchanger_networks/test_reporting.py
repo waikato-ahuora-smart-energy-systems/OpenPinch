@@ -2477,6 +2477,108 @@ def test_an_end_and_a_staged_heater_on_one_stream_sort_in_a_signature():
     )
 
 
+def _active_structure(recovery, **utilities):
+    network = HeatExchangerNetwork.from_structure(
+        recovery=recovery, hot_utility="HPS", cold_utility="CW", **utilities
+    )
+    return network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger.model_copy(
+                    update={
+                        "period_states": tuple(
+                            state.model_copy(update={"duty": 100.0, "active": True})
+                            for state in exchanger.period_states
+                        )
+                    }
+                )
+                for exchanger in network.exchangers
+            )
+        }
+    )
+
+
+def test_one_network_numbered_two_ways_has_one_signature():
+    """Round 3 review M7: Raw Milk meets Milk Conc. then CIP Water, and Milk
+    Conc. meets Raw Milk then HT Flash, in both; only the stage numbers of
+    the two matches that share no stream differ."""
+    ends = {"heaters": ("MC",), "coolers": ("RM", "HF")}
+    left = _active_structure(
+        (("RM", "MC", 1), ("HF", "MC", 2), ("RM", "CIP", 3)), **ends
+    )
+    right = _active_structure(
+        (("RM", "MC", 1), ("RM", "CIP", 2), ("HF", "MC", 2)), **ends
+    )
+
+    assert network_structure_signature(left) == network_structure_signature(right)
+
+
+def test_a_staged_cooler_keeps_its_place_among_relabelled_stages():
+    """A staged cooler on Raw Milk between its two matches is one network
+    however the independent HT Flash match is numbered, and another network
+    once it sits after both matches."""
+    between = _active_structure(
+        (("RM", "MC", 1), ("HF", "MC", 2), ("RM", "CIP", 3)),
+        coolers=(("RM", "CW", 1),),
+    )
+    relabelled = _active_structure(
+        (("RM", "MC", 1), ("RM", "CIP", 2), ("HF", "MC", 3)),
+        coolers=(("RM", "CW", 1),),
+    )
+    after = _active_structure(
+        (("RM", "MC", 1), ("RM", "CIP", 2), ("HF", "MC", 3)),
+        coolers=(("RM", "CW", 2),),
+    )
+
+    assert network_structure_signature(between) == network_structure_signature(
+        relabelled
+    )
+    assert network_structure_signature(between) != network_structure_signature(after)
+
+
+def _solver_available(solver: str) -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend(solver)
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_solver_available('highs') and _solver_available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_the_four_stream_ranking_lists_each_network_once():
+    """Round 3 review M7: at width 1 and depth 1 the 1.0 and 1.5 multipliers
+    give one network, which used to take ranks 1 and 2."""
+    from OpenPinch import PinchProblem
+
+    view = PinchProblem(
+        "Four-stream-Yee-and-Grossmann-1990-1.json"
+    ).design.heat_exchanger_network(width=1, depth=1)
+
+    def physical(network):
+        # The two copies' duties differ by solver noise (0.0002 kW), so the
+        # exchangers alone tell them apart from every other network here.
+        return tuple(
+            sorted(
+                (exchanger.kind.value, exchanger.source_stream, exchanger.sink_stream)
+                for exchanger in network.exchangers
+                if any(state.active for state in exchanger.period_states)
+            )
+        )
+
+    networks = [physical(outcome.network) for outcome in view.top(5)]
+
+    assert len(networks) == len(set(networks))
+
+
 def test_a_rated_segmented_exchanger_is_judged_with_its_allowance():
     """A segmented exchanger's installed area is compared with its
     period-total segment area; a rated one is widened by its rating
