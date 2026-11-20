@@ -901,8 +901,9 @@ class _DesignAccessor:
         """``network`` in its final form: fitted to every period, then rated.
 
         The one fit and rating path: every network a fitted or overdesigned
-        design admits goes through it. Returns the final view and the fit's
-        view (``None`` without a fit).
+        design admits goes through it. The rating holds the approach the fit
+        held: the design's, or the fallback's after a fit that warned.
+        Returns the final view and the fit's view (``None`` without a fit).
         """
         view = fitted = None
         # Read before the fit: its result is labelled a duty optimisation.
@@ -915,6 +916,12 @@ class _DesignAccessor:
                 solve_tolerance=solve_tolerance,
             )
             network = view.selected_network
+            # A fit at a floor (the design's, or the fallback's when the
+            # design approach could not be kept) sized the areas for it: the
+            # rating holds the same floor.
+            floor = (network.summary_metrics or {}).get("approach_temperature")
+            if floor is not None:
+                approach = {"min_approach_temperature": float(floor)}
         if margin is not None:
             view = self._overdesigned(
                 network,

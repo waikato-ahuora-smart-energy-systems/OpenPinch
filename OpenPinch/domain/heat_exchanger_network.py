@@ -71,8 +71,11 @@ class NetworkOverdesign(BaseModel):
 
     ``mode`` is ``"fixed"`` (the margin given) or ``"optimised"`` (the
     least-cost margin found); ``percentage`` is the margin, ``cost`` and
-    ``cost_without_margin`` the total annual costs with and without it, and
-    ``search`` every ``(percentage, cost)`` point rated.
+    ``cost_without_margin`` the total annual costs with and without it,
+    ``search`` every ``(percentage, cost)`` point rated, and
+    ``failed_margins`` every margin of an ``"optimised"`` search whose rating
+    failed. An optimised 0 % with no positive margin in ``search`` means no
+    positive margin could be rated, not that none pays.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -83,6 +86,7 @@ class NetworkOverdesign(BaseModel):
     cost_without_margin: float
     cost: float
     search: tuple[tuple[float, float], ...] = ()
+    failed_margins: tuple[float, ...] = ()
 
 
 class HeatExchangerNetwork(BaseModel):
