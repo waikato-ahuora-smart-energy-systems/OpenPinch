@@ -36,6 +36,13 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A fixed-structure solve (``optimise_duties``, the fit to every period or
+  an overdesign rating) that Ipopt stopped at ``max_iter`` or
+  ``max_wall_time`` was returned as a plain success with empty diagnostics,
+  at a cost that was not a converged optimum. Its outcome now records
+  ``diagnostics["unconverged_termination"]``; a verified allocation is kept
+  with a ``UserWarning`` to raise the limit in ``HENS_SOLVER_OPTIONS_EVM``,
+  and one that fails verification raises with that advice.
 - ``optimise_duties(objective="rating")`` rated at 1 K when no
   ``min_approach_temperature`` was given, so it failed on the default
   design's own network whenever evolution had closed an approach below 1 K.

@@ -33,6 +33,7 @@ remaining exchanger carries duty. Removed exchangers are named in the result's
 from __future__ import annotations
 
 import math
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -696,9 +697,11 @@ class FixedStructureDutyExecutor:
         except ValueError as exc:
             return _failed_task_outcome(task, str(exc))
         if failures:
+            # An unconverged point that fails verification keeps its
+            # termination, so the error says to raise the solver limit.
             return _failed_task_outcome(
                 task, "verification failed: " + "; ".join(failures)
-            )
+            ).model_copy(update={"diagnostics": _unconverged_diagnostics(model)})
         if task.task_id is not None:
             self.models_by_task_id[task.task_id] = model
         return HeatExchangerNetworkSynthesisTaskOutcome(
@@ -707,6 +710,7 @@ class FixedStructureDutyExecutor:
             network=network,
             objective_value=network.objective_value,
             solver_status=_solver_status(model),
+            diagnostics=_unconverged_diagnostics(model),
         )
 
 
@@ -851,7 +855,29 @@ def heat_exchanger_network_duty_optimisation_service(
         )
 
     workflow_result = run_single_method_workflow(settings, _METHOD, run_method_stage)
+    _warn_if_unconverged(workflow_result.outcomes)
     return finalise_design_result(problem, target_output, workflow_result)
+
+
+def _warn_if_unconverged(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    """Warn when the returned allocation stopped at a solver limit.
+
+    It passed verification, so it is kept (unlike a synthesis task's), but its
+    objective is not a converged optimum.
+    """
+    for outcome in outcomes:
+        termination = outcome.diagnostics.get("unconverged_termination")
+        if outcome.status == "success" and termination is not None:
+            warnings.warn(
+                "the fixed-structure duty optimisation stopped at a solver "
+                f"limit ({termination}) before converging; its duties are "
+                "feasible but may not be optimal. Raise the limit (max_iter or "
+                "max_wall_time for Ipopt) in HENS_SOLVER_OPTIONS_EVM.",
+                UserWarning,
+                stacklevel=2,
+            )
 
 
 def _design_points(exchanger: HeatExchanger, periods) -> dict[int, tuple]:
@@ -1160,6 +1186,13 @@ def _solver_failure(model: Any) -> str:
     solver_run = getattr(model, "solver_run", None)
     reason = getattr(solver_run, "failure_reason", None)
     return str(reason or "solver did not return a successful duty allocation")
+
+
+def _unconverged_diagnostics(model: Any) -> dict[str, str]:
+    solver_run = getattr(model, "solver_run", None)
+    if getattr(solver_run, "converged", True):
+        return {}
+    return {"unconverged_termination": str(solver_run.termination_condition)}
 
 
 def _solver_status(model: Any) -> str:

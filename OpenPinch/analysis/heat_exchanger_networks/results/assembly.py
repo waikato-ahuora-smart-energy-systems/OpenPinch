@@ -185,7 +185,10 @@ def demote_infeasible_outcomes(
     demoted = []
     for outcome in outcomes:
         termination = outcome.diagnostics.get("unconverged_termination")
-        if outcome.status == "success" and termination is not None:
+        # A fixed-structure allocation is verified where it is solved and
+        # has no downstream task: it is kept, and its service warns.
+        fixed = (outcome.task.settings or {}).get("fixed_structure")
+        if outcome.status == "success" and termination is not None and not fixed:
             demoted.append(
                 outcome.model_copy(
                     update={

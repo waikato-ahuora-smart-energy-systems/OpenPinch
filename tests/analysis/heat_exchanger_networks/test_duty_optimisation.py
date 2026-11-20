@@ -21,6 +21,7 @@ from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
     fixed_network_structure,
     heat_exchanger_network_duty_optimisation_service,
 )
+from OpenPinch.analysis.heat_exchanger_networks.errors import WorkflowContractError
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
@@ -923,6 +924,32 @@ def test_executor_reports_solver_failure_after_removals() -> None:
     )
 
 
+def test_executor_records_a_solve_stopped_at_its_limit(monkeypatch) -> None:
+    # A fixed-structure solve that stopped at max_iter or the time limit is
+    # recorded as unconverged, as a synthesis task is.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
+
+    class Unconverged(_ScriptedModel):
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.solver_run = SimpleNamespace(
+                converged=False, termination_condition="maxIterations", status="ok"
+            )
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    Unconverged.calls = []
+    Unconverged.zero_by_call = [set()]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Unconverged).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert outcome.status == "success", outcome.error
+    assert outcome.diagnostics == {"unconverged_termination": "maxIterations"}
+
+
 def test_four_stream_utility_objective_reaches_a_verified_network(
     scipy_backend,
 ) -> None:
@@ -974,6 +1001,35 @@ def test_service_runs_one_recorded_task_through_executor() -> None:
     assert task.stage_count == 2
     assert result.task_id == task.task_id
     assert problem.results.design.task_id == task.task_id
+
+
+def test_service_keeps_an_unconverged_allocation_and_warns() -> None:
+    # The allocation is verified, so it is returned rather than demoted as a
+    # synthesis task is, but with its termination and a warning to raise the
+    # limit: its objective is not a converged optimum.
+    class Unconverged(FakeSynthesisExecutor):
+        def execute(self, tasks, **kwargs):
+            return tuple(
+                outcome.model_copy(
+                    update={"diagnostics": {"unconverged_termination": "maxIterations"}}
+                )
+                for outcome in super().execute(tasks, **kwargs)
+            )
+
+    problem = _four_stream_problem()
+
+    with pytest.warns(UserWarning, match=r"maxIterations.*HENS_SOLVER_OPTIONS_EVM"):
+        result = heat_exchanger_network_duty_optimisation_service(
+            problem,
+            _four_stream_structure(),
+            objective="cost",
+            executor=Unconverged(),
+        )
+
+    assert result.ranked_networks[0].status == "success"
+    assert result.ranked_networks[0].diagnostics == {
+        "unconverged_termination": "maxIterations"
+    }
 
 
 def test_public_accessor_returns_design_view_with_provenance(monkeypatch) -> None:
@@ -1091,6 +1147,50 @@ def test_three_duty_objectives_on_four_stream_case() -> None:
 
 
 @pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_live_solve_stopped_at_max_iter_returns_diagnostics_and_warns() -> None:
+    # Warm-started from a converged allocation, three iterations stay
+    # feasible: the allocation is returned, flagged and warned about.
+    problem = _four_stream_problem()
+    converged = problem.design.optimise_duties(
+        _four_stream_structure(), objective="cost"
+    )
+
+    with pytest.warns(UserWarning, match="before converging"):
+        view = problem.design.optimise_duties(
+            converged.selected_network,
+            objective="cost",
+            options={"HENS_SOLVER_OPTIONS_EVM": {"max_iter": 3}},
+        )
+
+    outcome = view.result.ranked_networks[0]
+    assert outcome.status == "success"
+    assert outcome.diagnostics["unconverged_termination"] == "maxIterations"
+
+
+@pytest.mark.solver
+@_needs_live_solver
+def test_live_unconverged_infeasible_allocation_says_to_raise_the_limit() -> None:
+    # Three iterations end infeasible from zero duties (cost) and when rating
+    # at the installed areas: verification rejects the point and the error
+    # names the solver limit.
+    problem = _four_stream_problem()
+    limited = {"HENS_SOLVER_OPTIONS_EVM": {"max_iter": 3}}
+    converged = problem.design.optimise_duties(
+        _four_stream_structure(), objective="cost"
+    )
+
+    with pytest.raises(WorkflowContractError, match="raise the limit"):
+        problem.design.optimise_duties(
+            _four_stream_structure(), objective="cost", options=limited
+        )
+    with pytest.raises(WorkflowContractError, match="raise the limit"):
+        problem.design.optimise_duties(
+            converged.selected_network, objective="rating", options=limited
+        )
+
+
 @pytest.mark.solver
 @_needs_live_solver
 def test_per_exchanger_minimum_approach_is_enforced() -> None:

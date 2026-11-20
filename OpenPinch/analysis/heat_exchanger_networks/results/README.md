@@ -11,7 +11,7 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 - `recording_active()` (`record.py`): whether any record is installed in the current context.
 - `recording(record, *, finalise=None)` and `running(record, *, finalise=None)` (`record.py`): context managers that install a record; `running` also makes it the run's record and settles its status.
 - `run_record(outcomes)` (`record.py`): the enclosing run's record, or a record of the admissible `outcomes` outside a run.
-- `demote_infeasible_outcomes` (`assembly.py`): marks solver successes that fail `verify_network_feasibility`, or that carry `diagnostics["unconverged_termination"]`, as failed.
+- `demote_infeasible_outcomes` (`assembly.py`): marks solver successes that fail `verify_network_feasibility`, or that carry `diagnostics["unconverged_termination"]`, as failed. A fixed-structure outcome (`task.settings["fixed_structure"]`) that carries it is kept: it was verified where it was solved, and the duty optimisation service warns.
 - `resolve_seed_networks` (`seeds.py`): returns explicit seed networks, or the cached design's selected network followed by its other ranked topologies, up to a limit.
 - `ranked_networks` (`selection.py`): unique ranked outcomes of a result.
 - `network_for_rank` (`selection.py`): network at a one-based rank, without mutation.
