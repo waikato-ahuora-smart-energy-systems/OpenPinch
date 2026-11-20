@@ -1369,13 +1369,22 @@ def _with_pinch_end_stage(name: str, stages: int, restriction: list):
 
 
 def _ipopt_time_limit(options) -> dict[str, float] | None:
-    """The time limit in a HiGHS option set, as Ipopt's ``max_wall_time``;
-    HiGHS's other options do not apply to Ipopt."""
+    """The time limit in a solver's options, under any supported solver's
+    key (``backend.TIME_LIMIT_OPTIONS``, or Ipopt's own), as Ipopt's
+    ``max_wall_time``; the solver's other options do not apply to Ipopt."""
 
     if not isinstance(options, Mapping):
         return None
-    seconds = options.get(backend.TIME_LIMIT_OPTIONS["highs"])
-    return None if seconds is None else {"max_wall_time": float(seconds)}
+    keys = (*dict.fromkeys(backend.TIME_LIMIT_OPTIONS.values()), *_IPOPT_TIME_LIMITS)
+    for key in keys:
+        seconds = options.get(key)
+        if seconds is not None:
+            return {"max_wall_time": float(seconds)}
+    return None
+
+
+# Ipopt's own time limits, wall clock first.
+_IPOPT_TIME_LIMITS = ("max_wall_time", "max_cpu_time")
 
 
 def _with_time_limit(

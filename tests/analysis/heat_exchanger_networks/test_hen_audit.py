@@ -655,6 +655,19 @@ def test_a_reduced_solve_moved_to_ipopt_keeps_its_time_limit(monkeypatch):
     assert configured == {"name": "ipopt-pyomo", "options": {"max_wall_time": 30.0}}
 
 
+@pytest.mark.parametrize(
+    "options",
+    [{"limits/time": 30.0}, {"max_wall_time": 30.0}, {"max_cpu_time": 30.0}],
+    ids=["scip", "ipopt wall", "ipopt cpu"],
+)
+def test_a_reduced_solve_on_ipopt_keeps_any_solvers_time_limit(monkeypatch, options):
+    """The task's limit may be under SCIP's or Ipopt's own key; it still
+    reaches Ipopt as ``max_wall_time``."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+
+    assert unit._ipopt_time_limit(options) == {"max_wall_time": 30.0}
+
+
 def test_empty_stages_go_when_no_stage_reaches_the_threshold(monkeypatch):
     """Twelve stages hold their recovery evenly over eleven (9% each) and
     leave one empty: none reaches the 10% threshold, so stage reduction used
