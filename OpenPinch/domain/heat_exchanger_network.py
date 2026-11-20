@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -55,6 +55,36 @@ _AREA_LABEL_KINDS = {
 }
 
 
+class OverdesignPeriod(BaseModel):
+    """One period's recovery and utility, kW, before and after a margin."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recovery_before: float
+    recovery_after: float
+    utility_before: float
+    utility_after: float
+
+
+class NetworkOverdesign(BaseModel):
+    """An overdesign margin on a network's recovery areas and its effect.
+
+    ``mode`` is ``"fixed"`` (the margin given) or ``"optimised"`` (the
+    least-cost margin found); ``percentage`` is the margin, ``cost`` and
+    ``cost_without_margin`` the total annual costs with and without it, and
+    ``search`` every ``(percentage, cost)`` point rated.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["fixed", "optimised"]
+    percentage: float
+    periods: dict[str, OverdesignPeriod]
+    cost_without_margin: float
+    cost: float
+    search: tuple[tuple[float, float], ...] = ()
+
+
 class HeatExchangerNetwork(BaseModel):
     """Ordered heat exchanger network result collection."""
 
@@ -73,6 +103,9 @@ class HeatExchangerNetwork(BaseModel):
     summary_metrics: dict[str, float | int | str | bool | None] = Field(
         default_factory=dict,
     )
+    # The overdesign margin a rated network carries (``heat_exchanger_network
+    # (overdesign_percentage=...)``); None without one.
+    overdesign: NetworkOverdesign | None = None
     solver_axis_metadata: dict[str, Any] = Field(
         default_factory=dict,
         exclude=True,
@@ -473,4 +506,4 @@ def _require_recovery_label(
         raise ValueError(f"{label.value} is only valid for recovery exchangers")
 
 
-__all__ = ["HeatExchangerNetwork"]
+__all__ = ["HeatExchangerNetwork", "NetworkOverdesign", "OverdesignPeriod"]

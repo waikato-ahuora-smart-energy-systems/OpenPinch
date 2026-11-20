@@ -1325,16 +1325,23 @@ _RATING_SLACK = 1e-6
 def _installed_areas(owner) -> None:
     """Each exchanger's installed area caps its duty in every period."""
 
+    owner.rating_terms = {}
+
     def installed(side, areas, points, count):
         fixed = []
         for e in range(count):
             area = float(areas[e])
-            _cap_installed(
+            caps = _cap_installed(
                 owner,
                 area * (1.0 + _RATING_SLACK),
                 points.get(e, {}),
                 *_unit_terms(owner, side, e),
             )
+            # Per period, the cap's factor per m2 and end approaches, to
+            # compare with verification's exact sizing (``rating_allowances``).
+            owner.rating_terms[(side, e)] = [
+                (factor, thetas) for _constraint, factor, thetas in caps
+            ]
             fixed.append(area)
         return fixed
 
@@ -1777,6 +1784,8 @@ def post_process_fixed_structure(owner) -> None:
     owner.total_area = sum(
         result.area for result in owner.recovery_results + owner.utility_results
     )
+    if owner.minimisation_goal == "rating":
+        owner.rating_allowances = _rating_allowances(owner)
     if owner.minimisation_goal == "retrofit":
         owner.area_values = _area_values(owner)
         owner.rating_allowances = _rating_allowances(owner)

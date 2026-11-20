@@ -60,7 +60,7 @@ def test_an_overdesign_record_holds_every_network_rated_at_the_margin():
 
     _assert_result_is_the_record(view, record)
     for outcome in record.outcomes():
-        assert outcome.network.summary_metrics["overdesign"]["percentage"] == 10.0
+        assert outcome.network.overdesign.percentage == 10.0
     settings = view.result.provenance.effective_settings
     assert settings["HENS_OVERDESIGN_PERCENTAGE"] == 10.0
 

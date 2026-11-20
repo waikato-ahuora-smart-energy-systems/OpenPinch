@@ -2475,3 +2475,27 @@ def test_an_end_and_a_staged_heater_on_one_stream_sort_in_a_signature():
         ("hot_utility", "LPS", "C1", None),
         ("hot_utility", "LPS", "C1", 1),
     )
+
+
+def test_a_rated_segmented_exchanger_is_judged_with_its_allowance():
+    """A segmented exchanger's installed area is compared with its
+    period-total segment area; a rated one is widened by its rating
+    allowance there too, as a single-segment one is."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+        _check_segment_contribution_areas,
+    )
+
+    exchanger = SimpleNamespace(
+        exchanger_id="E1",
+        state=lambda period: SimpleNamespace(active=True),
+        segment_area_contributions=(SimpleNamespace(period="other"),),
+        area=4.0,
+        segment_design_area=4.2,
+    )
+
+    assert _check_segment_contribution_areas([exchanger], "0")
+    assert not _check_segment_contribution_areas(
+        [exchanger], "0", allowances={"E1": 1.1}
+    )

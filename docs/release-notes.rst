@@ -36,6 +36,20 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- **Breaking:** an overdesigned network carries its margin in a typed
+  ``overdesign`` field (``NetworkOverdesign``), no longer in
+  ``summary_metrics["overdesign"]``. Read ``selected_network.overdesign
+  .percentage`` (and ``periods``, ``cost``, ``cost_without_margin``,
+  ``search``) in place of the old dictionary keys. Overdesigned results now
+  reload from JSON; as a nested dictionary in the scalar summary metrics
+  they failed validation.
+- A rating (``optimise_duties(objective="rating")``, overdesign) is
+  verified with each unit's rating allowance: the cap is calibrated with
+  Chen's LMTD at the design point, so off it a unit can carry a few per
+  cent more duty than exact sizing allows, which verification used to
+  reject, dropping the network. The largest allowance is recorded as
+  ``summary_metrics["rating_area_allowance"]``; installed areas are
+  reported unchanged.
 - Stage reduction drops empty stages even when no stage carries enough of
   the recovery to meet its threshold; before, it kept every stage. A
   reduced solve moved from HiGHS to Ipopt keeps the task's time limit, as

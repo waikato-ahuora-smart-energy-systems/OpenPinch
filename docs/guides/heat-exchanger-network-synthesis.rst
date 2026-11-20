@@ -234,16 +234,21 @@ network is then rated over every period at the larger areas: each period's
 duties are re-optimised for the least utility cost, with a bypass where a
 period needs less. ``"optimise"`` chooses the margin, between 0 and
 ``HENS_OVERDESIGN_MAX`` (50 %), for the least total annual cost, from about
-15 rating solves. ``selected_network.summary_metrics["overdesign"]`` reports
-the margin, each period's recovery and utility before and after, the cost
-with and without the margin, and every margin tried, for plotting cost
-against margin. ``design.optimise_duties(network, objective="rating")`` rates
-any network with installed areas the same way.
+15 rating solves. ``selected_network.overdesign`` reports the margin
+(``percentage``), each period's recovery and utility before and after
+(``periods``), the cost with and without the margin (``cost``,
+``cost_without_margin``), and every margin tried (``search``), for plotting
+cost against margin. ``design.optimise_duties(network, objective="rating")``
+rates any network with installed areas the same way. A rating calibrates
+each unit's capacity with Chen's LMTD at its design point, so off that point
+it can credit a few per cent more duty than exact sizing allows; the rated
+network is verified with that allowance, and
+``summary_metrics["rating_area_allowance"]`` records the largest.
 
 .. code-block:: python
 
    design = problem.design.heat_exchanger_network(overdesign_percentage="optimise")
-   design.selected_network.summary_metrics["overdesign"]["percentage"]
+   design.selected_network.overdesign.percentage
 
 The result's provenance records the basis (``HENS_DESIGN_BASIS``, with
 ``basis_period_id`` for a period basis, or ``HENS_BASIS_CLUSTERS``,

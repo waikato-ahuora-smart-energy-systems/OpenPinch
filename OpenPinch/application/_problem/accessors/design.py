@@ -457,7 +457,7 @@ class _DesignAccessor:
         for the least utility cost, with bypass where a period needs less.
         ``"optimise"`` picks the margin, up to ``HENS_OVERDESIGN_MAX`` per
         cent, for the least total annual cost. The result's
-        ``selected_network.summary_metrics["overdesign"]`` reports it.
+        ``selected_network.overdesign`` (``NetworkOverdesign``) reports it.
 
         ``width`` (``HENS_SEARCH_WIDTH``, 0 to 3, default 1) picks the dt_cont
         multipliers: 1.0; 0.75, 1.0 and 1.5; then five and seven values from
@@ -1082,7 +1082,7 @@ class _DesignAccessor:
                 **(approach or self._design_approach(network, hens)),
             ),
         )
-        view.selected_network.summary_metrics["overdesign"] = metrics
+        view.selected_network.overdesign = metrics
         # Rating does not hold the levels: the rated network keeps the ones
         # its design held, to be checked against.
         return _with_released_levels(

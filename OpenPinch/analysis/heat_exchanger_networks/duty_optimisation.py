@@ -672,7 +672,27 @@ class FixedStructureDutyExecutor:
                 task_id=task.task_id,
                 removed=removed,
             )
-            failures = verify_solution(structure, model, network)
+            allowances = getattr(model, "rating_allowances", None)
+            if allowances:
+                # A rating's cap is calibrated with Chen's LMTD at the design
+                # point; off it, exact sizing can need a little more area. It
+                # is judged as the model rated it, as retrofit does, and the
+                # largest allowance is recorded.
+                network.summary_metrics["rating_area_allowance"] = max(
+                    allowances.values()
+                )
+                network.source_metadata["rating_area_allowances"] = {
+                    exchanger.exchanger_id: allowances.get(slot, 1.0)
+                    for exchanger, slot in zip(
+                        network.exchangers, structure.slots, strict=True
+                    )
+                    if exchanger.exchanger_id is not None
+                }
+                failures = verify_solution(
+                    structure, model, _with_allowances(network, structure, allowances)
+                )
+            else:
+                failures = verify_solution(structure, model, network)
         except ValueError as exc:
             return _failed_task_outcome(task, str(exc))
         if failures:
@@ -688,6 +708,31 @@ class FixedStructureDutyExecutor:
             objective_value=network.objective_value,
             solver_status=_solver_status(model),
         )
+
+
+def _with_allowances(
+    network: HeatExchangerNetwork,
+    structure: FixedNetworkStructure,
+    allowances: Mapping[tuple[str, int], float],
+) -> HeatExchangerNetwork:
+    """``network`` with each exchanger's area widened by its rating
+    allowance (``FixedStructureModel.rating_allowances``), for verification
+    only: the reported areas stay as installed."""
+
+    return network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger
+                if exchanger.area is None
+                else exchanger.model_copy(
+                    update={"area": exchanger.area * allowances.get(slot, 1.0)}
+                )
+                for exchanger, slot in zip(
+                    network.exchangers, structure.slots, strict=True
+                )
+            )
+        }
+    )
 
 
 def verify_solution(
