@@ -36,6 +36,15 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A credit (negative) price for a cold utility level no longer makes a
+  total site design fail. The credit paid for any steam dumped, so buying
+  steam, letting it down and dumping it earned without limit; a level with
+  a credit now dumps no more than the processes raise on it.
+- Heat pump retrofit targets price each side at the utilities the
+  network's heaters (or coolers) use, duty-weighted, not at the first one
+  listed; a dearer utility listed first overstated the operating cost.
+- A Carnot heat pump in a retrofit pays ``new_unit_cost`` for its
+  evaporator and condenser, as any new exchanger does.
 - Evolution sizes a split branch of a segmented stream on its solved
   flow split. The branch-share fix for split segmented streams used each
   match's share of the stage duty, which equals its flow share only when

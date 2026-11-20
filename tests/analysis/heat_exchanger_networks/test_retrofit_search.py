@@ -1137,7 +1137,11 @@ def test_a_heat_pump_step_is_priced_by_its_capacity_and_exchanger_area(
     assert pump.repiped_streams == (pump.hot_stream, pump.cold_stream)
     assert pump.heat_pump_capacity == pytest.approx(100.0)
     assert pump.heat_pump_cop > 1.0
-    assert pump.fixed_cost == pytest.approx(300.0 * 100.0 + 2 * 1_000.0)
+    # The compressor at its capacity, the evaporator and condenser as new
+    # exchangers, and the two repiped streams.
+    assert pump.fixed_cost == pytest.approx(
+        300.0 * 100.0 + 2 * COSTS["new_unit_cost"] + 2 * 1_000.0
+    )
     assert (pump.added_area, pump.utility_area) == (NEW_UNIT_AREA, NEW_UNIT_AREA)
     assert pump.area_cost == pytest.approx(AREA_COST * 2 * NEW_UNIT_AREA)
     exchangers = {e.exchanger_id: e for e in design.network.exchangers}
@@ -1166,6 +1170,7 @@ def test_design_retrofit_rates_carnot_heat_pumps_with_the_hpr_efficiency(fake_so
             max_modifications=1,
             heat_pump_cycle="carnot",
             heat_pump_cost=300.0,
+            new_unit_cost=0.0,
             options={"HPR_ETA_II_CARNOT": eta_ii},
         )
         (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]

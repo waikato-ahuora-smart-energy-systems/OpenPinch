@@ -382,3 +382,36 @@ def test_a_bare_stream_name_two_zones_share_is_refused_by_the_targets():
     assert _process_stream(streams, "C1") == "cold"
     with pytest.raises(ValueError, match="'H1'.*A.H1.*B.H1"):
         _process_stream(streams, "H1")
+
+
+def test_a_target_is_priced_at_the_utilities_the_network_uses(monkeypatch):
+    """A dearer hot utility listed first is not the one a heat pump saves:
+    each side is priced at the duty-weighted utilities its heaters (or
+    coolers) use, not at the first listed."""
+    import copy
+
+    from OpenPinch.analysis.heat_exchanger_networks.context import (
+        ensure_target_results,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        annual_cost_scales,
+    )
+
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", lambda **_k: None
+    )
+    source = json.loads(read_sample_case(CASE))
+    hot = next(u for u in source["utilities"] if u["name"] == "HU")
+    dear = copy.deepcopy(hot) | {"name": "HU dear"}
+    dear["price"] = {"value": 500.0, "unit": hot["price"]["unit"]}
+    source["utilities"].insert(0, dear)
+    problem = PinchProblem(source)
+    ensure_target_results(problem, {}, None)
+
+    piped = heat_pump_targets.retrofit_heat_pumps(problem, _solved_network()).as_piped
+
+    scale, _capital = annual_cost_scales(problem.master_zone.config.costing)
+    assert piped.hot_utility_price == pytest.approx(40.68 * scale)

@@ -117,12 +117,12 @@ class RetrofitSettings:
     evaporator at the end of a hot stream and a condenser at the end of a
     cold one, rated by the HPR service's cycle models, with work at
     ``COSTING_HPR_ELE_PRICE``. "carnot" rates them with
-    ``HPR_ETA_II_CARNOT``, pricing the exchangers' area like any new
-    exchanger's and the compressor and its package at ``heat_pump_cost``
-    ($ per kW of condenser capacity). "vapour_compression" rates them with a
-    single stage on the best of ``HPR_REFRIGERANTS`` within the HPR cycle
-    limits, and prices the whole machine with the HPR service's installed
-    capital.
+    ``HPR_ETA_II_CARNOT``, pricing the evaporator and condenser like any new
+    exchanger (``new_unit_cost`` and their area) and the compressor and its
+    package at ``heat_pump_cost`` ($ per kW of condenser capacity).
+    "vapour_compression" rates them with a single stage on the best of
+    ``HPR_REFRIGERANTS`` within the HPR cycle limits, and prices the whole
+    machine with the HPR service's installed capital.
 
     ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened
@@ -1108,8 +1108,12 @@ class _Evaluator:
                 logger.debug("Heat pump %s not priced: %s", move.heat_pump, exc)
                 return None
         elif move.kind == "heat_pump":
+            # The compressor at its capacity; the evaporator and condenser
+            # are new exchangers, as any new match is.
             added = float(result.added_area)
-            fixed = settings.heat_pump_cost * utility.max_duty
+            fixed = (
+                settings.heat_pump_cost * utility.max_duty + 2 * settings.new_unit_cost
+            )
         elif move.kind == "enhancement":
             added = 0.0
             fixed = (

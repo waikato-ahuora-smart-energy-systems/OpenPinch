@@ -52,14 +52,15 @@ def retrofit_heat_pumps(
         ),
         "as_piped": as_piped_profiles(problem, network),
     }
-    # Prices in $/kW/y as the retrofit's: the first hot and cold utility,
+    # Prices in $/kW/y as the retrofit's: each side at the utilities the
+    # network's heaters (or coolers) use, duty-weighted, in the first period;
     # and the HPR electricity price.
     config = zone.config
-    data = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont).arrays
+    arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
     price_scale, _capital = annual_cost_scales(config.costing)
     prices = {
-        "hot_utility_price": float(data["hu_cost_period"][0][0]),
-        "cold_utility_price": float(data["cu_cost_period"][0][0]),
+        "hot_utility_price": _utility_price(arrays, network, "hot"),
+        "cold_utility_price": _utility_price(arrays, network, "cold"),
         "electricity_price": float(config.costing.hpr_ele_price) * price_scale,
     }
     # The first period, whose states the as-piped profiles and prices take.
@@ -77,6 +78,36 @@ def retrofit_heat_pumps(
         )
         targets[name] = _summary(result, H_hot, H_cold, prices)
     return RetrofitHeatPumpTargets(**targets)
+
+
+def _utility_price(arrays, network: HeatExchangerNetwork, side: str) -> float:
+    """A side's utility price, $/kW/y: its heaters' (``"hot"``) or coolers'
+    utilities weighted by their first-period duties; with none in use, the
+    side's cheapest utility."""
+
+    hot = side == "hot"
+    axis = arrays.axis_maps["hot_utilities" if hot else "cold_utilities"]
+    costs = arrays.arrays["hu_cost_period" if hot else "cu_cost_period"][0]
+    kind = HeatExchangerKind.HOT_UTILITY if hot else HeatExchangerKind.COLD_UTILITY
+    duty: dict[str, float] = {}
+    for exchanger in network.exchangers:
+        if exchanger.kind != kind:
+            continue
+        name = exchanger.source_stream if hot else exchanger.sink_stream
+        index = axis.get(name)
+        if index is None:
+            index = next(
+                (u for key, u in axis.items() if key.rsplit(".", 1)[-1] == name), None
+            )
+        if index is None:
+            continue
+        duty[index] = duty.get(index, 0.0) + max(
+            0.0, float(exchanger.period_states[0].duty)
+        )
+    total = sum(duty.values())
+    if total <= 0.0:
+        return float(min(costs))
+    return float(sum(float(costs[u]) * q for u, q in duty.items()) / total)
 
 
 def _solved(network: HeatExchangerNetwork) -> bool:
