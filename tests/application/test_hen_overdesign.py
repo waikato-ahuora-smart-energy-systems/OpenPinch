@@ -194,3 +194,94 @@ def test_overdesign_keeps_a_network_designed_below_1_k():
     assert margined.selected_network.total_annual_cost == pytest.approx(
         plain.selected_network.total_annual_cost, rel=1e-4
     )
+
+
+def test_a_fitted_network_is_rated_at_its_designs_approach(monkeypatch):
+    """The fit's result is labelled as a duty optimisation; rating it for
+    overdesign keeps the approach the synthesised network was designed to,
+    read before the fit, not the evolution floor its label suggests."""
+    from types import SimpleNamespace
+
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+
+    designed = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="designed",
+        method="PDM",
+        summary_metrics={"dt_cont_multiplier": 0.75},
+    )
+    fitted = HeatExchangerNetwork(
+        exchangers=(), run_id="fitted", method="network_evolution_method"
+    )
+    seen = {}
+    monkeypatch.setattr(
+        _DesignAccessor,
+        "_fit_to_all_periods",
+        lambda self, network, **kwargs: SimpleNamespace(selected_network=fitted),
+    )
+
+    def overdesigned(self, network, margin, **kwargs):
+        seen.update(network=network, approach=kwargs.get("approach"))
+        return "rated"
+
+    monkeypatch.setattr(_DesignAccessor, "_overdesigned", overdesigned)
+    problem = _two_period_problem()
+
+    problem.design._finalise_network(
+        designed,
+        fit=True,
+        margin=0.0,
+        hens=problem.design._effective_hens(None),
+        options=None,
+        solver=None,
+        solve_tolerance=None,
+    )
+
+    assert seen["network"] is fitted
+    assert seen["approach"] == {"problem_approach": True, "dt_cont_multiplier": 0.75}
+
+
+def test_a_scaled_pinch_design_keeps_each_streams_contribution():
+    """At a multiplier other than 1 a pinch design network keeps each
+    stream's own contribution scaled by it, as synthesis does, not one
+    nominal approach for every exchanger."""
+    problem = _two_period_problem()
+    network = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="designed",
+        method="PDM",
+        summary_metrics={"dt_cont_multiplier": 0.75},
+    )
+
+    approach = problem.design._design_approach(
+        network, problem.design._effective_hens(None)
+    )
+
+    assert approach == {"problem_approach": True, "dt_cont_multiplier": 0.75}
+
+
+def test_a_duty_optimisation_builds_its_arrays_at_the_requested_multiplier():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        duty_optimisation_task,
+    )
+
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", problem_approach=True, dt_cont_multiplier=0.75
+    )
+
+    settings = SimpleNamespace(
+        run_id="run",
+        dt_cont_multipliers=(1.0,),
+        problem_id=None,
+        workspace_variant=None,
+        period_id=None,
+    )
+
+    task = duty_optimisation_task(request, settings)
+
+    assert task.dt_cont_multiplier == pytest.approx(0.75)

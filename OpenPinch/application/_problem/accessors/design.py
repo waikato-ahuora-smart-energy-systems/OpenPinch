@@ -753,11 +753,11 @@ class _DesignAccessor:
         """The minimum approach ``network``'s method designed it to, as
         duty optimisation arguments.
 
-        A pinch design network keeps its streams' contributions at its
-        dt_cont multiplier: the case's own at 1, else twice
-        ``THERMAL_DT_CONT`` times the multiplier. The thermal derivative and
-        evolution steps design down to 0.1 K, or ``hens``'s
-        ``min_exchanger_approach_share`` of that if larger.
+        The thermal derivative and evolution steps design down to 0.1 K, or
+        ``hens``'s ``min_exchanger_approach_share`` of twice
+        ``THERMAL_DT_CONT`` times the multiplier if larger. Any other network
+        (a pinch design, or one of unknown method) keeps each stream's own
+        contribution scaled by its dt_cont multiplier, as synthesis does.
         """
         from ....analysis.heat_exchanger_networks.solver.arrays import (
             nominal_approach_temperature,
@@ -772,15 +772,14 @@ class _DesignAccessor:
         root = self._problem._require_prepared_root_zone()
         nominal = nominal_approach_temperature(root.config, multiplier)
         if network.method in {
-            "PDM",
-            HeatExchangerNetworkDesignMethod.PinchDesign.value,
-            HeatExchangerNetworkDesignMethod.HeuristicPinchDesign.value,
+            "TDM",
+            "ESM",
+            HeatExchangerNetworkDesignMethod.ThermalDerivative.value,
+            HeatExchangerNetworkDesignMethod.NetworkEvolution.value,
         }:
-            if multiplier == 1.0:
-                return {"problem_approach": True}
-            return {"min_approach_temperature": nominal}
-        share = float(hens.min_exchanger_approach_share)
-        return {"min_approach_temperature": max(0.1, share * nominal)}
+            share = float(hens.min_exchanger_approach_share)
+            return {"min_approach_temperature": max(0.1, share * nominal)}
+        return {"problem_approach": True, "dt_cont_multiplier": multiplier}
 
     def _effective_hens(self, options):
         """The HENS configuration a call runs with: its options over the stored."""
@@ -897,6 +896,8 @@ class _DesignAccessor:
         view (``None`` without a fit).
         """
         view = fitted = None
+        # Read before the fit: its result is labelled a duty optimisation.
+        approach = self._design_approach(network, hens)
         if fit:
             view = fitted = self._fit_to_all_periods(
                 network,
@@ -913,6 +914,7 @@ class _DesignAccessor:
                 options=options,
                 solver=solver,
                 solve_tolerance=solve_tolerance,
+                approach=approach,
             )
         return view, fitted
 
@@ -1046,8 +1048,14 @@ class _DesignAccessor:
         self._problem._results.design = view.result
         return view
 
-    def _overdesigned(self, network, margin, *, hens, options, solver, solve_tolerance):
-        """The rating of ``network`` at ``margin``, its metrics on the network."""
+    def _overdesigned(
+        self, network, margin, *, hens, options, solver, solve_tolerance, approach=None
+    ):
+        """The rating of ``network`` at ``margin``, its metrics on the network.
+
+        ``approach`` is the design approach to rate at (``_design_approach``
+        of the synthesised network); by default ``network``'s own.
+        """
         from ....analysis.heat_exchanger_networks.overdesign import apply_overdesign
 
         view, metrics = apply_overdesign(
@@ -1062,7 +1070,7 @@ class _DesignAccessor:
                 options=options,
                 solver=solver,
                 solve_tolerance=solve_tolerance,
-                **self._design_approach(network, hens),
+                **(approach or self._design_approach(network, hens)),
             ),
         )
         view.selected_network.summary_metrics["overdesign"] = metrics
@@ -1791,6 +1799,7 @@ class _DesignAccessor:
         solve_tolerance=None,
         problem_approach: bool = False,
         level_targets: Mapping[str, Sequence[float]] | None = None,
+        dt_cont_multiplier: float | None = None,
     ) -> HeatExchangerNetworkDesignView:
         """``optimise_duties`` on a network; ``problem_approach`` keeps the
         ``"cost"`` objective at the case's minimum approach, not 1 K, and
@@ -1822,6 +1831,7 @@ class _DesignAccessor:
             workspace_variant=None,
             problem_approach=problem_approach,
             level_targets=level_targets,
+            dt_cont_multiplier=dt_cont_multiplier,
         )
 
     def _fit_to_all_periods(
