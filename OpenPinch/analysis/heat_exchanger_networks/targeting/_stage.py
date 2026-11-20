@@ -120,8 +120,19 @@ def build_seeded_quality_tasks(
         )
         dt_cont_multiplier = dt_cont_multiplier_from_network(network, settings)
         signature = topology_restriction_signature(restrictions)
+        stage_count = canonical_stage_count(restrictions)
         # A site seed holds each process's levels; its tasks hold them too.
         site_processes = network.source_metadata.get("site_processes")
+        if site_processes is not None:
+            # Staged heaters and coolers sit between stages only, so an
+            # empty stage at each end leaves room for a cooler before the
+            # first recovery stage (steam raised from a hot stream's hottest
+            # part) and a heater after the last.
+            restrictions = tuple(
+                restriction.model_copy(update={"stage": restriction.stage + 1})
+                for restriction in restrictions
+            )
+            stage_count += 2
         task_settings = (
             {} if site_processes is None else {"site_processes": site_processes}
         )
@@ -140,7 +151,7 @@ def build_seeded_quality_tasks(
                     method=method,
                     dt_cont_multiplier=dt_cont_multiplier,
                     derivative_threshold=derivative_threshold,
-                    stage_count=canonical_stage_count(restrictions),
+                    stage_count=stage_count,
                     problem_id=settings.problem_id,
                     workspace_variant=settings.workspace_variant,
                     period_id=settings.period_id,

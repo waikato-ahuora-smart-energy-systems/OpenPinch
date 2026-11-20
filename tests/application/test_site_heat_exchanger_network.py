@@ -515,3 +515,55 @@ def test_a_stored_overdesign_margin_does_not_reach_the_process_designs(monkeypat
 
     assert seen
     assert all(options["HENS_OVERDESIGN_PERCENTAGE"] is None for options in seen)
+
+
+def _main_site() -> PinchProblem:
+    """Cooling raises 52.6 kW of LP from H3's hot end, limited by the LP
+    main's temperature (a utility pinch), not a process pinch; Heating uses
+    40 kW of LP."""
+    return PinchProblem(
+        source={
+            "streams": [
+                _stream("Heating", "H2", 100.0, 70.0, 30.0),
+                _stream("Heating", "C1", 60.0, 130.0, 70.0),
+                _stream("Cooling", "H3", 200.0, 60.0, 140.0),
+                _stream("Cooling", "C2", 50.0, 120.0, 70.0),
+            ],
+            "utilities": [
+                _utility("LP", "Hot", 140.0, 139.9, 60.0),
+                _utility("LP", "Cold", 139.9, 140.0, 1.0),
+                _utility("HPS", "Hot", 250.0, 249.9, 80.0),
+                _utility("CW", "Cold", 20.0, 25.0, 5.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [
+                    {"name": zone, "type": "Process Zone"}
+                    for zone in ("Heating", "Cooling")
+                ],
+            },
+        }
+    )
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_the_level_held_seed_raises_steam_from_a_hot_streams_hottest_part():
+    """The level-held seed raises LP from H3 before its recovery match. Its
+    canonical stages put that match in stage 1, and staged coolers sit only
+    between stages, so the seed's task needs an empty stage at each end;
+    without one its first model was infeasible, and the site imported all
+    its LP."""
+    view = _main_site().design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1, "HENS_MAX_PARALLEL": 1}
+    )
+
+    balance = {
+        row.level: row
+        for row in view.selected_network.source_metadata[
+            "site_utility_balance"
+        ].balances
+    }
+    assert balance["LP"].generation == pytest.approx(52.6, abs=0.1)
+    assert balance["LP"].imported == pytest.approx(0.0, abs=0.1)
