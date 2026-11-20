@@ -301,3 +301,68 @@ def test_a_level_held_seed_takes_no_held_network_from_a_smaller_multiplier():
         if "recovery:A.H3->A.C1:S1" in {e.exchanger_id for e in seed.exchangers}
     ]
     assert held_multipliers == [0.75]
+
+
+def _staged_cooler(hot: str, utility: str, stage: int, duty: float) -> HeatExchanger:
+    return _cooler(hot, utility, duty).model_copy(
+        update={
+            "exchanger_id": f"cold-utility:{hot}->{utility}:S{stage}",
+            "stage": stage,
+        }
+    )
+
+
+IP, LP = "Cold Utility.IP", "Cold Utility.LP"
+
+
+def _raising_network() -> HeatExchangerNetwork:
+    """H1 raises IP then LP steam between its recovery matches (stages 1
+    and 5), and cools on CW at its end."""
+    return _network(
+        [
+            _recovery("A.H1", "A.C1", 1),
+            _recovery("A.H1", "A.C2", 5),
+            _staged_cooler("A.H1", IP, 3, 20.0),
+            _staged_cooler("A.H1", LP, 4, 10.0),
+            _cooler("A.H1", CW, 4.0),
+        ],
+        stages=5,
+        targets={IP: [20.0], LP: [10.0], CW: [4.0]},
+    )
+
+
+def test_a_site_seed_keeps_each_processs_staged_heaters_and_coolers():
+    """The staged coolers fix where H1's levels sit between its matches, so
+    the seed keeps them; the end cooler is the evolution's to place."""
+    (seed,) = site_seeds({"A": (_raising_network(),)})
+
+    assert {e.exchanger_id for e in seed.exchangers} == {
+        "recovery:A.H1->A.C1:S1",
+        "recovery:A.H1->A.C2:S5",
+        f"cold-utility:A.H1->{IP}:S3",
+        f"cold-utility:A.H1->{LP}:S4",
+    }
+
+
+def test_a_site_task_keeps_a_stage_boundary_for_each_staged_unit():
+    """A stream runs at most one staged cooler at a stage boundary, so H1's
+    two coolers need two boundaries between its recovery matches. The
+    task's canonical stages drop empty stages, but not those."""
+    from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+        workflow_settings_from_problem,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+        build_seeded_network_evolution_method_tasks,
+    )
+    from tests.application.test_site_heat_exchanger_network import _site
+
+    (seed,) = site_seeds({"A": (_raising_network(),)})
+
+    (task,) = build_seeded_network_evolution_method_tasks(
+        workflow_settings_from_problem(_site()), [seed]
+    )
+
+    stages = {r.sink_stream: r.stage for r in task.topology_restrictions}
+    assert set(stages) == {"A.C1", "A.C2"}
+    assert stages["A.C2"] - stages["A.C1"] >= 2
+    assert task.stage_count > stages["A.C2"]

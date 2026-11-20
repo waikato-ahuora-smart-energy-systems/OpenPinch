@@ -36,6 +36,22 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A total site design with ``levels="placed"`` carried utility
+  placement's fallback ``HU`` and ``CU`` into the design: on the unit test
+  site, two levels sent all cooling to a -30 C cooler priced as cooling
+  water, and three levels added a 300 C heater as a fourth level. The placed
+  case now keeps the case's own utility that placement priced the fallback
+  as (here cooling water at 20 to 25 C, or HPS), and a count fails as
+  infeasible when the case has no such utility. Placed levels closer than
+  1 K at every temperature are one level: the case keeps the first.
+- A site network could not be designed when a process stream held two
+  utility levels between its recovery matches (for example a hot stream
+  raising steam on two placed mains), as the placed steam-main site does
+  with ``levels="placed"``. A stream runs at most one staged heater or
+  cooler at a stage boundary, and the site seed dropped the empty stages
+  that gave the second one room. Site seeds now carry each process's staged
+  heaters and coolers, and the site's evolution tasks keep a stage boundary
+  for each.
 - Heuristic-only pinch design (width 0, depth 0) took 21 minutes on the
   packaged ``pulp_mill`` case. Almost all of it (1,141 of 1,180 s) was
   the below-pinch side: each of its 50 proposals was solved holding the

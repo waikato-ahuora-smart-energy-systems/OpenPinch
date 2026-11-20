@@ -112,17 +112,19 @@ def build_seeded_quality_tasks(
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     seen: set[tuple] = set()
     for seed_index, network in enumerate(seed_networks):
-        restrictions = canonical_topology_restrictions(
-            topology_restrictions_from_network(
-                network,
-                downstream_method=method,
-            )
+        restrictions = topology_restrictions_from_network(
+            network,
+            downstream_method=method,
         )
-        dt_cont_multiplier = dt_cont_multiplier_from_network(network, settings)
-        signature = topology_restriction_signature(restrictions)
-        stage_count = canonical_stage_count(restrictions)
         # A site seed holds each process's levels; its tasks hold them too.
         site_processes = network.source_metadata.get("site_processes")
+        if site_processes is None:
+            restrictions = canonical_topology_restrictions(restrictions)
+            stage_count = canonical_stage_count(restrictions)
+        else:
+            restrictions, stage_count = _site_stages(network, restrictions)
+        dt_cont_multiplier = dt_cont_multiplier_from_network(network, settings)
+        signature = topology_restriction_signature(restrictions)
         if site_processes is not None:
             # Staged heaters and coolers sit between stages only, so an
             # empty stage at each end leaves room for a cooler before the
@@ -161,3 +163,37 @@ def build_seeded_quality_tasks(
                 )
             )
     return tuple(tasks)
+
+
+def _site_stages(network: HeatExchangerNetwork, restrictions) -> tuple[tuple, int]:
+    """A site seed's canonical recovery restrictions and stage count.
+
+    A stream runs at most one staged heater or cooler at a stage boundary,
+    so a stream holding two levels between its recovery matches needs two
+    boundaries there. The seed's staged units each keep a canonical stage
+    of their own (in order with the matches), and are then dropped: the
+    task places its staged units itself.
+    """
+    from ....contracts.synthesis.topology import (
+        HeatExchangerNetworkTopologyRestriction,
+    )
+    from ....domain.enums import HeatExchangerKind
+
+    staged = tuple(
+        HeatExchangerNetworkTopologyRestriction(
+            source_stream=exchanger.source_stream,
+            sink_stream=exchanger.sink_stream,
+            stage=exchanger.stage,
+            duty=max(state.duty for state in exchanger.period_states),
+        )
+        for exchanger in network.exchangers
+        if exchanger.kind is not HeatExchangerKind.RECOVERY
+        and exchanger.stage is not None
+        and any(state.active for state in exchanger.period_states)
+    )
+    canonical = canonical_topology_restrictions(restrictions + staged)
+    matches = {(r.source_stream, r.sink_stream) for r in restrictions}
+    return (
+        tuple(r for r in canonical if (r.source_stream, r.sink_stream) in matches),
+        canonical_stage_count(canonical),
+    )
