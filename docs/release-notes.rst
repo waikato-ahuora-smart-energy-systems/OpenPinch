@@ -36,6 +36,10 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Stage reduction drops empty stages even when no stage carries enough of
+  the recovery to meet its threshold; before, it kept every stage. A
+  reduced solve moved from HiGHS to Ipopt keeps the task's time limit, as
+  Ipopt's ``max_wall_time``; before, it ran with no options.
 - A credit (negative) price for a cold utility level no longer makes a
   total site design fail. The credit paid for any steam dumped, so buying
   steam, letting it down and dumping it earned without limit; a level with

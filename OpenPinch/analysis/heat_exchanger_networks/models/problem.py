@@ -1095,6 +1095,9 @@ class InternalHeatExchangerNetworkProblem:
         active_stages = self._get_active_stages(
             case, threshold=0.0 if empty_only else None
         )
+        if not active_stages:
+            # No stage reaches the threshold: still drop the empty ones.
+            active_stages = self._get_active_stages(case, threshold=0.0)
         if not active_stages or len(active_stages) == case.S:
             return case
 
@@ -1197,7 +1200,11 @@ class InternalHeatExchangerNetworkProblem:
 
         if f_case.solver == "highs" and not f_case.m.is_linear():
             f_case.solver = "ipopt-pyomo"
-            f_case.solver_run = backend.configure_pyomo_solver(f_case.m, f_case.solver)
+            f_case.solver_run = backend.configure_pyomo_solver(
+                f_case.m,
+                f_case.solver,
+                solver_options=_ipopt_time_limit(getattr(case, "solver_options", None)),
+            )
         f_case.TAC_model = case.TAC_model
         f_case.TAC = case.TAC
         f_case.solve_time = case.solve_time
@@ -1359,6 +1366,16 @@ def _with_pinch_end_stage(name: str, stages: int, restriction: list):
         for row in recovery
     ]
     return stages + 1, [recovery, heaters, coolers]
+
+
+def _ipopt_time_limit(options) -> dict[str, float] | None:
+    """The time limit in a HiGHS option set, as Ipopt's ``max_wall_time``;
+    HiGHS's other options do not apply to Ipopt."""
+
+    if not isinstance(options, Mapping):
+        return None
+    seconds = options.get(backend.TIME_LIMIT_OPTIONS["highs"])
+    return None if seconds is None else {"max_wall_time": float(seconds)}
 
 
 def _with_time_limit(
