@@ -75,6 +75,18 @@ Heat exchanger network synthesis
   total site design fail. The credit paid for any steam dumped, so buying
   steam, letting it down and dumping it earned without limit; a level with
   a credit now dumps no more than the processes raise on it.
+- A total site whose steam credits exceed its purchases can be designed.
+  Its net utility cost, and so its total annual cost (the evolution
+  objective), is negative, and every solve with a negative objective was
+  marked failed, so ``total_site_heat_exchanger_network`` raised (the unit
+  site with LP steam raised at -200 $/MWh). A model that costs a site
+  utility balance now accepts a negative objective; other models still
+  reject one. ``HeatExchangerNetwork``, the network input contract and the
+  synthesis method output and result accept a negative (finite)
+  ``objective_value``, ``total_annual_cost`` and ``utility_cost``;
+  ``capital_cost`` stays non-negative. A site level move whose net utility
+  cost came back at solver noise below zero (-1.1e-05 $/y) is no longer
+  logged as failed.
 - Heat pump retrofit targets price each side at the utilities the
   network's heaters (or coolers) use, duty-weighted, not at the first one
   listed; a dearer utility listed first overstated the operating cost.

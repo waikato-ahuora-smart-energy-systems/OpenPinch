@@ -13,7 +13,7 @@ from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .common import (
     HeatExchangerNetworkSynthesisManifest,
     SynthesisTaskStatus,
-    _validate_non_negative_finite,
+    _validate_finite,
     _validate_optional_identity,
     _validate_positive_finite,
     _validate_run_id,
@@ -140,7 +140,7 @@ class HeatExchangerNetworkSynthesisMethodOutput(BaseModel):
     def _validate_objective_value(cls, value: float | None) -> float | None:
         if value is None:
             return value
-        return _validate_non_negative_finite(value)
+        return _validate_finite(value)
 
     @field_validator("solver_status", "error")
     @classmethod

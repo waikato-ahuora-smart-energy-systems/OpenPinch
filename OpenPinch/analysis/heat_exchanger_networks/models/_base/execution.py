@@ -94,7 +94,10 @@ def _solve_and_post_process(model, print_output: bool) -> None:
         logger.log(failure_level, "[Failed] [model: %s] [path: %s]", model.name, path)
     elif status == 1:
         objective = model.solver_run.objective_value
-        if objective is None or objective + model.tol < 0:
+        # A site model costs its net utility balance, which steam credits
+        # can make negative; no other model's objective can be.
+        signed = getattr(model, "site_utilities", None) is not None
+        if objective is None or (not signed and objective + model.tol < 0):
             model.mSuccess = 0
             model.solver_run = backend.SolverRun(
                 name=model.solver_run.name,

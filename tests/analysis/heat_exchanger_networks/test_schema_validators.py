@@ -180,10 +180,16 @@ def test_method_output_fills_method_from_task_and_validates_optional_fields():
     )
     assert empty_objective.objective_value is None
 
-    with pytest.raises(ValidationError, match="non-negative"):
+    # A site network's objective, its net utility cost, may be negative.
+    signed = HeatExchangerNetworkSynthesisMethodOutput(
+        status="success",
+        objective_value=-75481.0,
+    )
+    assert signed.objective_value == -75481.0
+    with pytest.raises(ValidationError, match="must be finite"):
         HeatExchangerNetworkSynthesisMethodOutput(
             status="failed",
-            objective_value=-1.0,
+            objective_value=math.nan,
         )
     with pytest.raises(ValidationError, match="identity fields"):
         HeatExchangerNetworkSynthesisMethodOutput(
@@ -214,6 +220,12 @@ def test_synthesis_result_validates_objectives_and_empty_rank_selection():
 
     assert result.task_id == "task-1"
     assert result.objective_values == {"total_annual_cost": 12.0}
+    signed = result.model_copy(
+        update={"objective_values": {"total_annual_cost": -1e-5}}
+    )
+    assert type(result).model_validate(signed.model_dump()).objective_values == {
+        "total_annual_cost": -1e-5
+    }
     assert result.diagnostic_references == ("result-log",)
     assert select_network(result, 1) is result
 
@@ -230,7 +242,7 @@ def test_synthesis_result_validates_objectives_and_empty_rank_selection():
         ({"task_id": " "}, "identity fields"),
         ({"stage_count": 0}, "positive integer"),
         ({"objective_values": {"": 1.0}}, "identity fields"),
-        ({"objective_values": {"cost": -1.0}}, "non-negative"),
+        ({"objective_values": {"cost": math.inf}}, "must be finite"),
         ({"diagnostic_references": (" ",)}, "identity fields"),
     ],
 )

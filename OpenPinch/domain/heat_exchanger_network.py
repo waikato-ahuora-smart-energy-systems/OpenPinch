@@ -133,12 +133,14 @@ class HeatExchangerNetwork(BaseModel):
             raise ValueError("stage_count must be a positive integer when supplied")
         return value
 
-    @field_validator(
-        "objective_value",
-        "total_annual_cost",
-        "utility_cost",
-        "capital_cost",
-    )
+    # A site network's net utility cost, and so its objective and total
+    # annual cost, is negative where steam credits exceed purchases.
+    @field_validator("objective_value", "total_annual_cost", "utility_cost")
+    @classmethod
+    def _validate_optional_signed_cost(cls, value: float | None) -> float | None:
+        return _rules.optional_finite(value, _rules.NETWORK_COST_MESSAGE)
+
+    @field_validator("capital_cost")
     @classmethod
     def _validate_optional_non_negative_finite(
         cls,

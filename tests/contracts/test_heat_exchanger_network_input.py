@@ -207,6 +207,17 @@ def test_canonical_problem_inputs_retain_the_transport_network_without_consuming
     )
 
 
+def test_network_input_accepts_a_site_networks_negative_costs() -> None:
+    network = HeatExchangerNetwork(
+        objective_value=-91200.4, total_annual_cost=-91200.4, utility_cost=-1e-5
+    )
+    payload = network.model_dump(mode="json")
+
+    validated = TargetInput.model_validate({"streams": [], "network": payload})
+
+    assert validated.model_dump(mode="json")["network"] == payload
+
+
 def test_network_input_rejects_an_encoded_json_string() -> None:
     with pytest.raises(ValidationError, match="valid dictionary"):
         TargetInput.model_validate(

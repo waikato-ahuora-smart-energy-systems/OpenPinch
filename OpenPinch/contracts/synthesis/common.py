@@ -46,6 +46,14 @@ def _validate_non_negative_finite(value: float) -> float:
     return float(value)
 
 
+def _validate_finite(value: float) -> float:
+    """A finite value of either sign: a site network's objective is its net
+    utility cost, which steam credits can make negative."""
+    if not math.isfinite(value):
+        raise ValueError("value must be finite")
+    return float(value)
+
+
 def _validate_positive_grid(value: tuple[float, ...]) -> tuple[float, ...]:
     if not value:
         raise ValueError("grid values must contain at least one entry")

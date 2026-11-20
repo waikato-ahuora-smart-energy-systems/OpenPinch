@@ -9,7 +9,7 @@ from ...domain.enums import HeatExchangerNetworkDesignMethod
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .common import (
     HeatExchangerNetworkSynthesisManifest,
-    _validate_non_negative_finite,
+    _validate_finite,
     _validate_optional_identity,
     _validate_run_id,
 )
@@ -72,7 +72,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
     ) -> dict[str, float]:
         for objective_name, objective_value in value.items():
             _validate_optional_identity(objective_name)
-            _validate_non_negative_finite(objective_value)
+            _validate_finite(objective_value)
         return {str(name): float(metric) for name, metric in value.items()}
 
     @field_validator("diagnostic_references")
