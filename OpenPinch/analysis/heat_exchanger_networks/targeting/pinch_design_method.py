@@ -37,7 +37,15 @@ def _execute_pinch_design_method_workflow(
     *,
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
-    """Execute only the pinch design stages and collect validated outputs."""
+    """Execute only the pinch design stages and collect validated outputs.
+
+    A problem with only hot or only cold streams has one network, of
+    heaters or coolers alone, as in the full workflow.
+    """
+    from ..utility_only import is_one_sided, utility_only_workflow
+
+    if is_one_sided(problem.master_zone):
+        return utility_only_workflow(problem, settings)
 
     def run_stages(method_settings: SynthesisWorkflowSettings):
         milp_tasks, milp_outcomes, heuristic_tasks, heuristic_outcomes = (

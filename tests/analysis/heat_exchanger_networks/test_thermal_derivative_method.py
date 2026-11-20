@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     SynthesisWorkflowSettings,
 )
@@ -146,8 +148,13 @@ def test_pinch_design_workflow_wrappers_use_executor_contract(monkeypatch):
     assert default_executor.calls[0]["parent_outcomes"] == {}
 
     workflow_executor = _RecordingExecutor()
+    # Hot and cold streams: the workflow runs its stages, not the
+    # utility-only network of a one-sided problem.
+    two_sided = SimpleNamespace(
+        master_zone=SimpleNamespace(hot_streams=[object()], cold_streams=[object()])
+    )
     result = pinch_design_method._execute_pinch_design_method_workflow(
-        problem=object(),
+        problem=two_sided,
         settings=settings,
         executor=workflow_executor,
     )

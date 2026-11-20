@@ -45,6 +45,15 @@ Heat exchanger network synthesis
   listed; a dearer utility listed first overstated the operating cost.
 - A Carnot heat pump in a retrofit pays ``new_unit_cost`` for its
   evaporator and condenser, as any new exchanger does.
+- ``design.pinch_design``, ``design.thermal_derivative`` and
+  ``design.network_evolution`` refuse a ``period_id`` on a multiperiod case.
+  They design over every period and used the period only as a label, so
+  the stored targets described one period and the design all of them. To
+  design one period, use ``heat_exchanger_network(design_basis="period",
+  period_id=...)`` or run the method on ``single_period_case``.
+- A standalone ``design.pinch_design`` of a case with only hot or only cold
+  streams returns its network of heaters or coolers, as
+  ``heat_exchanger_network`` does; before, it raised.
 - Evolution sizes a split branch of a segmented stream on its solved
   flow split. The branch-share fix for split segmented streams used each
   match's share of the stage duty, which equals its flow share only when
