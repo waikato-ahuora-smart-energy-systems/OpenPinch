@@ -467,6 +467,29 @@ def test_duty_optimisation_refuses_a_site_network():
         _site().design.optimise_duties(site)
 
 
+@pytest.mark.parametrize(
+    "marker",
+    [
+        {"source_metadata": {"site_utility_balance": {}}},
+        {"summary_metrics": {"site_total_annual_cost": 1.0}},
+        {"source_metadata": {"site_processes": {"Site/Heating": {}}}},
+    ],
+    ids=["site balance", "site cost", "site seed"],
+)
+@pytest.mark.parametrize("tool", ["optimise_duties", "retrofit", "retrofit_heat_pumps"])
+def test_fixed_structure_tools_refuse_a_site_network(marker, tool):
+    """The network ``total_site_heat_exchanger_network`` returns carries the
+    site utility balance and site cost, not the seed's ``site_processes``;
+    any of them marks a site network, which the fixed-structure tools
+    refuse rather than re-price unit by unit."""
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    site = HeatExchangerNetwork(exchangers=(), run_id="site", **marker)
+
+    with pytest.raises(ValueError, match="site network"):
+        getattr(_site().design, tool)(site)
+
+
 def test_a_stored_overdesign_margin_does_not_reach_the_process_designs(monkeypatch):
     """Rating a process network at a margin drops its level targets, so the
     site's process designs run without the stored margin."""

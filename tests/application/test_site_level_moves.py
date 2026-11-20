@@ -325,14 +325,20 @@ def test_level_moves_never_raise_the_placed_designs_cost():
 
     log = moved.result.provenance.effective_settings["HENS_SITE_LEVEL_MOVES"]
     assert log
-    cost = fixed.selected_network.summary_metrics["site_total_annual_cost"]
+    start = fixed.selected_network.summary_metrics["site_total_annual_cost"]
+    cost = start
     for move in log:
+        # A cheaper re-design of the unshifted levels is returned too.
+        if move["status"] == "baseline" and move["total_annual_cost"] < cost:
+            cost = move["total_annual_cost"]
         if move["status"] == "adopted":
             assert move["total_annual_cost"] < cost
             cost = move["total_annual_cost"]
-    assert moved.selected_network.summary_metrics[
-        "site_total_annual_cost"
-    ] == pytest.approx(cost)
+        if move["status"] == "start kept":
+            cost = move["total_annual_cost"]
+    returned = moved.selected_network.summary_metrics["site_total_annual_cost"]
+    assert returned == pytest.approx(cost)
+    assert returned <= start + 1e-6 * start
 
 
 def test_a_level_vector_already_designed_is_not_designed_again():
@@ -469,3 +475,50 @@ def test_levels_whose_design_failed_are_tried_again():
 
     # 185 C fails at the 5 K step; after 182.5 C is adopted it is tried again.
     assert evaluated.count(185.0) == 2
+
+
+def test_a_cheaper_baseline_is_returned_when_no_move_beats_it():
+    """The unshifted levels re-designed can beat the sweep's own network;
+    with no better move that re-design is returned, not the dearer start."""
+    baseline = _view(80.0)
+
+    def evaluate(case, view):
+        if _hot_supply(case, "iso_1") == pytest.approx(180.0):
+            return baseline
+        return _view(90.0)
+
+    case, view, log = moves.refine_levels(
+        _mains_site(),
+        _view(100.0),
+        evaluate=evaluate,
+        step=5.0,
+        step_min=5.0,
+        levels=("iso_1",),
+    )
+
+    assert view is baseline
+    assert _hot_supply(case, "iso_1") == pytest.approx(180.0)
+
+
+def test_the_log_says_when_the_start_is_kept_over_an_adopted_move():
+    """A move can beat the baseline re-design but not the sweep's own
+    network; the start is then returned, and the log ends saying so rather
+    than leaving the move as the last word."""
+    start = _view(100.0)
+
+    def evaluate(case, view):
+        return _view(120.0 if _hot_supply(case, "iso_1") == 180.0 else 110.0)
+
+    case, view, log = moves.refine_levels(
+        _mains_site(),
+        start,
+        evaluate=evaluate,
+        step=5.0,
+        step_min=5.0,
+        levels=("iso_1",),
+    )
+
+    assert view is start
+    assert "adopted" in [move.status for move in log]
+    assert log[-1].status == "start kept"
+    assert log[-1].total_annual_cost == pytest.approx(100.0)

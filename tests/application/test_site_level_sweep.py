@@ -462,3 +462,24 @@ def test_the_sweep_ranks_every_counts_networks_not_only_its_best(monkeypatch):
         "3-cheap": (3, 20.0),
         "3-held": (3, 25.0),
     }
+
+
+def test_a_placed_sweep_does_not_become_the_problems_design(monkeypatch):
+    """The placed networks name the placed case's utilities (iso_1, ...),
+    which the problem lacks, so the sweep's result is returned but not
+    committed as the problem's cached design for later tools to reuse."""
+    from OpenPinch.analysis.heat_exchanger_networks.results import selection
+    from OpenPinch.application._problem.targeting import provenance
+
+    monkeypatch.setattr(selection, "ranked_networks", lambda result, n=None: ())
+    monkeypatch.setattr(selection, "select_network", lambda result: result)
+    monkeypatch.setattr(provenance, "make_provenance", lambda *a, **k: "provenance")
+    view = SimpleNamespace(result=SimpleNamespace(name="two"))
+    run = site_levels.LevelCountRun(2, 2, 0, "designed", view, 30.0, case="c2")
+    results = SimpleNamespace(design="the problem's own design")
+    problem = SimpleNamespace(
+        _require_prepared_root_zone=lambda: None, period_ids=(), _results=results
+    )
+
+    assert site_levels.level_sweep_view(problem, (run,), settings={}) is view
+    assert results.design == "the problem's own design"
