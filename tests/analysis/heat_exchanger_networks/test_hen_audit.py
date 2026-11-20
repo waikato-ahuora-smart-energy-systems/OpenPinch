@@ -616,6 +616,92 @@ def test_stage_reduction_solves_with_the_tasks_solver_options(monkeypatch):
     assert built["solver_options"] == {"time_limit": 30}
 
 
+def test_a_reduced_solve_moved_to_ipopt_keeps_its_time_limit(monkeypatch):
+    """A reduced model that is not linear moves from HiGHS to Ipopt; the
+    task's time limit goes with it, under Ipopt's own option, as HiGHS's
+    other options do not apply there."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    configured = {}
+
+    class _Nonlinear(_ReducedModel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.m = SimpleNamespace(is_linear=lambda: False)
+
+        def optimise(self, print_output=False):
+            raise RuntimeError("stop after configuring")
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Nonlinear)
+    monkeypatch.setattr(unit.backend, "require_solver_backend", lambda name: None)
+    monkeypatch.setattr(
+        unit.backend,
+        "configure_pyomo_solver",
+        lambda model, name, *, solver_options=None: configured.update(
+            name=name, options=solver_options
+        ),
+    )
+    case = _reduction_case()
+    case.solver_options = {"time_limit": 30.0, "presolve": "on"}
+
+    with pytest.raises(RuntimeError, match="stop after configuring"):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=3
+        ).remove_unused_stages(case)
+
+    assert configured == {"name": "ipopt-pyomo", "options": {"max_wall_time": 30.0}}
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{"limits/time": 30.0}, {"max_wall_time": 30.0}, {"max_cpu_time": 30.0}],
+    ids=["scip", "ipopt wall", "ipopt cpu"],
+)
+def test_a_reduced_solve_on_ipopt_keeps_any_solvers_time_limit(monkeypatch, options):
+    """The task's limit may be under SCIP's or Ipopt's own key; it still
+    reaches Ipopt as ``max_wall_time``."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+
+    assert unit._ipopt_time_limit(options) == {"max_wall_time": 30.0}
+
+
+def test_empty_stages_go_when_no_stage_reaches_the_threshold(monkeypatch):
+    """Twelve stages hold their recovery evenly over eleven (9% each) and
+    leave one empty: none reaches the 10% threshold, so stage reduction used
+    to keep all twelve; it now drops the empty one."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    case = _two_period_stage_case()
+    case.I, case.J, case.S = 1, 1, 12
+    case.Q_r_by_period = [[[[[q] for q in [10.0] * 11 + [0.0]]]]]
+    case.Q_r = case.Q_r_by_period[0]
+    case.Q_h = [[[0.0]]]
+    case.Q_c = [[[0.0]]]
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=12
+        ).remove_unused_stages(case)
+
+    assert built["stages"] == 11
+
+
 def test_more_than_ten_stages_keep_the_ten_stage_threshold():
     from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
         InternalHeatExchangerNetworkProblem,
