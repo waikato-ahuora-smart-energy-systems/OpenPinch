@@ -325,3 +325,11 @@ def test_a_standalone_method_refuses_a_period_id_on_a_multiperiod_case(method):
     design one period."""
     with pytest.raises(ValueError, match="design_basis='period'"):
         getattr(_two_period_problem().design, method)(period_id="base")
+
+
+@pytest.mark.parametrize(
+    "method", ["pinch_design", "thermal_derivative", "network_evolution"]
+)
+def test_a_period_id_in_the_options_is_refused_too(method):
+    with pytest.raises(ValueError, match="design_basis='period'"):
+        getattr(_two_period_problem().design, method)(options={"period_id": "base"})

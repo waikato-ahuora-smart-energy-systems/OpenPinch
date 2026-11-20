@@ -1313,10 +1313,11 @@ class _DesignAccessor:
             heat_exchanger_network_pinch_design_method_service,
         )
 
-        self._refuse_period_scope(period_id, "pinch_design")
         runtime, configuration = self._arguments(
             options=options, period_id=period_id, **kwargs
         )
+        # The call's period, as an argument or in its options.
+        self._refuse_period_scope(runtime.get("period_id"), "pinch_design")
         return self._run(
             heat_exchanger_network_pinch_design_method_service,
             surface="pinch_design",
@@ -1338,10 +1339,11 @@ class _DesignAccessor:
             heat_exchanger_network_thermal_derivative_method_service,
         )
 
-        self._refuse_period_scope(period_id, "thermal_derivative")
         runtime, configuration = self._arguments(
             options=options, period_id=period_id, **kwargs
         )
+        # The call's period, as an argument or in its options.
+        self._refuse_period_scope(runtime.get("period_id"), "thermal_derivative")
         return self._run(
             heat_exchanger_network_thermal_derivative_method_service,
             surface="thermal_derivative",
@@ -1364,10 +1366,11 @@ class _DesignAccessor:
             heat_exchanger_network_evolution_method_service,
         )
 
-        self._refuse_period_scope(period_id, "network_evolution")
         runtime, configuration = self._arguments(
             options=options, period_id=period_id, **kwargs
         )
+        # The call's period, as an argument or in its options.
+        self._refuse_period_scope(runtime.get("period_id"), "network_evolution")
         return self._run(
             heat_exchanger_network_evolution_method_service,
             surface="network_evolution",
