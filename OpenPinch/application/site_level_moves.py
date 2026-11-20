@@ -33,7 +33,8 @@ class LevelMove:
     """One tried move: ``status`` is ``"adopted"``, ``"rejected"`` (no lower
     cost) or ``"failed"`` (the design raised). The first entry is the
     unshifted levels evaluated as a move (``"baseline"``, level ``""`` and
-    shift 0, or ``"failed"``)."""
+    shift 0, or ``"failed"``); a last ``"start kept"`` entry records that the
+    sweep's own network was returned over adopted moves."""
 
     level: str
     shift: float
@@ -229,8 +230,10 @@ def refine_levels(
     is checked; once it is true the moves end with a ``"stopped"`` entry
     (message ``"time limit"``) and the best levels so far. A missing synthesis
     solver or dependency is raised; any other failure of a design is
-    recorded. Returns the final case and view, or the start's when no
-    adopted move costs less than it, and every move tried.
+    recorded. Returns the final case and view (the baseline re-design when
+    no move beats it), or the start's when it costs no more, and every move
+    tried; when the start is kept over an adopted move, the log ends with a
+    ``"start kept"`` entry at the start's cost.
     """
     from ..analysis.heat_exchanger_networks.solver.dependencies import (
         MissingSynthesisDependencyError,
@@ -264,6 +267,10 @@ def refine_levels(
     else:
         cost = site_cost(baseline.selected_network)
         log.append(LevelMove("", 0.0, cost, "baseline"))
+        # The re-design stands for the unshifted levels from here: it is
+        # returned when nothing beats it, and moves are seeded from it.
+        view = baseline
+        designed.add((_level_key(case), _seed_key(view)))
     halted = False
     while step > 0 and step >= step_min and not halted:
         best = None
@@ -301,6 +308,8 @@ def refine_levels(
         elif not halted:
             step /= 2
     if start[2] <= cost:
+        if any(move.status == "adopted" for move in log):
+            log.append(LevelMove("", 0.0, start[2], "start kept"))
         return start[0], start[1], tuple(log)
     return case, view, tuple(log)
 
