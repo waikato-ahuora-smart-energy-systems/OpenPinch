@@ -10,16 +10,17 @@ from OpenPinch.analysis.heat_exchanger_networks.overdesign import apply_overdesi
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 
 
-def _rating(failing):
-    """A rating whose cost rises with the margin; ``failing(percentage)``
-    makes it raise, as an infeasible rating solve does."""
+def _rating(failing, cost=lambda percentage: 100.0 + percentage):
+    """A rating at ``cost(percentage)`` (by default rising with the margin);
+    ``failing(percentage)`` makes it raise, as an infeasible rating solve
+    does."""
 
     def rate(installed):
         percentage = round(100.0 * (installed.summary_metrics["scale"] - 1.0), 9)
         if failing(percentage):
             raise RuntimeError("Solver termination condition: infeasible")
         return SimpleNamespace(
-            selected_network=HeatExchangerNetwork(total_annual_cost=100.0 + percentage)
+            selected_network=HeatExchangerNetwork(total_annual_cost=cost(percentage))
         )
 
     return rate
@@ -66,3 +67,16 @@ def test_an_optimised_margin_skips_the_margins_that_fail(monkeypatch):
     assert metrics["percentage"] == 0.0
     assert 50.0 in metrics["failed_margins"]
     assert all(point <= 40.0 for point, _cost in metrics["search"])
+
+
+def test_an_optimised_margin_finds_a_small_feasible_margin(recwarn, monkeypatch):
+    """Only margins up to 5 % can be rated and 4 % is cheapest: bisection
+    from the failed maximum finds the largest margin that rates, so the search
+    finds 4 % rather than giving up at 0 %."""
+    _scaled(monkeypatch)
+    rate = _rating(lambda p: p > 5.0, cost=lambda p: 100.0 + (p - 4.0) ** 2)
+
+    _result, metrics = apply_overdesign(_network(), "optimise", maximum=50.0, rate=rate)
+
+    assert metrics["percentage"] == pytest.approx(4.0, abs=0.5)
+    assert not [w for w in recwarn if "overdesign margin" in str(w.message)]

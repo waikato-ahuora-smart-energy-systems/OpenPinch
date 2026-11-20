@@ -49,8 +49,9 @@ Heat exchanger network synthesis
   ``overdesign_percentage=10`` raised ``WorkflowContractError``. A fitted
   network is now rated at the approach its fit held.
 - ``overdesign_percentage="optimise"`` no longer drops a network when the
-  rating at a positive margin fails: the search leaves that margin out and
-  records it in the new ``NetworkOverdesign.failed_margins``. When no positive margin could be
+  rating at a positive margin fails: the search leaves that margin out,
+  records it in the new ``NetworkOverdesign.failed_margins``, and after a
+  failed maximum searches up to the largest margin that rates. When no positive margin could be
   rated, the result keeps 0 % and a ``UserWarning`` says so, rather than
   reporting 0 % as the optimum.
 - **Breaking:** an overdesigned network carries its margin in a typed
