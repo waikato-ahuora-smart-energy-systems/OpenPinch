@@ -29,6 +29,18 @@ Heat exchanger network synthesis
   parent utility instead, so a slice only part of the range could reach
   was rejected ("on the wrong side of the stream's temperature range") and
   the network could not be rated, overdesigned or fitted.
+- ``optimise_duties``, ``retrofit`` and ``retrofit_heat_pumps`` refuse the
+  network ``total_site_heat_exchanger_network()`` returns. The earlier guard
+  caught only a site seed, so the designed site network was re-priced unit
+  by unit (31,941 $/y against its site cost of 21,880 $/y in one case), and
+  retrofit proposed matches between processes the site model forbids.
+- Level moves on a placed site design return the unshifted levels'
+  re-design when it is the cheapest result; before, the dearer start was
+  returned. When the start is kept over adopted moves, the log ends with a
+  ``"start kept"`` entry rather than an adopted move it does not return.
+- A placed site design (``levels="placed"``) is no longer cached as the
+  problem's design: its networks name the placed utilities (``iso_1`` and
+  so on), which the problem lacks, so later tools failed on them.
 - Stage reduction keeps a network with fewer stages only when it costs no
   more and uses no more hot or cold utility in any period than the network
   it reduces. Before, it kept any reduced network that solved and verified,
