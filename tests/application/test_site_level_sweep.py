@@ -560,3 +560,22 @@ def test_a_placed_sweep_does_not_become_the_problems_design(monkeypatch):
 
     assert site_levels.level_sweep_view(problem, (run,), settings={}) is view
     assert results.design == "the problem's own design"
+
+
+def test_a_hot_and_a_cold_stand_in_may_share_a_name():
+    """A hot and a cold utility may share a name; each side's fallback
+    keeps its own."""
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] in {"HPS", "CW"}:
+            utility["name"] = "EDGE"
+    problem = PinchProblem(source)
+
+    kept = site_levels._stand_ins(
+        problem, {("HU", "Hot"): 300.0, ("CU", "Cold"): -30.0}
+    )
+
+    assert sorted((u["name"], u["type"]) for u in kept) == [
+        ("EDGE", "Cold"),
+        ("EDGE", "Hot"),
+    ]

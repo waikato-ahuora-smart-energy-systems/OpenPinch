@@ -203,7 +203,9 @@ def _stand_ins(
 
     zone = _resolve_placement_zone(problem, None)
     sources = _utility_sources(problem, zone, problem.to_problem_json()["utilities"])
-    kept: dict[str, dict] = {}
+    # By name and type: a hot and a cold utility may share a name, and a
+    # ``Both`` utility serving both fallbacks is kept once.
+    kept: dict[tuple[str, str], dict] = {}
     for (name, side), supply in fallbacks.items():
         own = [
             source
@@ -219,7 +221,8 @@ def _stand_ins(
                 ),
             )
         nearest = min(own, key=lambda source: abs(source[1] - supply))
-        kept.setdefault(nearest[0], nearest[3])
+        raw = nearest[3]
+        kept.setdefault((raw["name"], raw["type"]), raw)
     return list(kept.values())
 
 
