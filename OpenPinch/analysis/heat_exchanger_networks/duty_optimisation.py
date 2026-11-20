@@ -97,6 +97,9 @@ class DutyOptimisationRequest:
     # Utility name to per-period duty: each utility's exchangers together
     # carry its target in every period.
     level_targets: Mapping[str, tuple[float, ...]] | None = None
+    # The dt_cont multiplier the contributions are scaled by (the network's
+    # own); None is the reference multiplier.
+    dt_cont_multiplier: float | None = None
 
     @property
     def minimisation_goal(self) -> str:
@@ -126,6 +129,7 @@ def build_duty_optimisation_request(
     max_cold_utility: float | None = None,
     problem_approach: bool = False,
     level_targets: Mapping[str, Sequence[float]] | None = None,
+    dt_cont_multiplier: float | None = None,
 ) -> DutyOptimisationRequest:
     """Validate public arguments without touching the problem or a solver.
 
@@ -200,6 +204,7 @@ def build_duty_optimisation_request(
                 for name, duties in level_targets.items()
             }
         ),
+        dt_cont_multiplier=dt_cont_multiplier,
     )
 
 
@@ -705,9 +710,13 @@ def duty_optimisation_task(
     return HeatExchangerNetworkSynthesisTask(
         run_id=settings.run_id,
         method=_METHOD,
-        # Contributions at the reference multiplier; a requested minimum
-        # approach overrides them in the model.
-        dt_cont_multiplier=reference_dt_cont_multiplier(settings.dt_cont_multipliers),
+        # Contributions at the request's multiplier, else the reference one;
+        # a requested minimum approach overrides them in the model.
+        dt_cont_multiplier=(
+            request.dt_cont_multiplier
+            if request.dt_cont_multiplier is not None
+            else reference_dt_cont_multiplier(settings.dt_cont_multipliers)
+        ),
         stage_count=_stage_count(request.network, exchangers),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
@@ -733,6 +742,7 @@ def heat_exchanger_network_duty_optimisation_service(
     executor: SynthesisExecutor | None = None,
     problem_approach: bool = False,
     level_targets: Mapping[str, Sequence[float]] | None = None,
+    dt_cont_multiplier: float | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
     """Optimise exchanger duties on a fixed, user-defined network structure."""
 
@@ -745,6 +755,7 @@ def heat_exchanger_network_duty_optimisation_service(
         max_cold_utility=max_cold_utility,
         problem_approach=problem_approach,
         level_targets=level_targets,
+        dt_cont_multiplier=dt_cont_multiplier,
     )
     target_output, settings = prepare_service_context(
         problem,

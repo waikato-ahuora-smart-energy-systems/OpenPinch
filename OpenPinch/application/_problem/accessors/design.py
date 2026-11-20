@@ -763,9 +763,8 @@ class _DesignAccessor:
         The thermal derivative and evolution steps design down to 0.1 K, or
         ``hens``'s ``min_exchanger_approach_share`` of twice
         ``THERMAL_DT_CONT`` times the multiplier if larger. Any other network
-        (a pinch design, or one of unknown method) keeps its streams'
-        contributions at its dt_cont multiplier: the case's own at 1, else
-        twice ``THERMAL_DT_CONT`` times the multiplier.
+        (a pinch design, or one of unknown method) keeps each stream's own
+        contribution scaled by its dt_cont multiplier, as synthesis does.
         """
         from ....analysis.heat_exchanger_networks.solver.arrays import (
             nominal_approach_temperature,
@@ -787,9 +786,7 @@ class _DesignAccessor:
         }:
             share = float(hens.min_exchanger_approach_share)
             return {"min_approach_temperature": max(0.1, share * nominal)}
-        if multiplier == 1.0:
-            return {"problem_approach": True}
-        return {"min_approach_temperature": nominal}
+        return {"problem_approach": True, "dt_cont_multiplier": multiplier}
 
     def _effective_hens(self, options):
         """The HENS configuration a call runs with: its options over the stored."""
@@ -908,6 +905,8 @@ class _DesignAccessor:
         view (``None`` without a fit).
         """
         view = fitted = None
+        # Read before the fit: its result is labelled a duty optimisation.
+        approach = self._design_approach(network, hens)
         if fit:
             view = fitted = self._fit_to_all_periods(
                 network,
@@ -924,6 +923,7 @@ class _DesignAccessor:
                 options=options,
                 solver=solver,
                 solve_tolerance=solve_tolerance,
+                approach=approach,
             )
         return view, fitted
 
@@ -1057,8 +1057,14 @@ class _DesignAccessor:
         self._problem._results.design = view.result
         return view
 
-    def _overdesigned(self, network, margin, *, hens, options, solver, solve_tolerance):
-        """The rating of ``network`` at ``margin``, its metrics on the network."""
+    def _overdesigned(
+        self, network, margin, *, hens, options, solver, solve_tolerance, approach=None
+    ):
+        """The rating of ``network`` at ``margin``, its metrics on the network.
+
+        ``approach`` is the design approach to rate at (``_design_approach``
+        of the synthesised network); by default ``network``'s own.
+        """
         from ....analysis.heat_exchanger_networks.overdesign import apply_overdesign
 
         view, metrics = apply_overdesign(
@@ -1073,7 +1079,7 @@ class _DesignAccessor:
                 options=options,
                 solver=solver,
                 solve_tolerance=solve_tolerance,
-                **self._design_approach(network, hens),
+                **(approach or self._design_approach(network, hens)),
             ),
         )
         view.selected_network.summary_metrics["overdesign"] = metrics
@@ -1549,6 +1555,7 @@ class _DesignAccessor:
 
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
+        _refuse_site_network(existing, "retrofit")
         _runtime, configuration = self._arguments(
             options=options, period_id=None, solve_tolerance=solve_tolerance
         )
@@ -1671,6 +1678,7 @@ class _DesignAccessor:
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
+        _refuse_site_network(existing, "retrofit_heat_pumps")
         spec = cycle_spec(cycle)
         _runtime, configuration = self._arguments(options=options, period_id=None)
         configuration["HPR_TYPE"] = family_value(
@@ -1806,6 +1814,7 @@ class _DesignAccessor:
         solve_tolerance=None,
         problem_approach: bool = False,
         level_targets: Mapping[str, Sequence[float]] | None = None,
+        dt_cont_multiplier: float | None = None,
     ) -> HeatExchangerNetworkDesignView:
         """``optimise_duties`` on a network; ``problem_approach`` keeps the
         ``"cost"`` objective at the case's minimum approach, not 1 K, and
@@ -1815,12 +1824,7 @@ class _DesignAccessor:
             heat_exchanger_network_duty_optimisation_service,
         )
 
-        if "site_processes" in (network.source_metadata or {}):
-            raise ValueError(
-                "optimise_duties does not take a site network: the fixed-structure "
-                "model neither holds each process's utility levels nor keeps the "
-                "site utility balance. Optimise each process's network on its own."
-            )
+        _refuse_site_network(network, "optimise_duties")
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
@@ -1842,6 +1846,7 @@ class _DesignAccessor:
             workspace_variant=None,
             problem_approach=problem_approach,
             level_targets=level_targets,
+            dt_cont_multiplier=dt_cont_multiplier,
         )
 
     def _fit_to_all_periods(
@@ -1886,11 +1891,13 @@ class _DesignAccessor:
 
         design = self._design_approach(network, self._effective_hens(options))
         # The padding keeps the approach the fit solves at: the network's
-        # own, or twice THERMAL_DT_CONT for the case's contributions.
+        # own floor, or twice THERMAL_DT_CONT at its multiplier for the
+        # case's contributions.
         approach = design.get(
             "min_approach_temperature",
             nominal_approach_temperature(
-                self._problem._require_prepared_root_zone().config, 1.0
+                self._problem._require_prepared_root_zone().config,
+                float(design.get("dt_cont_multiplier", 1.0)),
             ),
         )
         levels = self._period_level_targets(network)
@@ -1993,6 +2000,27 @@ def _with_released_levels(view, levels, *, held: bool):
             name: list(duties) for name, duties in levels.items()
         }
     return view
+
+
+def _refuse_site_network(network, tool: str) -> None:
+    """Raise ``ValueError`` for a total site network.
+
+    A site network carries the site utility balance or site cost (the
+    designed network) or ``site_processes`` (a site seed). The fixed-structure
+    tools neither hold each process's utility levels nor keep the site
+    utility balance, so they would re-price it unit by unit.
+    """
+    metadata = network.source_metadata or {}
+    if (
+        "site_processes" in metadata
+        or "site_utility_balance" in metadata
+        or "site_total_annual_cost" in (network.summary_metrics or {})
+    ):
+        raise ValueError(
+            f"{tool} does not take a site network: the fixed-structure model "
+            "neither holds each process's utility levels nor keeps the site "
+            "utility balance. Use each process's own network."
+        )
 
 
 class _DesignAccessorDescriptor:

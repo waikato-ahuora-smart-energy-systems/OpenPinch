@@ -409,6 +409,7 @@ def test_the_all_period_fit_runs_with_the_calls_settings(monkeypatch):
         "solver": "ipopt-pyomo",
         "solve_tolerance": 1e-4,
         "problem_approach": True,
+        "dt_cont_multiplier": 1.0,
     }
 
 
@@ -546,8 +547,8 @@ def test_a_fit_that_cannot_hold_the_levels_says_so():
 @pytest.mark.parametrize(
     ("method", "multiplier", "expected"),
     [
-        ("PDM", 0.75, {"min_approach_temperature": 7.5}),
-        ("PDM", 1.0, {"problem_approach": True}),
+        ("PDM", 0.75, {"problem_approach": True, "dt_cont_multiplier": 0.75}),
+        ("PDM", 1.0, {"problem_approach": True, "dt_cont_multiplier": 1.0}),
         ("ESM", 1.0, {"min_approach_temperature": 0.1}),
     ],
 )
@@ -584,7 +585,10 @@ def test_the_fit_keeps_the_approach_the_network_was_designed_to(
 
     for name, value in expected.items():
         assert seen[0][name] == pytest.approx(value)
-    assert padded == [pytest.approx(expected.get("min_approach_temperature", 10.0))]
+    pad = expected.get(
+        "min_approach_temperature", 10.0 * expected.get("dt_cont_multiplier", 1.0)
+    )
+    assert padded == [pytest.approx(pad)]
 
 
 def test_networks_that_differ_in_design_approach_or_levels_are_fitted_apart():
@@ -608,9 +612,11 @@ def test_networks_that_differ_in_design_approach_or_levels_are_fitted_apart():
             approach,
         )
 
-    seven = {"min_approach_temperature": 7.5}
+    seven = {"problem_approach": True, "dt_cont_multiplier": 0.75}
     floor = {"min_approach_temperature": 0.1}
-    assert keyed(0.75, seven) != keyed(1.0, {"problem_approach": True})
+    assert keyed(0.75, seven) != keyed(
+        1.0, {"problem_approach": True, "dt_cont_multiplier": 1.0}
+    )
     # An evolved network's floor does not depend on its multiplier.
     assert keyed(0.75, floor) == keyed(1.5, floor)
     assert keyed(1.0, floor) != keyed(1.0, floor, {"Hot Utility.LPS": [10.0]})
