@@ -1761,3 +1761,59 @@ def test_the_retrofit_goal_reports_how_far_its_rating_outruns_verification() -> 
         for (side, _index), value in model.rating_allowances.items()
         if side == "utility"
     )
+
+
+def _sliced_payload() -> dict:
+    """Two sliding cold utilities and two hot ones: the pinch design slices
+    cooling water (285 to 315 K) at the streams it must reach."""
+    payload = _small_payload()
+    payload["streams"] = [
+        _stream("H1", 10.0, 500.0, 300.0),
+        _stream("H2", 20.0, 305.0, 298.0),
+        _stream("C1", 5.0, 450.0, 650.0),
+        _stream("C2", 4.0, 320.0, 420.0),
+    ]
+    payload["utilities"] = [
+        _utility("HPS", "Hot", 700.0, 700.0, 80.0, 5.0),
+        _utility("LPS", "Hot", 480.0, 479.0, 40.0, 5.0),
+        _utility("CW", "Cold", 285.0, 315.0, 15.0, 1.0),
+        _utility("AIR", "Cold", 350.0, 360.0, 5.0, 0.5),
+    ]
+    return payload
+
+
+@_needs_live_solver
+@pytest.mark.solver
+@pytest.mark.parametrize("objective", ["cost", "rating"])
+def test_a_sliced_network_keeps_its_utility_slices(objective):
+    """A slice of cooling water can cool H2 (305 K in) though the whole
+    utility, out at 315 K, cannot; the fixed-structure tools rebuild the
+    network's slices from its exchanger ids, and report them under their
+    parent utility as synthesis does."""
+    problem = PinchProblem(_sliced_payload())
+    network = problem.design.heat_exchanger_network(width=0, depth=0).selected_network
+    assert any("@" in (e.exchanger_id or "") for e in network.exchangers)
+
+    optimised = problem.design.optimise_duties(
+        network, objective=objective
+    ).selected_network
+
+    utilities = {
+        e.source_stream if e.kind is HeatExchangerKind.HOT_UTILITY else e.sink_stream
+        for e in optimised.exchangers
+        if e.kind is not HeatExchangerKind.RECOVERY
+    }
+    assert not any("@" in name for name in utilities)
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_the_fit_to_every_period_keeps_a_networks_utility_slices():
+    """The fit pads stream ends from the network's own exchangers; a sliced
+    heater or cooler keeps its slice there, so the fit can solve."""
+    problem = PinchProblem(_sliced_payload())
+    network = problem.design.heat_exchanger_network(width=0, depth=0).selected_network
+
+    fitted = problem.design._fit_to_all_periods(network).selected_network
+
+    assert fitted.exchangers
