@@ -36,6 +36,15 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Evolution sizes a split branch of a segmented stream on its solved
+  flow split. The branch-share fix for split segmented streams used each
+  match's share of the stage duty, which equals its flow share only when
+  branches mix at one temperature; evolution models let branch outlets
+  differ, so their areas were off (by 19% in one case). A branch with a
+  very small share no longer makes the stream's profile invalid.
+- Joining the two sides of a multiperiod pinch design treats a match as
+  idle in a period only below the side's own solve tolerance, so a small
+  active duty is no longer copied without its approach temperatures.
 - A total site design no longer loses its level-held seed when a process
   raises steam from a hot stream's hottest part ahead of its recovery
   matches (steam raising limited by the main's temperature). The seed's

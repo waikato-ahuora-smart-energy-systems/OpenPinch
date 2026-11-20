@@ -1487,3 +1487,65 @@ def test_a_stagewise_split_branch_area_uses_its_share_of_the_flow():
     expected = _half_flow_branch_area()
     assert model.area_r[0][0][0] == pytest.approx(expected)
     assert model.area_r[0][1][0] == pytest.approx(expected)
+
+
+def test_a_non_isothermal_branch_is_sized_on_its_solved_flow_share():
+    """A non-isothermal model solves each branch's flow split (``X``, ``Y``)
+    and lets branch outlets differ, so a branch's share of the flow is its
+    split, not its share of the stage duty."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.area import (
+        _apply_segment_recovery_areas,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
+        branch_profile,
+    )
+
+    arrays = problem_to_solver_arrays(_split_problem(), 10.0)
+    model = SimpleNamespace(
+        solver_arrays=arrays,
+        I=1,
+        J=2,
+        S=1,
+        N_periods=1,
+        period_ids=("0",),
+        tol=1e-6,
+        non_isothermal_model=True,
+        X_by_period=[[[[0.6], [0.55]]]],
+        Y_by_period=[[[[1.0]], [[1.0]]]],
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[413.15, 313.15], [413.15, 313.15]]],
+        area_r_by_period=[[[[999.0], [999.0]]]],
+        _active_binary_value=lambda value: value,
+    )
+
+    _apply_segment_recovery_areas(model, [[[[150.0], [150.0]]]])
+
+    hot = profile_from_solver_arrays(arrays, side="hot", parent_index=0, period_index=0)
+    cold = profile_from_solver_arrays(
+        arrays, side="cold", parent_index=0, period_index=0
+    )
+    expected = sum(
+        item.area
+        for item in duty_aligned_area_contributions(
+            branch_profile(hot, 0.6),
+            cold,
+            duty=150.0,
+            hot_inlet_temperature=473.15,
+            cold_inlet_temperature=313.15,
+            period="0",
+        )
+    )
+    assert model.area_r[0][0][0] == pytest.approx(expected)
+
+
+def test_a_tiny_branch_share_keeps_a_valid_profile():
+    from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
+        branch_profile,
+    )
+
+    profile = _profile("Hot", hot=True)
+
+    scaled = branch_profile(profile, 1e-12)
+
+    assert all(duty > tol for duty in scaled.duties)
+    assert all(cp > tol for cp in scaled.heat_capacity_flowrates)

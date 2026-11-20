@@ -207,6 +207,12 @@ def _clear_utility_matches(target: StageWiseModel, side: str) -> None:
             _assign_value(flag, [0])
 
 
+def _idle_tolerance(source, target) -> float:
+    """The duty below which the side treats a match as carrying none."""
+    tolerance = getattr(source, "tol", None)
+    return float(target.tol if tolerance is None else tolerance)
+
+
 def _copy_recovery_match(
     owner,
     target: StageWiseModel,
@@ -227,7 +233,11 @@ def _copy_recovery_match(
             # A match that cannot run in this period has a constant approach
             # in the joined model; the side's approach there means nothing
             # while it carries no duty (a stream idle in that period).
-            if slot.__class__ is float and abs(duty or 0.0) <= target.tol:
+            # Idle by the side's own tolerance: a small active duty the
+            # joined model cannot run is refused, not copied without them.
+            if slot.__class__ is float and abs(duty or 0.0) <= _idle_tolerance(
+                source, target
+            ):
                 continue
             _assign_value(slot, [_value(getattr(source, name)[n][i][j][source_stage])])
     if source.non_isothermal_model:

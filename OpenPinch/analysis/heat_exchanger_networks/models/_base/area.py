@@ -97,8 +97,8 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
                     duty = float(q_r[n][i][j][k])
                     if duty <= model.tol:
                         continue
-                    hot_share, cold_share = branch_fractions(
-                        lambda a, b, c: q_r[n][a][b][c], model.I, model.J, i, j, k
+                    hot_share, cold_share = split_shares(
+                        model, q_r, n, i, j, k, branch_fractions
                     )
                     contributions = duty_aligned_area_contributions(
                         branch_profile(hot_profile, hot_share),
@@ -129,6 +129,23 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
         ]
         for i in range(model.I)
     ]
+
+
+def split_shares(model, q_r, n: int, i: int, j: int, k: int, fractions):
+    """Match ``(i, j)``'s hot and cold branch shares of the flow in stage
+    ``k`` and period ``n``: a non-isothermal model's solved splits (``X``,
+    ``Y``), else the duty shares ``fractions`` (``branch_fractions``) gives
+    for isothermal mixing."""
+    from .execution import _value
+
+    if getattr(model, "non_isothermal_model", False) and hasattr(model, "X_by_period"):
+        hot = _value(model.X_by_period[n][i][j][k])
+        cold = _value(model.Y_by_period[n][j][i][k])
+        return (
+            float(hot) if hot is not None and hot > 0.0 else 1.0,
+            float(cold) if cold is not None and cold > 0.0 else 1.0,
+        )
+    return fractions(lambda a, b, c: q_r[n][a][b][c], model.I, model.J, i, j, k)
 
 
 def solved_utility_duties(model) -> tuple[list, list]:
