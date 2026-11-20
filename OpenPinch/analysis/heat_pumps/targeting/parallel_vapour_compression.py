@@ -35,6 +35,7 @@ from ..common.shared import (
     raise_parallel_lifts_to_floor,
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
+    vapour_seed_evaporating_temperatures,
 )
 from ..cycles.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
@@ -123,7 +124,11 @@ def _get_parallel_hp_opt_setup(
         1.0,
     ).tolist()
     x_evap = map_T_arr_to_x_arr(
-        init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
+        vapour_seed_evaporating_temperatures(
+            init_res.T_evap[::-1], args.dt_phase_change
+        ),
+        args.T_hot[-1],
+        args.T_hot[0],
     ).tolist()
     # Nor about pressure ratios, which the search penalises: seed within the
     # limit so even a small search starts from an unpenalised design.

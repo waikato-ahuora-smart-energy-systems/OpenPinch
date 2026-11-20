@@ -1316,6 +1316,12 @@ def _common_areas(owner) -> None:
     ]
 
 
+# The rating cap widens each installed area by this share: a unit rated at
+# exactly its design area runs at its cap with no slack, which Ipopt can find
+# infeasible. Verification accepts areas 1e-4 short, far wider.
+_RATING_SLACK = 1e-6
+
+
 def _installed_areas(owner) -> None:
     """Each exchanger's installed area caps its duty in every period."""
 
@@ -1323,7 +1329,12 @@ def _installed_areas(owner) -> None:
         fixed = []
         for e in range(count):
             area = float(areas[e])
-            _cap_installed(owner, area, points.get(e, {}), *_unit_terms(owner, side, e))
+            _cap_installed(
+                owner,
+                area * (1.0 + _RATING_SLACK),
+                points.get(e, {}),
+                *_unit_terms(owner, side, e),
+            )
             fixed.append(area)
         return fixed
 

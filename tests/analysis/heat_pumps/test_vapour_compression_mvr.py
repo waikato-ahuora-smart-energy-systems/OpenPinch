@@ -8,6 +8,9 @@ import OpenPinch.analysis.heat_pumps.cycles.vapour_compression_mvr_cascade as vc
 import OpenPinch.analysis.heat_pumps.service as hp
 import OpenPinch.analysis.heat_pumps.targeting.vapour_compression_mvr as hp_vc_mvr
 import OpenPinch.analysis.targeting.cascade as target_cascade
+from OpenPinch.analysis.heat_pumps.common._shared.streams import (
+    get_carnot_hpr_cycle_streams,
+)
 from OpenPinch.analysis.heat_pumps.common.encoding import (
     DutyAllocationRequest,
     StageDutyRequest,
@@ -1327,7 +1330,9 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     assert len(bnds) == x0.shape[0]
     unpacked = hp_vc_mvr._unpack_vc_mvr_state(state, args)
     np.testing.assert_allclose(unpacked["T_cond_vc"], init_res.T_cond)
-    np.testing.assert_allclose(unpacked["T_evap_vc"], init_res.T_evap)
+    np.testing.assert_allclose(
+        unpacked["T_evap_vc"], init_res.T_evap - args.dt_phase_change
+    )
     np.testing.assert_allclose(
         decode_available_fractions(state.x_heat_split, state.Q_heat_available),
         np.minimum(init_res.Q_cond, state.Q_heat_available),
@@ -1336,7 +1341,7 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     np.testing.assert_allclose(state.T_cond[:2], unpacked["T_cond_mvr"])
     np.testing.assert_allclose(state.T_cond[2:], init_res.T_cond)
     np.testing.assert_allclose(state.T_evap[:2], unpacked["T_evap_mvr"])
-    np.testing.assert_allclose(state.T_evap[2:], init_res.T_evap)
+    np.testing.assert_allclose(state.T_evap[2:], init_res.T_evap - args.dt_phase_change)
     assert state.dT_subcool.shape == (4,)
     np.testing.assert_allclose(state.dT_subcool[:2], unpacked["dT_subcool_mvr"])
     np.testing.assert_allclose(state.dT_subcool[2:], unpacked["dT_subcool_vc"])
@@ -1630,3 +1635,35 @@ def test_vc_mvr_parse_floors_evaporation_at_the_refrigerant_minimum():
     state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
 
     assert state.T_evap[-1] == pytest.approx(0.01, abs=1e-5)
+
+
+def test_warm_start_evaporator_stream_covers_carnot_evaporator_stream():
+    # A Carnot evaporator at T_evap = -0.09 C spans [-0.10, -0.09] C; the
+    # VC stage's vapour evaporator must start at the same lower edge.
+    args = _base_args(
+        n_cond=1,
+        n_evap=1,
+        n_mvr=1,
+        dt_phase_change=0.01,
+        T_hot=np.array([30.0, 10.0, -20.0]),
+        refrigerant_ls=["ammonia"],
+    )
+    init_res = SimpleNamespace(
+        T_cond=np.array([40.0]),
+        Q_cond=np.array([100.0]),
+        T_evap=np.array([-0.09]),
+        Q_evap=np.array([80.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=0.0,
+    )
+
+    x0, _ = hp_vc_mvr._get_vc_mvr_opt_setup(init_res=init_res, args=args)
+    state = hp_vc_mvr._parse_vc_mvr_state_variables(x0, args)
+    unpacked = hp_vc_mvr._unpack_vc_mvr_state(state, args)
+    carnot = get_carnot_hpr_cycle_streams(
+        init_res.T_cond, init_res.Q_cond, init_res.T_evap, init_res.Q_evap, args
+    )
+    carnot_bottom = min(float(s.supply_temperature) for s in carnot.get_cold_streams())
+
+    assert carnot_bottom == pytest.approx(-0.10, abs=1e-9)
+    assert unpacked["T_evap_vc"][-1] == pytest.approx(carnot_bottom, abs=1e-9)

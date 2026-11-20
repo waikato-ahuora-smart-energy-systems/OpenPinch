@@ -6,6 +6,9 @@ import pytest
 
 import OpenPinch.analysis.heat_pumps.targeting.parallel_vapour_compression as hp_parallel_vapour
 import OpenPinch.analysis.targeting.cascade as target_cascade
+from OpenPinch.analysis.heat_pumps.common._shared.streams import (
+    get_carnot_hpr_cycle_streams,
+)
 from OpenPinch.analysis.heat_pumps.common.encoding import decode_available_fractions
 from OpenPinch.contracts.hpr import HPRParsedState
 
@@ -72,7 +75,7 @@ def test_parallel_x0_round_trips_with_ambient_cooling_seed():
     )
     vars = hp_parallel_vapour._parse_parallel_hp_state_temperatures(x0, args)
 
-    np.testing.assert_allclose(vars.T_evap, init_res.T_evap)
+    np.testing.assert_allclose(vars.T_evap, init_res.T_evap - args.dt_phase_change)
     np.testing.assert_allclose(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available),
         np.minimum(init_res.Q_cond, vars.Q_heat_available),
@@ -282,3 +285,35 @@ def test_parallel_parse_floors_evaporation_at_the_refrigerant_minimum():
 
     assert state.T_evap[0] == pytest.approx(0.01, abs=1e-5)
     assert state.T_evap[1] == pytest.approx(-20.0)
+
+
+def test_warm_start_evaporator_stream_covers_carnot_evaporator_stream():
+    # A Carnot evaporator at T_evap = -0.09 C spans [-0.10, -0.09] C. The
+    # vapour evaporator widens a flat profile upwards from its saturation
+    # temperature, so the decoded seed must start at the same lower edge,
+    # not 0.01 K above it.
+    args = _base_args(
+        n_cond=1,
+        n_evap=1,
+        dt_phase_change=0.01,
+        T_hot=np.array([30.0, 10.0, -20.0]),
+        refrigerant_ls=["ammonia"],
+    )
+    init_res = SimpleNamespace(
+        T_cond=np.array([40.0]),
+        Q_cond=np.array([100.0]),
+        T_evap=np.array([-0.09]),
+        Q_evap=np.array([80.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=0.0,
+    )
+
+    x0, _ = hp_parallel_vapour._get_parallel_hp_opt_setup(init_res, args)
+    state = hp_parallel_vapour._parse_parallel_hp_state_temperatures(x0, args)
+    carnot = get_carnot_hpr_cycle_streams(
+        init_res.T_cond, init_res.Q_cond, init_res.T_evap, init_res.Q_evap, args
+    )
+    carnot_bottom = min(float(s.supply_temperature) for s in carnot.get_cold_streams())
+
+    assert carnot_bottom == pytest.approx(-0.10, abs=1e-9)
+    assert state.T_evap[-1] == pytest.approx(carnot_bottom, abs=1e-9)

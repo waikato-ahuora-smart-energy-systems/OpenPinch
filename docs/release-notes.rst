@@ -4,6 +4,20 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The vapour-compression warm starts (parallel, cascade and VC-MVR) now
+  seed each evaporator ``dt_phase_change`` below the Carnot evaporating
+  temperature. A Carnot evaporator at ``T`` spans
+  ``[T - dt_phase_change, T]`` but a vapour evaporator widens upwards from
+  its saturation temperature, so the seed sat 0.01 K warmer than the Carnot
+  design. On a utility background, where a refrigeration band is 0.1 K
+  wide, that lost 10% of the band's duty to refrigeration. On a brewery
+  utility-placement case the parallel seed now costs 431.4 k$/y rather than
+  446.6 k$/y (refrigeration 79.0 kW rather than 105.5 kW), and a search that
+  kept the seed kept the dearer design.
+
 Zones and targeting
 ~~~~~~~~~~~~~~~~~~~
 
@@ -29,6 +43,13 @@ Heat exchanger network synthesis
   parent utility instead, so a slice only part of the range could reach
   was rejected ("on the wrong side of the stream's temperature range") and
   the network could not be rated, overdesigned or fitted.
+- Overdesign no longer drops the cheapest networks. It rated every network
+  at the 1 K default approach, while evolution designs down to 0.1 K, and
+  rated each unit at exactly its design area, which left the solver no
+  slack; so even a margin of 0 could make the cheapest network infeasible
+  and select a dearer one (758,193 against 720,517 $/y in one case). Rating
+  for overdesign now uses the approach the network's method designed it
+  to, and the rating cap has a 1e-6 relative slack.
 - ``optimise_duties``, ``retrofit`` and ``retrofit_heat_pumps`` refuse the
   network ``total_site_heat_exchanger_network()`` returns. The earlier guard
   caught only a site seed, so the designed site network was re-priced unit
