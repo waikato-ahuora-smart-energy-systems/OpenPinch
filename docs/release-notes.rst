@@ -4,6 +4,20 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The vapour-compression warm starts (parallel, cascade and VC-MVR) now
+  seed each evaporator ``dt_phase_change`` below the Carnot evaporating
+  temperature. A Carnot evaporator at ``T`` spans
+  ``[T - dt_phase_change, T]`` but a vapour evaporator widens upwards from
+  its saturation temperature, so the seed sat 0.01 K warmer than the Carnot
+  design. On a utility background, where a refrigeration band is 0.1 K
+  wide, that lost 10% of the band's duty to refrigeration. On a brewery
+  utility-placement case the parallel seed now costs 431.4 k$/y rather than
+  446.6 k$/y (refrigeration 79.0 kW rather than 105.5 kW), and a search that
+  kept the seed kept the dearer design.
+
 Zones and targeting
 ~~~~~~~~~~~~~~~~~~~
 
