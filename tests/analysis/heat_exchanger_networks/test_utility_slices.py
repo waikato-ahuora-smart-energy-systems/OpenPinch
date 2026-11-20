@@ -344,3 +344,68 @@ def test_the_workflow_reads_slicing_from_the_configuration(option):
     )
 
     assert built.utility_slicing is option
+
+
+def _renamed(arrays, old: str, new: str):
+    """``arrays`` with hot utility ``old`` named ``new``."""
+    from dataclasses import replace
+
+    identities = {
+        axis: [new if name == old else name for name in names]
+        for axis, names in arrays.utility_identities.items()
+    }
+    axis_maps = {
+        axis: {(new if name == old else name): index for name, index in names.items()}
+        for axis, names in arrays.axis_maps.items()
+    }
+    return replace(arrays, utility_identities=identities, axis_maps=axis_maps)
+
+
+def test_named_slices_cut_a_utility_where_its_labels_say(arrays):
+    from OpenPinch.analysis.heat_exchanger_networks.solver.utility_slices import (
+        with_named_slices,
+    )
+
+    sliced = with_named_slices(arrays, {"hot": {f"{HW}@90-87.1"}})
+
+    slices = sliced.preparation["utility_slices"]["hot_utilities"]
+    assert slices[f"{HW}@90-87.1"][0] == HW
+    assert slices[f"{HW}@87.1-70"][0] == HW
+
+
+def test_a_utility_named_with_an_at_sign_is_not_taken_for_a_slice(arrays):
+    """Utility names may hold ``@``: a slice's parent is the longest
+    utility name its label starts with, and a label that is itself a
+    utility's name is no slice."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.utility_slices import (
+        with_named_slices,
+    )
+
+    plant = _renamed(arrays, HW, f"{HW}@plant")
+
+    assert with_named_slices(plant, {"hot": {f"{HW}@plant"}}) is plant
+    sliced = with_named_slices(plant, {"hot": {f"{HW}@plant@90-87.1"}})
+    slices = sliced.preparation["utility_slices"]["hot_utilities"]
+    assert slices[f"{HW}@plant@90-87.1"][0] == f"{HW}@plant"
+
+
+def test_a_held_level_counts_its_slices():
+    """The fit's padding names a sliced unit by its slice; the level hold
+    counts it under its parent."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        _level_holds,
+    )
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    heater = SimpleNamespace(
+        kind=HeatExchangerKind.HOT_UTILITY,
+        source_stream=f"{HW}@90-87.1",
+        sink_stream="Site.C1",
+    )
+    request = SimpleNamespace(level_targets={HW: (40.0,)})
+
+    holds = _level_holds(request, [heater], [("utility", 0)], [0])
+
+    assert holds == (((0,), (40.0,)),)

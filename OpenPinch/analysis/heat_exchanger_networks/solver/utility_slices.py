@@ -214,30 +214,45 @@ def _merged(shares: list[float], values, short: str, u: int) -> list[float]:
     return kept
 
 
-def slice_parent(label: str) -> str:
-    """The parent utility of a slice label (a plain name is its own)."""
-    return label.split("@", 1)[0]
+def slice_parent(label: str, parents) -> str:
+    """The utility in ``parents`` a slice label belongs to: the longest name
+    the label starts with, then ``@``; a name in ``parents`` is its own.
+    Utility names may hold ``@`` themselves, so the label is not split."""
+    if label in parents:
+        return label
+    owners = [name for name in parents if label.startswith(f"{name}@")]
+    return max(owners, key=len) if owners else label
 
 
 def slice_label(exchanger) -> str | None:
-    """The utility slice a heater's or cooler's id names, if any.
+    """The utility slice a heater's or cooler's id may name.
 
     Synthesis ids read ``hot-utility:<utility>-><stream>`` and
-    ``cold-utility:<stream>-><utility>``, with an optional ``:S<stage>``;
-    a sliced utility is ``<parent>@<inlet>-<outlet>``.
+    ``cold-utility:<stream>-><utility>``, with ``:S<stage>`` for a staged
+    unit; the stream and stage come from the exchanger itself, so names
+    holding ``->`` or ``:S`` do not mislead. A unit named after a slice (as
+    the fit's padding names it) is its own candidate. Any ``@`` makes a
+    candidate; ``with_named_slices`` keeps only those that slice a utility
+    on its axis.
     """
+    heater = exchanger.kind.value == "hot_utility"
+    utility = exchanger.source_stream if heater else exchanger.sink_stream
     identifier = exchanger.exchanger_id or ""
-    kind, _, body = identifier.partition(":")
-    left, arrow, right = body.partition("->")
-    if not arrow:
-        return None
-    if kind == "hot-utility":
-        name = left
-    elif kind == "cold-utility":
-        name = right.rsplit(":S", 1)[0] if ":S" in right else right
+    stage = getattr(exchanger, "stage", None)
+    suffix = f":S{stage}" if stage is not None else ""
+    if suffix and identifier.endswith(suffix):
+        identifier = identifier[: -len(suffix)]
+    if heater:
+        prefix, end = "hot-utility:", f"->{exchanger.sink_stream}"
+        named = (
+            identifier[len(prefix) : -len(end)]
+            if identifier.startswith(prefix) and identifier.endswith(end)
+            else utility
+        )
     else:
-        return None
-    return name if "@" in name else None
+        prefix = f"cold-utility:{exchanger.source_stream}->"
+        named = identifier[len(prefix) :] if identifier.startswith(prefix) else utility
+    return named if "@" in named else None
 
 
 def slice_labels(exchangers) -> dict[str, set[str]]:
@@ -265,14 +280,20 @@ def with_named_slices(
     for side, short, _long, _matched in _SIDES:
         names = list(arrays.utility_identities[f"{side}_utilities"])
         for label in labels.get(side, ()):
-            parent, _, span = label.partition("@")
-            if not span or parent not in names:
+            parent = slice_parent(label, names)
+            if parent == label or parent not in names:
+                continue
+            span = label[len(parent) + 1 :]
+            try:
+                ends_text = _span_ends(span)
+                float(ends_text[0]), float(ends_text[1])
+            except ValueError:
                 continue
             u = names.index(parent)
             inlet = float(arrays.arrays[f"T_{short}_in_period"][0][u])
             outlet = float(arrays.arrays[f"T_{short}_out_period"][0][u])
             ends = cuts[side].setdefault(parent, [0.0, 1.0])
-            for text in _span_ends(span):
+            for text in ends_text:
                 share = (float(text) + 273.15 - inlet) / (outlet - inlet)
                 if 0.0 < share < 1.0:
                     ends.append(share)

@@ -128,7 +128,7 @@ def with_stream_end_utilities(
                     placements.append((stream, utility))
             for name, u in names.items():
                 if (
-                    slice_parent(name) in levels
+                    slice_parent(name, levels) in levels
                     and (stream, name) not in placements
                     and reaches(side, index, u)
                 ):

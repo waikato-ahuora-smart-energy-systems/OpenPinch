@@ -72,6 +72,7 @@ from .solver.utility_slices import (
     slice_label,
     slice_labels,
     slice_parent,
+    utility_slices,
     with_named_slices,
 )
 from .targeting._stage import run_single_method_workflow, run_stage
@@ -399,6 +400,8 @@ def _level_holds(request, exchangers, slots, positions) -> tuple:
             if exchanger.kind is HeatExchangerKind.HOT_UTILITY
             else exchanger.sink_stream
         )
+        # A unit the fit's padding named by its slice counts for its parent.
+        name = slice_parent(name, units)
         if name in units:
             units[name].append(index)
     holds = []
@@ -430,6 +433,12 @@ def build_solution_network(
     period_ids = tuple(str(value) for value in solver_arrays.arrays["period_ids"])
     user_exchangers = _structural_exchangers(request.network)
     spec = structure.spec
+    # Each slice reported under its parent utility, as synthesis does.
+    parents = {
+        label: parent
+        for side in utility_slices(solver_arrays).values()
+        for label, (parent, _share) in side.items()
+    }
 
     exchangers: list[HeatExchanger] = []
     for position, (kind, index), result in zip(
@@ -448,14 +457,20 @@ def build_solution_network(
             match = spec.utilities[index]
             stage = user.stage
             if match.side == HEATER:
-                source = slice_parent(names["hot_utilities"][match.utility])
+                source = parents.get(
+                    names["hot_utilities"][match.utility],
+                    names["hot_utilities"][match.utility],
+                )
                 sink = names["cold_process_streams"][match.stream]
                 exchanger_kind = HeatExchangerKind.HOT_UTILITY
                 roles = (StreamID.Utility, StreamID.Process)
                 default_id = f"hot-utility:{source}->{sink}"
             else:
                 source = names["hot_process_streams"][match.stream]
-                sink = slice_parent(names["cold_utilities"][match.utility])
+                sink = parents.get(
+                    names["cold_utilities"][match.utility],
+                    names["cold_utilities"][match.utility],
+                )
                 exchanger_kind = HeatExchangerKind.COLD_UTILITY
                 roles = (StreamID.Process, StreamID.Utility)
                 default_id = f"cold-utility:{source}->{sink}"
