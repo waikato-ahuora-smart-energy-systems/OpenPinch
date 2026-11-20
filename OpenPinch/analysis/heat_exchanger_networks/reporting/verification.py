@@ -482,7 +482,11 @@ def _check_area_consistency(
     period_id: str,
 ) -> list[str]:
     metadata = network.source_metadata
-    failures = _check_segment_contribution_areas(network.exchangers, period_id)
+    failures = _check_segment_contribution_areas(
+        network.exchangers,
+        period_id,
+        allowances=metadata.get("rating_area_allowances"),
+    )
     if _uses_isothermal_stage_boundaries(metadata):
         return failures
     period_idx = (
@@ -572,6 +576,7 @@ def _check_segment_contribution_balances(
 def _check_segment_contribution_areas(
     exchangers: Iterable[HeatExchanger],
     period_id: str,
+    allowances=None,
 ) -> list[str]:
     failures = []
     for exchanger in exchangers:
@@ -598,10 +603,14 @@ def _check_segment_contribution_areas(
         if design_area is None:
             continue
         # As for single-segment exchangers, spare area (an installed unit
-        # running below its area) is fine; only too little fails.
-        if exchanger.area + _AREA_ABS_TOL < design_area and not _close(
+        # running below its area) is fine; only too little fails. A rated
+        # unit's area is widened by its rating allowance.
+        area = exchanger.area * float(
+            (allowances or {}).get(exchanger.exchanger_id, 1.0)
+        )
+        if area + _AREA_ABS_TOL < design_area and not _close(
             design_area,
-            exchanger.area,
+            area,
             rel_tol=_AREA_REL_TOL,
             abs_tol=_AREA_ABS_TOL,
         ):
