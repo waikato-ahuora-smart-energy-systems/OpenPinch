@@ -83,6 +83,11 @@ def add_site_balance(
             imports[i] = m.Var(value=0.0, lb=0.0, ub=bound)
         if level.dumps:
             dumps[i] = m.Var(value=0.0, lb=0.0)
+            # A dump credit (a negative price) pays for steam the processes
+            # raise; dumping bought or let-down steam earns none, and
+            # crediting it would let the site buy steam to sell it.
+            if level.dump_price[n] < 0.0:
+                m.Equation(dumps[i] <= generation[i])
     flows = {pair: m.Var(value=0.0, lb=0.0) for pair in letdowns(levels, n)}
     for i in range(len(items)):
         out = [flow for (h, _low), flow in flows.items() if h == i]

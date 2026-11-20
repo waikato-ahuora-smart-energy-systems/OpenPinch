@@ -567,3 +567,25 @@ def test_the_level_held_seed_raises_steam_from_a_hot_streams_hottest_part():
     }
     assert balance["LP"].generation == pytest.approx(52.6, abs=0.1)
     assert balance["LP"].imported == pytest.approx(0.0, abs=0.1)
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_credit_for_raised_steam_does_not_unbound_the_site():
+    """A negative dump price credits steam the processes raise; it used to
+    credit any dump, so buying HPS, letting it down and dumping it for the
+    credit made the site balance unbounded and the design failed. A level
+    with a credit now dumps no more than the processes raise on it."""
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "LPG":
+            utility["price"] = {"value": -50.0, "unit": "$/MWh"}
+    problem = PinchProblem(source=source)
+
+    view = problem.design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1, "HENS_MAX_PARALLEL": 1}
+    )
+
+    for row in view.selected_network.source_metadata["site_utility_balance"].balances:
+        if row.level == "LPG":
+            assert row.dump <= row.generation + 1e-6

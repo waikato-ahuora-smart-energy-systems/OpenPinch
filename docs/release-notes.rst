@@ -36,6 +36,15 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A credit (negative) price for a cold utility level no longer makes a
+  total site design fail. The credit paid for any steam dumped, so buying
+  steam, letting it down and dumping it earned without limit; a level with
+  a credit now dumps no more than the processes raise on it.
+- Heat pump retrofit targets price each side at the utilities the
+  network's heaters (or coolers) use, duty-weighted, not at the first one
+  listed; a dearer utility listed first overstated the operating cost.
+- A Carnot heat pump in a retrofit pays ``new_unit_cost`` for its
+  evaporator and condenser, as any new exchanger does.
 - ``design.pinch_design``, ``design.thermal_derivative`` and
   ``design.network_evolution`` refuse a ``period_id`` on a multiperiod case.
   They design over every period and used the period only as a label, so
