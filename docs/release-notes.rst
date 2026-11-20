@@ -36,6 +36,22 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``optimise_duties(objective="rating")`` rated at 1 K when no
+  ``min_approach_temperature`` was given, so it failed on the default
+  design's own network whenever evolution had closed an approach below 1 K.
+  It now rates at the approach the network was designed to, as overdesign
+  does. The docstring now lists four objectives and says rating needs an
+  installed area on every heater and cooler too.
+- A failed fixed-structure solve (a rating, a fit or ``optimise_duties``)
+  was reported as ``network_evolution_method(dt_cont x1)``; it is now named
+  as a fixed-structure duty optimisation with its objective.
+- Retrofit networks, the rated existing network included, failed
+  ``verify_network_feasibility`` with areas 1 to 2 % short: retrofit rates
+  each installed unit at its area widened by ``area_tolerance`` and by the
+  Chen cap's rating allowance but did not record it. Each network now
+  records that widening in ``source_metadata["rating_area_allowances"]``,
+  as a rating does, and every frontier network of the guide's example
+  verifies.
 - A total site design with ``levels="placed"`` carried utility
   placement's fallback ``HU`` and ``CU`` into the design: on the unit test
   site, two levels sent all cooling to a -30 C cooler priced as cooling

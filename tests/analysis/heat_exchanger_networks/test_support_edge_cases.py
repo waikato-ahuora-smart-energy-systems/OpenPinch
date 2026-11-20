@@ -1166,3 +1166,21 @@ def test_extraction_reads_numbers_and_bracketed_values_directly():
     assert extraction_metadata._optional_float(_BracketedValue([0.5])) == 0.5
     assert extraction_metadata._optional_float(_BracketedValue()) is None
     assert extraction_metadata._optional_float(3) == 3.0
+
+
+def test_a_failed_fixed_structure_task_is_named_by_its_objective():
+    """Fixed-structure duty optimisation is stamped with the evolution
+    method; its failure names the fixed-structure solve, not evolution."""
+    task = _task(method="network_evolution_method").model_copy(
+        update={"settings": {"fixed_structure": True, "duty_objective": "rating"}}
+    )
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task, status="failed", error="Solver termination condition: infeasible"
+    )
+
+    summary = assembly._failed_outcome_summary((outcome,))
+
+    assert summary == (
+        "fixed-structure duty optimisation ('rating' objective): "
+        "Solver termination condition: infeasible"
+    )

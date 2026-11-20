@@ -226,13 +226,23 @@ def _failed_outcome_summary(
     summaries = []
     for outcome in failed[:3]:
         reason = outcome.error or outcome.solver_status or "no failure reason"
-        summaries.append(
-            f"{outcome.task.method}(dt_cont x{outcome.task.dt_cont_multiplier:g}): "
-            f"{reason}"
-        )
+        summaries.append(f"{_task_label(outcome.task)}: {reason}")
     if len(failed) > len(summaries):
         summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")
     return "; ".join(summaries)
+
+
+def _task_label(task) -> str:
+    """How a failure names ``task``: a fixed-structure duty optimisation by
+    its objective (its method stamp is the evolution method's), any other
+    task by its method and dt_cont multiplier."""
+    settings = task.settings or {}
+    if settings.get("fixed_structure"):
+        return (
+            "fixed-structure duty optimisation "
+            f"({settings.get('duty_objective')!r} objective)"
+        )
+    return f"{task.method}(dt_cont x{task.dt_cont_multiplier:g})"
 
 
 def _infeasible_outcome_summary(

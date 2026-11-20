@@ -1780,7 +1780,7 @@ class _DesignAccessor:
         ``cold_utility`` keys, defaulting to the problem's only hot and cold
         utility; ``stage_count`` is optional.
 
-        Duties and stream split fractions are optimised for one of three
+        Duties and stream split fractions are optimised for one of four
         objectives; matches stay fixed:
 
         * ``"utility"``: minimise total utility use. Each exchanger keeps at
@@ -1796,10 +1796,15 @@ class _DesignAccessor:
           common areas (``COSTING_HX_*`` settings) plus utility cost. Only a
           positive approach is required at both ends of each exchanger,
           ``min_approach_temperature`` defaulting to 1 K.
-        * ``"rating"``: minimise utility cost with every recovery exchanger's
-          area fixed at the network's ``area`` (each needs one). Every
-          period's duty must fit that area; a period needing less runs with
-          a bypass. The approach defaults to 1 K, as for ``"cost"``.
+        * ``"rating"``: minimise utility cost with every exchanger's area,
+          recovery exchangers, heaters and coolers alike, fixed at the
+          network's ``area`` (each needs one). Every period's duty must fit
+          that area; a period needing less runs with a bypass.
+          ``min_approach_temperature`` defaults to the approach the network
+          was designed to: 0.1 K (or ``HENS_MIN_EXCHANGER_APPROACH_SHARE``
+          of the nominal approach if larger) for a thermal derivative or
+          evolution network, else each exchanger's stream temperature
+          contributions, scaled by the network's dt_cont multiplier.
 
         An exchanger left at zero duty in every period is removed, with its
         approach constraint, and the problem is solved again until every
@@ -1811,10 +1816,17 @@ class _DesignAccessor:
         """
         if isinstance(network, Mapping):
             network = self._network_from_structure(network)
+        # Rating holds the approach the network was designed to, as
+        # overdesign does: evolution designs down to 0.1 K.
+        design = (
+            self._design_approach(network, self._effective_hens(options))
+            if objective == "rating" and min_approach_temperature is None
+            else {"min_approach_temperature": min_approach_temperature}
+        )
         return self._optimise_duties(
             network,
             objective=objective,
-            min_approach_temperature=min_approach_temperature,
+            **design,
             exchanger_approach_temperatures=exchanger_approach_temperatures,
             max_hot_utility=max_hot_utility,
             max_cold_utility=max_cold_utility,

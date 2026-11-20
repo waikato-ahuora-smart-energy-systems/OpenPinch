@@ -779,10 +779,10 @@ class _Evaluator:
                 exchanger_id: reported.get(slot, 1.0)
                 for slot, exchanger_id in zip(structure.slots, ids)
             }
-            if verify_solution(
-                structure, model, self._widened(solved, state.enhanced, allowances)
-            ):
+            widened = self._widened(solved, state.enhanced, allowances)
+            if verify_solution(structure, model, widened):
                 return None
+            solved = _with_rating_allowances(solved, widened)
             results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
             values = getattr(model, "area_values", None)
@@ -1223,6 +1223,35 @@ def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]
         ]
         names[key] = matches[0] if len(matches) == 1 else key
     return names
+
+
+def _with_rating_allowances(
+    network: HeatExchangerNetwork, widened: HeatExchangerNetwork
+) -> HeatExchangerNetwork:
+    """``network`` recording, per existing unit, how much its reported area
+    was widened to rate it (``widened``'s area over its own: the area
+    tolerance, the Chen cap's rating allowance and any enhancement), as
+    ``rating_area_allowances``, so verification judges it as it was rated;
+    the largest is ``summary_metrics["rating_area_allowance"]``."""
+
+    rated = {e.exchanger_id: e.area for e in widened.exchangers}
+    allowances = {
+        e.exchanger_id: float(rated[e.exchanger_id]) / float(e.area)
+        for e in network.exchangers
+        if e.exchanger_id is not None
+        and e.area
+        and rated.get(e.exchanger_id) not in (None, e.area)
+    }
+    if not allowances:
+        return network
+    return network.model_copy(
+        update={
+            "source_metadata": dict(network.source_metadata)
+            | {"rating_area_allowances": allowances},
+            "summary_metrics": dict(network.summary_metrics)
+            | {"rating_area_allowance": max(allowances.values())},
+        }
+    )
 
 
 def _with_names(network: HeatExchangerNetwork, names) -> HeatExchangerNetwork:
