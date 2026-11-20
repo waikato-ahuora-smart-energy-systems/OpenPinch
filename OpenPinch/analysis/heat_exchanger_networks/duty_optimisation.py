@@ -68,6 +68,13 @@ from .models.fixed_structure import (
 )
 from .prepared_problem import SynthesisProblem
 from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
+from .solver.utility_slices import (
+    slice_label,
+    slice_labels,
+    slice_parent,
+    utility_slices,
+    with_named_slices,
+)
 from .targeting._stage import run_single_method_workflow, run_stage
 
 DutyObjective = Literal["utility", "area", "cost", "rating"]
@@ -310,9 +317,15 @@ def fixed_network_structure(
                 recovery_points[index] = _design_points(exchanger, periods)
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            # A sliced utility runs on the slice its id names, when the axis
+            # has it (``with_named_slices``).
+            sliced = slice_label(exchanger)
             if heater:
                 utility = _resolve_stream(
-                    exchanger.source_stream, hot_utility_axis, "hot utility", label
+                    sliced if sliced in hot_utility_axis else exchanger.source_stream,
+                    hot_utility_axis,
+                    "hot utility",
+                    label,
                 )
                 stream = _resolve_stream(
                     exchanger.sink_stream, cold_axis, "cold process", label
@@ -323,7 +336,10 @@ def fixed_network_structure(
                     exchanger.source_stream, hot_axis, "hot process", label
                 )
                 utility = _resolve_stream(
-                    exchanger.sink_stream, cold_utility_axis, "cold utility", label
+                    sliced if sliced in cold_utility_axis else exchanger.sink_stream,
+                    cold_utility_axis,
+                    "cold utility",
+                    label,
                 )
                 default_stage = stage_count
             stage = exchanger.stage if exchanger.stage is not None else default_stage
@@ -390,6 +406,8 @@ def _level_holds(request, exchangers, slots, positions) -> tuple:
             if exchanger.kind is HeatExchangerKind.HOT_UTILITY
             else exchanger.sink_stream
         )
+        # A unit the fit's padding named by its slice counts for its parent.
+        name = slice_parent(name, units)
         if name in units:
             units[name].append(index)
     holds = []
@@ -421,6 +439,12 @@ def build_solution_network(
     period_ids = tuple(str(value) for value in solver_arrays.arrays["period_ids"])
     user_exchangers = _structural_exchangers(request.network)
     spec = structure.spec
+    # Each slice reported under its parent utility, as synthesis does.
+    parents = {
+        label: parent
+        for side in utility_slices(solver_arrays).values()
+        for label, (parent, _share) in side.items()
+    }
 
     exchangers: list[HeatExchanger] = []
     for position, (kind, index), result in zip(
@@ -439,14 +463,20 @@ def build_solution_network(
             match = spec.utilities[index]
             stage = user.stage
             if match.side == HEATER:
-                source = names["hot_utilities"][match.utility]
+                source = parents.get(
+                    names["hot_utilities"][match.utility],
+                    names["hot_utilities"][match.utility],
+                )
                 sink = names["cold_process_streams"][match.stream]
                 exchanger_kind = HeatExchangerKind.HOT_UTILITY
                 roles = (StreamID.Utility, StreamID.Process)
                 default_id = f"hot-utility:{source}->{sink}"
             else:
                 source = names["hot_process_streams"][match.stream]
-                sink = names["cold_utilities"][match.utility]
+                sink = parents.get(
+                    names["cold_utilities"][match.utility],
+                    names["cold_utilities"][match.utility],
+                )
                 exchanger_kind = HeatExchangerKind.COLD_UTILITY
                 roles = (StreamID.Process, StreamID.Utility)
                 default_id = f"cold-utility:{source}->{sink}"
@@ -580,11 +610,14 @@ class FixedStructureDutyExecutor:
         removed: list[str] = []
         warm: dict[int, float] | None = None
         try:
-            arrays = problem_to_solver_arrays(
-                problem,
-                nominal_approach_temperature(
-                    problem.master_zone.config, task.dt_cont_multiplier
+            arrays = with_named_slices(
+                problem_to_solver_arrays(
+                    problem,
+                    nominal_approach_temperature(
+                        problem.master_zone.config, task.dt_cont_multiplier
+                    ),
                 ),
+                slice_labels(user_exchangers),
             )
             while True:
                 structure = fixed_network_structure(

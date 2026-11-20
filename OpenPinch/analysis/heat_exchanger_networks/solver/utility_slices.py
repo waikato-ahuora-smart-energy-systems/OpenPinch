@@ -33,7 +33,10 @@ _SIDES = (
 
 
 def with_utility_slices(
-    arrays: PreparedSolverArrays, *, like: PreparedSolverArrays | None = None
+    arrays: PreparedSolverArrays,
+    *,
+    like: PreparedSolverArrays | None = None,
+    cuts: dict[str, dict[str, list[float]]] | None = None,
 ) -> PreparedSolverArrays:
     """``arrays`` with each sliding utility replaced by its slices in series.
 
@@ -41,11 +44,13 @@ def with_utility_slices(
     outlet, named ``"<parent>@<inlet>-<outlet>"`` (degrees Celsius, period
     0). ``preparation["utility_slices"]`` maps each slice to its parent and
     its share of the parent's range, per side. With ``like``, the cuts are
-    ``like``'s (a child task keeps its parent's slices). With no cut,
-    ``arrays`` itself is returned.
+    ``like``'s (a child task keeps its parent's slices); with ``cuts`` (by
+    side and parent, shares of its range from its inlet), those. With no
+    cut, ``arrays`` itself is returned.
     """
 
-    cuts = _cuts_from(like) if like is not None else _cuts(arrays)
+    if cuts is None:
+        cuts = _cuts_from(like) if like is not None else _cuts(arrays)
     if not any(cuts[side] for side, *_rest in _SIDES):
         return arrays
     data = {name: values.copy() for name, values in arrays.arrays.items()}
@@ -209,6 +214,111 @@ def _merged(shares: list[float], values, short: str, u: int) -> list[float]:
     return kept
 
 
+def slice_parent(label: str, parents) -> str:
+    """The utility in ``parents`` a slice label belongs to: the longest name
+    the label starts with, then ``@``; a name in ``parents`` is its own.
+    Utility names may hold ``@`` themselves, so the label is not split."""
+    if label in parents:
+        return label
+    owners = [name for name in parents if label.startswith(f"{name}@")]
+    return max(owners, key=len) if owners else label
+
+
+def slice_label(exchanger) -> str | None:
+    """The utility slice a heater's or cooler's id may name.
+
+    Synthesis ids read ``hot-utility:<utility>-><stream>`` and
+    ``cold-utility:<stream>-><utility>``, with ``:S<stage>`` for a staged
+    unit; the stream and stage come from the exchanger itself, so names
+    holding ``->`` or ``:S`` do not mislead. A unit named after a slice (as
+    the fit's padding names it) is its own candidate. Any ``@`` makes a
+    candidate; ``with_named_slices`` keeps only those that slice a utility
+    on its axis.
+    """
+    heater = exchanger.kind.value == "hot_utility"
+    utility = exchanger.source_stream if heater else exchanger.sink_stream
+    identifier = exchanger.exchanger_id or ""
+    stage = getattr(exchanger, "stage", None)
+    suffix = f":S{stage}" if stage is not None else ""
+    if suffix and identifier.endswith(suffix):
+        identifier = identifier[: -len(suffix)]
+    if heater:
+        prefix, end = "hot-utility:", f"->{exchanger.sink_stream}"
+        named = (
+            identifier[len(prefix) : -len(end)]
+            if identifier.startswith(prefix) and identifier.endswith(end)
+            else utility
+        )
+    else:
+        prefix = f"cold-utility:{exchanger.source_stream}->"
+        named = identifier[len(prefix) :] if identifier.startswith(prefix) else utility
+    return named if "@" in named else None
+
+
+def slice_labels(exchangers) -> dict[str, set[str]]:
+    """The slice labels the heaters (``"hot"``) and coolers name."""
+    labels: dict[str, set[str]] = {"hot": set(), "cold": set()}
+    for exchanger in exchangers:
+        label = slice_label(exchanger)
+        if label is not None:
+            side = "hot" if exchanger.kind.value == "hot_utility" else "cold"
+            labels[side].add(label)
+    return labels
+
+
+def with_named_slices(
+    arrays: PreparedSolverArrays, labels: dict[str, set[str]]
+) -> PreparedSolverArrays:
+    """``arrays`` sliced so each slice label in ``labels`` (by side, as
+    ``with_utility_slices`` names them) is a utility on its axis.
+
+    A network designed with slices names each heater's or cooler's slice in
+    its exchanger id; the cuts are read back from those labels' inlet and
+    outlet (degrees Celsius, period 0).
+    """
+    cuts: dict[str, dict[str, list[float]]] = {side: {} for side, *_r in _SIDES}
+    for side, short, _long, _matched in _SIDES:
+        names = list(arrays.utility_identities[f"{side}_utilities"])
+        for label in labels.get(side, ()):
+            parent = slice_parent(label, names)
+            if parent == label or parent not in names:
+                continue
+            span = label[len(parent) + 1 :]
+            try:
+                ends_text = _span_ends(span)
+                float(ends_text[0]), float(ends_text[1])
+            except ValueError:
+                continue
+            u = names.index(parent)
+            inlet = float(arrays.arrays[f"T_{short}_in_period"][0][u])
+            outlet = float(arrays.arrays[f"T_{short}_out_period"][0][u])
+            ends = cuts[side].setdefault(parent, [0.0, 1.0])
+            for text in ends_text:
+                share = (float(text) + 273.15 - inlet) / (outlet - inlet)
+                if 0.0 < share < 1.0:
+                    ends.append(share)
+    for side in cuts:
+        for parent, ends in list(cuts[side].items()):
+            merged = []
+            for share in sorted(ends):
+                if not merged or share - merged[-1] > 1e-9:
+                    merged.append(share)
+            # A label spanning the whole utility needs no cut.
+            if len(merged) > 2:
+                cuts[side][parent] = merged
+            else:
+                del cuts[side][parent]
+    return with_utility_slices(arrays, cuts=cuts)
+
+
+def _span_ends(span: str) -> tuple[str, str]:
+    """A slice label's inlet and outlet texts; either may be negative."""
+    for index in range(1, len(span)):
+        if span[index] == "-" and span[index - 1] not in "eE":
+            return span[:index], span[index + 1 :]
+    raise ValueError(f"not a utility slice span: {span!r}")
+
+
 def _cuts_from(like: PreparedSolverArrays) -> dict[str, dict[str, list[float]]]:
     result: dict[str, dict[str, list[float]]] = {side: {} for side, *_r in _SIDES}
     for side, *_rest in _SIDES:
@@ -262,7 +372,11 @@ def _take(data, short: str, long: str, order, fractions) -> None:
 __all__ = [
     "MINIMUM_SLICED_RANGE",
     "MINIMUM_SLICE_SPAN",
+    "slice_label",
+    "slice_labels",
+    "slice_parent",
     "sliced_decomposition",
     "utility_slices",
+    "with_named_slices",
     "with_utility_slices",
 ]
