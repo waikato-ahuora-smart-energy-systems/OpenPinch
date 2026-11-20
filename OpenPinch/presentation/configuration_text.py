@@ -423,6 +423,76 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "HENS_PDM_MILP)."
         ),
     ),
+    "HENS_UTILITY_PLACEMENT": FieldText(
+        "Utility placement", None,
+        (
+            "How synthesis shares duty between utility levels when there is more "
+            "than one hot or cold utility. \"temperature\" holds each level at the "
+            "duty targeting gives it, the least valuable (lowest exergy) level "
+            "first, as the grand composite curve places them, as a site design "
+            "does. \"price\" lets the pinch design choose the levels by utility "
+            "cost, as an isolated process does. \"auto\" (the default) is "
+            "\"price\" for a design covering one process zone and \"temperature\" "
+            "for one covering more."
+        ),
+    ),
+    "HENS_UTILITY_SLICES": FieldText(
+        "Utility slices in series", None,
+        (
+            "With more than one hot or cold utility, the pinch design holds each "
+            "utility level at its target and runs a utility whose temperature "
+            "slides (hot water, say) through slices in series, so one utility "
+            "flow can heat or cool several process streams in turn. False keeps "
+            "each heater and cooler on the utility's whole range."
+        ),
+    ),
+    "HENS_SITE_LEVELS": FieldText(
+        "Total site utility levels", None,
+        (
+            "Utility levels a total site network design uses: given uses the "
+            "case's own utilities; placed places them by utility placement once "
+            "per count in HENS_SITE_LEVEL_COUNTS, designs the site with each set "
+            "and keeps the cheapest design."
+        ),
+    ),
+    "HENS_SITE_LEVEL_COUNTS": FieldText(
+        "Total site level counts", None,
+        (
+            "Numbers of utility levels a placed total site design sweeps, each at "
+            "least 2. Each level serves heating and cooling, as a steam main does; "
+            "the case's sensible utilities (hot water, say) stay sensible while "
+            "two isothermal levels remain."
+        ),
+    ),
+    "HENS_SITE_LEVEL_EARLY_STOP": FieldText(
+        "Total site level early stop", None,
+        (
+            "End the level count sweep once two designed counts in a row cost "
+            "more than the cheapest before them."
+        ),
+    ),
+    "HENS_SITE_LEVEL_STEP": FieldText(
+        "Total site level step", "delta_degC",
+        (
+            "First step (K) by which a placed total site design moves each "
+            "placed level's temperature to lower the site total annual cost; it "
+            "halves when no move improves, down to HENS_SITE_LEVEL_STEP_MIN. 0 "
+            "moves no level."
+        ),
+    ),
+    "HENS_SITE_LEVEL_STEP_MIN": FieldText(
+        "Total site level minimum step", "delta_degC",
+        "Smallest level-temperature step (K) a placed total site design tries.",
+    ),
+    "HENS_SITE_TIME_LIMIT": FieldText(
+        "Total site time limit", "s",
+        (
+            "Wall-clock budget (s) for a placed total site design. Once it runs "
+            "out, no further level count or level move is started and the best "
+            "design so far is returned; a design already running finishes. At "
+            "least one level count is always designed. None sets no limit."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (
@@ -469,7 +539,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
         "Thermal derivative parent limit", None,
-        "Recorded in the synthesis manifest; no current synthesis step reads it.",
+        (
+            "The most MILP pinch design networks the thermal derivative step"
+            " refines, cheapest first; unset refines every one."
+        ),
     ),
     "HENS_STAGE_PACKING": FieldText(
         "Stage packing", None,

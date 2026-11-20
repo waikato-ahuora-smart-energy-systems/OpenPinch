@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 
+from ...solver.piecewise import branch_fractions
 from .._base import alpha as _alpha
 from .._base import area as _area
 from .._base import piecewise as _piecewise
 from .._base.costing import set_period_totals_and_costs
 from .._base.execution import _value
+from . import staged_utilities as _staged
 
 
 def get_post_process(owner) -> None:
@@ -56,8 +58,13 @@ def _get_multiperiod_post_process(owner) -> None:
         for j in range(owner.J)
         for i in range(owner.I)
     )
-    owner.n_hu_units = sum(flag[0] for row in owner.z_hu for flag in row)
-    owner.n_cu_units = sum(flag[0] for row in owner.z_cu for flag in row)
+    _staged.post_process_staged_utilities(owner)
+    owner.n_hu_units = (
+        sum(flag[0] for row in owner.z_hu for flag in row) + owner.n_hs_units
+    )
+    owner.n_cu_units = (
+        sum(flag[0] for row in owner.z_cu for flag in row) + owner.n_cs_units
+    )
     owner.n_units = owner.n_recovery_units + owner.n_hu_units + owner.n_cu_units
 
     # An inactive match has no log-mean, so its approaches are not read: on
@@ -121,7 +128,12 @@ def _get_multiperiod_post_process(owner) -> None:
     ]
     _area._apply_segment_recovery_areas(owner, q_r)
 
-    set_period_totals_and_costs(owner, q_h, q_c, q_r)
+    set_period_totals_and_costs(
+        owner,
+        _staged.with_staged_duties(owner, q_h, "hot"),
+        _staged.with_staged_duties(owner, q_c, "cold"),
+        q_r,
+    )
     owner.unit_cost_total = owner.unit_cost[0] * owner.n_recovery_units
     owner.utility_unit_cost_total = owner.unit_cost[0] * (
         owner.n_hu_units + owner.n_cu_units
@@ -157,6 +169,13 @@ def _get_multiperiod_post_process(owner) -> None:
                     owner.dqda[i][j][k] = 0.0
                 if not (hot_segmented[i] or cold_segmented[j]):
                     continue
+                hot_share, cold_share = (
+                    branch_fractions(
+                        lambda a, b, c: q_r[0][a][b][c], owner.I, owner.J, i, j, k
+                    )
+                    if q_r[0][i][j][k] > 0.0
+                    else (1.0, 1.0)
+                )
                 exact_dqda = _area._segment_exact_dqda(
                     owner,
                     period_index=0,
@@ -165,6 +184,8 @@ def _get_multiperiod_post_process(owner) -> None:
                     duty=float(q_r[0][i][j][k]),
                     hot_inlet_temperature=hot_temperatures[i][k],
                     cold_inlet_temperature=cold_temperatures[j][k + 1],
+                    hot_share=hot_share,
+                    cold_share=cold_share,
                 )
                 if exact_dqda is not None:
                     owner.dqda[i][j][k] = exact_dqda
@@ -220,11 +241,9 @@ def get_lowest_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
         for j in range(owner.J):
             for i in range(owner.I):
                 if owner._active_binary_value(owner.z[i][j][k]) > owner.tol:
-                    owner.net_benefit[i][j][k] = _value(
-                        owner.Q_r[i][j][k]
-                    ) * _alpha.alpha_value(owner, i, j, k) * (
-                        _area.recovered_utility_price(owner)
-                    ) - (
+                    owner.net_benefit[i][j][k] = _area.recovered_value(
+                        owner, i, j, k
+                    ) * _alpha.alpha_value(owner, i, j, k) - (
                         owner.unit_cost[0]
                         + owner.A_coeff[0] * (owner.area_r[i][j][k] ** owner.A_exp[0])
                     )

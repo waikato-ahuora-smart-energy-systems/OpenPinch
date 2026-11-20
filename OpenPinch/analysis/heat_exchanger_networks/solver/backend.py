@@ -61,6 +61,11 @@ PDM_TIME_LIMIT = 600.0
 # MIP over the proposal's matches, unless the user sets a limit. A side
 # stopped there is dropped: its incumbent need not hold the minimum utility.
 HEURISTIC_SIDE_TIME_LIMIT = 10.0
+# Seconds allowed for a thermal derivative task's MINLP, unless the user sets
+# a limit: Couenne can otherwise run for hours on one parent network. A solve
+# stopped there keeps its incumbent when it has one, and that network is
+# verified like any other; a task without one fails.
+TDM_TIME_LIMIT = 300.0
 PYOMO_SOLVER_FACTORY_NAMES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",

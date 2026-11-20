@@ -53,6 +53,8 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
         return
 
     from ...solver.piecewise import (
+        branch_fractions,
+        branch_profile,
         duty_aligned_area_contributions,
         profile_from_solver_arrays,
     )
@@ -95,9 +97,12 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
                     duty = float(q_r[n][i][j][k])
                     if duty <= model.tol:
                         continue
+                    hot_share, cold_share = branch_fractions(
+                        lambda a, b, c: q_r[n][a][b][c], model.I, model.J, i, j, k
+                    )
                     contributions = duty_aligned_area_contributions(
-                        hot_profile,
-                        cold_profile,
+                        branch_profile(hot_profile, hot_share),
+                        branch_profile(cold_profile, cold_share),
                         duty=duty,
                         hot_inlet_temperature=model._active_binary_value(
                             model.T_h_by_period[n][i][k]
@@ -158,11 +163,12 @@ def used_utility_matches(model, q_h, q_c) -> tuple[list, list]:
     )
 
 
-def recovered_utility_price(model) -> float:
+def recovered_utility_price(model, period: int = 0) -> float:
     """Return the price of the utility heat one unit of recovery saves.
 
     Recovery saves heat from the hot and the cold utility in use; where
-    several are in use, each counts by its share of the solved period-0 duty.
+    several are in use, each counts by its share of the solved duty in
+    ``period``.
     """
 
     def price(prices, totals) -> float:
@@ -171,9 +177,31 @@ def recovered_utility_price(model) -> float:
             return float(min(prices))
         return float(sum(p * q for p, q in zip(prices, totals, strict=True)) / used)
 
-    return price(model.hu_cost_period[0], model.Q_hu_by_utility_by_period[0]) + price(
-        model.cu_cost_period[0], model.Q_cu_by_utility_by_period[0]
-    )
+    return price(
+        model.hu_cost_period[period], model.Q_hu_by_utility_by_period[period]
+    ) + price(model.cu_cost_period[period], model.Q_cu_by_utility_by_period[period])
+
+
+def recovered_value(model, i: int, j: int, k: int) -> float:
+    """The utility cost a match's recovery saves, weighted over periods.
+
+    Each period's duty is priced at that period's recovered utility price
+    and averaged by the period weights, as the operating cost is; without
+    per-period duties and weights, period 0's duty and price.
+    """
+    from .execution import _value
+
+    by_period = getattr(model, "Q_r_by_period", None)
+    weights = getattr(model, "period_weights", None)
+    if by_period is None or weights is None:
+        return _value(model.Q_r[i][j][k]) * recovered_utility_price(model)
+    total = float(sum(float(weight) for weight in weights))
+    return sum(
+        float(weights[n])
+        * _value(by_period[n][i][j][k])
+        * recovered_utility_price(model, n)
+        for n in range(len(by_period))
+    ) / (total if total > 0.0 else 1.0)
 
 
 def set_utility_lmtd_and_areas(model, q_h, q_c) -> None:
@@ -410,8 +438,14 @@ def _segment_exact_dqda(
     duty: float,
     hot_inlet_temperature: float,
     cold_inlet_temperature: float,
+    hot_share: float = 1.0,
+    cold_share: float = 1.0,
 ) -> float | None:
-    """Return a local numerical dQ/dA from ordered segment-summed area."""
+    """Return a local numerical dQ/dA from ordered segment-summed area.
+
+    ``hot_share`` and ``cold_share`` are the match's branch shares of its
+    streams' flow (``branch_fractions``).
+    """
     if not (
         _piecewise._solver_parent_is_segmented(model, "hot", hot_parent_index)
         or _piecewise._solver_parent_is_segmented(model, "cold", cold_parent_index)
@@ -419,21 +453,28 @@ def _segment_exact_dqda(
         return None
 
     from ...solver.piecewise import (
+        branch_profile,
         duty_aligned_area_contributions,
         profile_from_solver_arrays,
     )
 
-    hot_profile = profile_from_solver_arrays(
-        model.solver_arrays,
-        side="hot",
-        parent_index=hot_parent_index,
-        period_index=period_index,
+    hot_profile = branch_profile(
+        profile_from_solver_arrays(
+            model.solver_arrays,
+            side="hot",
+            parent_index=hot_parent_index,
+            period_index=period_index,
+        ),
+        hot_share,
     )
-    cold_profile = profile_from_solver_arrays(
-        model.solver_arrays,
-        side="cold",
-        parent_index=cold_parent_index,
-        period_index=period_index,
+    cold_profile = branch_profile(
+        profile_from_solver_arrays(
+            model.solver_arrays,
+            side="cold",
+            parent_index=cold_parent_index,
+            period_index=period_index,
+        ),
+        cold_share,
     )
     hot_start = hot_profile.heat_at_temperature(hot_inlet_temperature)
     cold_start = cold_profile.heat_at_temperature(cold_inlet_temperature)

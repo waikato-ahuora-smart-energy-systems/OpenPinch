@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..targeting.topology import (
+    canonical_stage_ends,
     canonical_topology_restrictions,
     topology_restriction_signature,
 )
@@ -44,35 +45,55 @@ def network_structure_signature(
     network: HeatExchangerNetwork,
 ) -> tuple[tuple[Any, ...], ...]:
     """Return the stable topology signature used by grid-diagram plotting."""
-    recovery_restrictions = canonical_topology_restrictions(
-        (
-            HeatExchangerNetworkTopologyRestriction(
-                source_stream=exchanger.source_stream,
-                sink_stream=exchanger.sink_stream,
-                stage=int(exchanger.stage),
-                duty=max(state.duty for state in exchanger.period_states),
-            )
-            for exchanger in network.exchangers
-            if exchanger.kind.value == "recovery"
-            and exchanger.stage is not None
-            and exchanger.match_allowed
-            and any(state.active for state in exchanger.period_states)
-        ),
-        hot_stream_order=tuple(
+    original_restrictions = tuple(
+        HeatExchangerNetworkTopologyRestriction(
+            source_stream=exchanger.source_stream,
+            sink_stream=exchanger.sink_stream,
+            stage=int(exchanger.stage),
+            duty=max(state.duty for state in exchanger.period_states),
+        )
+        for exchanger in network.exchangers
+        if exchanger.kind.value == "recovery"
+        and exchanger.stage is not None
+        and exchanger.match_allowed
+        and any(state.active for state in exchanger.period_states)
+    )
+    stream_orders = {
+        "hot_stream_order": tuple(
             dict.fromkeys(
                 exchanger.source_stream
                 for exchanger in network.exchangers
                 if exchanger.kind.value == "recovery"
             )
         ),
-        cold_stream_order=tuple(
+        "cold_stream_order": tuple(
             dict.fromkeys(
                 exchanger.sink_stream
                 for exchanger in network.exchangers
                 if exchanger.kind.value == "recovery"
             )
         ),
+    }
+    recovery_restrictions = canonical_topology_restrictions(
+        original_restrictions, **stream_orders
     )
+    stage_ends = canonical_stage_ends(original_restrictions, **stream_orders)
+
+    def canonical_boundary(boundary: int) -> int:
+        # Canonical stages at or before an original stage boundary.
+        return max(
+            (end for stage, end in stage_ends.items() if stage <= boundary),
+            default=0,
+        )
+
+    def heater_stage(stage):
+        # A heater at stage s sits at boundary s - 1 (extraction convention).
+        return None if stage is None else canonical_boundary(int(stage) - 1) + 1
+
+    def cooler_stage(stage):
+        # A cooler at stage s sits at boundary s.
+        return None if stage is None else canonical_boundary(int(stage))
+
     links = [
         (
             "recovery",
@@ -85,30 +106,104 @@ def network_structure_signature(
         )
     ]
     links.extend(
-        ("hot_utility", exchanger.source_stream, exchanger.sink_stream, None)
+        (
+            "hot_utility",
+            exchanger.source_stream,
+            exchanger.sink_stream,
+            heater_stage(exchanger.stage),
+        )
         for exchanger in network.exchangers
         if exchanger.kind.value == "hot_utility"
         and any(state.active for state in exchanger.period_states)
     )
     links.extend(
-        ("cold_utility", exchanger.source_stream, exchanger.sink_stream, None)
+        (
+            "cold_utility",
+            exchanger.source_stream,
+            exchanger.sink_stream,
+            cooler_stage(exchanger.stage),
+        )
         for exchanger in network.exchangers
         if exchanger.kind.value == "cold_utility"
         and any(state.active for state in exchanger.period_states)
     )
-    return tuple(sorted(links))
+    # An end heater (stage None) sorts before a staged one on the same pair.
+    return tuple(sorted(links, key=lambda link: (*link[:3], _stage_order(link[3]))))
+
+
+def _stage_order(stage) -> int:
+    return -1 if stage is None else int(stage)
+
+
+# A utility's duty within this fraction of its level target (or this many
+# kW of a small one) holds the level: the heuristic counts a load within
+# 0.1% as met.
+LEVEL_TOLERANCE = 1e-3
+
+
+def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
+    """Whether each utility's duty meets its level target in every period.
+
+    The targets are ``source_metadata["utility_level_targets"]`` (utility
+    name to per-period kW), recorded by a design that holds the levels and
+    by the tasks built on it. A network without them holds no level to miss.
+    """
+    targets = (network.source_metadata or {}).get("utility_level_targets")
+    if not targets:
+        return True
+    duties: dict[str, dict[int, float]] = {}
+    for exchanger in network.exchangers:
+        if exchanger.kind.value == "hot_utility":
+            name = exchanger.source_stream
+        elif exchanger.kind.value == "cold_utility":
+            name = exchanger.sink_stream
+        else:
+            continue
+        for state in exchanger.period_states:
+            by_period = duties.setdefault(name, {})
+            by_period[state.period_idx] = by_period.get(state.period_idx, 0.0) + (
+                float(state.duty) if state.active else 0.0
+            )
+    for name, by_period in targets.items():
+        for period, target in enumerate(by_period):
+            duty = duties.get(name, {}).get(period, 0.0)
+            if abs(duty - float(target)) > LEVEL_TOLERANCE * max(1.0, abs(target)):
+                return False
+    return True
+
+
+# A site network's total annual cost with site utility accounting
+# (``../models/_stagewise/site_utilities.py``): the site pays only for its
+# net utility use.
+SITE_TOTAL_ANNUAL_COST = "site_total_annual_cost"
+
+
+def ranking_cost(network: HeatExchangerNetwork | None, fallback):
+    """The cost a network ranks by: its site total annual cost when it has
+    one, else ``fallback`` (its total annual cost or objective)."""
+    value = (network.summary_metrics if network is not None else {}).get(
+        SITE_TOTAL_ANNUAL_COST
+    )
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    return fallback
 
 
 def outcome_ranking_key(
     outcome: "HeatExchangerNetworkSynthesisTaskOutcome",
-) -> tuple[float, str]:
+) -> tuple[bool, float, str]:
     """Return the one key used both to accept and to rank outcomes.
 
-    Lowest objective first; ties go to the task id, so the choice never
-    depends on the order in which tasks finished.
+    Networks that hold their utility levels first (``holds_utility_levels``),
+    then lowest objective (a site network's site total annual cost,
+    ``ranking_cost``); ties go to the task id, so the choice never depends
+    on the order in which tasks finished.
     """
-    objective = outcome.objective_value
+    network = getattr(outcome, "network", None)
+    objective = ranking_cost(network, outcome.objective_value)
+    held = network is None or holds_utility_levels(network)
     return (
+        not held,
         float("inf") if objective is None else float(objective),
         outcome.task.task_id or "",
     )
@@ -129,7 +224,11 @@ def _ranked_candidate_outcomes(
 
 
 __all__ = [
+    "LEVEL_TOLERANCE",
+    "holds_utility_levels",
     "network_structure_signature",
+    "SITE_TOTAL_ANNUAL_COST",
     "outcome_ranking_key",
+    "ranking_cost",
     "rank_unique_network_outcomes",
 ]

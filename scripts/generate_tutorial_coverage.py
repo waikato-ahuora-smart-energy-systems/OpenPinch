@@ -125,6 +125,8 @@ DESIGN_TUTORIALS = {
     "network_evolution": 16,
     "optimise_duties": 16,
     "retrofit": 16,
+    "retrofit_heat_pumps": 16,
+    "total_site_heat_exchanger_network": 16,
 }
 PLOT_TUTORIALS = {
     "catalog": 1,

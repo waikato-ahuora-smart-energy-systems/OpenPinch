@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import threading
+import time
+import warnings
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
@@ -14,17 +16,24 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
-    from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitResult
+    from ....contracts.synthesis.retrofit import (
+        HeatExchangerNetworkRetrofitResult,
+        RetrofitHeatPumpTargets,
+    )
     from ....contracts.synthesis.view import (
         HeatExchangerNetworkGridLayout,
         HeatExchangerNetworkView,
     )
     from ....domain.heat_exchanger_network import HeatExchangerNetwork
+    from ....domain.zone import Zone
     from ...problem import PinchProblem
 
 
 # Options a search level sets when they are unset (execution/search.py).
 _WIDTH_OPTIONS = ("HENS_DT_CONT_MULTIPLIERS",)
+# Ranked networks each process offers a site design: enough to hold its best
+# at every multiplier of the widest search.
+_SITE_POOL = 50
 _DEPTH_OPTIONS = (
     "HENS_HEURISTIC_PDM_NETWORKS",
     "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS",
@@ -402,6 +411,7 @@ class _DesignAccessor:
     def heat_exchanger_network(
         self,
         *,
+        zone: "str | Zone | None" = None,
         width: int | None = None,
         depth: int | None = None,
         options: Mapping[str, Any] | None = None,
@@ -465,10 +475,62 @@ class _DesignAccessor:
         every period and rated at the margin where the design calls for it),
         so another thread can poll it while the design runs. The result ranks
         exactly the record's networks. A record collects one call.
+
+        ``zone`` is one zone, by name or address as targeting takes it
+        (``"Hospital[S]"``) or as a ``Zone`` such as
+        ``problem.master_zone.subzones["Hospital[S]"]``; the network then
+        serves that zone's streams alone, with every utility of the problem.
+        It is designed on a case derived from the zone, so the problem's
+        stored results are not changed. The root zone (the default) designs
+        on every stream.
         """
+        if zone is not None:
+            target = self._problem._resolve_target_zone(zone)
+            if target.address != self._problem._require_prepared_root_zone().address:
+                from ...case_derivation import _zone_case
+
+                return _zone_case(self._problem, target).design.heat_exchanger_network(
+                    width=width,
+                    depth=depth,
+                    options=options,
+                    period_id=period_id,
+                    design_basis=design_basis,
+                    basis_clusters=basis_clusters,
+                    overdesign_percentage=overdesign_percentage,
+                    dt_cont_multipliers=dt_cont_multipliers,
+                    derivative_thresholds=derivative_thresholds,
+                    stages=stages,
+                    pack_stages=pack_stages,
+                    solver=solver,
+                    max_parallel=max_parallel,
+                    best_solutions=best_solutions,
+                    solve_tolerance=solve_tolerance,
+                    record=record,
+                )
+        from ....analysis.heat_exchanger_networks.utility_only import is_one_sided
+
+        if len(self._process_zones()) > 1:
+            warnings.warn(
+                "heat_exchanger_network() pools the streams of every process "
+                "zone, so it allows any inter-process match with no piping "
+                "cost and places utilities by temperature for the site. Use "
+                "design.total_site_heat_exchanger_network() for a network that "
+                "recovers heat within each process and holds each process's "
+                "utility levels.",
+                UserWarning,
+                stacklevel=2,
+            )
         hens = self._effective_hens(options)
         margin = self._overdesign_margin(overdesign_percentage, hens)
         basis = self._design_basis(design_basis, period_id, hens)
+        if is_one_sided(self._problem._require_prepared_root_zone()):
+            # Utility exchangers alone need no fit: design over every period.
+            if margin is not None:
+                raise ValueError(
+                    "overdesign is not available for a network of only hot or "
+                    "only cold streams."
+                )
+            basis, period_id = "all", None
         arguments = dict(
             width=width,
             depth=depth,
@@ -495,6 +557,197 @@ class _DesignAccessor:
             basis_clusters=basis_clusters,
             arguments=arguments,
         )
+
+    def total_site_heat_exchanger_network(
+        self,
+        *,
+        width: int | None = None,
+        depth: int | None = None,
+        options: Mapping[str, Any] | None = None,
+        levels: str | None = None,
+        level_counts: Sequence[int] | None = None,
+        placement: Mapping[str, Any] | None = None,
+    ) -> HeatExchangerNetworkDesignView:
+        """Design one network for a site of several process zones.
+
+        Each process zone (an immediate subzone of type ``Process Zone``) is
+        designed alone with the pinch design method at the search width's
+        dt_cont multipliers twice: with its utility levels chosen by price,
+        and held at the duties targeting gives them. At each multiplier the
+        fewest-unit network of each run (then the lowest total annual cost)
+        is joined, one per process, into a lowest-cost and a level-held site
+        seed, and network evolution refines the seeds as one problem: every
+        process keeps each utility level at its seed's duty, heat is
+        recovered only between streams of one process, and the model
+        carries the site utility balance, so the site pays only for its net
+        utility use. There is no thermal derivative step.
+
+        ``depth`` sets the evolution's breadth as in
+        ``heat_exchanger_network``, and at 2 and above the MILP pinch
+        design method joins the heuristic for the process networks.
+
+        On a multiperiod site each process is designed over every period at
+        once (design basis ``"all"``), so its levels carry their targeted
+        duty in each period, and the evolution holds them per period with
+        one area per exchanger over all periods; no fit to the periods
+        follows.
+
+        ``levels`` (``HENS_SITE_LEVELS``) ``"given"`` designs with the case's
+        utilities. ``"placed"`` places the site's levels by utility placement
+        (``placement`` holds its options) once per count in ``level_counts``
+        (``HENS_SITE_LEVEL_COUNTS``, default 2 to 5), each level serving
+        heating and cooling, designs the site with each set, and selects the
+        cheapest design. A count whose placement is infeasible or whose
+        design fails is skipped. The result ranks every network of each
+        designed count by site cost, each tagged
+        ``summary_metrics["utility_level_count"]``, and its provenance
+        records every count (``HENS_SITE_LEVEL_SWEEP``).
+        ``HENS_SITE_LEVEL_EARLY_STOP`` ends the sweep once two designed
+        counts in a row cost more than the cheapest before them. The
+        cheapest count's design is then refined by level-temperature moves:
+        each placed level (a main, its hot and cold utility of one name)
+        moves up or down by ``HENS_SITE_LEVEL_STEP`` (default 5 K) within
+        the levels' order and the streams' temperatures, the site is evolved
+        again with each process's levels re-targeted, and a move is kept
+        only on a lower site cost; the step halves down to
+        ``HENS_SITE_LEVEL_STEP_MIN`` (1 K). The moves are recorded as
+        ``HENS_SITE_LEVEL_MOVES``. ``HENS_SITE_TIME_LIMIT`` (seconds, default
+        none) bounds the sweep and the moves together: once it runs out no
+        further count or move is started and the cheapest design so far is
+        returned; the first count is always designed.
+        """
+        from ....domain.configuration_fields import _site_level_counts
+        from ...site_level_moves import move_seed, refine_selected
+        from ...site_levels import level_sweep_view, run_level_counts
+
+        processes = self._process_zones()
+        if len(processes) < 2:
+            raise ValueError(
+                "a site network needs more than one process zone; design a "
+                "single process with heat_exchanger_network()."
+            )
+        hens = self._effective_hens(options)
+        levels = hens.site_levels if levels is None else levels
+        if levels == "given":
+            return self._site_design(width=width, depth=depth, options=options)
+        if levels != "placed":
+            raise ValueError('levels must be "given" or "placed".')
+        limit = hens.site_time_limit
+        deadline = None if limit is None else time.monotonic() + limit
+
+        def expired() -> bool:
+            return time.monotonic() >= deadline
+
+        counts = tuple(
+            hens.site_level_counts
+            if level_counts is None
+            else _site_level_counts("level_counts", level_counts)
+        )
+        runs = run_level_counts(
+            self._problem,
+            counts,
+            design=lambda case: case.design._site_design(
+                width=width, depth=depth, options=options
+            ),
+            early_stop=hens.site_level_early_stop,
+            placement=placement,
+            expired=None if deadline is None else expired,
+        )
+        runs, moves = refine_selected(
+            runs,
+            evaluate=lambda case, view: case.design.network_evolution(
+                [move_seed(case, view.selected_network)],
+                options=options,
+                width=width,
+                depth=depth,
+            ),
+            step=hens.site_level_step,
+            step_min=hens.site_level_step_min,
+            expired=None if deadline is None else expired,
+        )
+        return level_sweep_view(
+            self._problem,
+            runs,
+            settings={
+                **dict(options or {}),
+                "HENS_SITE_LEVELS": "placed",
+                "HENS_SITE_LEVEL_COUNTS": list(counts),
+                "placement": dict(placement or {}),
+                "HENS_SITE_LEVEL_MOVES": [move.row() for move in moves],
+            },
+        )
+
+    def _site_design(self, *, width, depth, options) -> HeatExchangerNetworkDesignView:
+        """The site design with the case's utilities (``levels="given"``)."""
+        from ....analysis.heat_exchanger_networks.execution.search import (
+            resolve_search,
+        )
+        from ....analysis.heat_exchanger_networks.site import site_seeds
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
+
+        processes = self._process_zones()
+        _runtime, configuration = self._arguments(
+            options=options, period_id=None, width=width, depth=depth
+        )
+        search = resolve_search(self._effective_hens(configuration))
+        process_options = {
+            **configuration,
+            "HENS_SEARCH_DEPTH": 0,
+            "HENS_PDM_MILP": search.milp,
+            # Over every period, so each level holds its duty per period.
+            "HENS_DESIGN_BASIS": "all",
+            # Rating at a margin re-prices the network and drops its levels.
+            "HENS_OVERDESIGN_PERCENTAGE": None,
+        }
+
+        def pool(name: str, placement: str):
+            return tuple(
+                outcome.network
+                for outcome in self.heat_exchanger_network(
+                    zone=name,
+                    options=process_options | {"HENS_UTILITY_PLACEMENT": placement},
+                ).top(_SITE_POOL)
+            )
+
+        # Levels chosen by price (the lowest cost) and held at their
+        # targets: evolution starts from both. A process whose design fails
+        # one way takes the other way's networks for it.
+        priced, held = {}, {}
+        for name in processes:
+            failure = None
+            for designs, placement in ((priced, "price"), (held, "temperature")):
+                try:
+                    designs[name] = pool(name, placement)
+                except (
+                    MissingSynthesisDependencyError,
+                    MissingSynthesisSolverError,
+                ):
+                    raise
+                except (ValueError, RuntimeError) as exc:
+                    failure = exc
+            if name not in priced and name not in held:
+                raise failure
+            priced.setdefault(name, held.get(name))
+            held.setdefault(name, priced[name])
+        return self.network_evolution(
+            site_seeds(priced, level_held=held),
+            options=options,
+            width=width,
+            depth=depth,
+        )
+
+    def _process_zones(self) -> list[str]:
+        """The master zone's immediate subzones of type ``Process Zone``."""
+        from ....domain.enums import ZoneType
+
+        return [
+            name
+            for name, zone in (self._problem.master_zone.subzones or {}).items()
+            if str(getattr(zone, "type", "")) == ZoneType.P.value
+        ]
 
     def _effective_hens(self, options):
         """The HENS configuration a call runs with: its options over the stored."""
@@ -867,7 +1120,7 @@ class _DesignAccessor:
             hens.basis_clusters if basis_clusters is None else basis_clusters
         )
         basis = median_basis(
-            self._problem.to_problem_json(),
+            self._with_prepared_heat_flows(self._problem.to_problem_json()),
             tuple(self._problem.period_ids),
             tuple(self._problem.master_zone.weights),
             clusters=clusters,
@@ -887,6 +1140,36 @@ class _DesignAccessor:
                 stacklevel=3,
             )
         return basis, clusters
+
+    def _with_prepared_heat_flows(self, source: dict) -> dict:
+        """``source`` with each stream's heat flow given.
+
+        A stream given by its heat capacity flowrate has no ``heat_flow`` in
+        the source; the prepared stream's heat flow (per period) is used,
+        matched in the stream's own zone by its full ``<zone path>.<name>``.
+        """
+        zone = self._problem.master_zone
+        for record in source.get("streams", []):
+            if record.get("heat_flow") is not None:
+                continue
+            owner = zone.get_subzone(record.get("zone"))
+            if owner is None:
+                continue
+            key = f"{owner.address}.{record.get('name')}"
+            matches = [
+                stream
+                for collection in (owner.hot_streams, owner.cold_streams)
+                for k, stream in collection.items()
+                if k == key
+            ]
+            if len(matches) != 1:
+                continue
+            value = matches[0].heat_flow
+            record["heat_flow"] = {
+                "values": [abs(float(v)) for v in value.period_values],
+                "unit": str(value.unit),
+            }
+        return source
 
     def _design_on_median_basis(self, basis_clusters, hens, *, source, **arguments):
         """Synthesise on each candidate cluster's median case.
@@ -1133,7 +1416,14 @@ class _DesignAccessor:
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
         ``COSTING_HX_UNIT_COST``) and ``split_cost`` per stream it splits, and
         added area on an existing exchanger adds ``area_addition_cost``, all
-        in $ and annualised with the capital recovery factor.
+        in $ and annualised with the capital recovery factor. A call that
+        prices new units but leaves ``area_addition_cost``, ``split_cost``
+        and ``repiping_cost`` at 0 warns, since the search then favours
+        those modifications. Every exchanger keeps at least
+        ``min_approach_temperature`` (default: the sum of its two sides'
+        temperature contributions, per-stream ``dt_cont`` and zone
+        multipliers included; new matches and heat pumps are screened at
+        twice ``THERMAL_DT_CONT``).
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
@@ -1197,9 +1487,6 @@ class _DesignAccessor:
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
-        from ....analysis.heat_exchanger_networks.duty_optimisation import (
-            DEFAULT_FEASIBILITY_APPROACH,
-        )
         from ....analysis.heat_exchanger_networks.retrofit.search import (
             RetrofitSettings,
             run_retrofit_search,
@@ -1223,6 +1510,17 @@ class _DesignAccessor:
                 if new_unit_cost is None
                 else new_unit_cost
             )
+            if unit_cost > 0 and not (
+                area_addition_cost or split_cost or repiping_cost
+            ):
+                warnings.warn(
+                    "retrofit prices each new unit at new_unit_cost but area "
+                    "additions, splits and repiping at nothing; set "
+                    "area_addition_cost, split_cost and repiping_cost so the "
+                    "search does not favour them.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             result = run_retrofit_search(
                 isolated,
                 existing,
@@ -1232,11 +1530,7 @@ class _DesignAccessor:
                     new_match_candidates=new_match_candidates,
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
-                    approach=(
-                        DEFAULT_FEASIBILITY_APPROACH
-                        if min_approach_temperature is None
-                        else min_approach_temperature
-                    ),
+                    approach=min_approach_temperature,
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),
                     split_cost=float(split_cost),
@@ -1273,6 +1567,79 @@ class _DesignAccessor:
                     heat_pump_cost=float(heat_pump_cost),
                 ),
             )
+        for zone in walk_zone_tree(isolated._master_zone):
+            zone.config = stored_configs[zone.address]
+        commit_problem(self._problem, isolated)
+        return result
+
+    def retrofit_heat_pumps(
+        self,
+        existing: "HeatExchangerNetwork",
+        *,
+        cycle: str = "carnot",
+        topology: str | None = None,
+        maximum_iterations: int | None = None,
+        maximum_evaluations: int | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> "RetrofitHeatPumpTargets":
+        """The ideal and the as-piped heat pump target of ``existing``.
+
+        Both come from the HPR service with the ``cycle`` (``"carnot"`` or
+        ``"vapour_compression"``) and ``topology`` (``"cascade"`` or
+        ``"parallel"``, the cycle's own by default) of
+        ``target.heat_pump_and_refrigeration``, and with any ``HPR_*``
+        settings in ``options`` (``HPR_LOAD_FRACTION``, ``HPR_N_COND``,
+        ``HPR_REFRIGERANTS`` as a list of fluids, and so on).
+        ``maximum_iterations`` and ``maximum_evaluations`` bound each
+        target's search. The ideal target serves the process's heating
+        target from its cooling target, as a new design could; the as-piped
+        target serves only ``existing``'s heaters from only its coolers, at
+        their solved temperatures and duties (first period), so it needs no
+        process-side repiping.
+
+        Returns a ``RetrofitHeatPumpTargets``: each target's heat, work,
+        levels and operating cost before and after, priced at the first hot
+        and cold utility and ``COSTING_HPR_ELE_PRICE``, and the gap between
+        them split into the network's (``network_gap``) and the heat
+        pump's (``heat_pump_gap``). The problem's cached design is not
+        changed.
+        """
+
+        from ....analysis.heat_exchanger_networks.context import (
+            ensure_target_results,
+        )
+        from ....analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
+            retrofit_heat_pumps,
+        )
+        from ....analysis.heat_pumps.cycles.registry import (
+            cycle_spec,
+            family_value,
+        )
+        from ..targeting.execution import walk_zone_tree
+        from ..targeting.state import commit_problem, snapshot_problem
+
+        spec = cycle_spec(cycle)
+        _runtime, configuration = self._arguments(options=options, period_id=None)
+        configuration["HPR_TYPE"] = family_value(
+            spec.topologies[topology or spec.default_topology]
+        )
+        args = {
+            key: value
+            for key, value in (
+                ("maximum_iterations", maximum_iterations),
+                ("maximum_evaluations", maximum_evaluations),
+            )
+            if value is not None
+        }
+        isolated = snapshot_problem(self._problem)
+        root = isolated._build_execution_master_zone()
+        stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
+        # The first period's direct target, whose period the as-piped
+        # profiles and prices take, not whichever period was targeted last.
+        first_period = min(isolated.period_ids.items(), key=lambda item: item[1])[0]
+        with temporary_zone_configuration(root, configuration):
+            ensure_target_results(isolated, {"period_id": first_period}, first_period)
+            result = retrofit_heat_pumps(isolated, existing, args=args)
         for zone in walk_zone_tree(isolated._master_zone):
             zone.config = stored_configs[zone.address]
         commit_problem(self._problem, isolated)
@@ -1356,12 +1723,51 @@ class _DesignAccessor:
         Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
+        if isinstance(network, Mapping):
+            network = self._network_from_structure(network)
+        return self._optimise_duties(
+            network,
+            objective=objective,
+            min_approach_temperature=min_approach_temperature,
+            exchanger_approach_temperatures=exchanger_approach_temperatures,
+            max_hot_utility=max_hot_utility,
+            max_cold_utility=max_cold_utility,
+            options=options,
+            period_id=period_id,
+            solver=solver,
+            solve_tolerance=solve_tolerance,
+        )
+
+    def _optimise_duties(
+        self,
+        network: "HeatExchangerNetwork",
+        *,
+        objective: str,
+        min_approach_temperature: float | None = None,
+        exchanger_approach_temperatures: Mapping[str, float] | None = None,
+        max_hot_utility: float | None = None,
+        max_cold_utility: float | None = None,
+        options: Mapping[str, Any] | None = None,
+        period_id: str | None = None,
+        solver=None,
+        solve_tolerance=None,
+        problem_approach: bool = False,
+        level_targets: Mapping[str, Sequence[float]] | None = None,
+    ) -> HeatExchangerNetworkDesignView:
+        """``optimise_duties`` on a network; ``problem_approach`` keeps the
+        ``"cost"`` objective at the case's minimum approach, not 1 K, and
+        ``level_targets`` (utility name to per-period duty) holds each
+        utility's exchangers at its level."""
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             heat_exchanger_network_duty_optimisation_service,
         )
 
-        if isinstance(network, Mapping):
-            network = self._network_from_structure(network)
+        if "site_processes" in (network.source_metadata or {}):
+            raise ValueError(
+                "optimise_duties does not take a site network: the fixed-structure "
+                "model neither holds each process's utility levels nor keeps the "
+                "site utility balance. Optimise each process's network on its own."
+            )
         runtime, configuration = self._arguments(
             options=options,
             period_id=period_id,
@@ -1381,6 +1787,8 @@ class _DesignAccessor:
             max_hot_utility=max_hot_utility,
             max_cold_utility=max_cold_utility,
             workspace_variant=None,
+            problem_approach=problem_approach,
+            level_targets=level_targets,
         )
 
     def _fit_to_all_periods(
@@ -1398,6 +1806,9 @@ class _DesignAccessor:
         fit, with the call's ``options``, ``solver`` and ``solve_tolerance``,
         then gives every exchanger one area over all periods, with bypass
         where a period needs less, and removes the exchangers no period uses.
+        Every exchanger keeps the case's minimum approach (its streams'
+        temperature contributions). When the fit cannot meet it, a
+        ``UserWarning`` says so and the fit is repeated at 1 K.
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             DEFAULT_FEASIBILITY_APPROACH,
@@ -1405,17 +1816,110 @@ class _DesignAccessor:
         from ....analysis.heat_exchanger_networks.period_fit import (
             with_stream_end_utilities,
         )
+        from ....analysis.heat_exchanger_networks.solver.dependencies import (
+            MissingSynthesisDependencyError,
+            MissingSynthesisSolverError,
+        )
 
+        arguments = {
+            "objective": "cost",
+            "options": options,
+            "solver": solver,
+            "solve_tolerance": solve_tolerance,
+        }
+        levels = self._period_level_targets(network)
         padded = with_stream_end_utilities(
             self._problem, network, approach=DEFAULT_FEASIBILITY_APPROACH
         )
-        return self.optimise_duties(
-            padded,
-            objective="cost",
-            options=options,
-            solver=solver,
-            solve_tolerance=solve_tolerance,
+        attempts = [
+            *(
+                [
+                    (
+                        with_stream_end_utilities(
+                            self._problem,
+                            network,
+                            approach=DEFAULT_FEASIBILITY_APPROACH,
+                            levels=frozenset(
+                                name for name, duties in levels.items() if any(duties)
+                            ),
+                        ),
+                        {"problem_approach": True, "level_targets": levels},
+                        "hold",
+                    )
+                ]
+                if levels
+                else []
+            ),
+            (padded, {"problem_approach": True}, "approach"),
+        ]
+        for start, extra, kept in attempts:
+            try:
+                return self._optimise_duties(start, **extra, **arguments)
+            except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+                raise
+            except (ValueError, RuntimeError) as exc:
+                released = (
+                    "hold the design's utility levels in every period"
+                    if kept == "hold"
+                    else "keep the case's minimum approach"
+                )
+                fallback = (
+                    "the levels are released"
+                    if kept == "hold"
+                    else f"it is fitted at {DEFAULT_FEASIBILITY_APPROACH:g} K instead"
+                )
+                warnings.warn(
+                    f"the fit to every period cannot {released} ({exc}); {fallback}.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+        return self._optimise_duties(padded, **arguments)
+
+    def _period_level_targets(self, network) -> dict[str, list[float]] | None:
+        """Each utility level's targeted duty in every period of the case.
+
+        Only for a network that holds its levels (``utility_level_targets``):
+        the network's own when they cover every period, else the case
+        targeted at the network's dt_cont multiplier, as the pinch design
+        targets the levels it holds.
+        """
+        from ....analysis.heat_exchanger_networks.site.levels import (
+            COLD_PREFIX,
+            HOT_PREFIX,
         )
+        from ....analysis.heat_exchanger_networks.solver import (
+            pinch_design_decomposition as decomposition,
+        )
+        from ....analysis.heat_exchanger_networks.solver.arrays import (
+            nominal_approach_temperature,
+        )
+
+        held = (network.source_metadata or {}).get("utility_level_targets")
+        if not held:
+            return None
+        periods = len(self._problem.period_ids)
+        if all(len(duties) == periods for duties in held.values()):
+            return {name: list(duties) for name, duties in held.items()}
+        multiplier = (network.summary_metrics or {}).get("dt_cont_multiplier", 1.0)
+        root = self._problem._require_prepared_root_zone()
+        hot = tuple(HOT_PREFIX + utility.name for utility in root.hot_utilities)
+        cold = tuple(COLD_PREFIX + utility.name for utility in root.cold_utilities)
+        targets = decomposition._calculate_openpinch_targets(
+            self._problem,
+            dTmin=nominal_approach_temperature(root.config, float(multiplier)),
+            hot_utilities=hot,
+            cold_utilities=cold,
+        )
+        levels: dict[str, list[float]] = {}
+        for names, field_name in (
+            (hot, "hot_utility_level_targets"),
+            (cold, "cold_utility_level_targets"),
+        ):
+            for u, name in enumerate(names):
+                levels[name] = [
+                    float(getattr(target, field_name)[u]) for target in targets
+                ]
+        return levels
 
 
 class _DesignAccessorDescriptor:

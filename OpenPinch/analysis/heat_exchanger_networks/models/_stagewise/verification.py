@@ -6,6 +6,8 @@ import math
 
 from .._base import costing as _costing
 from .._base.execution import _value
+from . import site_utilities as _site
+from . import staged_utilities as _staged
 
 
 def verify(owner) -> tuple[bool, list[str]]:
@@ -22,6 +24,7 @@ def verify(owner) -> tuple[bool, list[str]]:
     failures = []
     if not _check_temperatures(owner):
         failures.append("temperature")
+    failures.extend(_site.balance_misses(owner))
     if owner.minimisation_goal in {"total cost", "variable total cost"}:
         if not _check_utility_costs(owner):
             failures.append("cost")
@@ -114,6 +117,16 @@ def _check_state_temperatures(
     abs_tol: float,
     q_tol: float,
 ) -> bool:
+    # Over several periods one area serves every period, and the model only
+    # bounds each period's theta by its actual approach: a period that does
+    # not set the area (bypass) approaches wider than its theta.
+    shared = case.N_periods > 1
+
+    def matches(t_hot, t_cold, theta):
+        if shared:
+            return t_hot - t_cold >= theta - max(abs_tol, rel_tol * abs(t_hot))
+        return math.isclose(t_hot, t_cold + theta, rel_tol=rel_tol, abs_tol=abs_tol)
+
     issues = False
     for n in range(case.N_periods):
         for i in range(case.I):
@@ -126,12 +139,7 @@ def _check_state_temperatures(
                         t_c_out_y = _value(case.T_c_out_y_by_period[n][j][i][k])
                         theta_1 = _value(case.theta_1_by_period[n][i][j][k])
                         if (
-                            not math.isclose(
-                                t_h_in,
-                                t_c_out_y + theta_1,
-                                rel_tol=rel_tol,
-                                abs_tol=abs_tol,
-                            )
+                            not matches(t_h_in, t_c_out_y, theta_1)
                             or t_h_in < t_c_out_y
                         ):
                             issues = True
@@ -139,22 +147,20 @@ def _check_state_temperatures(
                         t_h_out = _value(case.T_h_out_x_by_period[n][i][j][k])
                         t_c_in = _value(case.T_c_by_period[n][j][k + 1])
                         theta_2 = _value(case.theta_2_by_period[n][i][j][k])
-                        if (
-                            not math.isclose(
-                                t_h_out,
-                                t_c_in + theta_2,
-                                rel_tol=rel_tol,
-                                abs_tol=abs_tol,
-                            )
-                            or t_h_out < t_c_in
-                        ):
+                        if not matches(t_h_out, t_c_in, theta_2) or t_h_out < t_c_in:
                             issues = True
                     else:
+                        # Stage outlets are the mid temperatures, before any
+                        # staged heater or cooler.
+                        hot_mid = getattr(case, "T_h_mid_by_period", case.T_h_by_period)
+                        cold_mid = getattr(
+                            case, "T_c_mid_by_period", case.T_c_by_period
+                        )
                         if _value(case.T_h_by_period[n][i][k]) < _value(
-                            case.T_c_by_period[n][j][k]
+                            cold_mid[n][j][k]
                         ):
                             issues = True
-                        if _value(case.T_h_by_period[n][i][k + 1]) < _value(
+                        if _value(hot_mid[n][i][k + 1]) < _value(
                             case.T_c_by_period[n][j][k + 1]
                         ):
                             issues = True
@@ -187,7 +193,10 @@ def _check_utility_costs(
             utility_cost(
                 side,
                 n,
-                [sum(_value(row[u]) for row in grid) for u in range(len(grid[0]))],
+                [
+                    sum(_value(row[u]) for row in grid) + _staged_duty(case, side, n, u)
+                    for u in range(len(grid[0]))
+                ],
             )
             for n, grid in enumerate(grids)
         ]
@@ -210,6 +219,13 @@ def _check_utility_costs(
         rel_tol=rel_tol,
         abs_tol=abs_tol,
     )
+
+
+def _staged_duty(case, side: str, n: int, u: int) -> float:
+    """Utility ``u``'s staged duty in period ``n`` (0 without staging)."""
+    if not getattr(case, "staged_utilities", False):
+        return 0.0
+    return sum(_value(duty) for duty in _staged.staged_utility_loads(case, side, n, u))
 
 
 def _solver_utility_cost(case, solver_costs) -> float:
@@ -288,6 +304,9 @@ def _check_area_costs(
                                 ** (1 / 3)
                             )
                         )
+                        # The model's own smoothing (``objectives.py``): a
+                        # tiny match's cost is mostly this term.
+                        + 1e-3
                     )
                     ** case.A_exp[0]
                     for hot_idx in allowed_hots
@@ -366,17 +385,32 @@ def _check_shared_area_costs(
                 if _value(case.area_cu_shared[i][u]) + abs_tol < required_area:
                     return False
 
+    if not _staged_areas_cover_duties(case, abs_tol=abs_tol, q_tol=q_tol):
+        return False
+
+    # A match evolution removed is disallowed; its area keeps its warm-start
+    # value, but the model no longer costs it.
+    allowed = getattr(case, "z_allowed", None)
     recovery_area_cost = case.A_coeff[0] * sum(
-        _value(case.area_r_shared[i][j][k]) ** case.A_exp[0]
+        _used_area(case.area_r_shared[i][j][k]) ** case.A_exp[0]
         for k in range(case.S)
         for j in range(case.J)
         for i in range(case.I)
+        if allowed is None or allowed[i][j][k] > 0
     )
     hu_area_cost = case.hu_coeff[0] * sum(
-        _value(area) ** case.hu_exp[0] for row in case.area_hu_shared for area in row
+        _used_area(area) ** case.hu_exp[0]
+        for area in [
+            *(area for row in case.area_hu_shared for area in row),
+            *getattr(case, "area_hs_shared", {}).values(),
+        ]
     )
     cu_area_cost = case.cu_coeff[0] * sum(
-        _value(area) ** case.cu_exp[0] for row in case.area_cu_shared for area in row
+        _used_area(area) ** case.cu_exp[0]
+        for area in [
+            *(area for row in case.area_cu_shared for area in row),
+            *getattr(case, "area_cs_shared", {}).values(),
+        ]
     )
     return (
         math.isclose(
@@ -398,6 +432,36 @@ def _check_shared_area_costs(
             abs_tol=abs_tol,
         )
     )
+
+
+def _staged_areas_cover_duties(case, *, abs_tol: float, q_tol: float) -> bool:
+    """Whether each staged unit's area covers what every period needs."""
+    for side, areas in (
+        ("hot", getattr(case, "area_hs_shared", {})),
+        ("cold", getattr(case, "area_cs_shared", {})),
+    ):
+        if not areas:
+            continue
+        duties = case.Q_hs_by_period if side == "hot" else case.Q_cs_by_period
+        coefficients = case.U_hu_period if side == "hot" else case.U_cu_period
+        for (s, u, k), area in areas.items():
+            for n in range(case.N_periods):
+                q = _value(duties[n][s][u][k])
+                if q <= q_tol:
+                    continue
+                differences = _staged.staged_terminal_differences(
+                    case, side, n, s, u, k, value=_value
+                )
+                required_area = q / (coefficients[n][s][u] * _chen_mean(*differences))
+                if _value(area) + abs_tol < required_area:
+                    return False
+    return True
+
+
+def _used_area(area) -> float:
+    """An area as costed: an unused one the solver left a hair below zero is
+    none, where a fractional cost exponent would make it NaN."""
+    return max(float(_value(area)), 0.0)
 
 
 def _chen_mean(delta_1: float, delta_2: float) -> float:

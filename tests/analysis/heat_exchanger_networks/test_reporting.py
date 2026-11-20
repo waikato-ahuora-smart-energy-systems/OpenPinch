@@ -2335,3 +2335,143 @@ def _intermediate_labels(ax, text: str):
         and item.get_ha() == "center"
         and item.get_va() == "bottom"
     ]
+
+
+def test_heaters_at_different_stages_give_different_structures():
+    """A staged heater sits at a stage boundary; the same heater at another
+    boundary, or at the stream end, is another network, not a repeat."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import StreamID
+
+    def network(heater_stage):
+        recoveries = tuple(
+            HeatExchanger(
+                exchanger_id=f"recovery:H1->C1:S{stage}",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
+                stage=stage,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=5.0),
+                ),
+            )
+            for stage in (1, 2)
+        )
+        heater = HeatExchanger(
+            exchanger_id="hot-utility:LPS->C1",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="LPS",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            stage=heater_stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+            ),
+        )
+        return HeatExchangerNetwork(exchangers=(*recoveries, heater), run_id="n")
+
+    signatures = {network_structure_signature(network(stage)) for stage in (None, 2, 3)}
+
+    assert len(signatures) == 3
+
+
+def _utility_placement_network(recovery_stage, *, heater=None, cooler=None):
+    exchangers = [
+        HeatExchanger(
+            exchanger_id=f"recovery:H1->C1:S{recovery_stage}",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Process,
+            stage=recovery_stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=5.0),
+            ),
+        )
+    ]
+    if heater is not None:
+        exchangers.append(
+            HeatExchanger(
+                exchanger_id="hot-utility:LPS->C1",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="LPS",
+                sink_stream="C1",
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
+                stage=heater,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+                ),
+            )
+        )
+    if cooler is not None:
+        exchangers.append(
+            HeatExchanger(
+                exchanger_id="cold-utility:H1->CW",
+                kind=HeatExchangerKind.COLD_UTILITY,
+                source_stream="H1",
+                sink_stream="CW",
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
+                stage=cooler,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+                ),
+            )
+        )
+    return HeatExchangerNetwork(exchangers=tuple(exchangers), run_id="n")
+
+
+def test_stage_shifted_grids_with_staged_utilities_share_a_signature():
+    """Utility stages move with the recovery stages when gaps are removed."""
+    assert network_structure_signature(
+        _utility_placement_network(2, heater=3)
+    ) == network_structure_signature(_utility_placement_network(1, heater=2))
+    assert network_structure_signature(
+        _utility_placement_network(3, cooler=2)
+    ) == network_structure_signature(_utility_placement_network(2, cooler=1))
+
+
+def test_utilities_on_either_side_of_recovery_give_different_signatures():
+    """A heater the cold stream meets before the recovery match is another
+    structure from one it meets after, however the stages are numbered."""
+    assert network_structure_signature(
+        _utility_placement_network(2, heater=2)
+    ) != network_structure_signature(_utility_placement_network(1, heater=2))
+    assert network_structure_signature(
+        _utility_placement_network(2, cooler=1)
+    ) != network_structure_signature(_utility_placement_network(1, cooler=1))
+
+
+def test_an_end_and_a_staged_heater_on_one_stream_sort_in_a_signature():
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import StreamID
+
+    def heater(stage):
+        return HeatExchanger(
+            exchanger_id=f"hot-utility:LPS->C1:{stage}",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="LPS",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            stage=stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+            ),
+        )
+
+    network = HeatExchangerNetwork(exchangers=(heater(2), heater(None)), run_id="n")
+
+    assert network_structure_signature(network) == (
+        ("hot_utility", "LPS", "C1", None),
+        ("hot_utility", "LPS", "C1", 1),
+    )

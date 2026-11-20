@@ -585,7 +585,8 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._utilisation_threshold(5) == 5.0
     assert problem._utilisation_threshold(8) == 8.0
     assert problem._utilisation_threshold(10) == 10.0
-    assert problem._utilisation_threshold(11) == 0.0
+    # Above 10 stages the 10-stage threshold holds; it used to drop to 0.
+    assert problem._utilisation_threshold(11) == 10.0
     assert problem._get_active_stages(case) == [0, 2]
 
 
@@ -3784,3 +3785,58 @@ def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
     # Never per cell: the unused dTAC/dA grid that read it is gone.
     assert len(price_calls) <= 1
     assert approach_calls == []
+
+
+@pytest.mark.skipif(sys.platform == "emscripten", reason="Pyodide cannot start threads")
+def test_a_pooled_stage_that_raises_cancels_its_waiting_solves():
+    """An error from one solve ends the stage without running the solves
+    still waiting for a worker."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    release = threading.Event()
+    ran = []
+
+    def solve(index):
+        ran.append(index)
+        if index == 0:
+            raise RuntimeError("solve failed")
+        release.wait(5)
+        return index
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    with pytest.raises(RuntimeError, match="solve failed"):
+        list(executor._as_completed(pool, solve, range(4)))
+    release.set()
+    pool.shutdown(wait=True)
+
+    assert 3 not in ran
+
+
+def test_removal_ranking_weighs_every_periods_recovery() -> None:
+    """A match that recovers heat only in the second period is not pure
+    capital: the removal ranking prices each period's recovery at that
+    period's weight and utility price."""
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 1
+    model.J = 2
+    model.S = 1
+    model.N_periods = 2
+    model.period_weights = [0.5, 0.5]
+    model.z = [[[1], [1]]]
+    model.Q_r_by_period = [[[[0.0], [10.0]]], [[[100.0], [10.0]]]]
+    model.Q_r = model.Q_r_by_period[0]
+    model.alpha = [[[[1.0]], [[1.0]]]]
+    model.hu_cost_period = [[5.0], [5.0]]
+    model.cu_cost_period = [[5.0], [5.0]]
+    model.Q_hu_by_utility_by_period = [[0.0], [0.0]]
+    model.Q_cu_by_utility_by_period = [[0.0], [0.0]]
+    model.unit_cost = [50.0]
+    model.A_coeff = [2.0]
+    model.A_exp = [1.0]
+    model.area_r = [[[5.0], [5.0]]]
+    model.tol = 1e-3
+
+    assert model.get_lowest_benefit_HX_candidates(2) == [[0, 1, 0], [0, 0, 0]]

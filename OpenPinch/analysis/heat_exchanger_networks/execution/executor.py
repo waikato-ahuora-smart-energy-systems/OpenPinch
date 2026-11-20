@@ -16,7 +16,7 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from ....domain.enums import HeatExchangerNetworkDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod, ZoneType
 from ....domain.progress import emit as emit_progress
 from ....optimisation.execution import _main_module_blocks_workers
 from ...parallelism import supported_workers
@@ -24,6 +24,7 @@ from ..errors import WorkflowContractError
 from ..models._stagewise.evolution import reporting_improvements
 from ..models.problem import InternalHeatExchangerNetworkProblem
 from ..results.record import admit, recording_active
+from ..site.levels import site_utility_system, utility_capacities
 from ..solver.arrays import (
     PreparedSolverArrays,
     nominal_approach_temperature,
@@ -392,6 +393,8 @@ class LocalSynthesisExecutor:
             min_approach_share=config.hens.min_exchanger_approach_share,
         )
         arrays = problem_to_solver_arrays(problem, dTmin)
+        # A site seed's task holds each process's levels within the process.
+        site_processes = task.settings.get("site_processes")
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
         is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
@@ -453,6 +456,21 @@ class LocalSynthesisExecutor:
                 int(task.settings.get("heuristic_networks", _HEURISTIC_NETWORKS))
                 if is_heuristic
                 else 0
+            ),
+            staged_utilities=site_processes is not None
+            or (
+                decompositions is not None
+                and _utility_placement(problem) == "temperature"
+                and _has_utility_levels(decompositions["above"])
+            ),
+            utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
+            site_processes=site_processes,
+            site_utility_system=(
+                None
+                if site_processes is None
+                else site_utility_system(
+                    arrays, capacities=utility_capacities(problem.master_zone)
+                )
             ),
         )
 
@@ -582,10 +600,19 @@ _CANDIDATE_SINK: ContextVar[Callable[[Any], None] | None] = ContextVar(
 
 
 def _as_completed(pool, func, inputs):
-    """``func`` over ``inputs`` in ``pool``, each result as its task finishes."""
+    """``func`` over ``inputs`` in ``pool``, each result as its task finishes.
+
+    When the caller stops early (a solve raised, or the generator is
+    closed), the solves still waiting for a worker are cancelled, so the
+    pool's shutdown waits only for those already running.
+    """
     futures = [pool.submit(func, worker_args) for worker_args in inputs]
-    for future in as_completed(futures):
-        yield future.result()
+    try:
+        for future in as_completed(futures):
+            yield future.result()
+    finally:
+        for future in futures:
+            future.cancel()
 
 
 def _handed_off(worker_args: tuple[Callable, Any, Any]):
@@ -996,3 +1023,35 @@ __all__ = [
     "SynthesisExecutor",
     "_failed_task_outcome",
 ]
+
+
+def _utility_placement(problem) -> str:
+    """``HENS_UTILITY_PLACEMENT``, with ``"auto"`` resolved by the design's scope.
+
+    A design covering one process zone (a zone designed in isolation, or a
+    problem of one process) places utility by price; one covering several,
+    a site design, by temperature, as site targeting does.
+    """
+    placement = problem.master_zone.config.hens.utility_placement
+    if placement != "auto":
+        return placement
+    return "temperature" if _process_zone_count(problem.master_zone) > 1 else "price"
+
+
+def _process_zone_count(zone) -> int:
+    own = 1 if str(getattr(zone, "type", "")) == ZoneType.P.value else 0
+    return own + sum(
+        _process_zone_count(child) for child in (zone.subzones or {}).values()
+    )
+
+
+def _has_utility_levels(decomposition) -> bool:
+    """Whether targeting splits utility between levels on either side.
+
+    With one hot and one cold utility there is no level to hold, and the
+    pinch design sides keep their stream-end heaters and coolers.
+    """
+    return (
+        len(decomposition.hot_utility_identities) > 1
+        or len(decomposition.cold_utility_identities) > 1
+    )

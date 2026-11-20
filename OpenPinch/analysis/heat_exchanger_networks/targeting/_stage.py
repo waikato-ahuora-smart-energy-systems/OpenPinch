@@ -120,12 +120,17 @@ def build_seeded_quality_tasks(
         )
         dt_cont_multiplier = dt_cont_multiplier_from_network(network, settings)
         signature = topology_restriction_signature(restrictions)
+        # A site seed holds each process's levels; its tasks hold them too.
+        site_processes = network.source_metadata.get("site_processes")
+        task_settings = (
+            {} if site_processes is None else {"site_processes": site_processes}
+        )
         for derivative_threshold in derivative_thresholds(network):
             key = (
                 (dt_cont_multiplier, derivative_threshold, signature)
                 if distinct_thresholds
                 else (dt_cont_multiplier, signature)
-            )
+            ) + (repr(site_processes),)
             if key in seen:
                 continue
             seen.add(key)
@@ -141,6 +146,7 @@ def build_seeded_quality_tasks(
                     period_id=settings.period_id,
                     seed_network_index=seed_index,
                     topology_restrictions=restrictions,
+                    settings=task_settings,
                 )
             )
     return tuple(tasks)

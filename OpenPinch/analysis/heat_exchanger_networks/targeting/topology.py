@@ -20,9 +20,39 @@ def canonical_topology_restrictions(
     that share a process hot or cold stream stay in the same canonical stage.
     """
 
-    values = tuple(restrictions)
+    canonical, _ = _canonicalise(
+        tuple(restrictions),
+        hot_stream_order=hot_stream_order,
+        cold_stream_order=cold_stream_order,
+    )
+    return canonical
+
+
+def canonical_stage_ends(
+    restrictions: Iterable[HeatExchangerNetworkTopologyRestriction],
+    *,
+    hot_stream_order: Sequence[str] | None = None,
+    cold_stream_order: Sequence[str] | None = None,
+) -> dict[int, int]:
+    """Map each occupied original stage to the last canonical stage it gives,
+    as ``canonical_topology_restrictions`` numbers them."""
+
+    _, ends = _canonicalise(
+        tuple(restrictions),
+        hot_stream_order=hot_stream_order,
+        cold_stream_order=cold_stream_order,
+    )
+    return ends
+
+
+def _canonicalise(
+    values: tuple[HeatExchangerNetworkTopologyRestriction, ...],
+    *,
+    hot_stream_order: Sequence[str] | None,
+    cold_stream_order: Sequence[str] | None,
+) -> tuple[tuple[HeatExchangerNetworkTopologyRestriction, ...], dict[int, int]]:
     if not values:
-        return ()
+        return (), {}
 
     hot_index = _stream_index(
         hot_stream_order,
@@ -34,6 +64,7 @@ def canonical_topology_restrictions(
     )
 
     canonical: list[HeatExchangerNetworkTopologyRestriction] = []
+    ends: dict[int, int] = {}
     next_stage = 1
     for stage in sorted({item.stage for item in values}):
         stage_items = [item for item in values if item.stage == stage]
@@ -49,7 +80,8 @@ def canonical_topology_restrictions(
             ):
                 canonical.append(item.model_copy(update={"stage": next_stage}))
             next_stage += 1
-    return tuple(canonical)
+        ends[stage] = next_stage - 1
+    return tuple(canonical), ends
 
 
 def canonical_stage_count(

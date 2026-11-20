@@ -140,6 +140,13 @@ def set_preprocessing(owner) -> None:
         ]
         for i in range(owner.I)
     ]
+    groups = getattr(owner, "stream_groups", None)
+    if groups is not None:
+        hot_groups, cold_groups = groups
+        for i in range(owner.I):
+            for j in range(owner.J):
+                if hot_groups[i] != cold_groups[j]:
+                    owner.z_feasible[i][j] = [0] * owner.S
     owner.z_hu_feasible, owner.z_cu_feasible = _approach.utility_match_feasibility(
         owner
     )

@@ -45,6 +45,7 @@ from OpenPinch.domain._stream.segment import StreamSegment
 from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import StreamType
 from OpenPinch.domain.stream import Stream
+from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.zone import Zone
 from tests.strategies.stream_segments import segmented_streams
 
@@ -521,6 +522,8 @@ def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
             heat_recovery_target=140.0,
             hot_pinch=100.0,
             cold_pinch=90.0,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
         )
 
     monkeypatch.setattr(
@@ -1330,3 +1333,157 @@ def test_verification_accepts_a_segmented_exchanger_with_spare_area():
 
     assert failures(1.2 * needed) == []
     assert failures(0.8 * needed)
+
+
+def _split_problem() -> PinchProblem:
+    """A segmented hot stream that two cold streams split in one stage."""
+    cold = [
+        {
+            "zone": "Site",
+            "name": name,
+            "t_supply": 40.0,
+            "t_target": 140.0,
+            "heat_flow": 150.0,
+            "htc": 1.0,
+        }
+        for name in ("C1", "C2")
+    ]
+    return PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Hot parent",
+                    "segments": [
+                        {
+                            "t_supply": 200.0,
+                            "t_target": 150.0,
+                            "heat_flow": 100.0,
+                            "htc": 1.0,
+                        },
+                        {
+                            "t_supply": 150.0,
+                            "t_target": 100.0,
+                            "heat_flow": 200.0,
+                            "htc": 1.0,
+                        },
+                    ],
+                },
+                *cold,
+            ],
+            "utilities": [
+                {
+                    "name": "HU",
+                    "type": "Hot",
+                    "t_supply": 250.0,
+                    "t_target": 249.99,
+                    "htc": 2.0,
+                },
+                {
+                    "name": "CU",
+                    "type": "Cold",
+                    "t_supply": 20.0,
+                    "t_target": 20.01,
+                    "htc": 2.0,
+                },
+            ],
+            "options": dict(UNIT_COST_BASIS),
+        },
+        project_name="Site",
+    )
+
+
+def _half_flow_branch_area() -> float:
+    """The area of one branch on half the hot stream's flow."""
+    branch = PiecewiseThermalProfile(
+        identities=("H.a", "H.b"),
+        temperatures_in=np.array([473.15, 423.15]),
+        temperatures_out=np.array([423.15, 373.15]),
+        duties=np.array([50.0, 100.0]),
+        heat_capacity_flowrates=np.array([1.0, 2.0]),
+        heat_transfer_coefficients=np.array([1.0, 1.0]),
+    )
+    cold = PiecewiseThermalProfile(
+        identities=("C",),
+        temperatures_in=np.array([313.15]),
+        temperatures_out=np.array([413.15]),
+        duties=np.array([150.0]),
+        heat_capacity_flowrates=np.array([1.5]),
+        heat_transfer_coefficients=np.array([1.0]),
+    )
+    return sum(
+        item.area
+        for item in duty_aligned_area_contributions(
+            branch,
+            cold,
+            duty=150.0,
+            hot_inlet_temperature=473.15,
+            cold_inlet_temperature=313.15,
+            period="0",
+        )
+    )
+
+
+def test_a_split_branch_is_sized_on_its_share_of_the_segmented_flow():
+    """Two matches share the hot stream in one stage, each over the whole
+    stage (200 to 100 C) on half its flow: each branch is sized on the
+    profile at half flow, not on the whole stream's profile, which would
+    end the branch at 137.5 C and understate its area."""
+    arrays = problem_to_solver_arrays(_split_problem(), 10.0)
+    solved = SimpleNamespace(
+        S=1,
+        Q_r=[[[150.0], [150.0]]],
+        Q_r_by_period=[[[[150.0], [150.0]]]],
+        z=[[[1.0], [1.0]]],
+        z_allowed=[[[1], [1]]],
+        Q_h=[0.0, 0.0],
+        Q_c=[0.0],
+        z_hu=[0.0, 0.0],
+        z_cu=[0.0],
+        T_h=[[473.15, 373.15]],
+        T_c=[[413.15, 313.15], [413.15, 313.15]],
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[413.15, 313.15], [413.15, 313.15]]],
+        area_r=[[[999.0], [999.0]]],
+    )
+    expected = _half_flow_branch_area()
+
+    network = extract_heat_exchanger_network(solved, arrays, run_id="split")
+
+    assert len(network.exchangers) == 2
+    for exchanger in network.exchangers:
+        slices = exchanger.segment_area_contributions
+        assert sum(item.area for item in slices) == pytest.approx(expected)
+        assert min(item.hot_outlet_temperature for item in slices) == pytest.approx(
+            373.15
+        )
+
+
+def test_a_stagewise_split_branch_area_uses_its_share_of_the_flow():
+    """The stage-wise model replaces each segmented match's area with its
+    duty-aligned slices; a split branch is sized on its share of the flow,
+    as extraction does."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.area import (
+        _apply_segment_recovery_areas,
+    )
+
+    arrays = problem_to_solver_arrays(_split_problem(), 10.0)
+    model = SimpleNamespace(
+        solver_arrays=arrays,
+        I=1,
+        J=2,
+        S=1,
+        N_periods=1,
+        period_ids=("0",),
+        tol=1e-6,
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[413.15, 313.15], [413.15, 313.15]]],
+        area_r_by_period=[[[[999.0], [999.0]]]],
+        _active_binary_value=lambda value: value,
+    )
+
+    _apply_segment_recovery_areas(model, [[[[150.0], [150.0]]]])
+
+    expected = _half_flow_branch_area()
+    assert model.area_r[0][0][0] == pytest.approx(expected)
+    assert model.area_r[0][1][0] == pytest.approx(expected)

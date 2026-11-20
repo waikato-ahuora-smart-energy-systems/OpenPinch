@@ -83,17 +83,27 @@ def build_thermal_derivative_method_tasks(
     settings: SynthesisWorkflowSettings,
     pdm_outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    """Fan successful PDM topologies out over derivative thresholds."""
+    """Fan successful PDM topologies out over derivative thresholds.
+
+    Each distinct threshold gives one task per parent. With
+    ``tdm_parent_limit`` set, only that many parents are refined, the
+    cheapest by objective value first (one without a value last).
+    """
+    parents = [
+        outcome
+        for outcome in pdm_outcomes
+        if _successful_method(outcome, HeatExchangerNetworkDesignMethod.PinchDesign)
+        # utility-only: a final candidate, nothing to refine; extra PDM
+        # networks seed evolution directly
+        and not is_utility_only_outcome(outcome)
+        and not is_pdm_variant_outcome(outcome)
+    ]
+    if settings.tdm_parent_limit is not None:
+        parents = sorted(parents, key=_objective_or_inf)[
+            : max(1, int(settings.tdm_parent_limit))
+        ]
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    for outcome in pdm_outcomes:
-        if not _successful_method(
-            outcome, HeatExchangerNetworkDesignMethod.PinchDesign
-        ):
-            continue
-        if is_utility_only_outcome(outcome):
-            continue  # utility-only: a final candidate, nothing to refine
-        if is_pdm_variant_outcome(outcome):
-            continue  # extra PDM networks seed evolution directly
+    for outcome in parents:
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
             HeatExchangerNetworkDesignMethod.ThermalDerivative,
@@ -101,7 +111,7 @@ def build_thermal_derivative_method_tasks(
         stage_count = _required_stage_count(
             outcome, HeatExchangerNetworkDesignMethod.ThermalDerivative
         )
-        for derivative_threshold in settings.derivative_thresholds:
+        for derivative_threshold in settings.quality_derivative_thresholds:
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
@@ -117,6 +127,11 @@ def build_thermal_derivative_method_tasks(
                 )
             )
     return tuple(tasks)
+
+
+def _objective_or_inf(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> float:
+    value = outcome.objective_value
+    return float("inf") if value is None else float(value)
 
 
 def build_seeded_thermal_derivative_method_tasks(

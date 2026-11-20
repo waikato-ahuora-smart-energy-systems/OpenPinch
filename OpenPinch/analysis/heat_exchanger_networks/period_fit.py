@@ -21,7 +21,11 @@ _ARRAYS_APPROACH = 1.0
 
 
 def with_stream_end_utilities(
-    problem, network: HeatExchangerNetwork, *, approach: float
+    problem,
+    network: HeatExchangerNetwork,
+    *,
+    approach: float,
+    levels: frozenset[str] = frozenset(),
 ) -> HeatExchangerNetwork:
     """``network`` with a heater or cooler at each stream end every period can use.
 
@@ -29,7 +33,10 @@ def with_stream_end_utilities(
     in every period its stream runs is dropped. Each stream then without one
     gets the cheapest that can: a hot utility for a cold stream, a cold
     utility for a hot stream, priced by the period-weighted utility price. A
-    stream no utility can serve that way gets none.
+    stream no utility can serve that way gets none. Every utility named in
+    ``levels`` (levels held at their targets) is also placed at each stream
+    end it can serve, so a level has exchangers to carry its target; the fit
+    removes those it leaves unused.
     """
 
     arrays = problem_to_solver_arrays(problem, _ARRAYS_APPROACH)
@@ -101,12 +108,19 @@ def with_stream_end_utilities(
         ("hot", axes["cold_process_streams"], heaters),
         ("cold", axes["hot_process_streams"], coolers),
     ):
+        names = axes["hot_utilities" if side == "hot" else "cold_utilities"]
         for stream, index in streams.items():
-            if stream in served:
-                continue
-            utility = cheapest(index, side)
-            if utility is not None:
-                placements.append((stream, utility))
+            if stream not in served:
+                utility = cheapest(index, side)
+                if utility is not None:
+                    placements.append((stream, utility))
+            for name, u in names.items():
+                if (
+                    name in levels
+                    and (stream, name) not in placements
+                    and reaches(side, index, u)
+                ):
+                    placements.append((stream, name))
 
     return HeatExchangerNetwork.from_structure(
         recovery=recovery,
