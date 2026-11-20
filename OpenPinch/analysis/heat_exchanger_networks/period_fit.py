@@ -14,6 +14,12 @@ import numpy as np
 from ...domain.enums import HeatExchangerKind
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .solver.arrays import problem_to_solver_arrays
+from .solver.utility_slices import (
+    slice_label,
+    slice_labels,
+    slice_parent,
+    with_named_slices,
+)
 
 # The arrays are read for temperatures and prices only, which no approach
 # temperature changes.
@@ -39,7 +45,12 @@ def with_stream_end_utilities(
     removes those it leaves unused.
     """
 
-    arrays = problem_to_solver_arrays(problem, _ARRAYS_APPROACH)
+    # A sliced network keeps its slices: each heater or cooler named by its
+    # slice runs on that slice's range, not the whole utility's.
+    arrays = with_named_slices(
+        problem_to_solver_arrays(problem, _ARRAYS_APPROACH),
+        slice_labels(network.exchangers),
+    )
     values, axes = arrays.arrays, arrays.axis_maps
     weights = np.asarray(values["period_weights"], dtype=float)
 
@@ -91,6 +102,7 @@ def with_stream_end_utilities(
             if heater
             else (exchanger.source_stream, exchanger.sink_stream)
         )
+        utility = slice_label(exchanger) or utility
         if exchanger.stage is not None:
             (heaters if heater else coolers).append((stream, utility, exchanger.stage))
             continue
@@ -116,7 +128,7 @@ def with_stream_end_utilities(
                     placements.append((stream, utility))
             for name, u in names.items():
                 if (
-                    name in levels
+                    slice_parent(name) in levels
                     and (stream, name) not in placements
                     and reaches(side, index, u)
                 ):

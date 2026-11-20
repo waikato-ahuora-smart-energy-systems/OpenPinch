@@ -22,6 +22,13 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Duty optimisation, rating, overdesign and the fit to every period keep a
+  network's utility slices. Pinch design slices a sliding utility (cooling
+  water, hot water) at the streams it must reach, and names each slice in
+  the exchanger id; these tools ran each heater or cooler over its whole
+  parent utility instead, so a slice only part of the range could reach
+  was rejected ("on the wrong side of the stream's temperature range") and
+  the network could not be rated, overdesigned or fitted.
 - Stage reduction keeps a network with fewer stages only when it costs no
   more and uses no more hot or cold utility in any period than the network
   it reduces. Before, it kept any reduced network that solved and verified,
