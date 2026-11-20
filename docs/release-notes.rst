@@ -36,6 +36,14 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A total site design no longer loses its level-held seed when a process
+  raises steam from a hot stream's hottest part ahead of its recovery
+  matches (steam raising limited by the main's temperature). The seed's
+  stages were compacted so that its first recovery match sat in stage 1,
+  where no staged cooler can precede it, and its first model was
+  infeasible; only the lowest-cost seed was evolved and the site imported
+  all its steam (30,281 against 11,031 $/y in one case). A site seed's tasks
+  now keep an empty stage at each end.
 - The fit to every period keeps the approach each network was designed
   to: a pinch design network its contributions at its own dt_cont
   multiplier (7.5 K at 0.75x, not the reference 10 K), an evolved network
