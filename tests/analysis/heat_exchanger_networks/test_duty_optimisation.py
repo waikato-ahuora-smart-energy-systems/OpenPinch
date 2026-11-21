@@ -981,6 +981,38 @@ def test_an_unconverged_point_failing_verification_says_to_raise_the_limit(
     assert outcome.diagnostics == {"unconverged_termination": "maxIterations"}
 
 
+@pytest.mark.parametrize(
+    ("termination", "advised"),
+    [("maxIterations", True), ("maxTimeLimit", True), ("minStepLength", False)],
+)
+def test_only_a_limit_termination_is_advised_to_raise_the_limit(
+    monkeypatch, termination, advised
+) -> None:
+    # A solve that stopped for another reason (a step too small, say) is
+    # named, but raising max_iter would not help it.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ("short",))
+
+    class Unconverged(_ScriptedModel):
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.solver_run = SimpleNamespace(
+                converged=False, termination_condition=termination, status="ok"
+            )
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    Unconverged.calls = []
+    Unconverged.zero_by_call = [set()]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Unconverged).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert termination in outcome.error
+    assert ("HENS_SOLVER_OPTIONS_EVM" in outcome.error) is advised
+
+
 def test_four_stream_utility_objective_reaches_a_verified_network(
     scipy_backend,
 ) -> None:
@@ -1061,6 +1093,28 @@ def test_service_keeps_an_unconverged_allocation_and_warns() -> None:
     assert result.ranked_networks[0].diagnostics == {
         "unconverged_termination": "maxIterations"
     }
+
+
+def test_service_warns_a_non_limit_termination_without_limit_advice() -> None:
+    class Unconverged(FakeSynthesisExecutor):
+        def execute(self, tasks, **kwargs):
+            return tuple(
+                outcome.model_copy(
+                    update={"diagnostics": {"unconverged_termination": "minStepLength"}}
+                )
+                for outcome in super().execute(tasks, **kwargs)
+            )
+
+    with pytest.warns(UserWarning) as caught:
+        heat_exchanger_network_duty_optimisation_service(
+            _four_stream_problem(),
+            _four_stream_structure(),
+            objective="cost",
+            executor=Unconverged(),
+        )
+
+    (message,) = [str(w.message) for w in caught if "minStepLength" in str(w.message)]
+    assert "HENS_SOLVER_OPTIONS_EVM" not in message
 
 
 def test_public_accessor_returns_design_view_with_provenance(monkeypatch) -> None:

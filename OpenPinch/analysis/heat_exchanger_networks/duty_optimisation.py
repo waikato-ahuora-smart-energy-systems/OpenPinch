@@ -69,6 +69,7 @@ from .models.fixed_structure import (
 )
 from .prepared_problem import SynthesisProblem
 from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
+from .solver.backend import LIMIT_TERMINATION_CONDITIONS
 from .solver.utility_slices import (
     slice_label,
     slice_labels,
@@ -703,12 +704,14 @@ class FixedStructureDutyExecutor:
             diagnostics = _unconverged_diagnostics(model)
             error = "verification failed: " + "; ".join(failures)
             termination = diagnostics.get("unconverged_termination")
-            if termination is not None:
+            if termination in LIMIT_TERMINATION_CONDITIONS:
                 error += (
                     f" (the solver stopped at a limit ({termination}) before "
                     "converging: raise max_iter or max_wall_time in "
                     "HENS_SOLVER_OPTIONS_EVM)"
                 )
+            elif termination is not None:
+                error += f" (the solver stopped before converging ({termination}))"
             return _failed_task_outcome(task, error).model_copy(
                 update={"diagnostics": diagnostics}
             )
@@ -879,15 +882,21 @@ def _warn_if_unconverged(
     """
     for outcome in outcomes:
         termination = outcome.diagnostics.get("unconverged_termination")
-        if outcome.status == "success" and termination is not None:
-            warnings.warn(
-                "the fixed-structure duty optimisation stopped at a solver "
-                f"limit ({termination}) before converging; its duties are "
-                "feasible but may not be optimal. Raise the limit (max_iter or "
-                "max_wall_time for Ipopt) in HENS_SOLVER_OPTIONS_EVM.",
-                UserWarning,
-                stacklevel=2,
-            )
+        if outcome.status != "success" or termination is None:
+            continue
+        advice = (
+            " Raise the limit (max_iter or max_wall_time for Ipopt) in "
+            "HENS_SOLVER_OPTIONS_EVM."
+            if termination in LIMIT_TERMINATION_CONDITIONS
+            else ""
+        )
+        warnings.warn(
+            "the fixed-structure duty optimisation stopped before converging "
+            f"({termination}); its duties are feasible but may not be "
+            f"optimal.{advice}",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 def _design_points(exchanger: HeatExchanger, periods) -> dict[int, tuple]:

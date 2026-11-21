@@ -115,7 +115,11 @@ Heat exchanger network synthesis
   with a ``UserWarning`` to raise the limit in ``HENS_SOLVER_OPTIONS_EVM``,
   and one that fails verification fails with an error that names the
   termination and gives that advice, so the ``WorkflowContractError``
-  repeats it.
+  repeats it. The advice to raise a limit is given only for an iteration,
+  evaluation or time limit (``maxIterations``, ``maxEvaluations`` or
+  ``maxTimeLimit``); a solve that stopped for another reason, such as
+  ``minStepLength``, is named without it, here and in the synthesis
+  error that lists the ``HENS_SOLVER_OPTIONS_*`` limits.
 - ``optimise_duties(objective="rating")`` rated at 1 K when no
   ``min_approach_temperature`` was given, so it failed on the default
   design's own network whenever evolution had closed an approach below 1 K.
