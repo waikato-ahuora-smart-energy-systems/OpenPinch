@@ -83,6 +83,13 @@ Heat exchanger network synthesis
   proposals off. On a two-process case whose only option is a loop, the
   loop now takes the cold stream's whole 100 kW of steam heating from the
   other process's hot stream.
+- The fit to every period screened a segmented utility at a stream end with
+  its largest segment ``dt_cont`` at both ends, so a utility whose terminal
+  segments keep the approach was dropped or replaced by a dearer one when
+  another of its segments had a larger contribution. Each end is now held
+  to its own terminal segment's contribution (the inlet segment at the
+  utility's inlet, the outlet segment at its outlet), as the fit's approach
+  equations do.
 - One network could carry two topology signatures when two matches that
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case

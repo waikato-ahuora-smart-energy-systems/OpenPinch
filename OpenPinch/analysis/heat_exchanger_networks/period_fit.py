@@ -67,9 +67,21 @@ def with_stream_end_utilities(
         )
         return masked.max(axis=2)
 
+    def terminal_contributions(prefix: str) -> tuple[np.ndarray, np.ndarray]:
+        """Each period's inlet and outlet segment contributions of every
+        utility on a side, the terminals the fit's approach equations use."""
+        segments = values[f"{prefix}_segment_dt_cont_period"]
+        last = np.maximum(values[f"{prefix}_segment_count"] - 1, 0)
+        outlet = np.take_along_axis(
+            segments,
+            np.broadcast_to(last[None, :, None], (*segments.shape[:2], 1)),
+            axis=2,
+        )[..., 0]
+        return segments[..., 0], outlet
+
     held = {
-        "hot": (contributions("cold"), contributions("hot_utility")),
-        "cold": (contributions("hot"), contributions("cold_utility")),
+        "hot": (contributions("cold"), terminal_contributions("hot_utility")),
+        "cold": (contributions("hot"), terminal_contributions("cold_utility")),
     }
 
     def reaches(side: str, stream_index: int, utility_index: int) -> bool:
@@ -87,17 +99,22 @@ def with_stream_end_utilities(
             running = values["f_h_period"][:, stream_index] > 0.0
             sign = -1.0
         if approach is None:
-            stream_cont, util_cont = held[side]
-            needed = stream_cont[:, stream_index] + util_cont[:, utility_index]
+            stream_cont, (inlet_cont, outlet_cont) = held[side]
+            needed_out = stream_cont[:, stream_index] + outlet_cont[:, utility_index]
+            needed_in = stream_cont[:, stream_index] + inlet_cont[:, utility_index]
         else:
-            needed = np.full(len(weights), float(approach))
+            needed_out = needed_in = np.full(len(weights), float(approach))
         # Hot side: the utility's outlet against the stream's inlet, its inlet
-        # against the stream's target; cold side mirrored.
-        gaps = np.minimum(
-            sign * (util_out[:, utility_index] - stream_in[:, stream_index]),
-            sign * (util_in[:, utility_index] - stream_out[:, stream_index]),
+        # against the stream's target; cold side mirrored. Each gap keeps the
+        # contribution of the utility segment at that end.
+        outlet_short = (
+            sign * (util_out[:, utility_index] - stream_in[:, stream_index])
+            < needed_out
         )
-        return not np.any(gaps[running] < needed[running])
+        inlet_short = (
+            sign * (util_in[:, utility_index] - stream_out[:, stream_index]) < needed_in
+        )
+        return not np.any((outlet_short | inlet_short)[running])
 
     def cheapest(stream_index: int, side: str):
         names = axes["hot_utilities" if side == "hot" else "cold_utilities"]
