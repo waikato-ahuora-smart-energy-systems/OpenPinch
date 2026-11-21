@@ -37,7 +37,9 @@ def test_ci_triggers_and_single_required_check():
         "workflow_dispatch",
         "workflow_call",
     }
-    assert ci["on"]["pull_request"]["branches"] == ["develop", "main"]
+    # A stacked pull request (based on another claude/ branch) gets the
+    # standard profile too.
+    assert ci["on"]["pull_request"]["branches"] == ["develop", "main", "claude/**"]
     assert ci["on"]["push"]["branches"] == ["develop"]
     # Metadata edits must never re-run (and so never re-report) the gate.
     assert "types" not in ci["on"]["pull_request"]
