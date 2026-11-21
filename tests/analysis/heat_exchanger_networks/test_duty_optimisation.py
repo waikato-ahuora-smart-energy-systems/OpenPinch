@@ -950,6 +950,37 @@ def test_executor_records_a_solve_stopped_at_its_limit(monkeypatch) -> None:
     assert outcome.diagnostics == {"unconverged_termination": "maxIterations"}
 
 
+def test_an_unconverged_point_failing_verification_says_to_raise_the_limit(
+    monkeypatch,
+) -> None:
+    # The failure's own error carries the termination and the advice, so a
+    # summary that reads only the error still tells the user what to do.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ("short",))
+
+    class Unconverged(_ScriptedModel):
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.solver_run = SimpleNamespace(
+                converged=False, termination_condition="maxIterations", status="ok"
+            )
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    Unconverged.calls = []
+    Unconverged.zero_by_call = [set()]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Unconverged).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert outcome.status == "failed"
+    assert outcome.error.startswith("verification failed: short")
+    assert "maxIterations" in outcome.error
+    assert "HENS_SOLVER_OPTIONS_EVM" in outcome.error
+    assert outcome.diagnostics == {"unconverged_termination": "maxIterations"}
+
+
 def test_four_stream_utility_objective_reaches_a_verified_network(
     scipy_backend,
 ) -> None:

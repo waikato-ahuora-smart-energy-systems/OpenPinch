@@ -104,7 +104,9 @@ Heat exchanger network synthesis
   at a cost that was not a converged optimum. Its outcome now records
   ``diagnostics["unconverged_termination"]``; a verified allocation is kept
   with a ``UserWarning`` to raise the limit in ``HENS_SOLVER_OPTIONS_EVM``,
-  and one that fails verification raises with that advice.
+  and one that fails verification fails with an error that names the
+  termination and gives that advice, so the ``WorkflowContractError``
+  repeats it.
 - ``optimise_duties(objective="rating")`` rated at 1 K when no
   ``min_approach_temperature`` was given, so it failed on the default
   design's own network whenever evolution had closed an approach below 1 K.
