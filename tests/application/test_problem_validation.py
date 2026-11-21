@@ -518,7 +518,7 @@ def test_semantic_issues_report_declared_non_numeric_period_ids():
     assert not any("period_id '2'" in message for message in messages)
 
 
-def _price_issues(utility_type: str, price: float) -> list[str]:
+def _price_issues(utility_type: str, price: float, **extra) -> list[str]:
     data = {
         "streams": [
             {
@@ -539,6 +539,7 @@ def _price_issues(utility_type: str, price: float) -> list[str]:
                 "t_target": 124.0,
                 "dt_cont": 5.0,
                 "price": price,
+                **extra,
             }
         ],
     }
@@ -552,3 +553,14 @@ def test_a_cold_utility_credit_price_passes_validation_silently():
     negative hot utility price is still warned of."""
     assert _price_issues("Cold", -50.0) == []
     assert _price_issues("Hot", -50.0) == ["utilities[0].price"]
+
+
+def test_a_profiled_cold_utility_credit_price_still_warns():
+    """A segmented utility's profile takes non-negative prices only, so a
+    credit on one is still warned of."""
+    segments = [
+        {"t_supply": 125.0, "t_target": 124.5, "heat_flow": 1.0, "htc": 1.0},
+        {"t_supply": 124.5, "t_target": 124.0, "heat_flow": 1.0, "htc": 1.0},
+    ]
+    issues = _price_issues("Cold", -50.0, segments=segments)
+    assert "utilities[0].price" in issues
