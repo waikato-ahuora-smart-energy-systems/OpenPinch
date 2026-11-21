@@ -1494,7 +1494,11 @@ class _DesignAccessor:
         (screened by the utility it could cut where it sits) or, optionally,
         a relocated exchanger, with the added area each structure needs
         sized in the same solve. Each step keeps the ``beam_width`` designs
-        with the best net annual benefit.
+        with the best net annual benefit. When the existing network's
+        streams span several process zones (a site's network given as this
+        mapping), new matches and relocations join only streams of one
+        process, and a ``UserWarning`` says the site utility balance is not
+        modelled: utilities are priced unit by unit.
 
         Added area costs ``COSTING_HX_AREA_COEFF * area **
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default

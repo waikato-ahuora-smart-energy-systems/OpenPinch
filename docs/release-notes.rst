@@ -36,6 +36,15 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.retrofit`` on a multi-process site network given as a mapping
+  (the documented form, which carries no site metadata, so the site guard
+  let it through) proposed new matches between streams of different
+  processes and priced utilities unit by unit with no warning. On a
+  two-process site its first step matched the Cooling process's ``H3``
+  with the Heating process's ``C1``. When the existing network's streams
+  span several process zones, new matches and relocations are now screened
+  only within one process, and a ``UserWarning`` says the site utility
+  balance is not modelled. Single-process retrofits are unchanged.
 - One network could carry two topology signatures when two matches that
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case

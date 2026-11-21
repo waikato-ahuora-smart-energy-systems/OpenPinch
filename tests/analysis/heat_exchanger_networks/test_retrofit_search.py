@@ -1427,3 +1427,99 @@ def test_a_heat_pump_whose_machine_cannot_be_priced_is_dropped(
         for modification in design.modifications
         if modification.kind == "heat_pump"
     ]
+
+
+# A two-process site's network, given as the documented mapping (the
+# selected total site network of tests/application's ``_site``).
+SITE_EXISTING = {
+    "recovery": [
+        {
+            "hot": "Heating.H1",
+            "cold": "Heating.C1",
+            "stage": 2,
+            "area": 2.33,
+            "id": "E1",
+        },
+        {
+            "hot": "Heating.H2",
+            "cold": "Heating.C1",
+            "stage": 4,
+            "area": 6.0,
+            "id": "E2",
+        },
+        {
+            "hot": "Cooling.H3",
+            "cold": "Cooling.C2",
+            "stage": 5,
+            "area": 2.8,
+            "id": "E3",
+        },
+        {
+            "hot": "Cooling.H3",
+            "cold": "Cooling.C3",
+            "stage": 3,
+            "area": 6.0,
+            "id": "E4",
+        },
+    ],
+    "heaters": [{"stream": "Heating.C1", "utility": "HPS", "area": 1.18, "id": "E5"}],
+    "coolers": [{"stream": "Cooling.H3", "utility": "CW", "area": 1.44, "id": "E6"}],
+    "stage_count": 5,
+}
+
+
+def _tried_matches(monkeypatch) -> list[tuple[str, str]]:
+    """Record the stream pair of every new match and relocation tried."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    tried: list[tuple[str, str]] = []
+    new_match, relocation = search.apply_new_match, search.apply_relocation
+
+    def spy_new_match(network, match, exchanger_id):
+        tried.append((match.hot, match.cold))
+        return new_match(network, match, exchanger_id)
+
+    def spy_relocation(network, exchanger_id, match):
+        tried.append((match.hot, match.cold))
+        return relocation(network, exchanger_id, match)
+
+    monkeypatch.setattr(search, "apply_new_match", spy_new_match)
+    monkeypatch.setattr(search, "apply_relocation", spy_relocation)
+    return tried
+
+
+@pytest.mark.parametrize("strategy", ["structure", "stepwise"])
+def test_a_multi_process_retrofit_matches_streams_only_within_a_process(
+    fake_solver, monkeypatch, strategy
+):
+    from tests.application.test_site_heat_exchanger_network import _site
+
+    tried = _tried_matches(monkeypatch)
+
+    with pytest.warns(UserWarning, match="site utility balance"):
+        result = _site().design.retrofit(
+            SITE_EXISTING,
+            strategy=strategy,
+            max_modifications=1,
+            new_match_candidates=20,
+            relocation_cost=0.0,
+            relocation_candidates=20,
+        )
+
+    assert tried
+    assert all(hot.split(".")[0] == cold.split(".")[0] for hot, cold in tried)
+    assert len(result.frontier) == 2
+
+
+def test_a_single_process_retrofit_screens_every_pair_without_a_site_warning(
+    fake_solver, monkeypatch, recwarn
+):
+    tried = _tried_matches(monkeypatch)
+
+    _problem().design.retrofit(
+        _existing_network(), max_modifications=1, new_match_candidates=20
+    )
+
+    assert not [w for w in recwarn if "site utility balance" in str(w.message)]
+    # H1 is matched with both cold streams, as before.
+    assert {("H1", "C1"), ("H1", "C2")} <= set(tried)

@@ -13,6 +13,7 @@ import logging
 import math
 import sys
 import threading
+import warnings
 from collections import Counter
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -63,6 +64,7 @@ from .moves import (
     new_utility_candidates,
     screen_new_matches,
 )
+from .processes import stream_process_zones
 
 # Added area below this (m2) is no modification.
 _MIN_ADDED_AREA = 1e-3
@@ -261,6 +263,16 @@ def run_retrofit_search(
             )
     ensure_target_results(problem, {}, None)
     evaluator = _Evaluator(problem, existing, settings)
+    if evaluator.processes is not None:
+        warnings.warn(
+            "the existing network spans the process zones "
+            + ", ".join(sorted(set(evaluator.processes.values())))
+            + ": retrofit proposes new matches only within one process and "
+            "does not model the site utility balance, so it prices utilities "
+            "unit by unit.",
+            UserWarning,
+            stacklevel=3,
+        )
     base = evaluator.evaluate(_State(existing, frozenset(), ()))
     if base is None:
         raise ValueError(
@@ -399,6 +411,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
         evaluator.ends,
         approach=evaluator.screen_approach,
         limit=settings.new_match_candidates,
+        processes=evaluator.processes,
     )
     for match in matches:
         exchanger_id = _new_id(network, match)
@@ -418,6 +431,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
         settings,
         evaluator.existing,
         approach=evaluator.screen_approach,
+        processes=evaluator.processes,
     ):
         remaining = network.model_copy(
             update={
@@ -498,7 +512,13 @@ def _relocation_repiping(
 
 
 def _relocations(
-    parent: _Evaluated, ends, settings: RetrofitSettings, existing, *, approach
+    parent: _Evaluated,
+    ends,
+    settings: RetrofitSettings,
+    existing,
+    *,
+    approach,
+    processes=None,
 ):
     """The relocations from ``parent``, most promising first.
 
@@ -511,7 +531,9 @@ def _relocations(
     ceiling ranking judges a move by what its whole structure can reach and
     the score barely tracks that; the cap bounds the ranking on large
     networks. A unit that is the
-    only exchanger on one of its streams stays on that stream.
+    only exchanger on one of its streams stays on that stream. With
+    ``processes`` (stream to process zone) only matches within one process
+    are screened.
     """
 
     solved = parent.solved
@@ -529,7 +551,9 @@ def _relocations(
         for stream in (e.source_stream, e.sink_stream)
     )
     # Every screened match, not just the best few.
-    pool = screen_new_matches(solved, ends, approach=approach, limit=sys.maxsize)
+    pool = screen_new_matches(
+        solved, ends, approach=approach, limit=sys.maxsize, processes=processes
+    )
     scored = []
     for match in pool:
         potential = match_potential(solved, ends, match, approach=approach)
@@ -643,6 +667,7 @@ class _Evaluator:
         self.ends = {
             self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
         }
+        self.processes = _spanned_processes(problem, existing, self.names)
         axes = self.arrays.axis_maps
         self.utility_axes = {
             "hot_streams": tuple(n for n, e in self.ends.items() if e[0] > e[1]),
@@ -1193,6 +1218,26 @@ def _cycle_settings(hpr) -> dict:
             min_lift=float(hpr.min_stage_lift),
         ),
     }
+
+
+def _spanned_processes(
+    problem, existing: HeatExchangerNetwork, names
+) -> dict[str, str] | None:
+    """Each stream (by its name in ``existing``) mapped to its process
+    zone when ``existing``'s streams span several process zones, else
+    ``None``."""
+
+    processes = {
+        names.get(key, key): process
+        for key, process in stream_process_zones(problem.master_zone).items()
+    }
+    spanned = {
+        processes[name]
+        for e in _structural_exchangers(existing)
+        for name in (e.source_stream, e.sink_stream)
+        if name in processes
+    }
+    return processes if len(spanned) > 1 else None
 
 
 def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]:

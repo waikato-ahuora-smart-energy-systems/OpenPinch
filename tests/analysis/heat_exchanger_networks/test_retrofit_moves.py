@@ -210,3 +210,20 @@ def test_screen_ranks_new_matches_by_utility_relief_then_potential():
     assert all(
         match_potential(network, ENDS, move, approach=10.0) > 0.0 for move in everything
     )
+
+
+def test_the_screen_keeps_each_match_within_one_process_when_given_processes():
+    network = _solved_network()
+    processes = {"H1": "A", "C1": "A", "H2": "B", "C2": "B"}
+
+    everything = screen_new_matches(network, ENDS, approach=10.0, limit=100)
+    within = screen_new_matches(
+        network, ENDS, approach=10.0, limit=100, processes=processes
+    )
+
+    # H1-C2 leads the unrestricted screen but joins two processes.
+    assert any(m.hot == "H1" and m.cold == "C2" for m in everything)
+    assert within == tuple(
+        m for m in everything if processes[m.hot] == processes[m.cold]
+    )
+    assert within

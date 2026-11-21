@@ -112,14 +112,17 @@ def screen_new_matches(
     *,
     approach: float,
     limit: int,
+    processes: Mapping[str, str] | None = None,
 ) -> tuple[NewMatch, ...]:
     """The ``limit`` most promising new matches for solved ``network``.
 
     Every hot and cold stream pair is tried joining each stage and in a new
     stage at each position; a pair already matched in a stage is not
-    proposed there again. Moves with positive ``match_potential`` are ranked
-    by ``utility_relief``, then potential, then fewest new splits, then
-    stage, joining before a new stage, and stream names.
+    proposed there again. With ``processes`` (stream to its process zone)
+    only pairs of one process are tried. Moves with positive
+    ``match_potential`` are ranked by ``utility_relief``, then potential,
+    then fewest new splits, then stage, joining before a new stage, and
+    stream names.
     """
 
     hot = sorted(name for name, (supply, target, _) in ends.items() if supply > target)
@@ -134,6 +137,7 @@ def screen_new_matches(
         NewMatch(h, c, stage, new_stage)
         for h in hot
         for c in cold
+        if processes is None or processes.get(h) == processes.get(c)
         for new_stage, last in ((False, count), (True, count + 1))
         for stage in range(1, last + 1)
         if new_stage or (h, c, stage) not in existing
