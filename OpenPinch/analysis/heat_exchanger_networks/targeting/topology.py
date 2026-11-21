@@ -75,11 +75,11 @@ def canonical_topology_restrictions(
 ) -> tuple[HeatExchangerNetworkTopologyRestriction, ...]:
     """Return restrictions in canonical grid-stage form.
 
-    Matches that share a process hot or cold stream in one original stage
-    stay in one canonical stage; every other group of matches takes a stage
-    of its own, numbered by ``canonical_stage_indices``. Two numberings that
-    give every stream the same match order therefore give the same result.
-    Streams missing from the given orders sort by name after them.
+    Empty recovery-stage gaps are removed. Within each occupied original stage,
+    independent match groups are split into consecutive stages, while matches
+    that share a process hot or cold stream stay in the same canonical stage.
+    Groups keep their original stage order, so a task built from them solves
+    the superstructure it came from.
     """
 
     values = tuple(restrictions)
@@ -91,7 +91,10 @@ def canonical_topology_restrictions(
         cold_stream_order,
         (item.sink_stream for item in values),
     )
-    orders = [_match_order(item, hot_index, cold_index) for item in values]
+    # Ordering by original stage first keeps the original stage order.
+    orders = [
+        (item.stage, *_match_order(item, hot_index, cold_index)) for item in values
+    ]
     stages = canonical_stage_indices(
         [
             StageNode(
@@ -124,16 +127,28 @@ def canonical_stage_count(
 def topology_restriction_signature(
     restrictions: Iterable[HeatExchangerNetworkTopologyRestriction],
 ) -> tuple[tuple[str, str, int], ...]:
-    """Return a duty-independent topology signature."""
+    """Return a duty-independent topology signature.
 
+    Stages are renumbered by ``canonical_stage_indices`` with ties broken by
+    stream names, so two numberings that give every stream the same match
+    order give the same signature.
+    """
+
+    values = tuple(restrictions)
+    stages = canonical_stage_indices(
+        [
+            StageNode(
+                frozenset({("hot", item.source_stream), ("cold", item.sink_stream)}),
+                item.stage,
+                (item.source_stream, item.sink_stream),
+            )
+            for item in values
+        ]
+    )
     return tuple(
         sorted(
-            (
-                item.source_stream,
-                item.sink_stream,
-                item.stage,
-            )
-            for item in restrictions
+            (item.source_stream, item.sink_stream, stage)
+            for item, stage in zip(values, stages, strict=True)
         )
     )
 
@@ -167,7 +182,7 @@ def _stream_index(
     ordered: list[str] = []
     if preferred_order is not None:
         ordered.extend(str(item) for item in preferred_order)
-    ordered.extend(sorted(str(item) for item in fallback_order))
+    ordered.extend(str(item) for item in fallback_order)
     return {stream: index for index, stream in enumerate(dict.fromkeys(ordered))}
 
 
