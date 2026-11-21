@@ -617,7 +617,8 @@ class _DesignAccessor:
         the levels' order and the streams' temperatures, the site is evolved
         again with each process's levels re-targeted, and a move is kept
         only on a lower site cost; the step halves down to
-        ``HENS_SITE_LEVEL_STEP_MIN`` (1 K). The moves are recorded as
+        ``HENS_SITE_LEVEL_STEP_MIN`` (1 K); each set of level positions is
+        designed once. The moves are recorded as
         ``HENS_SITE_LEVEL_MOVES``. ``HENS_SITE_TIME_LIMIT`` (seconds, default
         none) bounds the sweep and the moves together: once it runs out no
         further count or move is started and the cheapest design so far is

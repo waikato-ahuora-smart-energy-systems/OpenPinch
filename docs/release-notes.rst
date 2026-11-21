@@ -36,6 +36,15 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Level moves on a placed site design no longer design the same level
+  positions twice. Before, levels were cached only with the seed network a
+  move was designed from, so after each adopted move the next round
+  re-designed the positions just left (to the same cost), and a move whose
+  design failed was retried every round. Each position is now designed
+  once: a move back to it is logged ``"skipped"`` with the cached cost, or
+  with ``"already failed: <message>"``. Moves refused for meeting another
+  level or leaving the stream temperatures are logged ``"refused"`` with
+  the reason, so the log shows why a level never moved.
 - ``HENS_TDM_PARENT_LIMIT`` now cuts work. A MILP pinch design network
   the limit left out got no thermal derivative task, so it counted as one
   whose derivative tasks had all failed and went straight to network

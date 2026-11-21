@@ -466,10 +466,13 @@ the shifted level, and network evolution designs the site again from the
 current best network's recovery matches, with the call's width, depth and
 options. A round tries every placed level both ways and adopts the cheapest
 move that lowers the site total annual cost; a move whose design fails is
-recorded and skipped. When no move improves, the step halves, and the moves
+recorded and skipped. Each set of level positions is designed once: a move
+back to positions already designed, or whose design failed, is not designed
+again. When no move improves, the step halves, and the moves
 stop once it falls below ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K).
 ``HENS_SITE_LEVEL_STEP: 0`` moves no level. Every move tried, with its cost
-and whether it was adopted, rejected or failed, is listed in
+and whether it was adopted, rejected, failed, refused (with the reason) or
+skipped as already designed, is listed in
 ``result.provenance.effective_settings["HENS_SITE_LEVEL_MOVES"]``. The level
 count stays fixed while levels move. Each move runs a site evolution, so the
 moves can take several times as long as the sweep's design of one count.
