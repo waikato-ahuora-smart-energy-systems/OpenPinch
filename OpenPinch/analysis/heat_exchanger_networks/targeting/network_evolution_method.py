@@ -299,7 +299,7 @@ def build_direct_network_evolution_method_tasks(
             period_id=settings.period_id,
             settings=_run_breadth_settings(settings),
         )
-        for dt_cont_multiplier in settings.dt_cont_multipliers
+        for dt_cont_multiplier in dict.fromkeys(settings.dt_cont_multipliers)
         for stage_count in settings.stage_selection
     )
 

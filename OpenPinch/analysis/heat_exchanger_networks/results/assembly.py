@@ -76,6 +76,7 @@ def build_synthesis_result(
         }.items()
         if value is not None
     }
+    task_methods = {task.method for task in tasks}
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id=settings.run_id,
         # The dt_cont multipliers the tasks ran.
@@ -91,8 +92,18 @@ def build_synthesis_result(
         best_solutions_to_save=settings.best_solutions_to_save,
         search_width=settings.search_width,
         search_depth=settings.search_depth,
-        pdm_stage_pair_limit=settings.pdm_stage_pair_limit,
-        tdm_parent_limit=settings.tdm_parent_limit,
+        # Each stage limit only for the stage it limits, when that stage ran.
+        pdm_stage_pair_limit=(
+            settings.pdm_stage_pair_limit
+            if settings.runs_milp_pinch_design
+            and HeatExchangerNetworkDesignMethod.PinchDesign in task_methods
+            else None
+        ),
+        tdm_parent_limit=(
+            settings.tdm_parent_limit
+            if HeatExchangerNetworkDesignMethod.ThermalDerivative in task_methods
+            else None
+        ),
         stage_packing=settings.stage_packing,
         evm_n_ad_branches=settings.effective_evm_n_ad_branches,
         evm_n_rm_branches=settings.effective_evm_n_rm_branches,

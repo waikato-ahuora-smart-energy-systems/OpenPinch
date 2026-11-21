@@ -295,6 +295,72 @@ def test_a_milp_network_whose_derivative_tasks_all_fail_is_evolved_directly(
     assert milp_parents <= evolved
 
 
+def test_tdm_parent_limit_leaves_excluded_milp_parents_unevolved() -> None:
+    """``HENS_TDM_PARENT_LIMIT`` cuts work: a MILP parent the limit leaves
+    out gets neither a derivative task nor direct evolution."""
+
+    problem = _small_problem_with_options({"HENS_TDM_PARENT_LIMIT": 1})
+    settings = workflow_settings_from_problem(problem)
+
+    result = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    )
+
+    parents = [
+        outcome
+        for outcome in result.outcomes
+        if outcome.status == "success" and outcome.task.method == "pinch_design_method"
+    ]
+    children = {
+        parent.task.task_id: {
+            str(child.task.method)
+            for child in result.outcomes
+            if child.task.parent_task_id == parent.task.task_id
+        }
+        for parent in parents
+    }
+    assert len(parents) == 2
+    assert sorted(children.values(), key=len) == [
+        set(),
+        {"thermal_derivative_method"},
+    ]
+
+
+def test_manifest_records_stage_limits_only_for_stages_that_ran() -> None:
+    problem = _small_problem_with_options(
+        {
+            "HENS_SEARCH_DEPTH": 1,
+            "HENS_HEURISTIC_PDM_NETWORKS": 2,
+            "HENS_PDM_STAGE_PAIR_LIMIT": 3,
+            "HENS_TDM_PARENT_LIMIT": 2,
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+
+    manifest = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    ).accepted_result.manifest
+
+    assert "pinch_design_method" not in manifest.task_count_by_method
+    assert "thermal_derivative_method" not in manifest.task_count_by_method
+    assert manifest.pdm_stage_pair_limit is None
+    assert manifest.tdm_parent_limit is None
+
+
+def test_manifest_records_stage_limits_for_stages_that_ran() -> None:
+    problem = _small_problem_with_options(
+        {"HENS_PDM_STAGE_PAIR_LIMIT": 1, "HENS_TDM_PARENT_LIMIT": 2}
+    )
+    settings = workflow_settings_from_problem(problem)
+
+    manifest = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    ).accepted_result.manifest
+
+    assert manifest.pdm_stage_pair_limit == 1
+    assert manifest.tdm_parent_limit == 2
+
+
 def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     class MissingCouenneForPdmExecutor(FakeSynthesisExecutor):
         def execute(self, tasks, *, problem, parent_outcomes, max_parallel):

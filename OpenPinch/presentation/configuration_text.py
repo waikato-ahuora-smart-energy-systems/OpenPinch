@@ -541,7 +541,9 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Thermal derivative parent limit", None,
         (
             "The most MILP pinch design networks the thermal derivative step"
-            " refines, cheapest first; unset refines every one."
+            " refines, cheapest first. Below depth 3 the rest are not evolved"
+            " either; from depth 3 every MILP network seeds evolution anyway."
+            " Unset refines every one."
         ),
     ),
     "HENS_STAGE_PACKING": FieldText(

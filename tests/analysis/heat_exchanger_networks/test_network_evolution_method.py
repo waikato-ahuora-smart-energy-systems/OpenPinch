@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
     LocalSynthesisExecutor,
@@ -12,6 +13,7 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     SynthesisWorkflowSettings,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+    build_direct_network_evolution_method_tasks,
     build_seeded_network_evolution_method_tasks,
 )
 from OpenPinch.application.problem import PinchProblem
@@ -201,3 +203,14 @@ def _recovery_exchanger(hot: str, cold: str, stage: int) -> HeatExchanger:
             ),
         ),
     )
+
+
+def test_direct_evolution_tasks_skip_repeated_multipliers() -> None:
+    settings = replace(
+        _settings(), dt_cont_multipliers=(1.0, 1.0, 0.5), stage_selection=(2,)
+    )
+
+    tasks = build_direct_network_evolution_method_tasks(settings)
+
+    assert [task.dt_cont_multiplier for task in tasks] == [1.0, 0.5]
+    assert len({task.task_id for task in tasks}) == 2

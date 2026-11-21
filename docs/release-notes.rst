@@ -36,6 +36,18 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``HENS_TDM_PARENT_LIMIT`` now cuts work. A MILP pinch design network
+  the limit left out got no thermal derivative task, so it counted as one
+  whose derivative tasks had all failed and went straight to network
+  evolution, the dearest stage. Only a network whose derivative tasks ran
+  and failed is now evolved directly; below search depth 3 one the limit
+  leaves out is a final candidate as it stands.
+- The run manifest records ``pdm_stage_pair_limit`` only when the MILP
+  pinch design stage ran at every multiplier, and ``tdm_parent_limit``
+  only when the thermal derivative stage ran; otherwise both are ``None``.
+  Before, a depth 1 run recorded both though neither stage ran.
+- A repeated ``HENS_DT_CONT_MULTIPLIERS`` value no longer adds a second,
+  identical direct network evolution task when Couenne is missing.
 - ``design.retrofit`` on a multi-process site network given as a mapping
   (the documented form, which carries no site metadata, so the site guard
   let it through) proposed new matches between streams of different
