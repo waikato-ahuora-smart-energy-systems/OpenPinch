@@ -64,9 +64,14 @@ def verify_network_feasibility(
     """Return feasibility failures for one extracted HEN candidate.
 
     The checks intentionally operate on the service-boundary network data,
-    not the private solver model. They therefore catch under-costed or
-    heat-balance-inconsistent EVM candidates after solution extraction and before
-    ranking/selection.
+    not the private solver model. They catch heat-balance, temperature,
+    approach and area inconsistencies after solution extraction and before
+    ranking/selection. Costs are checked for consistency only: the total
+    annual cost must equal utility plus capital, and, when every exchanger
+    records its own capital cost, the network's capital must be their sum.
+    The cost law and the utility prices are not on the network (and differ
+    between the process, site, retrofit and multiperiod cost models), so
+    capital is not recomputed from the areas nor utility cost from the duties.
     """
 
     if network is None:
@@ -77,6 +82,7 @@ def verify_network_feasibility(
     if len(period_ids) <= 1:
         failures.extend(_check_summary_totals(network))
     failures.extend(_check_cost_consistency(network))
+    failures.extend(_check_exchanger_capital(network))
     for period_id in period_ids:
         failures.extend(_check_temperature_order(network.exchangers, period_id))
         failures.extend(_check_minimum_approach(network, period_id))
@@ -150,6 +156,26 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
         "total annual cost "
         f"{network.total_annual_cost:.6g} does not match utility + capital "
         f"{component_total:.6g}"
+    ]
+
+
+def _check_exchanger_capital(network: HeatExchangerNetwork) -> list[str]:
+    """The network's capital against its exchangers' own capital costs,
+    when every exchanger records one."""
+    costs = [exchanger.capital_cost for exchanger in network.exchangers]
+    if network.capital_cost is None or not costs or None in costs:
+        return []
+    exchanger_total = math.fsum(costs)
+    if _close(
+        network.capital_cost,
+        exchanger_total,
+        rel_tol=_COST_REL_TOL,
+        abs_tol=_COST_ABS_TOL,
+    ):
+        return []
+    return [
+        f"capital cost {network.capital_cost:.6g} does not match the "
+        f"exchangers' capital costs {exchanger_total:.6g}"
     ]
 
 

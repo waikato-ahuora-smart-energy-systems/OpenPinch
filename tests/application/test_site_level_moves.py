@@ -341,18 +341,20 @@ def test_level_moves_never_raise_the_placed_designs_cost():
     assert returned <= start + 1e-6 * start
 
 
-def test_a_level_vector_already_designed_is_not_designed_again():
-    """Adopting +5 K makes the next round's -5 K the levels just left; the
-    moves are judged by site cost, so that design is not repeated."""
+def test_no_level_position_is_designed_twice():
+    """Adopting a move makes the next round's opposite move the levels just
+    left. Each move designs from the current network, so the seed differs,
+    but the levels were designed already: their cached cost is logged
+    ``"skipped"`` and they are not designed again."""
     evaluated = []
 
     def evaluate(case, view):
         evaluated.append(_hot_supply(case, "iso_1"))
-        return _view(_cost_by_level(case))
+        return _seeded_view(_cost_by_level(case), str(_hot_supply(case, "iso_1")))
 
     _, _, log = moves.refine_levels(
         _mains_site(),
-        _view(_cost_by_level(_mains_site())),
+        _seeded_view(_cost_by_level(_mains_site()), "start"),
         evaluate=evaluate,
         step=5.0,
         step_min=1.0,
@@ -360,8 +362,11 @@ def test_a_level_vector_already_designed_is_not_designed_again():
     )
 
     assert len(evaluated) == len(set(evaluated))
-    revisits = [move for move in log if move.message == "already designed"]
-    assert revisits and all(move.status == "rejected" for move in revisits)
+    skipped = [move for move in log if move.status == "skipped"]
+    assert skipped and all(move.message == "already designed" for move in skipped)
+    # From 185 C, the move back to 180 C is skipped at the baseline's cost.
+    assert skipped[0].shift == -5.0
+    assert skipped[0].total_annual_cost == pytest.approx(1015.0)
 
 
 def test_the_moves_stop_when_the_time_runs_out():
@@ -431,40 +436,17 @@ def _seeded_view(cost, tag):
     )
 
 
-def test_levels_are_designed_again_from_a_different_seed():
-    """A move designs from the current network's recovery matches, so levels
-    met again after another move was adopted are designed again."""
-    evaluated = []
-
-    def evaluate(case, view):
-        evaluated.append(_hot_supply(case, "iso_1"))
-        return _seeded_view(_cost_by_level(case), str(_hot_supply(case, "iso_1")))
-
-    moves.refine_levels(
-        _mains_site(),
-        _seeded_view(_cost_by_level(_mains_site()), "start"),
-        evaluate=evaluate,
-        step=5.0,
-        step_min=5.0,
-        levels=("iso_1",),
-    )
-
-    # 185 C is adopted; its -5 K move returns to 180 C from 185 C's network.
-    assert evaluated[:4] == [180.0, 185.0, 175.0, 190.0]
-    assert evaluated[4] == 180.0
-
-
-def test_levels_whose_design_failed_are_tried_again():
+def test_a_failed_move_is_not_tried_again_at_the_same_levels():
     evaluated = []
 
     def evaluate(case, view):
         level = _hot_supply(case, "iso_1")
         evaluated.append(level)
-        if level == 185.0 and evaluated.count(185.0) == 1:
+        if level == 185.0:
             raise WorkflowContractError("no successful task outcomes")
         return _view(_cost_by_level(case))
 
-    moves.refine_levels(
+    _, _, log = moves.refine_levels(
         _mains_site(),
         _view(_cost_by_level(_mains_site())),
         evaluate=evaluate,
@@ -473,8 +455,35 @@ def test_levels_whose_design_failed_are_tried_again():
         levels=("iso_1",),
     )
 
-    # 185 C fails at the 5 K step; after 182.5 C is adopted it is tried again.
-    assert evaluated.count(185.0) == 2
+    # 185 C fails at the 5 K step; after 182.5 C is adopted its +2.5 K move
+    # is 185 C again, and is skipped with the failure's message.
+    assert evaluated.count(185.0) == 1
+    again = [move for move in log if move.status == "skipped" and move.shift == 2.5]
+    assert len(again) == 1
+    assert again[0].total_annual_cost is None
+    assert again[0].message == "already failed: no successful task outcomes"
+
+
+def test_refused_moves_are_logged_with_the_reason():
+    """iso_1 at 180 C moved 80 K up leaves the streams (50 to 220 C), and
+    down meets iso_2 at 100 C: neither is designed, and the log says why."""
+    _, _, log = moves.refine_levels(
+        _mains_site(),
+        _view(1.0),
+        evaluate=lambda case, view: _view(1.0),
+        step=80.0,
+        step_min=80.0,
+        levels=("iso_1",),
+    )
+
+    refused = [move for move in log if move.status == "refused"]
+    assert [(move.level, move.shift) for move in refused] == [
+        ("iso_1", 80.0),
+        ("iso_1", -80.0),
+    ]
+    assert all(move.total_annual_cost is None for move in refused)
+    assert "stream temperatures" in refused[0].message
+    assert "iso_2" in refused[1].message
 
 
 def test_a_cheaper_baseline_is_returned_when_no_move_beats_it():

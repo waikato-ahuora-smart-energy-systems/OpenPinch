@@ -30,13 +30,24 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     ``heat_pump_capacity`` (its largest condenser duty, kW) and, for a
     real-fluid cycle, ``heat_pump_refrigerant``; ``fixed_cost`` holds its
     compressor and package, or its whole machine for a real-fluid cycle
-    (then ``area_cost`` is 0).
+    (then ``area_cost`` is 0). ``"heat_recovery_loop"`` is a new heat
+    recovery loop linking ``hot_stream`` of one process to ``cold_stream``
+    of another: its loop cooler ``exchanger_id`` (``added_area``) on the hot
+    stream and loop heater ``utility_exchanger_id`` (``utility_area``) on
+    the cold one, at ``loop_temperature`` (degC), carrying ``loop_duty``
+    (its largest duty, kW); ``fixed_cost`` holds its two new units, the
+    loop's pump and piping and the repiping.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal[
-        "new_match", "area_addition", "relocation", "enhancement", "heat_pump"
+        "new_match",
+        "area_addition",
+        "relocation",
+        "enhancement",
+        "heat_pump",
+        "heat_recovery_loop",
     ]
     exchanger_id: str
     added_area: float = 0.0
@@ -53,6 +64,8 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     heat_pump_cop: float | None = None
     heat_pump_capacity: float | None = None
     heat_pump_refrigerant: str | None = None
+    loop_temperature: float | None = None
+    loop_duty: float | None = None
 
 
 class HeatExchangerNetworkRetrofitDesign(BaseModel):

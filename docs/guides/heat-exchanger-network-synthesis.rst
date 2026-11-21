@@ -281,11 +281,16 @@ rules by default. On each side of the pinch it:
 It enumerates the alternatives at each decision (pinch matches, optional
 splits and partners away from the pinch), streams of similar CP first, up to
 ``HENS_HEURISTIC_PDM_NETWORKS`` networks per dt_cont multiplier (default
-50). Each proposal is then solved by the pinch design side model with
-only its matches allowed, so its duties and temperatures are consistent and
-it meets the utility targets; the sides are joined, stage-reduced and
-verified like the pinch design networks. Proposals the model cannot solve or
-verify are dropped. With several operating periods, each period is designed
+50). At search depths 0 and 1, when the option is unset, a case of more than
+30 process streams gets fewer: 50 times (30 / streams) squared, at least 10
+(10 for a 64-stream case). Each proposal is then solved by the pinch design
+side model with only its matches allowed, so its duties and temperatures are
+consistent and it meets the utility targets; the sides are joined,
+stage-reduced and verified like the pinch design networks. Proposals the
+model cannot solve or verify are dropped. A heuristic task has a wall-clock
+limit of 300 s: past it, each side stops at its first realised proposal and
+the joining at its first network, and a warning says the task kept the
+networks found so far. With several operating periods, each period is designed
 on its own and a proposal is the union of one design per period, one shared
 topology.
 
@@ -422,10 +427,19 @@ heat let down from above plus imports, period by period. Imports enter hot
 levels and mains (a hot and a cold utility of one name) at the import price,
 within the hot utility's ``maximum_heat_flow`` when it has one; dumps leave
 cold levels and mains at the dump price. So steam a process raises on a main
-offsets steam another process uses there. The selected network's
-``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
+offsets steam another process uses there. A cold utility without segments
+may have a negative price, a credit for the steam raised on it; a level with
+a credit dumps no more than the processes raise on it, so the site cannot
+buy steam to sell it. The selected network's ``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
 ``site_total_annual_cost``, and its ``source_metadata["site_utility_balance"]``
 holds each level's use, generation, imports, letdowns and dumps per period.
+Heat let down from a level to a colder one costs ``HENS_SITE_LETDOWN_PRICE``
+($/MWh, annualised as utility prices are; default 0, so letdowns are free).
+Network evolution of a site network holds each process's utility levels at
+the duties its pinch design targeted. ``HENS_SITE_LEVEL_HOLDS: "at_least"``
+holds each level at or above its target instead, so a process may take more
+of a level, or raise more steam on one, when the site utility balance makes
+that cheaper; the default, ``"fixed"``, holds them at their targets.
 To design one process zone of a site alone, pass its name:
 ``design.heat_exchanger_network(zone="Food Plant[S]")``.
 
@@ -442,7 +456,7 @@ count 4 three isothermal and one sensible. The site is designed with each
 count's levels, and the cheapest design over the counts is selected (its site total annual cost, from site utility
 accounting). A count whose
 placement is infeasible, or whose design fails, is recorded and skipped.
-The result ranks each designed count's best network, tagged
+The result ranks every network of each designed count by site cost, each tagged
 ``summary_metrics["utility_level_count"]``, and
 ``result.provenance.effective_settings["HENS_SITE_LEVEL_SWEEP"]`` lists every
 count with its status (``designed``, ``infeasible``, ``failed`` or ``not
@@ -461,13 +475,23 @@ the shifted level, and network evolution designs the site again from the
 current best network's recovery matches, with the call's width, depth and
 options. A round tries every placed level both ways and adopts the cheapest
 move that lowers the site total annual cost; a move whose design fails is
-recorded and skipped. When no move improves, the step halves, and the moves
+recorded and skipped. Each set of level positions is designed once: a move
+back to positions already designed, or whose design failed, is not designed
+again. When no move improves, the step halves, and the moves
 stop once it falls below ``HENS_SITE_LEVEL_STEP_MIN`` (default 1 K).
 ``HENS_SITE_LEVEL_STEP: 0`` moves no level. Every move tried, with its cost
-and whether it was adopted, rejected or failed, is listed in
+and whether it was adopted, rejected, failed, refused (with the reason) or
+skipped as already designed, is listed in
 ``result.provenance.effective_settings["HENS_SITE_LEVEL_MOVES"]``. The level
 count stays fixed while levels move. Each move runs a site evolution, so the
 moves can take several times as long as the sweep's design of one count.
+``HENS_SITE_TIME_LIMIT`` (seconds, default none) bounds the sweep and the
+moves together: once it runs out, no further count or move is started and
+the cheapest design so far is returned; a design already running finishes,
+and the first count is always designed. A ``levels="given"`` design is a
+single design with no point to stop between, so the limit does not apply to
+it; it warns when the limit, ``level_counts`` or ``placement`` is set, as it
+ignores all three.
 
 .. code-block:: python
 
@@ -817,6 +841,28 @@ Heat pumps
    (COP 1.92, 14.7 MW) is the best first step, at $2.06M/y net; at the
    case's $100/MWh, and with a single water stage (COP 1.62, $13.7M
    installed), new matches win.
+Sites and heat recovery loops
+   When the existing network's streams span several process zones (a
+   site's network given as a mapping), new matches and relocations join
+   only streams of one process, and a ``UserWarning`` says the site utility
+   balance is not modelled: utilities are priced unit by unit. Processes are
+   linked only through a heat recovery loop, which ``HENS_RETROFIT_LOOPS``
+   (default on) lets a step add: an intermediate fluid, hot water for
+   example, at one temperature midway between a hot stream's target in one
+   process and a cold stream's in another. A loop cooler at the end of the
+   hot stream heats it and a loop heater at the end of the cold stream takes
+   the same heat back, in every period and with no loss, so the hot stream
+   reaches its target ``min_approach_temperature`` above the loop and the
+   cold stream its target as far below (the loop circulates over 1 K, so
+   the two targets must be at least twice the approach and 1 K apart; a
+   pair closer than that needs a heat pump instead). Pairs are screened by
+   the utility the loop could relieve: the hot stream's cooling, capped by
+   the cold stream's heating. The two exchangers are priced like new
+   exchangers, plus ``heat_recovery_loop_cost`` ($ per loop, for its pump
+   and piping run; default 0) and repiping for both streams; the loop's
+   heat is not counted as utility. Each loop is one modification of kind
+   ``"heat_recovery_loop"`` with its ``loop_temperature`` (degC) and
+   ``loop_duty`` (kW).
 
 Heat pump targets
    ``design.retrofit_heat_pumps(existing, cycle=..., topology=...,

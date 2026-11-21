@@ -884,3 +884,26 @@ def test_a_retrofit_without_an_approach_screens_at_the_cases_minimum_approach():
     assert evaluator.heat_pumps
     for pump in evaluator.heat_pumps:
         assert pump.evaporating == pytest.approx(evaluator.ends[pump.hot][1] - 10.0)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_every_frontier_network_of_the_guide_example_verifies():
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+        verify_network_feasibility,
+    )
+
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=3,
+        area_addition_cost=8_650.0,
+        split_cost=10_000.0,
+    )
+
+    # The existing network (step 0) included: each installed unit is judged
+    # as the search rated it, its area widened by the tolerance and the
+    # rating allowance it records.
+    assert result.frontier[0].modifications == ()
+    for step, design in enumerate(result.frontier):
+        assert verify_network_feasibility(design.network) == (), step

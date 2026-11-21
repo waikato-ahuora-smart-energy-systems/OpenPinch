@@ -490,6 +490,43 @@ def test_fixed_structure_tools_refuse_a_site_network(marker, tool):
         getattr(_site().design, tool)(site)
 
 
+@pytest.mark.solver
+def test_retrofit_of_a_site_network_mapping_matches_within_each_process():
+    """A site's network given as the retrofit mapping carries no site
+    metadata, so it passes the site guard; the search then proposes new
+    matches only within one process and warns that the site utility balance
+    is not modelled (by price the HPS-heated C1 would take H3's heat)."""
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    problem = _site()
+    network = problem.design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
+    ).selected_network
+    existing = {"recovery": [], "heaters": [], "coolers": []}
+    for e in network.exchangers:
+        unit = {"area": e.area, "id": e.exchanger_id}
+        if e.kind is HeatExchangerKind.RECOVERY:
+            unit |= {"hot": e.source_stream, "cold": e.sink_stream, "stage": e.stage}
+            existing["recovery"].append(unit)
+        elif e.kind is HeatExchangerKind.HOT_UTILITY:
+            unit |= {"stream": e.sink_stream, "utility": e.source_stream.split(".")[1]}
+            existing["heaters"].append(unit)
+        else:
+            unit |= {"stream": e.source_stream, "utility": e.sink_stream.split(".")[1]}
+            existing["coolers"].append(unit)
+    existing["stage_count"] = network.stage_count
+
+    with pytest.warns(UserWarning, match="site utility balance"):
+        result = problem.design.retrofit(
+            existing, max_modifications=1, beam_width=1, new_match_candidates=4
+        )
+
+    matches = [m for d in result.frontier for m in d.modifications if m.hot_stream]
+    assert all(
+        m.hot_stream.split(".")[0] == m.cold_stream.split(".")[0] for m in matches
+    )
+
+
 def test_a_stored_overdesign_margin_does_not_reach_the_process_designs(monkeypatch):
     """Rating a process network at a margin drops its level targets, so the
     site's process designs run without the stored margin."""
@@ -589,3 +626,24 @@ def test_a_credit_for_raised_steam_does_not_unbound_the_site():
     for row in view.selected_network.source_metadata["site_utility_balance"].balances:
         if row.level == "LPG":
             assert row.dump <= row.generation + 1e-6
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_site_whose_steam_credit_exceeds_its_purchases_designs():
+    """At -200 $/MWh the LP steam Cooling raises earns more than the site
+    buys, so the site's total annual cost, the evolution objective, is
+    negative; the runner used to fail every such solve."""
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "LPG":
+            utility["price"] = {"value": -200.0, "unit": "$/MWh"}
+    problem = PinchProblem(source=source)
+
+    view = problem.design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1, "HENS_MAX_PARALLEL": 1}
+    )
+
+    network = view.selected_network
+    assert network.summary_metrics["site_operating_cost"] < 0.0
+    assert network.utility_cost < 0.0

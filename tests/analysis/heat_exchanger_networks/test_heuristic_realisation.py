@@ -433,3 +433,40 @@ def test_a_heuristic_side_stopped_at_its_limit_is_dropped():
     proposal = propose_side_topologies(pinch_side(problem.below), limit=1)[0]
 
     assert problem._realise_side("below", proposal, 0) is None
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_the_heuristic_stage_returns_its_first_network_past_its_time_limit(
+    monkeypatch, caplog
+):
+    # Past the stage's wall-clock limit each side stops at its first realised
+    # proposal and the pairing at its first network, with a warning.
+    pinch = PinchProblem("basic_pinch.json")
+    pinch.target.all_heat_integration()
+    dTmin = nominal_approach_temperature(pinch.master_zone.config, 1.0)
+    monkeypatch.setattr(backend, "HEURISTIC_STAGE_TIME_LIMIT", 0.0)
+    problem = _problem(pinch, dTmin, limit=10)
+
+    with caplog.at_level("WARNING"):
+        solved = problem.get_solution(print_output=False)
+
+    assert solved is not None and solved.mSuccess == 1
+    report = problem.heuristic_report
+    assert report["time_limited"] is True
+    assert report["realised"] == {"above": 1, "below": 1}
+    assert report["networks"] == 1 and problem.pdm_variants == []
+    assert verify_network_feasibility(_networks(problem)[0]) == ()
+    assert "time limit" in caplog.text
+
+
+@pytest.mark.skipif("not _highs_available()", reason="needs highspy")
+def test_the_heuristic_stage_within_its_time_limit_is_not_cut_short():
+    pinch = PinchProblem("basic_pinch.json")
+    pinch.target.all_heat_integration()
+    dTmin = nominal_approach_temperature(pinch.master_zone.config, 1.0)
+    problem = _problem(pinch, dTmin, limit=10)
+
+    problem.get_solution(print_output=False)
+
+    assert problem.heuristic_report["time_limited"] is False
+    assert problem.heuristic_report["networks"] >= 2

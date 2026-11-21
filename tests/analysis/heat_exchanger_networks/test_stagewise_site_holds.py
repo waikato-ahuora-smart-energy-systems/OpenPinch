@@ -49,12 +49,13 @@ def _stream(zone, name, supply, target, heat_flow):
     }
 
 
-def _site(streams, utilities) -> PinchProblem:
+def _site(streams, utilities, options=None) -> PinchProblem:
     zones = sorted({stream["zone"].split("/")[1] for stream in streams})
     return PinchProblem(
         source={
             "streams": streams,
             "utilities": utilities,
+            **({} if options is None else {"options": options}),
             "zone_tree": {
                 "name": "Site",
                 "type": "Site",
@@ -129,6 +130,56 @@ def test_a_level_target_holds_the_levels_duty():
     assert duties["LPS"] == pytest.approx(40.0, rel=1e-6)
     # The band (1e-7 relative) lets 4e-6 kW go to the cheaper level.
     assert duties["HPS"] == pytest.approx(0.0, abs=1e-5)
+
+
+def test_an_at_least_target_holds_the_level_at_or_above_its_duty():
+    """HPS is the cheaper level: held at least 10 kW, it takes all 40 kW
+    between H1 and H2 rather than stopping at its target; held to its
+    target it takes 10 kW and LPS the rest."""
+    problem = _heating_site()
+    (c1,) = range(_model(problem, staged_utilities=True).J)
+    hps = 1
+
+    def solved(at_least):
+        model = _model(
+            problem,
+            staged_utilities=True,
+            level_targets=(
+                UtilityLevelTarget("hot", (hps,), (c1,), (10.0,), at_least=at_least),
+            ),
+        )
+        model.optimise(False)
+        assert model.mSuccess == 1
+        return _hot_utility_duties(model)
+
+    assert solved(True)["HPS"] == pytest.approx(40.0, rel=1e-6)
+    held = solved(False)
+    assert held["HPS"] == pytest.approx(10.0, rel=1e-6)
+    assert held["LPS"] == pytest.approx(30.0, rel=1e-6)
+
+
+def test_an_at_least_target_no_exchanger_serves_needs_only_its_floor():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.level_targets import (
+        set_level_target_equations,
+    )
+
+    def owner(target):
+        return SimpleNamespace(
+            N_periods=1,
+            level_targets=(target,),
+            Q_h_by_period=[[[None]]],
+            m=None,
+        )
+
+    set_level_target_equations(
+        owner(UtilityLevelTarget("hot", (0,), (0,), (0.0,), at_least=True))
+    )
+    with pytest.raises(ValueError, match="no exchanger"):
+        set_level_target_equations(
+            owner(UtilityLevelTarget("hot", (0,), (0,), (5.0,), at_least=True))
+        )
 
 
 def test_a_level_target_counts_only_its_streams():
@@ -248,7 +299,7 @@ def test_searches_share_solved_children_only_with_the_same_holds():
     )
 
 
-def _two_heated_plants() -> PinchProblem:
+def _two_heated_plants(options=None) -> PinchProblem:
     """Plants A and B each heat a stream from 100 to 130 C on LPS or HPS."""
     return _site(
         [
@@ -262,6 +313,7 @@ def _two_heated_plants() -> PinchProblem:
             _utility("HPS", "Hot", 250.0, 249.9, 40.0),
             _utility("CW", "Cold", 20.0, 25.0, 5.0),
         ],
+        options,
     )
 
 
@@ -313,6 +365,48 @@ def test_a_site_problem_holds_each_processs_levels_by_name():
     assert _value(case.Q_h_by_period[0][c2][1]) == pytest.approx(30.0, rel=1e-6)
 
 
+def test_a_site_problem_holds_its_levels_at_least_when_asked():
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    problem = _two_heated_plants()
+    arrays = problem_to_solver_arrays(problem, D_TMIN)
+    a, b = sorted(
+        {
+            name.rsplit(".", 1)[0]
+            for name in arrays.stream_identities["cold_process_streams"]
+        }
+    )
+
+    def targets(holds):
+        internal = InternalHeatExchangerNetworkProblem(
+            solver_arrays=arrays,
+            name="site",
+            framework="ESM",
+            solver="highs",
+            dTmin=D_TMIN,
+            stages=2,
+            minimisation_goal="utility costs",
+            integers=True,
+            tol=1e-6,
+            staged_utilities=True,
+            site_processes={
+                a: {"Hot Utility.LPS": [30.0]},
+                b: {"Hot Utility.HPS": [30.0]},
+            },
+            site_level_holds=holds,
+        )
+        internal.load_model()
+        return internal
+
+    relaxed = targets("at_least")
+    assert {target.at_least for target in relaxed.case.level_targets} == {True}
+    assert {target.at_least for target in targets("fixed").case.level_targets} == {
+        False
+    }
+
+
 def test_a_site_seed_carries_its_process_targets_into_the_evolution_task():
     from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
         LocalSynthesisExecutor,
@@ -358,6 +452,53 @@ def test_a_site_seed_carries_its_process_targets_into_the_evolution_task():
     assert task.settings["site_processes"] == processes
     assert built.site_processes == processes
     assert built.staged_utilities
+    assert built.site_level_holds == "fixed"
+
+
+def test_a_site_evolution_task_takes_its_level_holds_from_the_configuration():
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        LocalSynthesisExecutor,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+        workflow_settings_from_problem,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+        build_seeded_network_evolution_method_tasks,
+    )
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+    from tests.analysis.heat_exchanger_networks.test_network_evolution_method import (
+        _recovery_exchanger,
+    )
+
+    problem = _two_heated_plants(options={"HENS_SITE_LEVEL_HOLDS": "at_least"})
+    arrays = problem_to_solver_arrays(problem, D_TMIN)
+    a, b = sorted(
+        {
+            name.rsplit(".", 1)[0]
+            for name in arrays.stream_identities["cold_process_streams"]
+        }
+    )
+    seed = HeatExchangerNetwork(
+        exchangers=(_recovery_exchanger(f"{a}.H1", f"{a}.C1", 1),),
+        run_id="seed-run",
+        method="heuristic_pinch_design_method",
+        stage_count=1,
+        source_metadata={
+            "site_processes": {
+                a: {"Hot Utility.LPS": [30.0]},
+                b: {"Hot Utility.HPS": [30.0]},
+            }
+        },
+    )
+    (task,) = build_seeded_network_evolution_method_tasks(
+        workflow_settings_from_problem(problem), [seed]
+    )
+
+    built = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task, problem=problem, parent_outcomes={}
+    )
+
+    assert built.site_level_holds == "at_least"
 
 
 @pytest.mark.skipif(not _ipopt_available(), reason="needs ipopt")

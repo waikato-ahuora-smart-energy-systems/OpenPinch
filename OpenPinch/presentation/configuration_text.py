@@ -493,6 +493,33 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "least one level count is always designed. None sets no limit."
         ),
     ),
+    "HENS_SITE_LETDOWN_PRICE": FieldText(
+        "Total site letdown price", "$/MWh",
+        (
+            "Price of heat the site utility balance of a total site network "
+            "design lets down from a utility level to a colder one, as a "
+            "utility price is given; 0 lets heat down for free."
+        ),
+    ),
+    "HENS_SITE_LEVEL_HOLDS": FieldText(
+        "Total site level holds", None,
+        (
+            "How network evolution of a total site network design holds each "
+            "process's utility levels: fixed holds each at its targeted duty; "
+            "at_least holds each at or above it, so a process may take more "
+            "of a level when the site utility balance makes that cheaper."
+        ),
+    ),
+    "HENS_RETROFIT_LOOPS": FieldText(
+        "Retrofit heat recovery loops", None,
+        (
+            "Let a retrofit of a network that spans several process zones "
+            "propose a new heat recovery loop: an intermediate fluid that a "
+            "hot stream of one process heats and that gives the same heat to "
+            "a cold stream of another, the only link between processes it "
+            "proposes. Off proposes new matches within each process only."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (
@@ -541,7 +568,9 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Thermal derivative parent limit", None,
         (
             "The most MILP pinch design networks the thermal derivative step"
-            " refines, cheapest first; unset refines every one."
+            " refines, cheapest first. Below depth 3 the rest are not evolved"
+            " either; from depth 3 every MILP network seeds evolution anyway."
+            " Unset refines every one."
         ),
     ),
     "HENS_STAGE_PACKING": FieldText(

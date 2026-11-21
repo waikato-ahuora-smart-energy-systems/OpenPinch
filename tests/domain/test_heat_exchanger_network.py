@@ -262,12 +262,32 @@ def test_heat_exchanger_network_validators_reject_invalid_metadata():
         HeatExchangerNetwork(run_id=" ")
     with pytest.raises(ValidationError, match="positive integer"):
         HeatExchangerNetwork(stage_count=0)
-    with pytest.raises(ValidationError, match="finite and non-negative"):
+    with pytest.raises(ValidationError, match="must be finite"):
         HeatExchangerNetwork(objective_value=float("inf"))
     with pytest.raises(ValidationError, match="summary metric names"):
         HeatExchangerNetwork(summary_metrics={"": 1.0})
     with pytest.raises(ValidationError, match="summary metric values"):
         HeatExchangerNetwork(summary_metrics={"cost": float("inf")})
+
+
+@pytest.mark.parametrize(
+    "field", ["objective_value", "total_annual_cost", "utility_cost"]
+)
+@pytest.mark.parametrize("value", [-1e-5, -91200.4])
+def test_a_network_cost_may_be_negative(field, value):
+    """A site network's net utility cost, and so its objective and total
+    annual cost, is negative where steam credits exceed purchases, and
+    within solver noise of zero where they balance."""
+    network = HeatExchangerNetwork(**{field: value})
+
+    assert getattr(network, field) == value
+
+
+def test_a_network_capital_cost_stays_non_negative():
+    with pytest.raises(ValidationError, match="finite and non-negative"):
+        HeatExchangerNetwork(capital_cost=-1.0)
+    with pytest.raises(ValidationError, match="finite"):
+        HeatExchangerNetwork(utility_cost=float("nan"))
 
 
 def test_network_services_accept_domain_network(monkeypatch):

@@ -18,6 +18,7 @@ EXCHANGER_IDENTITY_MESSAGE = "stream and exchanger identities must be non-empty 
 EXCHANGER_NUMERIC_MESSAGE = "numeric exchanger values must be finite and non-negative"
 NETWORK_IDENTITY_MESSAGE = "network metadata identities must be non-empty strings"
 NETWORK_NUMERIC_MESSAGE = "network numeric values must be finite and non-negative"
+NETWORK_COST_MESSAGE = "network objective and costs must be finite"
 
 EXPECTED_STREAM_ROLES: dict[HeatExchangerKind, tuple[StreamID, StreamID]] = {
     HeatExchangerKind.RECOVERY: (StreamID.Process, StreamID.Process),
@@ -42,6 +43,17 @@ def optional_non_negative_finite(value: float | None, message: str) -> float | N
     if value is None:
         return value
     if not math.isfinite(value) or value < 0.0:
+        raise ValueError(message)
+    return float(value)
+
+
+def optional_finite(value: float | None, message: str) -> float | None:
+    """Return a finite float of either sign, ``None`` unchanged, or raise
+    ``message``."""
+
+    if value is None:
+        return value
+    if not math.isfinite(value):
         raise ValueError(message)
     return float(value)
 

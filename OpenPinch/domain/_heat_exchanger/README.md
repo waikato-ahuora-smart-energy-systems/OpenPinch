@@ -9,16 +9,17 @@ Private helpers owned by `OpenPinch.domain.heat_exchanger` and `OpenPinch.domain
 - `segment_duty_by_period`, `segment_area_by_period` (`area.py`): sum slice duty or area per period id.
 - `segment_design_area` (`area.py`): maximum period-total slice area, or `None` without slices.
 - `validate_segment_design_area` (`area.py`): return the slice-derived design area when slices exist (raising if a supplied area disagrees), otherwise the supplied area.
-- `optional_identity`, `optional_non_negative_finite` (`rules.py`): strip a non-empty identity or check a finite non-negative float, passing `None` through.
+- `optional_identity`, `optional_non_negative_finite`, `optional_finite` (`rules.py`): strip a non-empty identity, or check a finite non-negative float or a finite float of either sign, passing `None` through.
 - `check_period_states`, `check_period_alignment` (`rules.py`): period ordering, uniqueness and cross-exchanger alignment checks.
 - `check_direction_semantics` (`rules.py`): endpoint distinctness, kind-consistent stream roles and recovery stage presence.
 - `check_summary_metrics` (`rules.py`): metric names and float values.
-- `EXCHANGER_IDENTITY_MESSAGE`, `EXCHANGER_NUMERIC_MESSAGE`, `NETWORK_IDENTITY_MESSAGE`, `NETWORK_NUMERIC_MESSAGE`, `EXPECTED_STREAM_ROLES` (`rules.py`): shared error messages and the kind-to-roles table.
+- `EXCHANGER_IDENTITY_MESSAGE`, `EXCHANGER_NUMERIC_MESSAGE`, `NETWORK_IDENTITY_MESSAGE`, `NETWORK_NUMERIC_MESSAGE`, `NETWORK_COST_MESSAGE`, `EXPECTED_STREAM_ROLES` (`rules.py`): shared error messages and the kind-to-roles table.
 
 ## Invariants
 - A period state has a non-empty stripped `period_id`, non-negative `period_idx`, finite non-negative `duty`, split fractions in [0, 1], finite temperatures and finite non-negative approach temperatures. [period_state.py:HeatExchangerPeriodState]
 - `period_states` must be ordered by contiguous `period_idx` starting at zero, with unique `period_id` values. [rules.py:check_period_states]
 - Every exchanger in a network must share the first exchanger's ordered period ids. [rules.py:check_period_alignment]
+- A network's `objective_value`, `total_annual_cost` and `utility_cost` are finite of either sign (a site network's net utility cost is negative where steam credits exceed purchases); `capital_cost` is finite and non-negative. The input contract applies the same rules. [heat_exchanger_network.py:HeatExchangerNetwork] [rules.py:optional_finite]
 - Recovery exchangers link Process to Process, hot utility exchangers link Utility to Process, cold utility exchangers link Process to Utility; source and sink streams must differ; recovery exchangers need a stage. [rules.py:check_direction_semantics]
 - Area slices are immutable, with finite positive duty, HTCs, LMTD and area, finite temperatures and non-empty identities. [area.py:HeatExchangerAreaSlice]
 - The design area is the maximum over periods of the summed slice areas, and a supplied area must match it within relative 1e-4 or absolute 1e-3. [area.py:segment_design_area] [area.py:validate_segment_design_area]

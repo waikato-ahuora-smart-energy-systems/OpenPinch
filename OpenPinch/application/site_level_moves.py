@@ -31,7 +31,10 @@ _GAIN = 1e-6
 @dataclass(frozen=True)
 class LevelMove:
     """One tried move: ``status`` is ``"adopted"``, ``"rejected"`` (no lower
-    cost) or ``"failed"`` (the design raised). The first entry is the
+    cost), ``"failed"`` (the design raised), ``"refused"`` (the levels would
+    meet or leave the streams; not designed) or ``"skipped"`` (the levels
+    were designed already: the cached cost, or no cost after a failure, is
+    logged). The first entry is the
     unshifted levels evaluated as a move (``"baseline"``, level ``""`` and
     shift 0, or ``"failed"``); a last ``"start kept"`` entry records that the
     sweep's own network was returned over adopted moves."""
@@ -92,6 +95,13 @@ def shifted_case(
     The move is refused when the level would touch or pass another placed
     level, or leave the range of the site's stream temperatures.
     """
+    return _shifted(case, level, shift)[0]
+
+
+def _shifted(
+    case: "PinchProblem", level: str, shift: float
+) -> "tuple[PinchProblem | None, str | None]":
+    """``shifted_case``'s result, and why the move is refused (or ``None``)."""
     source = case.to_problem_json()
     by_level: dict[str, list] = {}
     for utility in source["utilities"]:
@@ -101,9 +111,9 @@ def shifted_case(
     for utility in by_level[level]:
         for key in ("t_supply", "t_target"):
             utility[key] = _shift(utility[key], shift)
-    spans = [_span(by_level[name]) for name in order]
-    if any(low <= below for (_, below), (low, _) in zip(spans, spans[1:])):
-        return None
+    for below, above in zip(order, order[1:]):
+        if _span(by_level[above])[0] <= _span(by_level[below])[1]:
+            return None, f"{below} and {above} would touch or cross"
     streams = [
         t
         for stream in source["streams"]
@@ -112,8 +122,11 @@ def shifted_case(
     ]
     low, high = _span(by_level[level])
     if low < min(streams) or high > max(streams):
-        return None
-    return type(case)(source, project_name=case.project_name)
+        return None, (
+            f"{level} would leave the stream temperatures "
+            f"({min(streams):g} to {max(streams):g} C)"
+        )
+    return type(case)(source, project_name=case.project_name), None
 
 
 def _level_key(case: "PinchProblem") -> tuple:
@@ -129,16 +142,6 @@ def _level_key(case: "PinchProblem") -> tuple:
         )
         if _PLACED.fullmatch(u["name"])
     )
-
-
-def _seed_key(view) -> tuple:
-    """The recovery matches a move from ``view`` is seeded with."""
-    from ..analysis.heat_exchanger_networks.site.seeds import _recovery
-
-    network = view.selected_network
-    if not hasattr(network, "exchangers"):
-        return ()
-    return tuple(sorted(e.model_dump_json() for e in _recovery(network)))
 
 
 def level_duties(
@@ -224,9 +227,13 @@ def refine_levels(
     start's network may come from a seed no move builds). The cheapest
     move below the current cost is adopted; with none, the step halves,
     and the moves stop once it is below ``step_min``. Levels already
-    designed from the same seed are not designed again: a move back to them
-    is ``"rejected"`` with message ``"already designed"``; a failed design
-    may be tried again. Before each design ``expired()``
+    designed (the full tuple of level positions, whatever the seed) are not
+    designed again: a move to them is ``"skipped"`` with the cached cost and
+    message ``"already designed"``, or, when their design failed, no cost
+    and ``"already failed: <message>"``. The cached cost cannot win: every
+    designed cost is at least the current one. A move ``shifted_case``
+    refuses is logged ``"refused"`` with the reason. Before each design
+    ``expired()``
     is checked; once it is true the moves end with a ``"stopped"`` entry
     (message ``"time limit"``) and the best levels so far. A missing synthesis
     solver or dependency is raised; any other failure of a design is
@@ -254,7 +261,8 @@ def refine_levels(
 
     if stopped():
         return case, view, tuple(log)
-    designed = {(_level_key(case), _seed_key(view))}
+    # Each designed level position: its site cost, or the failure message.
+    designed: dict[tuple, tuple[float | None, str | None]] = {}
     # The start's network may come from a seed no move builds, so moves are
     # judged against the unshifted levels evaluated the way a move is.
     try:
@@ -263,6 +271,7 @@ def refine_levels(
         raise
     except (ValueError, RuntimeError) as exc:
         log.append(LevelMove("", 0.0, None, "failed", str(exc)))
+        designed[_level_key(case)] = (None, str(exc))
         cost = start[2]
     else:
         cost = site_cost(baseline.selected_network)
@@ -270,20 +279,25 @@ def refine_levels(
         # The re-design stands for the unshifted levels from here: it is
         # returned when nothing beats it, and moves are seeded from it.
         view = baseline
-        designed.add((_level_key(case), _seed_key(view)))
+        designed[_level_key(case)] = (cost, None)
     halted = False
     while step > 0 and step >= step_min and not halted:
         best = None
         for level in levels:
             for shift in (step, -step):
-                shifted = shifted_case(case, level, shift)
+                shifted, refusal = _shifted(case, level, shift)
                 if shifted is None:
+                    log.append(LevelMove(level, shift, None, "refused", refusal))
                     continue
-                key = (_level_key(shifted), _seed_key(view))
+                key = _level_key(shifted)
                 if key in designed:
-                    log.append(
-                        LevelMove(level, shift, None, "rejected", "already designed")
+                    cached, failure = designed[key]
+                    message = (
+                        "already designed"
+                        if failure is None
+                        else f"already failed: {failure}"
                     )
+                    log.append(LevelMove(level, shift, cached, "skipped", message))
                     continue
                 if stopped():
                     halted = True
@@ -294,9 +308,10 @@ def refine_levels(
                     raise
                 except (ValueError, RuntimeError) as exc:
                     log.append(LevelMove(level, shift, None, "failed", str(exc)))
+                    designed[key] = (None, str(exc))
                     continue
-                designed.add(key)
                 moved_cost = site_cost(moved.selected_network)
+                designed[key] = (moved_cost, None)
                 log.append(LevelMove(level, shift, moved_cost, "rejected"))
                 if best is None or moved_cost < best[2]:
                     best = (len(log) - 1, shifted, moved_cost, moved)

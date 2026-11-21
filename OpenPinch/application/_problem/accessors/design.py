@@ -173,7 +173,9 @@ class HeatExchangerNetworkDesignView:
         """Return the first ``n`` ranked successful outcomes.
 
         Uses the same ranking as ``network(rank=)`` and ``grid(rank=)``, so
-        ``top(n)[k - 1]`` is the network at rank ``k``.
+        ``top(n)[k - 1]`` is the outcome at rank ``k``: a
+        ``HeatExchangerNetworkSynthesisTaskOutcome``, whose ``network`` is
+        ``network(rank=k)``.
         """
         if isinstance(n, bool) or not isinstance(n, int) or n < 1:
             raise ValueError("n must be a positive integer.")
@@ -617,11 +619,16 @@ class _DesignAccessor:
         the levels' order and the streams' temperatures, the site is evolved
         again with each process's levels re-targeted, and a move is kept
         only on a lower site cost; the step halves down to
-        ``HENS_SITE_LEVEL_STEP_MIN`` (1 K). The moves are recorded as
+        ``HENS_SITE_LEVEL_STEP_MIN`` (1 K); each set of level positions is
+        designed once. The moves are recorded as
         ``HENS_SITE_LEVEL_MOVES``. ``HENS_SITE_TIME_LIMIT`` (seconds, default
         none) bounds the sweep and the moves together: once it runs out no
         further count or move is started and the cheapest design so far is
-        returned; the first count is always designed.
+        returned; the first count is always designed. A ``"given"`` design
+        is one design with nothing to stop between, so it ignores
+        ``level_counts``, ``placement`` and ``HENS_SITE_TIME_LIMIT`` and
+        warns when any is set. ``HENS_SITE_LETDOWN_PRICE`` ($/MWh, default
+        0) prices heat the site balance lets down to a colder level.
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected
@@ -636,6 +643,24 @@ class _DesignAccessor:
         hens = self._effective_hens(options)
         levels = hens.site_levels if levels is None else levels
         if levels == "given":
+            ignored = [
+                name
+                for name, value in (
+                    ("level_counts", level_counts),
+                    ("placement", placement),
+                    ("HENS_SITE_TIME_LIMIT", hens.site_time_limit),
+                )
+                if value is not None
+            ]
+            if ignored:
+                warnings.warn(
+                    'levels="given" designs with the case\'s utilities in one '
+                    "design and ignores "
+                    + ", ".join(ignored)
+                    + '; use levels="placed".',
+                    UserWarning,
+                    stacklevel=2,
+                )
             return self._site_design(width=width, depth=depth, options=options)
         if levels != "placed":
             raise ValueError('levels must be "given" or "placed".')
@@ -1469,6 +1494,7 @@ class _DesignAccessor:
         repiping_cost: float = 0.0,
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
+        heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1494,7 +1520,22 @@ class _DesignAccessor:
         (screened by the utility it could cut where it sits) or, optionally,
         a relocated exchanger, with the added area each structure needs
         sized in the same solve. Each step keeps the ``beam_width`` designs
-        with the best net annual benefit.
+        with the best net annual benefit. When the existing network's
+        streams span several process zones (a site's network given as this
+        mapping), new matches and relocations join only streams of one
+        process, and a ``UserWarning`` says the site utility balance is not
+        modelled: utilities are priced unit by unit. With
+        ``HENS_RETROFIT_LOOPS`` (in ``options``; on by default) such a step
+        may instead link two processes through a new heat recovery loop, the
+        only link between processes: an intermediate fluid at one temperature,
+        midway between a hot stream's target in one process and a cold
+        stream's in another (at least twice ``min_approach_temperature`` and
+        1 K apart), heated by a loop cooler at the end of the hot stream and
+        giving the same heat, in every period and with no loss, to a loop
+        heater at the end of the cold stream. The loop's two exchangers cost
+        two ``new_unit_cost`` and their area, plus ``heat_recovery_loop_cost``
+        ($ per loop, its pump and piping) and ``repiping_cost`` for each of
+        the two streams; the loop's heat is not counted as utility.
 
         Added area costs ``COSTING_HX_AREA_COEFF * area **
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
@@ -1650,6 +1691,10 @@ class _DesignAccessor:
                     repiping_cost=float(repiping_cost),
                     heat_pump_cycle=heat_pump_cycle,
                     heat_pump_cost=float(heat_pump_cost),
+                    heat_recovery_loops=bool(
+                        isolated.master_zone.config.hens.retrofit_loops
+                    ),
+                    heat_recovery_loop_cost=float(heat_recovery_loop_cost),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):
@@ -1683,8 +1728,9 @@ class _DesignAccessor:
         process-side repiping.
 
         Returns a ``RetrofitHeatPumpTargets``: each target's heat, work,
-        levels and operating cost before and after, priced at the first hot
-        and cold utility and ``COSTING_HPR_ELE_PRICE``, and the gap between
+        levels and operating cost before and after, each side priced at the
+        utilities the network's heaters (or coolers) use, weighted by their
+        first-period duties, and at ``COSTING_HPR_ELE_PRICE``; and the gap between
         them split into the network's (``network_gap``) and the heat
         pump's (``heat_pump_gap``). The problem's cached design is not
         changed.
@@ -1780,7 +1826,7 @@ class _DesignAccessor:
         ``cold_utility`` keys, defaulting to the problem's only hot and cold
         utility; ``stage_count`` is optional.
 
-        Duties and stream split fractions are optimised for one of three
+        Duties and stream split fractions are optimised for one of four
         objectives; matches stay fixed:
 
         * ``"utility"``: minimise total utility use. Each exchanger keeps at
@@ -1796,10 +1842,15 @@ class _DesignAccessor:
           common areas (``COSTING_HX_*`` settings) plus utility cost. Only a
           positive approach is required at both ends of each exchanger,
           ``min_approach_temperature`` defaulting to 1 K.
-        * ``"rating"``: minimise utility cost with every recovery exchanger's
-          area fixed at the network's ``area`` (each needs one). Every
-          period's duty must fit that area; a period needing less runs with
-          a bypass. The approach defaults to 1 K, as for ``"cost"``.
+        * ``"rating"``: minimise utility cost with every exchanger's area,
+          recovery exchangers, heaters and coolers alike, fixed at the
+          network's ``area`` (each needs one). Every period's duty must fit
+          that area; a period needing less runs with a bypass.
+          ``min_approach_temperature`` defaults to the approach the network
+          was designed to: 0.1 K (or ``HENS_MIN_EXCHANGER_APPROACH_SHARE``
+          of the nominal approach if larger) for a thermal derivative or
+          evolution network, else each exchanger's stream temperature
+          contributions, scaled by the network's dt_cont multiplier.
 
         An exchanger left at zero duty in every period is removed, with its
         approach constraint, and the problem is solved again until every
@@ -1811,10 +1862,17 @@ class _DesignAccessor:
         """
         if isinstance(network, Mapping):
             network = self._network_from_structure(network)
+        # Rating holds the approach the network was designed to, as
+        # overdesign does: evolution designs down to 0.1 K.
+        design = (
+            self._design_approach(network, self._effective_hens(options))
+            if objective == "rating" and min_approach_temperature is None
+            else {"min_approach_temperature": min_approach_temperature}
+        )
         return self._optimise_duties(
             network,
             objective=objective,
-            min_approach_temperature=min_approach_temperature,
+            **design,
             exchanger_approach_temperatures=exchanger_approach_temperatures,
             max_hot_utility=max_hot_utility,
             max_cold_utility=max_cold_utility,
@@ -1884,14 +1942,19 @@ class _DesignAccessor:
     ):
         """Fit a network designed on one basis to every operating period.
 
-        Each stream without a utility at its end every period can use gets
-        the cheapest one that can serve it there; the fixed-structure cost
-        fit, with the call's ``options``, ``solver`` and ``solve_tolerance``,
-        then gives every exchanger one area over all periods, with bypass
-        where a period needs less, and removes the exchangers no period uses.
-        Every exchanger keeps the case's minimum approach (its streams'
-        temperature contributions). When the fit cannot meet it, a
-        ``UserWarning`` says so and the fit is repeated at 1 K.
+        Every exchanger keeps the approach the network was designed to
+        (``_design_approach``): a pinch design network its streams'
+        temperature contributions at its own dt_cont multiplier, an evolved
+        network the evolution floor (0.1 K by default). Each stream without
+        a utility at its end every period can use gets the cheapest one that
+        can serve it there at that approach; the fixed-structure cost fit,
+        with the call's ``options``, ``solver`` and ``solve_tolerance``, then
+        gives every exchanger one area over all periods, with bypass where a
+        period needs less, and removes the exchangers no period uses. A
+        network that holds its utility levels is first fitted holding them;
+        when that fails, a ``UserWarning`` says so and the levels are
+        released. When the fit cannot keep the approach, a ``UserWarning``
+        says so and the fit is repeated at 1 K.
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             DEFAULT_FEASIBILITY_APPROACH,

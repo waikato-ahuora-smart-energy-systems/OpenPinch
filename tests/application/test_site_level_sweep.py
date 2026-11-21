@@ -22,6 +22,7 @@ from tests.application.test_site_heat_exchanger_network import (
     _process,
     _site,
     _solvers_available,
+    _steam_main_site,
 )
 
 # A short placement search: these tests check the sweep, not the placement.
@@ -93,8 +94,9 @@ def test_a_count_below_two_is_refused():
 def test_each_counts_placed_levels_reach_its_design():
     """The design for a count sees the site's streams with that count's
     placed levels. Each level serves both heating and cooling: its hot and
-    cold utility share its name, so the site accounts it as one main."""
-    problem = _site()
+    cold utility share its name, so the site accounts it as one main. The
+    steam-main site's placed levels lie apart and need no fallback."""
+    problem = _steam_main_site()
     seen = {}
 
     def design(case):
@@ -109,11 +111,7 @@ def test_each_counts_placed_levels_reach_its_design():
     for count, source in seen.items():
         assert sorted(s["name"] for s in source["streams"]) == streams
         isothermal, sensible = site_levels.level_split(problem, count)
-        placed = {
-            (u["name"], u["type"])
-            for u in source["utilities"]
-            if u["name"] not in {"HU", "CU"}
-        }
+        placed = {(u["name"], u["type"]) for u in source["utilities"]}
         assert placed == {
             (f"{kind}_{level}", side)
             for side in ("Hot", "Cold")
@@ -130,11 +128,68 @@ def test_a_placed_level_is_a_main_of_the_site_utility_system():
         problem_to_solver_arrays,
     )
 
-    case = site_levels.placed_case(_site(), 2, placement=SHORT_PLACEMENT)
+    case = site_levels.placed_case(_steam_main_site(), 2, placement=SHORT_PLACEMENT)
     levels = site_utility_system(problem_to_solver_arrays(case, 10.0)).levels
 
     kinds = {level.name: level.kind for level in levels.levels}
     assert kinds["iso_1"] == kinds["iso_2"] == "both"
+
+
+def _site_levels(case):
+    from OpenPinch.analysis.heat_exchanger_networks.site.levels import (
+        site_utility_system,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    return site_utility_system(problem_to_solver_arrays(case, 10.0)).levels.levels
+
+
+def test_a_count_cools_on_the_cases_own_utility_where_placement_fell_back():
+    """With two levels, placement puts both near 140 C and cools the rest
+    on its fallback CU at -30 C, priced as cooling water. The placed case
+    cools on the case's own cooling water instead: no -30 C cooler at the
+    cooling-water price."""
+    problem = _site()
+
+    case = site_levels.placed_case(problem, 2, placement=SHORT_PLACEMENT)
+
+    utilities = case.to_problem_json()["utilities"]
+    assert {u["name"] for u in utilities}.isdisjoint({"HU", "CU"})
+    (water,) = (u for u in problem.to_problem_json()["utilities"] if u["name"] == "CW")
+    assert water in utilities
+    assert min(u["t_supply"]["value"] for u in utilities) == 20.0
+
+
+def test_a_count_heats_on_the_cases_own_utility_where_placement_fell_back():
+    """With three levels, placement heats above them on its fallback HU
+    at 300 C; the placed case takes the case's hottest utility, HPS."""
+    problem = _site()
+
+    case = site_levels.placed_case(problem, 3, placement=SHORT_PLACEMENT)
+
+    utilities = case.to_problem_json()["utilities"]
+    assert {u["name"] for u in utilities}.isdisjoint({"HU", "CU"})
+    (steam,) = (u for u in problem.to_problem_json()["utilities"] if u["name"] == "HPS")
+    assert steam in utilities
+
+
+@pytest.mark.parametrize("count", [2, 3])
+def test_placed_levels_closer_than_the_minimum_gap_are_one_level(count):
+    """Placement puts the unit site's levels within 0.3 K of each other
+    near 140 C (or 120 C): one main in effect. The case keeps one of them,
+    so the site's levels lie at least the minimum gap apart."""
+    case = site_levels.placed_case(_site(), count, placement=SHORT_PLACEMENT)
+
+    levels = _site_levels(case)
+    temperatures = sorted(level.t_high[0] for level in levels)
+
+    assert len(levels) == 2
+    assert all(
+        above - below >= site_levels.MINIMUM_LEVEL_GAP
+        for below, above in zip(temperatures, temperatures[1:])
+    )
 
 
 def test_an_infeasible_count_is_recorded_and_skipped():
@@ -392,7 +447,9 @@ def test_a_placed_site_network_is_the_cheapest_over_the_counts():
         placed = (
             {f"iso_{level}" for level in range(1, count + 1)}
             | {f"sensible_{level}" for level in range(1, count + 1)}
-            | {"HU", "CU"}
+            # The case's own utilities that stand in for placement's
+            # fallbacks.
+            | {"HPS", "CW"}
         )
         used = _utility_names(counted)
         assert len(used) == 2
@@ -400,6 +457,26 @@ def test_a_placed_site_network_is_the_cheapest_over_the_counts():
     assert view.result.provenance.method_id == (
         "design.total_site_heat_exchanger_network"
     )
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_the_steam_main_site_designs_with_placed_levels():
+    """Each process holds two placed levels on one stream (Heating's C1
+    takes heat from both, Cooling's H3 raises both), staged between its
+    recovery matches. The site seed keeps room for both."""
+    view = _steam_main_site().design.total_site_heat_exchanger_network(
+        levels="placed",
+        level_counts=[2, 3],
+        placement=SHORT_PLACEMENT,
+        width=0,
+        depth=1,
+        options={"HENS_EVM_N_AD_BRANCHES": 1, "HENS_SITE_LEVEL_STEP": 0.0},
+    )
+
+    sweep = view.result.provenance.effective_settings["HENS_SITE_LEVEL_SWEEP"]
+    assert [row["status"] for row in sweep] == ["designed", "designed"]
 
 
 class _Outcome(SimpleNamespace):
@@ -483,3 +560,22 @@ def test_a_placed_sweep_does_not_become_the_problems_design(monkeypatch):
 
     assert site_levels.level_sweep_view(problem, (run,), settings={}) is view
     assert results.design == "the problem's own design"
+
+
+def test_a_hot_and_a_cold_stand_in_may_share_a_name():
+    """A hot and a cold utility may share a name; each side's fallback
+    keeps its own."""
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] in {"HPS", "CW"}:
+            utility["name"] = "EDGE"
+    problem = PinchProblem(source)
+
+    kept = site_levels._stand_ins(
+        problem, {("HU", "Hot"): 300.0, ("CU", "Cold"): -30.0}
+    )
+
+    assert sorted((u["name"], u["type"]) for u in kept) == [
+        ("EDGE", "Cold"),
+        ("EDGE", "Hot"),
+    ]

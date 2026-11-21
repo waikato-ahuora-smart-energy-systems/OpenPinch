@@ -1549,3 +1549,28 @@ def test_a_tiny_branch_share_keeps_a_valid_profile():
 
     assert all(duty > tol for duty in scaled.duties)
     assert all(cp > tol for cp in scaled.heat_capacity_flowrates)
+
+
+def test_a_branch_never_carries_more_than_its_stream():
+    """The validity floor 2 * tol / smallest exceeds 1 when a segment's duty
+    is under 2 * tol; the branch is then the whole stream, never larger."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
+        branch_profile,
+    )
+
+    cp = np.array([2.0, 1.0])
+    temperatures_in = np.array([200.0, 150.0])
+    temperatures_out = np.array([150.0, 150.0 - 1.5 * tol])
+    profile = PiecewiseThermalProfile(
+        identities=("H.a", "H.b"),
+        temperatures_in=temperatures_in,
+        temperatures_out=temperatures_out,
+        duties=np.abs(temperatures_in - temperatures_out) * cp,
+        heat_capacity_flowrates=cp,
+        heat_transfer_coefficients=np.ones(2),
+    )
+
+    branch = branch_profile(profile, 0.5)
+
+    assert np.all(branch.duties <= profile.duties)
+    assert np.all(branch.heat_capacity_flowrates <= profile.heat_capacity_flowrates)
