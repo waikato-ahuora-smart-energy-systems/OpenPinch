@@ -8,7 +8,11 @@ _STAGE_DUTY_RELATIVE_TOLERANCE = 1e-5
 
 
 def add_recovery_stage_packing_constraints(model: Any) -> None:
-    """Force active recovery stages to be contiguous in integer models."""
+    """Force active recovery stages to be contiguous in integer models.
+
+    Contiguous among the stages with an allowed match: an empty stage is
+    skipped.
+    """
 
     if not getattr(model, "integers", False) or getattr(model, "S", 0) <= 1:
         return
@@ -53,8 +57,11 @@ def add_recovery_stage_packing_constraints(model: Any) -> None:
         stage_active.append(active)
         stage_duties.append(duty)
 
-    for k in range(model.S - 1):
-        model.m.Equation(stage_active[k] >= stage_active[k + 1])
+    # Chain only the stages that can carry duty: a stage with no allowed
+    # match is skipped, not a barrier that empties every stage after it.
+    open_stages = [k for k, capacity in enumerate(stage_capacities) if capacity > 0.0]
+    for k, later in zip(open_stages, open_stages[1:]):
+        model.m.Equation(stage_active[k] >= stage_active[later])
 
     model.recovery_stage_active = stage_active
     model.recovery_stage_duty = stage_duties

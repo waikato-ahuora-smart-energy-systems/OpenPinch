@@ -139,7 +139,9 @@ def test_stage_packing_adds_contiguous_stage_constraints_from_static_fixture():
     assert model.m.variables == [active[0]]
     assert model.m.params == [active[1], duty[1], active[2], duty[2]]
     assert model.m.intermediates == [duty[0]]
-    assert len(model.m.equations) == 5
+    # One match-duty, two stage-duty bounds; empty stages 2 and 3 are not
+    # chained to stage 1.
+    assert len(model.m.equations) == 3
     assert model.m.equations[0][0] == "ge"
     assert model.m.equations[-1][0] == "ge"
 
@@ -184,3 +186,20 @@ def test_stage_packed_model_wrappers_call_parent_setup_before_packing(monkeypatc
         ("stagewise_parent", "StagePackedStageWiseModel"),
         ("stagewise_packing", "StagePackedStageWiseModel"),
     ]
+
+
+def test_stage_packing_skips_a_stage_with_no_allowed_match():
+    """A leading stage with no allowed match is not chained to the stages
+    after it, so a match allowed only in stage 2 can still carry duty."""
+    model = _fake_model_from_case(
+        {"integers": True, "tol": 1e-6, "q_max": [[100.0]], "z_allowed": [[[0, 1]]]}
+    )
+
+    add_recovery_stage_packing_constraints(model)
+
+    empty_stage = model.recovery_stage_active[0]
+    assert not any(
+        empty_stage in equation
+        for equation in model.m.equations
+        if isinstance(equation, tuple)
+    )

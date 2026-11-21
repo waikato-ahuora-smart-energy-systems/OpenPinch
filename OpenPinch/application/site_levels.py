@@ -19,6 +19,10 @@ if TYPE_CHECKING:
 _MIN_ISOTHERMAL = 2
 # Generated level names, after their side: ``hot_iso_1``, ``cold_sensible_2``.
 _PLACED_KINDS = ("iso_", "sensible_")
+# Placed levels whose supply and target both lie closer than this (K) are
+# one main in effect; synthesis treats a utility spanning less as isothermal
+# (``MINIMUM_SLICED_RANGE``).
+MINIMUM_LEVEL_GAP = 1.0
 
 
 @dataclass(frozen=True)
@@ -110,6 +114,13 @@ def placed_case(
     ``cold_iso_1`` to ``iso_1``), so the site accounts the pair as one main
     (``../analysis/heat_exchanger_networks/site/levels.py``). Placement runs
     over every period of the site.
+
+    Where placement fell back on its own ``HU`` or ``CU`` (beyond the site's
+    temperatures, priced as the case's utility nearest it), the case keeps
+    that utility of its own instead, at its own temperatures and price; a
+    side with none raises ``NoFeasiblePlacementError``. A placed level
+    whose supply and target both lie within ``MINIMUM_LEVEL_GAP`` of an
+    earlier one's is dropped: the two are one main.
     """
     from .case_derivation import with_utilities_from
 
@@ -121,11 +132,98 @@ def placed_case(
         options=placement,
     )
     source = with_utilities_from(problem, placed).to_problem_json()
-    for utility in source["utilities"]:
+    fallbacks = _fallback_utilities(placed)
+    utilities = [
+        utility
+        for utility in source["utilities"]
+        if (utility["name"], utility["type"]) not in fallbacks
+    ]
+    for utility in utilities:
         side, _, name = utility["name"].partition("_")
         if side == utility["type"].casefold() and name.startswith(_PLACED_KINDS):
             utility["name"] = name
+    source["utilities"] = _distinct_levels(utilities) + _stand_ins(problem, fallbacks)
     return type(problem)(source, project_name=problem.project_name)
+
+
+def _fallback_utilities(placed) -> dict[tuple[str, str], float]:
+    """Placement's fallback utilities, ``(name, type)`` to supply (degC)."""
+    from .utility_placement import _level_temperature
+
+    return {
+        (row.utility, row.side.value.capitalize()): _level_temperature(
+            row.supply_temperature
+        )
+        for row in placed.utility_placement_result.retarget_comparison
+        if row.is_fallback
+    }
+
+
+def _distinct_levels(utilities: list[dict]) -> list[dict]:
+    """``utilities`` without each placed level whose temperatures all lie
+    within ``MINIMUM_LEVEL_GAP`` of an earlier placed level's."""
+    from .site_level_moves import _PLACED, _values
+
+    kept: dict[str, list[float]] = {}
+    dropped: set[str] = set()
+    for utility in utilities:
+        name = utility["name"]
+        if not _PLACED.fullmatch(name) or name in kept or name in dropped:
+            continue
+        # Sorted, so a pair's hot and cold utility give the same ends.
+        ends = sorted(
+            _degc(utility[key], value)
+            for key in ("t_supply", "t_target")
+            for value in _values(utility[key])
+        )
+        if any(
+            len(other) == len(ends)
+            and all(abs(a - b) < MINIMUM_LEVEL_GAP for a, b in zip(other, ends))
+            for other in kept.values()
+        ):
+            dropped.add(name)
+        else:
+            kept[name] = ends
+    return [utility for utility in utilities if utility["name"] not in dropped]
+
+
+def _degc(quantity: Mapping, value: float) -> float:
+    from ..domain.value import Value
+
+    return Value(value, quantity.get("unit") or "degC").to("degC").value
+
+
+def _stand_ins(
+    problem: "PinchProblem", fallbacks: Mapping[tuple[str, str], float]
+) -> list[dict]:
+    """The case's own utility for each fallback: its side's nearest by
+    supply temperature, as placement priced the fallback."""
+    from ..analysis.utility_placement.errors import NoFeasiblePlacementError
+    from .utility_placement import _resolve_placement_zone, _utility_sources
+
+    zone = _resolve_placement_zone(problem, None)
+    sources = _utility_sources(problem, zone, problem.to_problem_json()["utilities"])
+    # By name and type: a hot and a cold utility may share a name, and a
+    # ``Both`` utility serving both fallbacks is kept once.
+    kept: dict[tuple[str, str], dict] = {}
+    for (name, side), supply in fallbacks.items():
+        own = [
+            source
+            for source in sources[side]
+            if source[0].strip().casefold() not in {"hu", "cu"}
+        ]
+        if not own:
+            raise NoFeasiblePlacementError(
+                code="no_fallback_utility",
+                message=(
+                    f"placement needs its fallback {name}, and the case has no "
+                    f"{side.casefold()} utility of its own to take its place."
+                ),
+            )
+        nearest = min(own, key=lambda source: abs(source[1] - supply))
+        raw = nearest[3]
+        kept.setdefault((raw["name"], raw["type"]), raw)
+    return list(kept.values())
 
 
 def site_cost(network) -> float:
@@ -219,8 +317,8 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
     each tagged with ``summary_metrics["utility_level_count"]``, and selects
     the cheapest. Its provenance names the problem's root zone and records
     ``settings`` with the sweep (``HENS_SITE_LEVEL_SWEEP``, one row per
-    count). The result is committed to the problem's design results when
-    it has results.
+    count). It is not committed as the problem's design: its networks name
+    the placed case's utilities, which the problem lacks.
     """
     from ..analysis.heat_exchanger_networks.results.selection import (
         ranked_networks,

@@ -241,42 +241,61 @@ def with_heat_pump_utilities(
     those of the first utility on each side. ``arrays`` is not changed.
     """
 
-    data = {name: values.copy() for name, values in arrays.arrays.items()}
-    axis_maps = {axis: dict(names) for axis, names in arrays.axis_maps.items()}
-    streams = {axis: list(names) for axis, names in arrays.stream_identities.items()}
-    utilities = {axis: list(names) for axis, names in arrays.utility_identities.items()}
+    utilities = []
     for candidate in candidates:
         top = candidate.condensing
         bottom = candidate.evaporating
-        for side, name, inlet, outlet, price in (
+        utilities.append(
             (
                 "hot",
                 condenser_name(candidate),
                 top,
                 top - _PHASE_CHANGE_SPAN,
                 float(electricity_price) / candidate.cop,
-            ),
+            )
+        )
+        utilities.append(
             (
                 "cold",
                 evaporator_name(candidate),
                 bottom - _PHASE_CHANGE_SPAN,
                 bottom,
                 0.0,
-            ),
-        ):
-            _append_utility(data, side, inlet, outlet, price, f"{name}.S1")
-            axis = f"{side}_utilities"
-            segments = f"{side}_utility_segments"
-            axis_maps[axis][name] = len(axis_maps[axis])
-            axis_maps[segments][f"{name}.S1"] = len(axis_maps[segments])
-            utilities[axis].append(name)
-            streams[segments].append(f"{name}.S1")
+            )
+        )
+    return with_constant_utilities(arrays, utilities)
+
+
+def with_constant_utilities(
+    arrays: PreparedSolverArrays,
+    utilities: list[tuple[str, str, float, float, float]],
+) -> PreparedSolverArrays:
+    """``arrays`` with each of ``utilities`` (side "hot" or "cold", name,
+    inlet and outlet temperature in K, price per kW) added on its side,
+    after the problem's own, as one segment. Film coefficients, area costs
+    and temperature contributions are those of the first utility on each
+    side. ``arrays`` is not changed."""
+
+    data = {name: values.copy() for name, values in arrays.arrays.items()}
+    axis_maps = {axis: dict(names) for axis, names in arrays.axis_maps.items()}
+    streams = {axis: list(names) for axis, names in arrays.stream_identities.items()}
+    identities = {
+        axis: list(names) for axis, names in arrays.utility_identities.items()
+    }
+    for side, name, inlet, outlet, price in utilities:
+        _append_utility(data, side, inlet, outlet, price, f"{name}.S1")
+        axis = f"{side}_utilities"
+        segments = f"{side}_utility_segments"
+        axis_maps[axis][name] = len(axis_maps[axis])
+        axis_maps[segments][f"{name}.S1"] = len(axis_maps[segments])
+        identities[axis].append(name)
+        streams[segments].append(f"{name}.S1")
     return replace(
         arrays,
         arrays=data,
         axis_maps=axis_maps,
         stream_identities=streams,
-        utility_identities=utilities,
+        utility_identities=identities,
     )
 
 

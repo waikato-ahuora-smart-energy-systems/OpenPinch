@@ -23,16 +23,21 @@ LEVEL_BAND = 1e-7
 
 @dataclass(frozen=True)
 class UtilityLevelTarget:
-    """One level's duty per period over a group of process streams."""
+    """One level's duty per period over a group of process streams.
+
+    ``at_least`` holds the duty at or above the target rather than at it.
+    """
 
     side: Literal["hot", "cold"]
     utilities: tuple[int, ...]
     streams: tuple[int, ...]
     duties: tuple[float, ...]
+    at_least: bool = False
 
 
 def set_level_target_equations(owner) -> None:
-    """Add ``duty == target`` (within the band) for each level target."""
+    """Add ``duty == target`` (within the band) for each level target, or
+    ``duty >= target`` (less the band) for an ``at_least`` target."""
 
     for target in getattr(owner, "level_targets", ()):
         for n in range(owner.N_periods):
@@ -40,13 +45,15 @@ def set_level_target_equations(owner) -> None:
             level = float(target.duties[n])
             band = LEVEL_BAND * max(1.0, abs(level))
             if isinstance(duty, int | float):
-                if abs(duty - level) > band:
+                short = duty < level - band
+                if short or (not target.at_least and duty > level + band):
                     raise ValueError(
                         f"A {target.side} utility level target of {level} kW "
                         "has no exchanger that can serve it."
                     )
                 continue
-            owner.m.Equation(duty <= level + band)
+            if not target.at_least:
+                owner.m.Equation(duty <= level + band)
             owner.m.Equation(duty >= level - band)
 
 
@@ -71,14 +78,18 @@ def _level_duty(owner, target: UtilityLevelTarget, n: int):
 
 
 def site_level_targets(
-    solver_arrays, processes: Mapping[str, Mapping[str, Sequence[float]]]
+    solver_arrays,
+    processes: Mapping[str, Mapping[str, Sequence[float]]],
+    *,
+    at_least: bool = False,
 ) -> tuple[tuple[UtilityLevelTarget, ...], tuple[tuple[str, ...], tuple[str, ...]]]:
     """Each process's levels as targets, and each stream's process as its group.
 
     ``processes`` maps a process's stream-key prefix (``"<process>.<stream>"``)
     to its targeted duty per period by utility name (``"Hot Utility.LPS"``).
     A sliced utility's slices count as their parent. A stream of no listed
-    process is in the group ``""``.
+    process is in the group ``""``. ``at_least`` holds each level at or
+    above its target.
     """
 
     identities = solver_arrays.stream_identities
@@ -108,7 +119,11 @@ def site_level_targets(
                     continue
                 targets.append(
                     UtilityLevelTarget(
-                        side, utilities, streams, tuple(float(d) for d in duties)
+                        side,
+                        utilities,
+                        streams,
+                        tuple(float(d) for d in duties),
+                        at_least,
                     )
                 )
     return tuple(targets), groups

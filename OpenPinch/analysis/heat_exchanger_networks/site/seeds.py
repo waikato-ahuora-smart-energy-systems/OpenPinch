@@ -2,7 +2,8 @@
 
 A site network serves several processes. Each process is designed alone,
 holding its utility levels at their targets; a seed then takes one network
-per process at a dt_cont multiplier, joins their recovery matches, and
+per process at a dt_cont multiplier, joins their recovery matches and staged
+heaters and coolers (which hold a stream's levels between its matches), and
 records each process's level duties (``source_metadata["site_processes"]``)
 so the evolution that refines it holds them and matches streams only within
 a process (``models/_stagewise/level_targets.py``).
@@ -174,6 +175,9 @@ def _seed(
     recovery = [
         exchanger for network in networks.values() for exchanger in _recovery(network)
     ]
+    staged = [
+        exchanger for network in networks.values() for exchanger in _staged(network)
+    ]
     stages = [
         network.stage_count
         if network.stage_count is not None
@@ -181,7 +185,7 @@ def _seed(
         for network in networks.values()
     ]
     return HeatExchangerNetwork(
-        exchangers=tuple(recovery),
+        exchangers=tuple(recovery + staged),
         run_id="site-seed",
         method="site_pinch_design",
         stage_count=max(stages, default=None) or None,
@@ -200,6 +204,17 @@ def _recovery(network: HeatExchangerNetwork) -> list:
         exchanger
         for exchanger in network.exchangers
         if exchanger.kind is HeatExchangerKind.RECOVERY
+        and exchanger.stage is not None
+        and any(state.active for state in exchanger.period_states)
+    ]
+
+
+def _staged(network: HeatExchangerNetwork) -> list:
+    """The network's heaters and coolers between stages."""
+    return [
+        exchanger
+        for exchanger in network.exchangers
+        if exchanger.kind is not HeatExchangerKind.RECOVERY
         and exchanger.stage is not None
         and any(state.active for state in exchanger.period_states)
     ]

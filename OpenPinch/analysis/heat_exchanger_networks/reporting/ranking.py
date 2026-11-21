@@ -4,13 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
-from ..targeting.topology import (
-    canonical_stage_ends,
-    canonical_topology_restrictions,
-    topology_restriction_signature,
-)
+from ..targeting.topology import StageNode, canonical_stage_indices
 from .verification import is_network_feasible
 
 if TYPE_CHECKING:
@@ -44,87 +39,44 @@ def rank_unique_network_outcomes(
 def network_structure_signature(
     network: HeatExchangerNetwork,
 ) -> tuple[tuple[Any, ...], ...]:
-    """Return the stable topology signature used by grid-diagram plotting."""
-    original_restrictions = tuple(
-        HeatExchangerNetworkTopologyRestriction(
-            source_stream=exchanger.source_stream,
-            sink_stream=exchanger.sink_stream,
-            stage=int(exchanger.stage),
-            duty=max(state.duty for state in exchanger.period_states),
-        )
-        for exchanger in network.exchangers
-        if exchanger.kind.value == "recovery"
-        and exchanger.stage is not None
-        and exchanger.match_allowed
-        and any(state.active for state in exchanger.period_states)
-    )
-    stream_orders = {
-        "hot_stream_order": tuple(
-            dict.fromkeys(
-                exchanger.source_stream
-                for exchanger in network.exchangers
-                if exchanger.kind.value == "recovery"
+    """Return the stable topology signature used by grid-diagram plotting.
+
+    Recovery matches and staged heaters and coolers are numbered by
+    ``canonical_stage_indices``: a staged heater at stage ``s`` sits on its
+    cold stream at the boundary before stage ``s``, a staged cooler at
+    stage ``s`` on its hot stream at the boundary after it. The signature
+    therefore follows each stream's order of exchangers, however stages
+    were numbered. A stream-end heater or cooler keeps stage ``None``.
+    """
+    placed: list[tuple[tuple[str, str, str], StageNode]] = []
+    for exchanger in network.exchangers:
+        if exchanger.stage is None or not any(
+            state.active for state in exchanger.period_states
+        ):
+            continue
+        kind = exchanger.kind.value
+        link = (kind, exchanger.source_stream, exchanger.sink_stream)
+        stage = int(exchanger.stage)
+        if kind == "recovery" and exchanger.match_allowed:
+            streams = {("hot", link[1]), ("cold", link[2])}
+            node = StageNode(frozenset(streams), stage, (0, *link[1:]))
+        elif kind == "hot_utility":
+            node = StageNode(
+                frozenset({("cold", link[2])}), stage - 0.5, (1, *link[1:])
             )
-        ),
-        "cold_stream_order": tuple(
-            dict.fromkeys(
-                exchanger.sink_stream
-                for exchanger in network.exchangers
-                if exchanger.kind.value == "recovery"
-            )
-        ),
-    }
-    recovery_restrictions = canonical_topology_restrictions(
-        original_restrictions, **stream_orders
-    )
-    stage_ends = canonical_stage_ends(original_restrictions, **stream_orders)
+        elif kind == "cold_utility":
+            node = StageNode(frozenset({("hot", link[1])}), stage + 0.5, (2, *link[1:]))
+        else:
+            continue
+        placed.append((link, node))
 
-    def canonical_boundary(boundary: int) -> int:
-        # Canonical stages at or before an original stage boundary.
-        return max(
-            (end for stage, end in stage_ends.items() if stage <= boundary),
-            default=0,
-        )
-
-    def heater_stage(stage):
-        # A heater at stage s sits at boundary s - 1 (extraction convention).
-        return None if stage is None else canonical_boundary(int(stage) - 1) + 1
-
-    def cooler_stage(stage):
-        # A cooler at stage s sits at boundary s.
-        return None if stage is None else canonical_boundary(int(stage))
-
-    links = [
-        (
-            "recovery",
-            source_stream,
-            sink_stream,
-            stage,
-        )
-        for source_stream, sink_stream, stage in topology_restriction_signature(
-            recovery_restrictions
-        )
-    ]
+    stages = canonical_stage_indices([node for _, node in placed])
+    links = [(*link, stage) for (link, _), stage in zip(placed, stages, strict=True)]
     links.extend(
-        (
-            "hot_utility",
-            exchanger.source_stream,
-            exchanger.sink_stream,
-            heater_stage(exchanger.stage),
-        )
+        (exchanger.kind.value, exchanger.source_stream, exchanger.sink_stream, None)
         for exchanger in network.exchangers
-        if exchanger.kind.value == "hot_utility"
-        and any(state.active for state in exchanger.period_states)
-    )
-    links.extend(
-        (
-            "cold_utility",
-            exchanger.source_stream,
-            exchanger.sink_stream,
-            cooler_stage(exchanger.stage),
-        )
-        for exchanger in network.exchangers
-        if exchanger.kind.value == "cold_utility"
+        if exchanger.stage is None
+        and exchanger.kind.value in ("hot_utility", "cold_utility")
         and any(state.active for state in exchanger.period_states)
     )
     # An end heater (stage None) sorts before a staged one on the same pair.

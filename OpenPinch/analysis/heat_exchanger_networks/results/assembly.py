@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -49,6 +50,7 @@ def build_synthesis_result(
     """
     from .record import run_record
 
+    _warn_skipped_evolutions(outcomes)
     outcomes = demote_infeasible_outcomes(outcomes)
     ranked = run_record(outcomes).outcomes()
     if not ranked:
@@ -76,6 +78,7 @@ def build_synthesis_result(
         }.items()
         if value is not None
     }
+    task_methods = {task.method for task in tasks}
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id=settings.run_id,
         # The dt_cont multipliers the tasks ran.
@@ -91,8 +94,18 @@ def build_synthesis_result(
         best_solutions_to_save=settings.best_solutions_to_save,
         search_width=settings.search_width,
         search_depth=settings.search_depth,
-        pdm_stage_pair_limit=settings.pdm_stage_pair_limit,
-        tdm_parent_limit=settings.tdm_parent_limit,
+        # Each stage limit only for the stage it limits, when that stage ran.
+        pdm_stage_pair_limit=(
+            settings.pdm_stage_pair_limit
+            if settings.runs_milp_pinch_design
+            and HeatExchangerNetworkDesignMethod.PinchDesign in task_methods
+            else None
+        ),
+        tdm_parent_limit=(
+            settings.tdm_parent_limit
+            if HeatExchangerNetworkDesignMethod.ThermalDerivative in task_methods
+            else None
+        ),
         stage_packing=settings.stage_packing,
         evm_n_ad_branches=settings.effective_evm_n_ad_branches,
         evm_n_rm_branches=settings.effective_evm_n_rm_branches,
@@ -119,6 +132,23 @@ def build_synthesis_result(
         ranked_networks=ranked,
         manifest=manifest,
     )
+
+
+def _warn_skipped_evolutions(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    """Warn once for each task whose evolution its failed seed skipped."""
+
+    for outcome in outcomes:
+        reason = outcome.diagnostics.get("evolution_skipped")
+        if reason is None:
+            continue
+        warnings.warn(
+            f"{_task_label(outcome.task)}: its initial model was not solved "
+            f"({reason}), so its network evolution was skipped.",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 def _executed_method_sequence(
@@ -185,7 +215,10 @@ def demote_infeasible_outcomes(
     demoted = []
     for outcome in outcomes:
         termination = outcome.diagnostics.get("unconverged_termination")
-        if outcome.status == "success" and termination is not None:
+        # A fixed-structure allocation is verified where it is solved and
+        # has no downstream task: it is kept, and its service warns.
+        fixed = (outcome.task.settings or {}).get("fixed_structure")
+        if outcome.status == "success" and termination is not None and not fixed:
             demoted.append(
                 outcome.model_copy(
                     update={
@@ -226,13 +259,31 @@ def _failed_outcome_summary(
     summaries = []
     for outcome in failed[:3]:
         reason = outcome.error or outcome.solver_status or "no failure reason"
-        summaries.append(
-            f"{outcome.task.method}(dt_cont x{outcome.task.dt_cont_multiplier:g}): "
-            f"{reason}"
-        )
+        summaries.append(f"{_task_label(outcome.task)}: {reason}")
     if len(failed) > len(summaries):
         summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")
     return "; ".join(summaries)
+
+
+def _task_label(task) -> str:
+    """How a failure names ``task``: a fixed-structure duty optimisation by
+    its objective (its method stamp is the evolution method's), any other
+    task by its method and dt_cont multiplier."""
+    settings = task.settings or {}
+    if settings.get("fixed_structure"):
+        return (
+            "fixed-structure duty optimisation "
+            f"({settings.get('duty_objective')!r} objective)"
+        )
+    return f"{task.method}(dt_cont x{task.dt_cont_multiplier:g})"
+
+
+def _infeasible_task_label(task) -> str:
+    """How an infeasibility names ``task``: a fixed-structure duty
+    optimisation by its objective, any other task by its method and id."""
+    if (task.settings or {}).get("fixed_structure"):
+        return _task_label(task)
+    return f"{task.method}({task.task_id or 'unknown-task'})"
 
 
 def _infeasible_outcome_summary(
@@ -244,8 +295,9 @@ def _infeasible_outcome_summary(
         return ""
     summaries = []
     for outcome, failures in outcomes[:3]:
-        task_id = outcome.task.task_id or "unknown-task"
-        summaries.append(f"{outcome.task.method}({task_id}) infeasible: {failures[0]}")
+        summaries.append(
+            f"{_infeasible_task_label(outcome.task)} infeasible: {failures[0]}"
+        )
     if len(outcomes) > len(summaries):
         summaries.append(f"{len(outcomes) - len(summaries)} more infeasible task(s)")
     return "; ".join(summaries)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import time
 from dataclasses import dataclass, field, replace
 from itertools import product
 from typing import Any, Literal, Mapping, Sequence
@@ -103,6 +104,9 @@ class InternalHeatExchangerNetworkProblem:
     # process's levels and matches streams only within a process
     # (``_stagewise/level_targets.py:site_level_targets``).
     site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
+    # How a site design holds each process's levels: "fixed" at its targets,
+    # "at_least" at or above them (``HENS_SITE_LEVEL_HOLDS``).
+    site_level_holds: str = "fixed"
     # A site task's utility levels (``../site/levels.py``): its stage-wise
     # model carries the site utility balance, so the site pays only for
     # its net utility use (``_stagewise/site_utilities.py``).
@@ -142,7 +146,9 @@ class InternalHeatExchangerNetworkProblem:
             self.args["staged_utilities"] = True
         if self.site_processes is not None and self.framework != "PDM":
             targets, groups = site_level_targets(
-                self.solver_arrays, self.site_processes
+                self.solver_arrays,
+                self.site_processes,
+                at_least=self.site_level_holds == "at_least",
             )
             self.args["level_targets"] = targets
             self.args["stream_groups"] = groups
@@ -826,6 +832,12 @@ class InternalHeatExchangerNetworkProblem:
         stage-reduced and verified like the extra PDM networks, and repeats
         are dropped, up to ``heuristic_network_limit`` networks. The first
         becomes this problem's case, the others ``pdm_variants``.
+
+        Past ``backend.HEURISTIC_STAGE_TIME_LIMIT`` seconds of wall clock, a
+        side stops at its first realised proposal (holding its utility
+        levels, it tries one more proposal and then drops them) and the
+        pairing at its first network; the networks found so far are kept,
+        with a warning.
         """
 
         from ..heuristic.enumeration import propose_side_topologies
@@ -833,10 +845,12 @@ class InternalHeatExchangerNetworkProblem:
         from ..reporting.ranking import network_structure_signature
 
         limit = self.heuristic_network_limit
+        deadline = time.monotonic() + backend.HEURISTIC_STAGE_TIME_LIMIT
         report: dict[str, Any] = {
             "proposed": {},
             "realised": {},
             "repeated_sides": {"above": 0, "below": 0},
+            "time_limited": False,
         }
         sides = {}
         # Repeats of each realised side, by identity: stand-ins for a
@@ -848,7 +862,9 @@ class InternalHeatExchangerNetworkProblem:
                 sides[name] = [template]
                 continue
             proposals = propose_side_topologies(pinch_side(template), limit=limit)
-            realised = self._realise_proposals(name, proposals, alternates, report)
+            realised = self._realise_proposals(
+                name, proposals, alternates, report, deadline
+            )
             if not realised and self._side_args(name).get("staged_utilities"):
                 logger.warning(
                     "[%s] No %s pinch side proposal holds the utility levels "
@@ -858,7 +874,9 @@ class InternalHeatExchangerNetworkProblem:
                     name,
                 )
                 self._drop_levels(name)
-                realised = self._realise_proposals(name, proposals, alternates, report)
+                realised = self._realise_proposals(
+                    name, proposals, alternates, report, deadline
+                )
             report["proposed"][name] = len(proposals)
             report["realised"][name] = len(realised)
             sides[name] = realised
@@ -871,6 +889,9 @@ class InternalHeatExchangerNetworkProblem:
         failed = repeated = 0
         for (_a, above), (_b, below) in pairs:
             if len(networks) >= limit:
+                break
+            if networks and time.monotonic() >= deadline:
+                report["time_limited"] = True
                 break
             variant = self._verified_heuristic_variant(above, below, alternates)
             if variant is None:
@@ -896,6 +917,14 @@ class InternalHeatExchangerNetworkProblem:
         )
         self.heuristic_report = report
         logger.info("[%s] heuristic pinch design: %s", self.name, report)
+        if report["time_limited"]:
+            logger.warning(
+                "[%s] Heuristic pinch design reached its %g s time limit; "
+                "it keeps the networks found so far: %d.",
+                self.name,
+                backend.HEURISTIC_STAGE_TIME_LIMIT,
+                len(networks),
+            )
         if not networks:
             raise ValueError(
                 "No heuristic pinch design proposal could be realised as a network."
@@ -904,12 +933,26 @@ class InternalHeatExchangerNetworkProblem:
         self.above, self.below, self.case = first.above, first.below, first.case
         self.pdm_variants = rest
 
-    def _realise_proposals(self, name: str, proposals, alternates, report) -> list:
-        """Realise a side's proposals, keeping the first of each repeat."""
+    def _realise_proposals(
+        self, name: str, proposals, alternates, report, deadline: float
+    ) -> list:
+        """Realise a side's proposals, keeping the first of each repeat.
 
+        Past ``deadline`` it stops once a side is realised; holding the
+        utility levels, it also stops after one more try, so that the side
+        drops its levels.
+        """
+
+        holding = bool(self._side_args(name).get("staged_utilities"))
         realised = []
         first_by_topology: dict[tuple, Any] = {}
+        tried_late = False
         for rank, proposal in enumerate(proposals):
+            if time.monotonic() >= deadline:
+                if realised or (holding and tried_late):
+                    report["time_limited"] = True
+                    break
+                tried_late = True
             side = self._realise_side(name, proposal, rank)
             if side is None:
                 continue

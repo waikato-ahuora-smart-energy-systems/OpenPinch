@@ -16,8 +16,6 @@ from .search import DEPTH_LEVELS, resolve_search
 
 StagePackingScope = str
 
-_MAX_PDM_STAGE_PAIR_COUNT = 12
-_MAX_TDM_PARENT_LIMIT = 10
 _OPEN_HENS_METHOD_SEQUENCE = (
     HeatExchangerNetworkDesignMethod.PinchDesign,
     HeatExchangerNetworkDesignMethod.ThermalDerivative,
@@ -185,14 +183,6 @@ class SynthesisWorkflowSettings:
         )
 
     @property
-    def quality_tdm_parent_limit(self) -> int:
-        """Return explicit parent limit metadata for reporting."""
-
-        if self.tdm_parent_limit is not None:
-            return max(1, int(self.tdm_parent_limit))
-        return max(1, int(self.best_solutions_to_save))
-
-    @property
     def effective_evm_n_ad_branches(self) -> int:
         """Return derived or explicitly overridden add-branch breadth."""
 
@@ -223,7 +213,9 @@ def workflow_settings_from_problem(
         )
     config = zone.config
     hens = config.hens
-    search = resolve_search(hens)
+    search = resolve_search(
+        hens, streams=len(zone.hot_streams) + len(zone.cold_streams)
+    )
     solvers = {
         stage: configured_stage_solver(hens, f"HENS_SOLVER_{stage.upper()}")
         for stage in ("pdm", "tdm", "evm")

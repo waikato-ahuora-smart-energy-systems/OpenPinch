@@ -490,6 +490,43 @@ def test_fixed_structure_tools_refuse_a_site_network(marker, tool):
         getattr(_site().design, tool)(site)
 
 
+@pytest.mark.solver
+def test_retrofit_of_a_site_network_mapping_matches_within_each_process():
+    """A site's network given as the retrofit mapping carries no site
+    metadata, so it passes the site guard; the search then proposes new
+    matches only within one process and warns that the site utility balance
+    is not modelled (by price the HPS-heated C1 would take H3's heat)."""
+    from OpenPinch.domain.enums import HeatExchangerKind
+
+    problem = _site()
+    network = problem.design.total_site_heat_exchanger_network(
+        width=0, depth=1, options={"HENS_EVM_N_AD_BRANCHES": 1}
+    ).selected_network
+    existing = {"recovery": [], "heaters": [], "coolers": []}
+    for e in network.exchangers:
+        unit = {"area": e.area, "id": e.exchanger_id}
+        if e.kind is HeatExchangerKind.RECOVERY:
+            unit |= {"hot": e.source_stream, "cold": e.sink_stream, "stage": e.stage}
+            existing["recovery"].append(unit)
+        elif e.kind is HeatExchangerKind.HOT_UTILITY:
+            unit |= {"stream": e.sink_stream, "utility": e.source_stream.split(".")[1]}
+            existing["heaters"].append(unit)
+        else:
+            unit |= {"stream": e.source_stream, "utility": e.sink_stream.split(".")[1]}
+            existing["coolers"].append(unit)
+    existing["stage_count"] = network.stage_count
+
+    with pytest.warns(UserWarning, match="site utility balance"):
+        result = problem.design.retrofit(
+            existing, max_modifications=1, beam_width=1, new_match_candidates=4
+        )
+
+    matches = [m for d in result.frontier for m in d.modifications if m.hot_stream]
+    assert all(
+        m.hot_stream.split(".")[0] == m.cold_stream.split(".")[0] for m in matches
+    )
+
+
 def test_a_stored_overdesign_margin_does_not_reach_the_process_designs(monkeypatch):
     """Rating a process network at a margin drops its level targets, so the
     site's process designs run without the stored margin."""

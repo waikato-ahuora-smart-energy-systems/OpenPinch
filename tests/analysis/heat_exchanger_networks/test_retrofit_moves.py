@@ -210,3 +210,79 @@ def test_screen_ranks_new_matches_by_utility_relief_then_potential():
     assert all(
         match_potential(network, ENDS, move, approach=10.0) > 0.0 for move in everything
     )
+
+
+def test_the_screen_keeps_each_match_within_one_process_when_given_processes():
+    network = _solved_network()
+    processes = {"H1": "A", "C1": "A", "H2": "B", "C2": "B"}
+
+    everything = screen_new_matches(network, ENDS, approach=10.0, limit=100)
+    within = screen_new_matches(
+        network, ENDS, approach=10.0, limit=100, processes=processes
+    )
+
+    # H1-C2 leads the unrestricted screen but joins two processes.
+    assert any(m.hot == "H1" and m.cold == "C2" for m in everything)
+    assert within == tuple(
+        m for m in everything if processes[m.hot] == processes[m.cold]
+    )
+    assert within
+
+
+def test_the_process_screen_drops_streams_outside_every_process():
+    network = _solved_network()
+    # H2 and C2 sit outside every process zone: their pair is not proven to
+    # be within one process.
+    processes = {"H1": "A", "C1": "A"}
+
+    within = screen_new_matches(
+        network, ENDS, approach=10.0, limit=100, processes=processes
+    )
+
+    assert within
+    assert all(m.hot in processes and m.cold in processes for m in within)
+
+
+def test_process_zones_are_told_apart_by_their_address():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.processes import (
+        stream_process_zones,
+    )
+
+    def streams(**items):
+        return SimpleNamespace(items=lambda: list(items.items()))
+
+    h1, c1, h2, c2 = (object() for _ in range(4))
+
+    def zone(name, address, kind, hot, cold, subzones=None):
+        return SimpleNamespace(
+            name=name,
+            address=address,
+            type=kind,
+            hot_streams=streams(**hot),
+            cold_streams=streams(**cold),
+            subzones=subzones or {},
+        )
+
+    # Two sites each holding a process zone named "Dairy".
+    north = zone("Dairy", "Site/North/Dairy", "Process Zone", {"x": h1}, {"y": c1})
+    south = zone("Dairy", "Site/South/Dairy", "Process Zone", {"x": h2}, {"y": c2})
+    root = zone(
+        "Site",
+        "Site",
+        "Site",
+        {"North.Dairy.H1": h1, "South.Dairy.H1": h2},
+        {"North.Dairy.C1": c1, "South.Dairy.C1": c2},
+        {
+            "North": zone("North", "Site/North", "Site", {}, {}, {"Dairy": north}),
+            "South": zone("South", "Site/South", "Site", {}, {}, {"Dairy": south}),
+        },
+    )
+
+    assert stream_process_zones(root) == {
+        "North.Dairy.H1": "Site/North/Dairy",
+        "North.Dairy.C1": "Site/North/Dairy",
+        "South.Dairy.H1": "Site/South/Dairy",
+        "South.Dairy.C1": "Site/South/Dairy",
+    }

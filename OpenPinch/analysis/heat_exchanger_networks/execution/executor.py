@@ -27,6 +27,7 @@ from ..results.record import admit, recording_active
 from ..site.levels import site_utility_system, utility_capacities
 from ..solver.arrays import (
     PreparedSolverArrays,
+    annual_cost_scales,
     nominal_approach_temperature,
     problem_to_solver_arrays,
 )
@@ -465,11 +466,14 @@ class LocalSynthesisExecutor:
             ),
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
             site_processes=site_processes,
+            site_level_holds=str(problem.master_zone.config.hens.site_level_holds),
             site_utility_system=(
                 None
                 if site_processes is None
                 else site_utility_system(
-                    arrays, capacities=utility_capacities(problem.master_zone)
+                    arrays,
+                    capacities=utility_capacities(problem.master_zone),
+                    letdown_price=_site_letdown_price(problem.master_zone.config),
                 )
             ),
         )
@@ -576,12 +580,7 @@ def _solve_built_task(
         ):
             solved = internal_problem.get_solution(**solve_kwargs)
         if solved is None or getattr(solved, "mSuccess", 0) != 1:
-            reason = getattr(
-                internal_problem,
-                "solution_failure_reason",
-                "solver did not return a successful heat exchanger network model",
-            )
-            return task, _failed_task_outcome(task, reason), None
+            return task, _unsolved_outcome(task, internal_problem, solved), None
         return task, _solved_outcome(task, internal_problem, solved), internal_problem
     except Exception as exc:
         logger.debug(
@@ -793,6 +792,30 @@ def _can_build_tasks_in_workers(
     return not parent_outcomes and all(task.parent_task_id is None for task in tasks)
 
 
+def _unsolved_outcome(
+    task: HeatExchangerNetworkSynthesisTask,
+    internal_problem: Any,
+    solved: Any,
+) -> HeatExchangerNetworkSynthesisTaskOutcome:
+    """The failed outcome of a task whose solve returned no solved model.
+
+    An evolution whose seed model failed evolved nothing; the outcome keeps
+    that as ``diagnostics["evolution_skipped"]`` so results assembly warns.
+    """
+
+    reason = getattr(
+        internal_problem,
+        "solution_failure_reason",
+        "solver did not return a successful heat exchanger network model",
+    )
+    outcome = _failed_task_outcome(task, reason)
+    if getattr(solved, "evolution_skipped", False):
+        outcome = outcome.model_copy(
+            update={"diagnostics": {"evolution_skipped": reason}}
+        )
+    return outcome
+
+
 def _failed_task_outcome(
     task: HeatExchangerNetworkSynthesisTask,
     reason: str,
@@ -959,6 +982,13 @@ def _stage_packed_stagewise_factory():
     from ..models.packed_stagewise import StagePackedStageWiseModel
 
     return StagePackedStageWiseModel
+
+
+def _site_letdown_price(config) -> float:
+    """``HENS_SITE_LETDOWN_PRICE`` ($/MWh) as an annual price ($/kW/y), as
+    the solver arrays price utilities."""
+    price_scale, _capital_scale = annual_cost_scales(config.costing)
+    return float(config.hens.site_letdown_price) * price_scale
 
 
 def _solve_tolerance(problem) -> float:

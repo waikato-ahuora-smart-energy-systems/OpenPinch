@@ -125,9 +125,11 @@ def execute_open_hens_method(
                     parent_outcomes=pdm_outcome_map | _outcome_map(tdm_outcomes),
                     executor=executor,
                 )
-            # A MILP network none of whose derivative tasks succeeded (Couenne
-            # missing, a time limit without an incumbent, a failed check) is
-            # evolved directly rather than left unevolved.
+            # A MILP network that had derivative tasks, none of which succeeded
+            # (Couenne missing, a time limit without an incumbent, a failed
+            # check), is evolved directly rather than left unevolved. One that
+            # ``tdm_parent_limit`` left out had no task and is not evolved.
+            tried = {task.parent_task_id for task in tdm_tasks}
             refined = {
                 o.task.parent_task_id for o in tdm_outcomes if o.status == "success"
             }
@@ -135,7 +137,9 @@ def execute_open_hens_method(
             unrefined = tuple(
                 o
                 for o in pdm_outcomes
-                if o.task.task_id not in refined and o.task.task_id not in seeded
+                if o.task.task_id in tried
+                and o.task.task_id not in refined
+                and o.task.task_id not in seeded
             )
             if unrefined:
                 direct_tasks, direct_outcomes = evolve_from_pinch_design(unrefined)
