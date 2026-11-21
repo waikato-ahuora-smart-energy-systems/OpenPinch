@@ -6,7 +6,9 @@ from ....domain.enums import ZoneType
 
 
 def stream_process_zones(zone) -> dict[str, str]:
-    """Each stream key of ``zone`` mapped to the name of its process zone.
+    """Each stream key of ``zone`` mapped to the address of its process
+    zone (``Site/Heating``), which tells apart process zones that share a
+    name under different parents.
 
     A stream belongs to the outermost ``Process Zone`` at or below ``zone``
     that holds it; a stream outside every process zone is left out. Keys are
@@ -25,7 +27,7 @@ def stream_process_zones(zone) -> dict[str, str]:
             for streams in (node.hot_streams, node.cold_streams):
                 for _key, stream in streams.items():
                     if id(stream) in keys:
-                        found.setdefault(keys[id(stream)], str(node.name))
+                        found.setdefault(keys[id(stream)], str(node.address))
             return
         for child in (node.subzones or {}).values():
             visit(child)
