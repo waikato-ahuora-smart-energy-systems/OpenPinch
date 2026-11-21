@@ -139,60 +139,85 @@ def _get_multiperiod_post_process(owner) -> None:
         owner.n_hu_units + owner.n_cu_units
     )
 
-    owner.dqda = [
-        [[None for _k in range(owner.S)] for _j in range(owner.J)]
-        for _i in range(owner.I)
-    ]
-    # A temperature depends on its stream and stage boundary only, so each is
-    # read once rather than once per partner; T_h and T_c are period 0's.
-    hot_temperatures = [[_value(t) for t in row] for row in owner.T_h_by_period[0]]
-    cold_temperatures = [[_value(t) for t in row] for row in owner.T_c_by_period[0]]
-    hot_segmented = [
-        _piecewise._solver_parent_is_segmented(owner, "hot", i) for i in range(owner.I)
-    ]
-    cold_segmented = [
-        _piecewise._solver_parent_is_segmented(owner, "cold", j) for j in range(owner.J)
-    ]
-    for k in range(owner.S):
-        for j in range(owner.J):
-            for i in range(owner.I):
-                driving_force = hot_temperatures[i][k] - cold_temperatures[j][k + 1]
-                if q_r[0][i][j][k] > 0.0 and driving_force > 0.0:
-                    owner.dqda[i][j][k] = (
-                        _value(owner.theta_1[i][j][k])
-                        * _value(owner.theta_2[i][j][k])
-                        * owner.U_r[i][j]
-                    ) / driving_force
-                elif driving_force > 0.0:
-                    owner.dqda[i][j][k] = owner.U_r[i][j] * driving_force
-                else:
-                    owner.dqda[i][j][k] = 0.0
-                if not (hot_segmented[i] or cold_segmented[j]):
-                    continue
-                hot_share, cold_share = (
-                    _area.split_shares(owner, q_r, 0, i, j, k, branch_fractions)
-                    if q_r[0][i][j][k] > 0.0
-                    else (1.0, 1.0)
-                )
-                exact_dqda = _area._segment_exact_dqda(
-                    owner,
-                    period_index=0,
-                    hot_parent_index=i,
-                    cold_parent_index=j,
-                    duty=float(q_r[0][i][j][k]),
-                    hot_inlet_temperature=hot_temperatures[i][k],
-                    cold_inlet_temperature=cold_temperatures[j][k + 1],
-                    hot_share=hot_share,
-                    cold_share=cold_share,
-                )
-                if exact_dqda is not None:
-                    owner.dqda[i][j][k] = exact_dqda
+    owner.dqda = period_weighted_dqda(owner, q_r)
     # Only benefit ranking reads alpha, and most solved models are never
     # ranked, so the alpha solve waits for _solve_ranking_alpha.
     owner._ranking_alpha_pending = True
 
     owner.TAC_model = owner.solver_run.objective_value
     owner.TAC = owner.capital_cost_value + owner.weighted_operating_cost_value
+
+
+def period_weighted_dqda(owner, q_r) -> list[list[list[float]]]:
+    """Every match's dQ/dA, averaged over periods by the period weights.
+
+    Each period's dQ/dA is read from that period's approaches, temperatures
+    and coefficient, as ``_base.area.recovered_value`` weights a match's
+    recovered value; one period gives that period's dQ/dA.
+    """
+
+    weights = [float(weight) for weight in owner.period_weights]
+    total = sum(weights)
+    dqda = [
+        [[0.0 for _k in range(owner.S)] for _j in range(owner.J)]
+        for _i in range(owner.I)
+    ]
+    hot_segmented = [
+        _piecewise._solver_parent_is_segmented(owner, "hot", i) for i in range(owner.I)
+    ]
+    cold_segmented = [
+        _piecewise._solver_parent_is_segmented(owner, "cold", j) for j in range(owner.J)
+    ]
+    for n in range(owner.N_periods):
+        share = weights[n] / (total if total > 0.0 else 1.0)
+        if share == 0.0:
+            continue
+        for i in range(owner.I):
+            for j in range(owner.J):
+                for k in range(owner.S):
+                    dqda[i][j][k] += share * _period_dqda(
+                        owner, q_r, n, i, j, k, hot_segmented[i] or cold_segmented[j]
+                    )
+    return dqda
+
+
+def _period_dqda(owner, q_r, n, i, j, k, segmented) -> float:
+    """Match ``(i, j, k)``'s dQ/dA in period ``n``."""
+
+    # A temperature depends on its stream and stage boundary only.
+    hot_temperature = _value(owner.T_h_by_period[n][i][k])
+    cold_temperature = _value(owner.T_c_by_period[n][j][k + 1])
+    driving_force = hot_temperature - cold_temperature
+    duty = float(q_r[n][i][j][k])
+    if duty > 0.0 and driving_force > 0.0:
+        dqda = (
+            _value(owner.theta_1_by_period[n][i][j][k])
+            * _value(owner.theta_2_by_period[n][i][j][k])
+            * owner.U_r_period[n][i][j]
+        ) / driving_force
+    elif driving_force > 0.0:
+        dqda = owner.U_r_period[n][i][j] * driving_force
+    else:
+        return 0.0
+    if not segmented:
+        return dqda
+    hot_share, cold_share = (
+        _area.split_shares(owner, q_r, n, i, j, k, branch_fractions)
+        if duty > 0.0
+        else (1.0, 1.0)
+    )
+    exact_dqda = _area._segment_exact_dqda(
+        owner,
+        period_index=n,
+        hot_parent_index=i,
+        cold_parent_index=j,
+        duty=duty,
+        hot_inlet_temperature=hot_temperature,
+        cold_inlet_temperature=cold_temperature,
+        hot_share=hot_share,
+        cold_share=cold_share,
+    )
+    return dqda if exact_dqda is None else exact_dqda
 
 
 def get_lowest_benefit_HX(owner) -> list[list[int]]:
