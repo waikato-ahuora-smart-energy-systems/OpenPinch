@@ -130,7 +130,9 @@ Heat exchanger network synthesis
   case now keeps the case's own utility that placement priced the fallback
   as (here cooling water at 20 to 25 C, or HPS), and a count fails as
   infeasible when the case has no such utility. Placed levels closer than
-  1 K at every temperature are one level: the case keeps the first.
+  1 K at every temperature are one level: the case keeps the first. When a
+  multiperiod placement falls back at a different temperature in each
+  period, the case keeps the utility nearest each period's fallback.
 - A site network could not be designed when a process stream held two
   utility levels between its recovery matches (for example a hot stream
   raising steam on two placed mains), as the placed steam-main site does
