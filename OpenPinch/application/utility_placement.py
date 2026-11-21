@@ -1211,8 +1211,9 @@ def run_problem_utility_placement(
     return optimized_case
 
 
-def _utility_sources(problem, selected_zone, raw_utilities):
-    """Return each side's original utilities as (name, supply, shift, raw)."""
+def _utility_sources(problem, selected_zone, raw_utilities, period_idx=None):
+    """Return each side's original utilities as (name, supply, shift, raw),
+    each value at period ``period_idx`` (the first when ``None``)."""
     sources = {}
     for utility_type, attribute in (
         ("Hot", "hot_utilities"),
@@ -1232,8 +1233,14 @@ def _utility_sources(problem, selected_zone, raw_utilities):
         sources[utility_type] = [
             (
                 utility.name,
-                float(get_scalar_value(utility.supply_temperature)),
-                float(get_scalar_value(utility.effective_delta_t_contribution)),
+                float(
+                    get_scalar_value(utility.supply_temperature, period_idx=period_idx)
+                ),
+                float(
+                    get_scalar_value(
+                        utility.effective_delta_t_contribution, period_idx=period_idx
+                    )
+                ),
                 raw_by_name[utility.name],
             )
             for utility in utilities

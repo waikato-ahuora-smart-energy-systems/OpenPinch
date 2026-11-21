@@ -146,19 +146,24 @@ def placed_case(
     return type(problem)(source, project_name=problem.project_name)
 
 
-def _fallback_utilities(placed) -> dict[tuple[str, str], tuple[float, ...]]:
-    """Placement's fallback utilities, ``(name, type)`` to every supply
-    (degC) a period placed it at, ascending: a multiperiod placement may
-    place one fallback at a different supply in each period."""
+def _fallback_utilities(
+    placed,
+) -> dict[tuple[str, str], tuple[tuple[str | None, float], ...]]:
+    """Placement's fallback utilities, ``(name, type)`` to each period's
+    ``(period_id, supply)`` (degC): a multiperiod placement may place one
+    fallback at a different supply in each period."""
     from .utility_placement import _level_temperature
 
-    supplies: dict[tuple[str, str], set[float]] = {}
+    supplies: dict[tuple[str, str], set[tuple[str | None, float]]] = {}
     for row in placed.utility_placement_result.retarget_comparison:
         if row.is_fallback:
             supplies.setdefault((row.utility, row.side.value.capitalize()), set()).add(
-                float(_level_temperature(row.supply_temperature))
+                (row.period_id, float(_level_temperature(row.supply_temperature)))
             )
-    return {key: tuple(sorted(values)) for key, values in supplies.items()}
+    return {
+        key: tuple(sorted(values, key=lambda item: (item[1], str(item[0]))))
+        for key, values in supplies.items()
+    }
 
 
 def _distinct_levels(utilities: list[dict]) -> list[dict]:
@@ -196,37 +201,44 @@ def _degc(quantity: Mapping, value: float) -> float:
 
 
 def _stand_ins(
-    problem: "PinchProblem", fallbacks: Mapping[tuple[str, str], Sequence[float]]
+    problem: "PinchProblem",
+    fallbacks: Mapping[tuple[str, str], Sequence[tuple[str | None, float]]],
 ) -> list[dict]:
     """The case's own utility for each fallback: its side's nearest by
-    supply temperature, as placement priced the fallback, for each supply
-    a period placed it at (their union)."""
+    supply temperature in the period placement placed it, as placement
+    priced the fallback, for each period's supply (their union). A period
+    the case does not name is matched at its first period."""
     from ..analysis.utility_placement.errors import NoFeasiblePlacementError
     from .utility_placement import _resolve_placement_zone, _utility_sources
 
     zone = _resolve_placement_zone(problem, None)
-    sources = _utility_sources(problem, zone, problem.to_problem_json()["utilities"])
+    raw = problem.to_problem_json()["utilities"]
+    periods = problem.period_ids
     # By name and type: a hot and a cold utility may share a name, and a
     # ``Both`` utility serving both fallbacks is kept once.
     kept: dict[tuple[str, str], dict] = {}
     for (name, side), supplies in fallbacks.items():
-        own = [
-            source
-            for source in sources[side]
-            if source[0].strip().casefold() not in {"hu", "cu"}
-        ]
-        if not own:
-            raise NoFeasiblePlacementError(
-                code="no_fallback_utility",
-                message=(
-                    f"placement needs its fallback {name}, and the case has no "
-                    f"{side.casefold()} utility of its own to take its place."
-                ),
+        for period_id, supply in supplies:
+            sources = _utility_sources(
+                problem, zone, raw, period_idx=periods.get(period_id)
             )
-        for supply in supplies:
+            own = [
+                source
+                for source in sources[side]
+                if source[0].strip().casefold() not in {"hu", "cu"}
+            ]
+            if not own:
+                raise NoFeasiblePlacementError(
+                    code="no_fallback_utility",
+                    message=(
+                        f"placement needs its fallback {name}, and the case has "
+                        f"no {side.casefold()} utility of its own to take its "
+                        "place."
+                    ),
+                )
             nearest = min(own, key=lambda source: abs(source[1] - supply))
-            raw = nearest[3]
-            kept.setdefault((raw["name"], raw["type"]), raw)
+            utility = nearest[3]
+            kept.setdefault((utility["name"], utility["type"]), utility)
     return list(kept.values())
 
 

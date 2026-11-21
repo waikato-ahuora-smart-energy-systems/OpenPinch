@@ -572,7 +572,7 @@ def test_a_hot_and_a_cold_stand_in_may_share_a_name():
     problem = PinchProblem(source)
 
     kept = site_levels._stand_ins(
-        problem, {("HU", "Hot"): (300.0,), ("CU", "Cold"): (-30.0,)}
+        problem, {("HU", "Hot"): ((None, 300.0),), ("CU", "Cold"): ((None, -30.0),)}
     )
 
     assert sorted((u["name"], u["type"]) for u in kept) == [
@@ -589,6 +589,7 @@ def test_every_periods_fallback_keeps_its_nearest_utility():
 
     def row(supply):
         return SimpleNamespace(
+            period_id=f"p{supply:g}",
             utility="HU",
             side=UtilitySide.HOT,
             supply_temperature=QuantityValue(value=supply, unit="degC"),
@@ -604,5 +605,49 @@ def test_every_periods_fallback_keeps_its_nearest_utility():
     fallbacks = site_levels._fallback_utilities(placed)
     kept = site_levels._stand_ins(_site(), fallbacks)
 
-    assert fallbacks == {("HU", "Hot"): (145.0, 300.0)}
+    assert fallbacks == {("HU", "Hot"): (("p145", 145.0), ("p300", 300.0))}
     assert sorted(u["name"] for u in kept) == ["HPS", "LPS"]
+
+
+def test_each_periods_fallback_is_matched_at_that_periods_temperatures():
+    """Steam A runs at 140 C in the base period and 290 C at peak; B at
+    250 C and 160 C. A fallback at 145 C in the base period and 300 C at
+    peak is nearest A in both, so only A stands in: matched at the base
+    period's temperatures alone, 300 C would pick B."""
+    from OpenPinch.contracts.utility_placement import QuantityValue, UtilitySide
+    from tests.analysis.heat_exchanger_networks.test_hen_period_handling import (
+        _two_period_problem,
+    )
+
+    source = _two_period_problem().to_problem_json()
+    steam, water = source["utilities"]
+
+    def periodic(name, base, peak):
+        temperatures = {"values": [base + 273.15, peak + 273.15], "unit": "K"}
+        return dict(steam, name=name, t_supply=temperatures, t_target=temperatures)
+
+    source["utilities"] = [
+        periodic("A", 140.0, 290.0),
+        periodic("B", 250.0, 160.0),
+        water,
+    ]
+    problem = PinchProblem(source, project_name="two-period")
+
+    def row(period_id, supply):
+        return SimpleNamespace(
+            period_id=period_id,
+            utility="HU",
+            side=UtilitySide.HOT,
+            supply_temperature=QuantityValue(value=supply, unit="degC"),
+            is_fallback=True,
+        )
+
+    placed = SimpleNamespace(
+        utility_placement_result=SimpleNamespace(
+            retarget_comparison=(row("base", 145.0), row("peak", 300.0))
+        )
+    )
+
+    kept = site_levels._stand_ins(problem, site_levels._fallback_utilities(placed))
+
+    assert [u["name"] for u in kept] == ["A"]

@@ -145,7 +145,8 @@ Heat exchanger network synthesis
   infeasible when the case has no such utility. Placed levels closer than
   1 K at every temperature are one level: the case keeps the first. When a
   multiperiod placement falls back at a different temperature in each
-  period, the case keeps the utility nearest each period's fallback.
+  period, the case keeps the utility nearest each period's fallback, at
+  that period's utility temperatures.
 - A site network could not be designed when a process stream held two
   utility levels between its recovery matches (for example a hot stream
   raising steam on two placed mains), as the placed steam-main site does
