@@ -159,7 +159,8 @@ Heat exchanger network synthesis
   steam, letting it down and dumping it earned without limit; a level with
   a credit now dumps no more than the processes raise on it. Input
   validation no longer warns "Value should be non-negative" for a cold
-  utility's negative price; a negative hot utility price still warns.
+  utility's negative price; a negative price on a hot utility, or on a
+  segmented or profiled cold utility, still warns.
 - A total site whose steam credits exceed its purchases can be designed.
   Its net utility cost, and so its total annual cost (the evolution
   objective), is negative, and every solve with a negative objective was

@@ -427,10 +427,10 @@ heat let down from above plus imports, period by period. Imports enter hot
 levels and mains (a hot and a cold utility of one name) at the import price,
 within the hot utility's ``maximum_heat_flow`` when it has one; dumps leave
 cold levels and mains at the dump price. So steam a process raises on a main
-offsets steam another process uses there. A cold utility may have a negative
-price, a credit for the steam raised on it; a level with a credit dumps no
-more than the processes raise on it, so the site cannot buy steam to sell it. The selected network's
-``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
+offsets steam another process uses there. A cold utility without segments
+may have a negative price, a credit for the steam raised on it; a level with
+a credit dumps no more than the processes raise on it, so the site cannot
+buy steam to sell it. The selected network's ``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
 ``site_total_annual_cost``, and its ``source_metadata["site_utility_balance"]``
 holds each level's use, generation, imports, letdowns and dumps per period.
 Heat let down from a level to a colder one costs ``HENS_SITE_LETDOWN_PRICE``
