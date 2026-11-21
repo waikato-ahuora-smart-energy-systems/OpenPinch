@@ -19,6 +19,7 @@ from ..errors import WorkflowContractError
 from ..execution.fallbacks import _couenne_was_missing
 from ..execution.settings import SynthesisWorkflowSettings
 from ..reporting.verification import verify_network_feasibility
+from ..solver.backend import LIMIT_TERMINATION_CONDITIONS
 
 _METHOD_SEQUENCE: tuple[HeatExchangerNetworkDesignMethod, ...] = (
     HeatExchangerNetworkDesignMethod.PinchDesign,
@@ -191,7 +192,11 @@ def _accepted_outcome(
     message = "heat exchanger network synthesis produced no successful task outcomes."
     if detail:
         message = f"{message} Failed task details: {detail}"
-    if any("unconverged_termination" in outcome.diagnostics for outcome in outcomes):
+    if any(
+        outcome.diagnostics.get("unconverged_termination")
+        in LIMIT_TERMINATION_CONDITIONS
+        for outcome in outcomes
+    ):
         message = (
             f"{message} A solve stopped at a solver limit before converging: "
             "raise the limit (time_limit for HiGHS, max_iter for Ipopt) in "

@@ -539,6 +539,34 @@ def test_only_unconverged_outcomes_say_which_solver_limit_to_raise() -> None:
         build_synthesis_result(settings, pdm_tasks, [unconverged])
 
 
+def test_a_non_limit_termination_is_not_advised_to_raise_a_limit() -> None:
+    # A solve that stopped at too small a step would not converge with a
+    # larger limit: the error names the termination but gives no limit.
+    from OpenPinch.analysis.heat_exchanger_networks.results.assembly import (
+        build_synthesis_result,
+    )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)[:1]
+    (outcome,) = FakeSynthesisExecutor().execute(
+        pdm_tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    unconverged = outcome.model_copy(
+        update={
+            "status": "failed",
+            "error": "solver stopped before converging (minStepLength)",
+            "diagnostics": {"unconverged_termination": "minStepLength"},
+        }
+    )
+
+    with pytest.raises(WorkflowContractError) as raised:
+        build_synthesis_result(settings, pdm_tasks, [unconverged])
+
+    assert "minStepLength" in str(raised.value)
+    assert "raise the limit" not in str(raised.value)
+
+
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
     settings = workflow_settings_from_problem(_small_problem())
 

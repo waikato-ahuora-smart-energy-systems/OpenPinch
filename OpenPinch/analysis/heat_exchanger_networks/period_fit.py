@@ -79,6 +79,18 @@ def with_stream_end_utilities(
         )[..., 0]
         return segments[..., 0], outlet
 
+    def running_by_period(prefix: str) -> np.ndarray:
+        """Whether each stream on a side runs in each period: a heat capacity
+        flowrate, or (a segmented stream, which has none) segment duty."""
+        segment_duty = np.where(
+            values[f"{prefix}_segment_mask_period"],
+            values[f"{prefix}_segment_duty_period"],
+            0.0,
+        ).sum(axis=2)
+        return (values[f"f_{prefix[0]}_period"] > 0.0) | (segment_duty > 0.0)
+
+    runs = {"hot": running_by_period("cold"), "cold": running_by_period("hot")}
+
     held = {
         "hot": (contributions("cold"), terminal_contributions("hot_utility")),
         "cold": (contributions("hot"), terminal_contributions("cold_utility")),
@@ -91,13 +103,12 @@ def with_stream_end_utilities(
         if side == "hot":
             stream_in, stream_out = values["T_c_in_period"], values["T_c_out_period"]
             util_in, util_out = values["T_hu_in_period"], values["T_hu_out_period"]
-            running = values["f_c_period"][:, stream_index] > 0.0
             sign = 1.0
         else:
             stream_in, stream_out = values["T_h_in_period"], values["T_h_out_period"]
             util_in, util_out = values["T_cu_in_period"], values["T_cu_out_period"]
-            running = values["f_h_period"][:, stream_index] > 0.0
             sign = -1.0
+        running = runs[side][:, stream_index]
         if approach is None:
             stream_cont, (inlet_cont, outlet_cont) = held[side]
             needed_out = stream_cont[:, stream_index] + outlet_cont[:, utility_index]

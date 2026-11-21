@@ -190,3 +190,52 @@ def test_a_segmented_utility_is_screened_at_its_terminal_segments():
 
     assert _heaters(terminal) == [("hot_utility", "Hot Utility.HU", "Site.Cold")]
     assert _heaters(inlet_too_large) == []
+
+
+def test_a_segmented_stream_is_screened_like_a_plain_one():
+    """A segmented stream heated from 50 to 150 C has no single heat capacity
+    flowrate, but it still runs: the cheap 120 C steam cannot finish it, so
+    its end heater is the dearer 250 C steam."""
+
+    def steam(name, temperature, price):
+        return {
+            "name": name,
+            "type": "Hot",
+            "t_supply": temperature,
+            "t_target": temperature - 0.01,
+            "price": price,
+        }
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Hot",
+                    "t_supply": 200.0,
+                    "t_target": 100.0,
+                    "heat_flow": 150.0,
+                },
+                {
+                    "zone": "Site",
+                    "name": "Cold",
+                    "segments": [
+                        {"t_supply": 50.0, "t_target": 100.0, "heat_flow": 50.0},
+                        {"t_supply": 100.0, "t_target": 150.0, "heat_flow": 100.0},
+                    ],
+                },
+            ],
+            "utilities": [
+                steam("LPS", 120.0, 10.0),
+                steam("HPS", 250.0, 50.0),
+                {"name": "CU", "type": "Cold", "t_supply": 20.0, "t_target": 20.01},
+            ],
+        },
+        project_name="Site",
+    )
+
+    padded = with_stream_end_utilities(
+        problem, HeatExchangerNetwork.from_structure(recovery=[]), approach=1.0
+    )
+
+    assert _heaters(padded) == [("hot_utility", "Hot Utility.HPS", "Site.Cold")]

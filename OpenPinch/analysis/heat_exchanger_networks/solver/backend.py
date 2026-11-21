@@ -129,6 +129,12 @@ PASSING_TERMINATION_CONDITIONS = CONVERGED_TERMINATION_CONDITIONS | frozenset(
     }
 )
 
+# The passing, unconverged terminations at an iteration, evaluation or time
+# limit: only these may converge with a larger limit.
+LIMIT_TERMINATION_CONDITIONS = frozenset(
+    {"maxTimeLimit", "maxIterations", "maxEvaluations"}
+)
+
 
 @dataclass(frozen=True)
 class SolverRun:

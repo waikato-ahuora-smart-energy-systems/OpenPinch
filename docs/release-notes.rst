@@ -93,6 +93,12 @@ Heat exchanger network synthesis
   to its own terminal segment's contribution (the inlet segment at the
   utility's inlet, the outlet segment at its outlet), as the fit's approach
   equations do.
+- The same screen skipped segmented process streams: it took a stream to
+  run in a period only when it had a heat capacity flowrate, which a
+  segmented stream does not, so any utility passed, and a segmented stream
+  could be given the cheapest end utility even when it could not reach the
+  stream's target. A segmented stream now runs where its segments carry
+  duty, and is screened like any other.
 - One network could carry two topology signatures when two matches that
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case
@@ -109,7 +115,11 @@ Heat exchanger network synthesis
   with a ``UserWarning`` to raise the limit in ``HENS_SOLVER_OPTIONS_EVM``,
   and one that fails verification fails with an error that names the
   termination and gives that advice, so the ``WorkflowContractError``
-  repeats it.
+  repeats it. The advice to raise a limit is given only for an iteration,
+  evaluation or time limit (``maxIterations``, ``maxEvaluations`` or
+  ``maxTimeLimit``); a solve that stopped for another reason, such as
+  ``minStepLength``, is named without it, here and in the synthesis
+  error that lists the ``HENS_SOLVER_OPTIONS_*`` limits.
 - ``optimise_duties(objective="rating")`` rated at 1 K when no
   ``min_approach_temperature`` was given, so it failed on the default
   design's own network whenever evolution had closed an approach below 1 K.
@@ -135,7 +145,8 @@ Heat exchanger network synthesis
   infeasible when the case has no such utility. Placed levels closer than
   1 K at every temperature are one level: the case keeps the first. When a
   multiperiod placement falls back at a different temperature in each
-  period, the case keeps the utility nearest each period's fallback.
+  period, the case keeps the utility nearest each period's fallback, at
+  that period's utility temperatures.
 - A site network could not be designed when a process stream held two
   utility levels between its recovery matches (for example a hot stream
   raising steam on two placed mains), as the placed steam-main site does
