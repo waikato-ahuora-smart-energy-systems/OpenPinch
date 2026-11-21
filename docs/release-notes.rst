@@ -49,10 +49,10 @@ Heat exchanger network synthesis
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case
   at width 1 and depth 1, ranks 1 and 2 were one network (from the 1.0 and
-  1.5 multipliers). Signatures and canonical task restrictions now follow
-  each stream's order of exchangers, so such a network is listed once and
-  its seeded tasks are not repeated. Record keys of affected networks
-  change.
+  1.5 multipliers). Signatures now follow each stream's order of
+  exchangers, so such a network is listed once and its seeded tasks are not
+  repeated; the tasks keep their seed's stage order. Record keys of
+  affected networks change.
 - A fixed-structure solve (``optimise_duties``, the fit to every period or
   an overdesign rating) that Ipopt stopped at ``max_iter`` or
   ``max_wall_time`` was returned as a plain success with empty diagnostics,

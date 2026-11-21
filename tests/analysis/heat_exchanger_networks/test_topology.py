@@ -38,6 +38,25 @@ def test_canonical_topology_splits_independent_matches_in_one_stage() -> None:
     ]
 
 
+def test_canonical_topology_keeps_the_seed_stage_order_of_independent_groups() -> None:
+    """Task restrictions keep the seed's stage order, so a seeded or site task
+    solves the superstructure its seed came from; only the signature is
+    numbered by stream order."""
+    restrictions = canonical_topology_restrictions(
+        (
+            _restriction("H2", "C2", 1),
+            _restriction("H1", "C1", 2),
+        )
+    )
+
+    assert [
+        (item.source_stream, item.sink_stream, item.stage) for item in restrictions
+    ] == [
+        ("H2", "C2", 1),
+        ("H1", "C1", 2),
+    ]
+
+
 def test_canonical_topology_keeps_shared_stream_matches_together() -> None:
     restrictions = canonical_topology_restrictions(
         (
