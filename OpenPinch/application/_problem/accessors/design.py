@@ -173,7 +173,9 @@ class HeatExchangerNetworkDesignView:
         """Return the first ``n`` ranked successful outcomes.
 
         Uses the same ranking as ``network(rank=)`` and ``grid(rank=)``, so
-        ``top(n)[k - 1]`` is the network at rank ``k``.
+        ``top(n)[k - 1]`` is the outcome at rank ``k``: a
+        ``HeatExchangerNetworkSynthesisTaskOutcome``, whose ``network`` is
+        ``network(rank=k)``.
         """
         if isinstance(n, bool) or not isinstance(n, int) or n < 1:
             raise ValueError("n must be a positive integer.")
@@ -1710,8 +1712,9 @@ class _DesignAccessor:
         process-side repiping.
 
         Returns a ``RetrofitHeatPumpTargets``: each target's heat, work,
-        levels and operating cost before and after, priced at the first hot
-        and cold utility and ``COSTING_HPR_ELE_PRICE``, and the gap between
+        levels and operating cost before and after, each side priced at the
+        utilities the network's heaters (or coolers) use, weighted by their
+        first-period duties, and at ``COSTING_HPR_ELE_PRICE``; and the gap between
         them split into the network's (``network_gap``) and the heat
         pump's (``heat_pump_gap``). The problem's cached design is not
         changed.
@@ -1923,14 +1926,19 @@ class _DesignAccessor:
     ):
         """Fit a network designed on one basis to every operating period.
 
-        Each stream without a utility at its end every period can use gets
-        the cheapest one that can serve it there; the fixed-structure cost
-        fit, with the call's ``options``, ``solver`` and ``solve_tolerance``,
-        then gives every exchanger one area over all periods, with bypass
-        where a period needs less, and removes the exchangers no period uses.
-        Every exchanger keeps the case's minimum approach (its streams'
-        temperature contributions). When the fit cannot meet it, a
-        ``UserWarning`` says so and the fit is repeated at 1 K.
+        Every exchanger keeps the approach the network was designed to
+        (``_design_approach``): a pinch design network its streams'
+        temperature contributions at its own dt_cont multiplier, an evolved
+        network the evolution floor (0.1 K by default). Each stream without
+        a utility at its end every period can use gets the cheapest one that
+        can serve it there at that approach; the fixed-structure cost fit,
+        with the call's ``options``, ``solver`` and ``solve_tolerance``, then
+        gives every exchanger one area over all periods, with bypass where a
+        period needs less, and removes the exchangers no period uses. A
+        network that holds its utility levels is first fitted holding them;
+        when that fails, a ``UserWarning`` says so and the levels are
+        released. When the fit cannot keep the approach, a ``UserWarning``
+        says so and the fit is repeated at 1 K.
         """
         from ....analysis.heat_exchanger_networks.duty_optimisation import (
             DEFAULT_FEASIBILITY_APPROACH,

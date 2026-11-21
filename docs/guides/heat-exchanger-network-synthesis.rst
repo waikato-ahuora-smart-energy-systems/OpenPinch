@@ -427,7 +427,9 @@ heat let down from above plus imports, period by period. Imports enter hot
 levels and mains (a hot and a cold utility of one name) at the import price,
 within the hot utility's ``maximum_heat_flow`` when it has one; dumps leave
 cold levels and mains at the dump price. So steam a process raises on a main
-offsets steam another process uses there. The selected network's
+offsets steam another process uses there. A cold utility may have a negative
+price, a credit for the steam raised on it; a level with a credit dumps no
+more than the processes raise on it, so the site cannot buy steam to sell it. The selected network's
 ``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
 ``site_total_annual_cost``, and its ``source_metadata["site_utility_balance"]``
 holds each level's use, generation, imports, letdowns and dumps per period.
@@ -449,7 +451,7 @@ count 4 three isothermal and one sensible. The site is designed with each
 count's levels, and the cheapest design over the counts is selected (its site total annual cost, from site utility
 accounting). A count whose
 placement is infeasible, or whose design fails, is recorded and skipped.
-The result ranks each designed count's best network, tagged
+The result ranks every network of each designed count by site cost, each tagged
 ``summary_metrics["utility_level_count"]``, and
 ``result.provenance.effective_settings["HENS_SITE_LEVEL_SWEEP"]`` lists every
 count with its status (``designed``, ``infeasible``, ``failed`` or ``not

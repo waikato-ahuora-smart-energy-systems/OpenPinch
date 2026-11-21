@@ -176,6 +176,7 @@ def semantic_issues(
                 record_index=index,
                 record_label=label,
                 period_ids=period_ids,
+                credit_price=utility.type == StreamType.Cold.value,
             )
         )
         issues.extend(
@@ -987,7 +988,11 @@ def _validate_utility_record_states(
     record_index: int,
     record_label: Optional[str],
     period_ids: Sequence[str] | None = None,
+    credit_price: bool = False,
 ) -> list[ValidationIssue]:
+    """Issues with a utility's values. ``credit_price`` (a cold utility)
+    accepts a negative price: a credit for the heat it takes, such as
+    steam raised."""
     issues: list[ValidationIssue] = _validate_period_lengths(
         values,
         section=section,
@@ -1008,6 +1013,8 @@ def _validate_utility_record_states(
         )
 
     for field_name in ("dt_cont", "price", "heat_flow", "maximum_heat_flow"):
+        if credit_price and field_name == "price":
+            continue
         issues.extend(
             _validate_non_negative_states(
                 values.get(field_name),

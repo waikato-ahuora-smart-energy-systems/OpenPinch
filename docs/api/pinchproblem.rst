@@ -119,7 +119,8 @@ Interaction Matrix
    * - ``design.retrofit``
      - Find cost-effective modifications of an existing network
      - ``HeatExchangerNetworkRetrofitResult``
-     - none
+     - targeted (the direct target, when not cached); the cached design is
+       not changed
      - HEN solver
    * - ``design.retrofit_heat_pumps``
      - Heat pump targets for an existing network, ideal and as piped

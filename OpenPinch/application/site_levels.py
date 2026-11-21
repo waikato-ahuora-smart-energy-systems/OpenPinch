@@ -317,8 +317,8 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
     each tagged with ``summary_metrics["utility_level_count"]``, and selects
     the cheapest. Its provenance names the problem's root zone and records
     ``settings`` with the sweep (``HENS_SITE_LEVEL_SWEEP``, one row per
-    count). The result is committed to the problem's design results when
-    it has results.
+    count). It is not committed as the problem's design: its networks name
+    the placed case's utilities, which the problem lacks.
     """
     from ..analysis.heat_exchanger_networks.results.selection import (
         ranked_networks,

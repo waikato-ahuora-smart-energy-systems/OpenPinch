@@ -65,7 +65,7 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - `PinchWorkspace.save_bundle` and `load_bundle` read and write a bundle file [workspace.py:PinchWorkspace.save_bundle] [workspace.py:PinchWorkspace.load_bundle]; `to_bundle` and `save_bundle` first sync live case edits into stored inputs [workspace.py:PinchWorkspace.to_bundle].
 - `retain_hpr_target` writes `problem._retained_hpr_targets` [hpr_selection.py:retain_hpr_target].
 - All-period dt_min and HPR load-kink runs may use a `ThreadPoolExecutor` [heat_recovery_dt_min.py:calculate_all_period_heat_recovery_dt_min] [hpr_load_kinks.py:calculate_all_period_hpr_load_kinks].
-- `level_sweep_view` sets the selected view's result and, when the problem has results, commits it as `problem._results.design` [site_levels.py:level_sweep_view].
+- `level_sweep_view` sets the selected view's result (its ranked networks, selection and provenance); it does not commit it as `problem._results.design` [site_levels.py:level_sweep_view].
 - Utility placement mutates detached problem copies, and replaces `_period_results` and `_period_result_states` on the returned case [utility_placement.py:_finalize_placement_case].
 - `with_utilities_from` replaces private fields on a snapshot when the receiver has process components [case_derivation.py:with_utilities_from].
 - Optional imports (Streamlit dashboard, Excel export, residual and HPR analysis) are deferred to call time [problem.py:PinchProblem.show_dashboard] [problem.py:PinchProblem.export_excel].
