@@ -36,6 +36,19 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A split branch whose stream has a segment under twice the tolerance
+  was floored above the whole stream's flow, so the branch carried more
+  duty than its stream. The floor is now capped at the whole stream.
+- Stage packing no longer empties every stage after one with no allowed
+  match: packing chains only the stages that can carry duty.
+- Verification now checks a network's capital cost against the sum of its
+  exchangers' capital costs when every exchanger records one, so a network
+  costed below its exchangers fails. Capital is not recomputed from the
+  areas nor utility cost from the duties, as the network does not carry the
+  cost law or the prices; the docstring no longer claims it catches every
+  under-costed network.
+- An infeasible fixed-structure solve is named by its objective in the
+  error (as a failed one already was), not as ``network_evolution_method``.
 - ``HENS_SITE_LETDOWN_PRICE`` ($/MWh, default 0) prices heat that a total
   site network's utility balance lets down from one level to a colder one.
   Letdowns were always free: the site balance had a letdown price, but no

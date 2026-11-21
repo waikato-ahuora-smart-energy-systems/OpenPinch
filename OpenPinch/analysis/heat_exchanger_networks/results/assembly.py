@@ -259,6 +259,14 @@ def _task_label(task) -> str:
     return f"{task.method}(dt_cont x{task.dt_cont_multiplier:g})"
 
 
+def _infeasible_task_label(task) -> str:
+    """How an infeasibility names ``task``: a fixed-structure duty
+    optimisation by its objective, any other task by its method and id."""
+    if (task.settings or {}).get("fixed_structure"):
+        return _task_label(task)
+    return f"{task.method}({task.task_id or 'unknown-task'})"
+
+
 def _infeasible_outcome_summary(
     outcomes: Sequence[
         tuple[HeatExchangerNetworkSynthesisTaskOutcome, tuple[str, ...]]
@@ -268,8 +276,9 @@ def _infeasible_outcome_summary(
         return ""
     summaries = []
     for outcome, failures in outcomes[:3]:
-        task_id = outcome.task.task_id or "unknown-task"
-        summaries.append(f"{outcome.task.method}({task_id}) infeasible: {failures[0]}")
+        summaries.append(
+            f"{_infeasible_task_label(outcome.task)} infeasible: {failures[0]}"
+        )
     if len(outcomes) > len(summaries):
         summaries.append(f"{len(outcomes) - len(summaries)} more infeasible task(s)")
     return "; ".join(summaries)

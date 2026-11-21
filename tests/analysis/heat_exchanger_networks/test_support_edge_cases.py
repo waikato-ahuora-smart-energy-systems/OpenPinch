@@ -1184,3 +1184,21 @@ def test_a_failed_fixed_structure_task_is_named_by_its_objective():
         "fixed-structure duty optimisation ('rating' objective): "
         "Solver termination condition: infeasible"
     )
+
+
+def test_an_infeasible_fixed_structure_task_is_named_by_its_objective():
+    """The infeasible summary names a fixed-structure duty optimisation by
+    its objective too, not by the evolution method it is stamped with."""
+    task = _task(method="network_evolution_method").model_copy(
+        update={"settings": {"fixed_structure": True, "duty_objective": "cost"}}
+    )
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(task=task, status="success")
+
+    summary = assembly._infeasible_outcome_summary(
+        ((outcome, ("total annual cost does not match",)),)
+    )
+
+    assert summary == (
+        "fixed-structure duty optimisation ('cost' objective) infeasible: "
+        "total annual cost does not match"
+    )

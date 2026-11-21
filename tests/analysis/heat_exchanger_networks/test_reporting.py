@@ -2601,3 +2601,32 @@ def test_a_rated_segmented_exchanger_is_judged_with_its_allowance():
     assert not _check_segment_contribution_areas(
         [exchanger], "0", allowances={"E1": 1.1}
     )
+
+
+def test_network_feasibility_recomputes_capital_from_exchanger_costs() -> None:
+    """When every exchanger records its capital cost, the network's capital
+    must be their sum: halving capital and TAC together is under-costing."""
+    network = _feasible_balance_network("costed")
+    costed = network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger.model_copy(
+                    update={
+                        "capital_cost": 60.0
+                        if exchanger.kind.name == "RECOVERY"
+                        else 40.0
+                    }
+                )
+                for exchanger in network.exchangers
+            )
+        }
+    )
+    halved = costed.model_copy(
+        update={"capital_cost": 50.0, "total_annual_cost": 100.0}
+    )
+
+    assert verify_network_feasibility(costed) == ()
+    assert any(
+        "capital cost 50 does not match the exchangers' capital costs 100" in reason
+        for reason in verify_network_feasibility(halved)
+    )

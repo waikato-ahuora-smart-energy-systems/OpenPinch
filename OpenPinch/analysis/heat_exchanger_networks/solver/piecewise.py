@@ -213,11 +213,15 @@ def branch_profile(
     if fraction >= 1.0:
         return profile
     # A branch carrying almost nothing keeps every segment's duty and heat
-    # capacity flowrate above the profile's validity floor.
+    # capacity flowrate above the profile's validity floor. That floor
+    # exceeds 1 when a segment is under 2 * tol; a branch is then the whole
+    # stream, never more.
     smallest = float(
         min(np.min(profile.duties), np.min(profile.heat_capacity_flowrates))
     )
     fraction = max(fraction, 1e-9, 2.0 * tol / smallest)
+    if fraction >= 1.0:
+        return profile
     return PiecewiseThermalProfile(
         identities=profile.identities,
         temperatures_in=profile.temperatures_in,
