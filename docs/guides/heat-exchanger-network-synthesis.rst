@@ -435,6 +435,11 @@ buy steam to sell it. The selected network's ``summary_metrics`` hold ``site_cap
 holds each level's use, generation, imports, letdowns and dumps per period.
 Heat let down from a level to a colder one costs ``HENS_SITE_LETDOWN_PRICE``
 ($/MWh, annualised as utility prices are; default 0, so letdowns are free).
+Network evolution of a site network holds each process's utility levels at
+the duties its pinch design targeted. ``HENS_SITE_LEVEL_HOLDS: "at_least"``
+holds each level at or above its target instead, so a process may take more
+of a level, or raise more steam on one, when the site utility balance makes
+that cheaper; the default, ``"fixed"``, holds them at their targets.
 To design one process zone of a site alone, pass its name:
 ``design.heat_exchanger_network(zone="Food Plant[S]")``.
 

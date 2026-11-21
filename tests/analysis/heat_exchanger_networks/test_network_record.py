@@ -856,3 +856,38 @@ def test_site_networks_rank_by_site_total_annual_cost():
     ] == [80.0, None, 150.0]
     ranked = sorted((plain, buys_steam, raises_steam), key=outcome_ranking_key)
     assert [outcome.task.task_id for outcome in ranked] == ["raises", "plain", "buys"]
+
+
+def _lps_heated(duty: float, metadata) -> HeatExchangerNetwork:
+    return HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="HU1",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="Hot Utility.LPS",
+                sink_stream="C1",
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=duty),
+                ),
+                area=1.0,
+            ),
+        ),
+        run_id="run",
+        source_metadata=metadata,
+    )
+
+
+def test_a_network_held_at_least_at_its_levels_holds_them_above_target():
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+        holds_utility_levels,
+    )
+
+    targets = {"utility_level_targets": {"Hot Utility.LPS": [40.0]}}
+    at_least = targets | {"utility_level_holds": "at_least"}
+
+    assert holds_utility_levels(_lps_heated(50.0, at_least))
+    assert holds_utility_levels(_lps_heated(40.0, at_least))
+    assert not holds_utility_levels(_lps_heated(30.0, at_least))
+    assert not holds_utility_levels(_lps_heated(50.0, targets))

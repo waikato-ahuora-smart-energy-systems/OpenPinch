@@ -1370,3 +1370,67 @@ def _neither_couenne_nor_scip(monkeypatch) -> None:
         real(name)
 
     monkeypatch.setattr(backend, "require_solver_backend", require)
+
+
+def test_a_skipped_evolution_warns_once_per_task() -> None:
+    # The seed of an evolution task failed, so the task evolved nothing: the
+    # user sees it as a warning, not only in the log of a worker.
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
+    outcomes = FakeSynthesisExecutor().execute(
+        pdm_tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    assert len(outcomes) == 2
+    skipped = [
+        outcome.model_copy(
+            update={
+                "status": "failed",
+                "network": None,
+                "error": "not solved",
+                "diagnostics": {"evolution_skipped": "seed model not solved"},
+            }
+        )
+        for outcome in outcomes
+    ]
+
+    with pytest.warns(UserWarning, match="evolution") as caught:
+        build_synthesis_result(settings, pdm_tasks, [*outcomes, *skipped])
+
+    messages = [
+        str(item.message) for item in caught if "evolution" in str(item.message)
+    ]
+    assert len(messages) == 2
+    assert all("seed model not solved" in message for message in messages)
+
+
+def test_an_unsolved_evolution_seed_is_kept_as_a_diagnostic() -> None:
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        _unsolved_outcome,
+    )
+
+    task = build_pinch_design_method_tasks(
+        workflow_settings_from_problem(_small_problem())
+    )[0]
+    solved = SimpleNamespace(mSuccess=0, evolution_skipped=True)
+
+    outcome = _unsolved_outcome(task, SimpleNamespace(), solved)
+
+    assert outcome.status == "failed"
+    assert "evolution_skipped" in outcome.diagnostics
+    assert _unsolved_outcome(task, SimpleNamespace(), None).diagnostics == {}
+
+
+def test_evolution_of_an_unsolved_model_is_marked_skipped() -> None:
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.evolution import (
+        get_net_benefit_evolution,
+    )
+
+    owner = SimpleNamespace(mSuccess=0)
+
+    assert get_net_benefit_evolution(owner, print_output=False) is owner
+    assert owner.evolution_skipped is True

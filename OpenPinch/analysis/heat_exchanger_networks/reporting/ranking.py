@@ -99,6 +99,8 @@ def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
     The targets are ``source_metadata["utility_level_targets"]`` (utility
     name to per-period kW), recorded by a design that holds the levels and
     by the tasks built on it. A network without them holds no level to miss.
+    A network held at least at its levels (``source_metadata
+    ["utility_level_holds"] == "at_least"``) meets a target at or above it.
     """
     targets = (network.source_metadata or {}).get("utility_level_targets")
     if not targets:
@@ -116,10 +118,13 @@ def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
             by_period[state.period_idx] = by_period.get(state.period_idx, 0.0) + (
                 float(state.duty) if state.active else 0.0
             )
+    at_least = network.source_metadata.get("utility_level_holds") == "at_least"
     for name, by_period in targets.items():
         for period, target in enumerate(by_period):
-            duty = duties.get(name, {}).get(period, 0.0)
-            if abs(duty - float(target)) > LEVEL_TOLERANCE * max(1.0, abs(target)):
+            excess = duties.get(name, {}).get(period, 0.0) - float(target)
+            if at_least:
+                excess = min(excess, 0.0)
+            if abs(excess) > LEVEL_TOLERANCE * max(1.0, abs(target)):
                 return False
     return True
 

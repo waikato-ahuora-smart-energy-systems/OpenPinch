@@ -104,6 +104,9 @@ class InternalHeatExchangerNetworkProblem:
     # process's levels and matches streams only within a process
     # (``_stagewise/level_targets.py:site_level_targets``).
     site_processes: Mapping[str, Mapping[str, Sequence[float]]] | None = None
+    # How a site design holds each process's levels: "fixed" at its targets,
+    # "at_least" at or above them (``HENS_SITE_LEVEL_HOLDS``).
+    site_level_holds: str = "fixed"
     # A site task's utility levels (``../site/levels.py``): its stage-wise
     # model carries the site utility balance, so the site pays only for
     # its net utility use (``_stagewise/site_utilities.py``).
@@ -143,7 +146,9 @@ class InternalHeatExchangerNetworkProblem:
             self.args["staged_utilities"] = True
         if self.site_processes is not None and self.framework != "PDM":
             targets, groups = site_level_targets(
-                self.solver_arrays, self.site_processes
+                self.solver_arrays,
+                self.site_processes,
+                at_least=self.site_level_holds == "at_least",
             )
             self.args["level_targets"] = targets
             self.args["stream_groups"] = groups
@@ -331,11 +336,11 @@ class InternalHeatExchangerNetworkProblem:
             network = with_site_cost(network, balance)
         if self.utility_level_targets is None:
             return network
+        held = {"utility_level_targets": self.utility_level_targets}
+        if self.site_processes is not None and self.site_level_holds == "at_least":
+            held["utility_level_holds"] = "at_least"
         return network.model_copy(
-            update={
-                "source_metadata": network.source_metadata
-                | {"utility_level_targets": self.utility_level_targets}
-            }
+            update={"source_metadata": network.source_metadata | held}
         )
 
     def extract_result(

@@ -56,6 +56,7 @@ HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period", "median"})
 # Which utility levels a total site network design uses: the case's own, or
 # placed by utility placement over a sweep of level counts.
 HENS_SITE_LEVELS_VALUES = frozenset({"given", "placed"})
+HENS_SITE_LEVEL_HOLDS_VALUES = frozenset({"fixed", "at_least"})
 # Which median-basis clusters a design is synthesised from.
 HENS_BASIS_CANDIDATES_VALUES = frozenset({"dominant", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
@@ -461,6 +462,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_SITE_LEVEL_STEP_MIN": _spec(float, 1.0, "hens", "site_level_step_min", numeric_min=0.0, validator=_positive_float),
     "HENS_SITE_TIME_LIMIT": _spec(float | None, None, "hens", "site_time_limit", validator=_positive_float_or_none),
     "HENS_SITE_LETDOWN_PRICE": _spec(float, 0.0, "hens", "site_letdown_price", numeric_min=0.0),
+    "HENS_SITE_LEVEL_HOLDS": _spec(str, "fixed", "hens", "site_level_holds", validator=partial(_string_choice, choices=HENS_SITE_LEVEL_HOLDS_VALUES)),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),

@@ -101,6 +101,8 @@ def get_net_benefit_evolution(
 
     if owner.mSuccess != 1:
         logger.warning("Initial model was not successful; skipping evolution.")
+        # Results assembly warns the user, once per task, from this flag.
+        owner.evolution_skipped = True
         return owner
 
     n_ad_branches = max(1, int(n_ad_branches))

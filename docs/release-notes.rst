@@ -526,6 +526,20 @@ Heat exchanger network synthesis
   utility target is zero but whose streams still exchange heat there, as in
   a threshold problem. Before, that side's matches were left out of the
   network, which then failed verification.
+- Network evolution ranks the matches it could add by their dQ/dA
+  averaged over the periods by the period weights, as it already weighted a
+  match's recovered value. Before, a multiperiod evolution read period 0's
+  approaches and temperatures only, so a match that helps mostly in a later
+  period ranked low. Single-period runs are unchanged.
+- A network evolution task whose initial model fails now raises a
+  ``UserWarning`` naming the task, once per task. Before, the evolution was
+  skipped with only a log line, often in a worker process.
+- ``HENS_SITE_LEVEL_HOLDS`` sets how network evolution of a total site
+  network design holds each process's utility levels: ``"fixed"`` (the
+  default, as before) at the duties its pinch design targeted, or
+  ``"at_least"`` at or above them, so load may shift between processes
+  under the site utility balance. A network held at least ranks as holding
+  its levels when each is at or above its target.
 
 Testing and CI
 ~~~~~~~~~~~~~~

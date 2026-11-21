@@ -501,6 +501,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "utility price is given; 0 lets heat down for free."
         ),
     ),
+    "HENS_SITE_LEVEL_HOLDS": FieldText(
+        "Total site level holds", None,
+        (
+            "How network evolution of a total site network design holds each "
+            "process's utility levels: fixed holds each at its targeted duty; "
+            "at_least holds each at or above it, so a process may take more "
+            "of a level when the site utility balance makes that cheaper."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (

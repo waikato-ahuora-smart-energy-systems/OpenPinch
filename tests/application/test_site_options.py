@@ -114,3 +114,14 @@ def test_a_given_levels_design_without_site_options_does_not_warn(
     _site().design.total_site_heat_exchanger_network(levels="given")
 
     assert not [w for w in recwarn if issubclass(w.category, UserWarning)]
+
+
+def test_the_site_level_holds_are_a_configuration_key():
+    spec = USER_CONFIG_FIELD_SPECS["HENS_SITE_LEVEL_HOLDS"]
+
+    assert spec.default == "fixed"
+    assert spec.config_path == ("hens", "site_level_holds")
+    with pytest.raises(ValueError, match="HENS_SITE_LEVEL_HOLDS"):
+        _site().design.total_site_heat_exchanger_network(
+            options={"HENS_SITE_LEVEL_HOLDS": "loose"}
+        )

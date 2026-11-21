@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -49,6 +50,7 @@ def build_synthesis_result(
     """
     from .record import run_record
 
+    _warn_skipped_evolutions(outcomes)
     outcomes = demote_infeasible_outcomes(outcomes)
     ranked = run_record(outcomes).outcomes()
     if not ranked:
@@ -130,6 +132,23 @@ def build_synthesis_result(
         ranked_networks=ranked,
         manifest=manifest,
     )
+
+
+def _warn_skipped_evolutions(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    """Warn once for each task whose evolution its failed seed skipped."""
+
+    for outcome in outcomes:
+        reason = outcome.diagnostics.get("evolution_skipped")
+        if reason is None:
+            continue
+        warnings.warn(
+            f"{_task_label(outcome.task)}: its initial model was not solved "
+            f"({reason}), so its network evolution was skipped.",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 def _executed_method_sequence(
