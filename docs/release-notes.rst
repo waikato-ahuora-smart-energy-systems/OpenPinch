@@ -36,6 +36,16 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``HENS_SITE_LETDOWN_PRICE`` ($/MWh, default 0) prices heat that a total
+  site network's utility balance lets down from one level to a colder one.
+  Letdowns were always free: the site balance had a letdown price, but no
+  setting reached it. The default keeps today's results.
+- ``total_site_heat_exchanger_network(levels="given")`` now warns when
+  ``level_counts``, ``placement`` or ``HENS_SITE_TIME_LIMIT`` is set, since
+  a given-levels design ignores them. ``HENS_SITE_TIME_LIMIT`` stays a
+  budget for the placed sweep and moves only: a given-levels design is one
+  design with no point to stop between, and its solves are bounded by the
+  synthesis solver time limits.
 - Level moves on a placed site design no longer design the same level
   positions twice. Before, levels were cached only with the seed network a
   move was designed from, so after each adopted move the next round

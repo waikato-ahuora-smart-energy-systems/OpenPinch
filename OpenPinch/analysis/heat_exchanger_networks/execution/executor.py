@@ -27,6 +27,7 @@ from ..results.record import admit, recording_active
 from ..site.levels import site_utility_system, utility_capacities
 from ..solver.arrays import (
     PreparedSolverArrays,
+    annual_cost_scales,
     nominal_approach_temperature,
     problem_to_solver_arrays,
 )
@@ -469,7 +470,9 @@ class LocalSynthesisExecutor:
                 None
                 if site_processes is None
                 else site_utility_system(
-                    arrays, capacities=utility_capacities(problem.master_zone)
+                    arrays,
+                    capacities=utility_capacities(problem.master_zone),
+                    letdown_price=_site_letdown_price(problem.master_zone.config),
                 )
             ),
         )
@@ -959,6 +962,13 @@ def _stage_packed_stagewise_factory():
     from ..models.packed_stagewise import StagePackedStageWiseModel
 
     return StagePackedStageWiseModel
+
+
+def _site_letdown_price(config) -> float:
+    """``HENS_SITE_LETDOWN_PRICE`` ($/MWh) as an annual price ($/kW/y), as
+    the solver arrays price utilities."""
+    price_scale, _capital_scale = annual_cost_scales(config.costing)
+    return float(config.hens.site_letdown_price) * price_scale
 
 
 def _solve_tolerance(problem) -> float:

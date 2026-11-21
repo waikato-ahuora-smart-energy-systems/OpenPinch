@@ -622,7 +622,11 @@ class _DesignAccessor:
         ``HENS_SITE_LEVEL_MOVES``. ``HENS_SITE_TIME_LIMIT`` (seconds, default
         none) bounds the sweep and the moves together: once it runs out no
         further count or move is started and the cheapest design so far is
-        returned; the first count is always designed.
+        returned; the first count is always designed. A ``"given"`` design
+        is one design with nothing to stop between, so it ignores
+        ``level_counts``, ``placement`` and ``HENS_SITE_TIME_LIMIT`` and
+        warns when any is set. ``HENS_SITE_LETDOWN_PRICE`` ($/MWh, default
+        0) prices heat the site balance lets down to a colder level.
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected
@@ -637,6 +641,24 @@ class _DesignAccessor:
         hens = self._effective_hens(options)
         levels = hens.site_levels if levels is None else levels
         if levels == "given":
+            ignored = [
+                name
+                for name, value in (
+                    ("level_counts", level_counts),
+                    ("placement", placement),
+                    ("HENS_SITE_TIME_LIMIT", hens.site_time_limit),
+                )
+                if value is not None
+            ]
+            if ignored:
+                warnings.warn(
+                    'levels="given" designs with the case\'s utilities in one '
+                    "design and ignores "
+                    + ", ".join(ignored)
+                    + '; use levels="placed".',
+                    UserWarning,
+                    stacklevel=2,
+                )
             return self._site_design(width=width, depth=depth, options=options)
         if levels != "placed":
             raise ValueError('levels must be "given" or "placed".')

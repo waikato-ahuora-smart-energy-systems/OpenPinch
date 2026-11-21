@@ -493,6 +493,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "least one level count is always designed. None sets no limit."
         ),
     ),
+    "HENS_SITE_LETDOWN_PRICE": FieldText(
+        "Total site letdown price", "$/MWh",
+        (
+            "Price of heat the site utility balance of a total site network "
+            "design lets down from a utility level to a colder one, as a "
+            "utility price is given; 0 lets heat down for free."
+        ),
+    ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
         "Pinch design minimum-unit networks", None,
         (

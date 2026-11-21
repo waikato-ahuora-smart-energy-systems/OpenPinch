@@ -431,6 +431,8 @@ offsets steam another process uses there. The selected network's
 ``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
 ``site_total_annual_cost``, and its ``source_metadata["site_utility_balance"]``
 holds each level's use, generation, imports, letdowns and dumps per period.
+Heat let down from a level to a colder one costs ``HENS_SITE_LETDOWN_PRICE``
+($/MWh, annualised as utility prices are; default 0, so letdowns are free).
 To design one process zone of a site alone, pass its name:
 ``design.heat_exchanger_network(zone="Food Plant[S]")``.
 
@@ -476,6 +478,13 @@ skipped as already designed, is listed in
 ``result.provenance.effective_settings["HENS_SITE_LEVEL_MOVES"]``. The level
 count stays fixed while levels move. Each move runs a site evolution, so the
 moves can take several times as long as the sweep's design of one count.
+``HENS_SITE_TIME_LIMIT`` (seconds, default none) bounds the sweep and the
+moves together: once it runs out, no further count or move is started and
+the cheapest design so far is returned; a design already running finishes,
+and the first count is always designed. A ``levels="given"`` design is a
+single design with no point to stop between, so the limit does not apply to
+it; it warns when the limit, ``level_counts`` or ``placement`` is set, as it
+ignores all three.
 
 .. code-block:: python
 
