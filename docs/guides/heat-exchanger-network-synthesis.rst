@@ -237,8 +237,10 @@ period needs less. ``"optimise"`` chooses the margin, between 0 and
 15 rating solves. ``selected_network.overdesign`` reports the margin
 (``percentage``), each period's recovery and utility before and after
 (``periods``), the cost with and without the margin (``cost``,
-``cost_without_margin``), and every margin tried (``search``), for plotting
-cost against margin. ``design.optimise_duties(network, objective="rating")``
+``cost_without_margin``), every margin rated (``search``), for plotting
+cost against margin, and every margin whose rating failed
+(``failed_margins``). If no positive margin can be rated, ``"optimise"``
+keeps 0 % and warns. ``design.optimise_duties(network, objective="rating")``
 rates any network with installed areas the same way. A rating calibrates
 each unit's capacity with Chen's LMTD at its design point, so off that point
 it can credit a few per cent more duty than exact sizing allows; the rated

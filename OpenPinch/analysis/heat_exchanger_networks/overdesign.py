@@ -6,11 +6,16 @@ those fixed areas, then re-optimises every period's duties for the least
 period-weighted utility cost, with bypass where a period needs less area.
 ``"optimise"`` picks OD in [0, ``maximum``] for the least total annual cost
 (annualised capital on the installed areas plus utility cost) with a bounded
-one-dimensional search over rating solves.
+one-dimensional search over rating solves. A positive margin whose rating
+fails is left out of the search; after a failed maximum, bisection finds
+the largest margin that rates, which then bounds the search. When none
+could be rated the margin is 0 % with a ``UserWarning``.
 """
 
 from __future__ import annotations
 
+import math
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -18,6 +23,10 @@ from scipy.optimize import minimize_scalar
 
 from ...domain.enums import HeatExchangerKind
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
+from .solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+)
 
 OPTIMISE = "optimise"
 # The bounded search stops within this many percentage points of the optimum,
@@ -71,11 +80,14 @@ def apply_overdesign(
     returns a result whose ``selected_network`` is the rated network. Returns
     ``(result, metrics)`` for the chosen margin; ``metrics`` holds the mode,
     the percentage, each period's recovery and utility before and after, the
-    total annual cost with and without the margin, and every evaluated
-    ``(percentage, cost)`` point.
+    total annual cost with and without the margin, every evaluated
+    ``(percentage, cost)`` point, and every margin of an ``"optimise"``
+    search whose rating failed (``ValueError`` or ``RuntimeError``; the
+    rating at 0 % must succeed).
     """
 
     evaluated: dict[float, Any] = {}
+    failed: list[float] = []
 
     def rated(percentage: float):
         percentage = float(percentage)
@@ -88,16 +100,50 @@ def apply_overdesign(
     def cost(percentage: float) -> float:
         return float(rated(percentage).selected_network.total_annual_cost)
 
+    def searched(percentage: float) -> float:
+        """The cost at a positive margin, infinite where its rating fails."""
+        percentage = float(percentage)
+        if percentage in failed:
+            return math.inf
+        try:
+            return cost(percentage)
+        except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+            raise
+        except (ValueError, RuntimeError):
+            failed.append(percentage)
+            return math.inf
+
     if margin == OPTIMISE:
-        for end in (0.0, float(maximum)):
-            cost(end)
+        cost(0.0)
         if maximum > 0.0:
-            minimize_scalar(
-                cost,
-                bounds=(0.0, float(maximum)),
-                method="bounded",
-                options={"xatol": _SEARCH_TOLERANCE, "maxiter": _SEARCH_SOLVES},
-            )
+            # After a failed maximum, bisection finds the largest margin that
+            # rates (0 % always does), which bounds the search, so small
+            # feasible margins are not missed.
+            upper, failed_above = 0.0, float(maximum)
+            if not math.isinf(searched(failed_above)):
+                upper = failed_above
+            else:
+                while failed_above - upper > _SEARCH_TOLERANCE:
+                    middle = 0.5 * (upper + failed_above)
+                    if math.isinf(searched(middle)):
+                        failed_above = middle
+                    else:
+                        upper = middle
+            if upper > 0.0:
+                minimize_scalar(
+                    searched,
+                    bounds=(0.0, upper),
+                    method="bounded",
+                    options={"xatol": _SEARCH_TOLERANCE, "maxiter": _SEARCH_SOLVES},
+                )
+            if failed and all(point == 0.0 for point in evaluated):
+                warnings.warn(
+                    "no positive overdesign margin could be rated (every rating "
+                    f"from {min(failed):g} to {max(failed):g} % failed); the "
+                    "network keeps 0 %, which is not shown to be optimal.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         percentage = min(evaluated, key=lambda point: (cost(point), point))
     else:
         percentage = float(margin)
@@ -120,6 +166,7 @@ def apply_overdesign(
         "cost_without_margin": cost(0.0),
         "cost": cost(percentage),
         "search": [[point, cost(point)] for point in sorted(evaluated)],
+        "failed_margins": sorted(set(failed)),
     }
     return result, metrics
 

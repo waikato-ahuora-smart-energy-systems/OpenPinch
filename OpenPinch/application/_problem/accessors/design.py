@@ -901,8 +901,9 @@ class _DesignAccessor:
         """``network`` in its final form: fitted to every period, then rated.
 
         The one fit and rating path: every network a fitted or overdesigned
-        design admits goes through it. Returns the final view and the fit's
-        view (``None`` without a fit).
+        design admits goes through it. The rating holds the approach the fit
+        held: the design's, or the fallback's after a fit that warned.
+        Returns the final view and the fit's view (``None`` without a fit).
         """
         view = fitted = None
         # Read before the fit: its result is labelled a duty optimisation.
@@ -915,6 +916,12 @@ class _DesignAccessor:
                 solve_tolerance=solve_tolerance,
             )
             network = view.selected_network
+            # A fit at a floor (the design's, or the fallback's when the
+            # design approach could not be kept) sized the areas for it: the
+            # rating holds the same floor.
+            floor = (network.summary_metrics or {}).get("approach_temperature")
+            if floor is not None:
+                approach = {"min_approach_temperature": float(floor)}
         if margin is not None:
             view = self._overdesigned(
                 network,
@@ -1903,21 +1910,13 @@ class _DesignAccessor:
             "solver": solver,
             "solve_tolerance": solve_tolerance,
         }
-        from ....analysis.heat_exchanger_networks.solver.arrays import (
-            nominal_approach_temperature,
-        )
-
         design = self._design_approach(network, self._effective_hens(options))
         # The padding keeps the approach the fit solves at: the network's
-        # own floor, or twice THERMAL_DT_CONT at its multiplier for the
-        # case's contributions.
-        approach = design.get(
-            "min_approach_temperature",
-            nominal_approach_temperature(
-                self._problem._require_prepared_root_zone().config,
-                float(design.get("dt_cont_multiplier", 1.0)),
-            ),
-        )
+        # own floor, or each pair's contributions at its multiplier.
+        approach = {
+            "approach": design.get("min_approach_temperature"),
+            "dt_cont_multiplier": float(design.get("dt_cont_multiplier", 1.0)),
+        }
         levels = self._period_level_targets(network)
         held = frozenset(name for name, duties in (levels or {}).items() if any(duties))
         attempts = [
@@ -1931,7 +1930,7 @@ class _DesignAccessor:
         for pad, placed, extra, kept in attempts:
             try:
                 start = with_stream_end_utilities(
-                    self._problem, network, approach=pad, levels=placed
+                    self._problem, network, **pad, levels=placed
                 )
                 view = self._optimise_duties(start, **extra, **arguments)
             except (MissingSynthesisDependencyError, MissingSynthesisSolverError):

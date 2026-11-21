@@ -36,6 +36,24 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A fit to every period padded stream-end heaters and coolers at twice
+  ``THERMAL_DT_CONT`` times the multiplier (10 K by default), while the fit
+  holds each pair's own dt_cont contributions. On the packaged
+  ``dairy_chilling_multiperiod`` case that dropped the Glycol cooler on
+  Ice-water return (a 3.5 K pair with 7 K end gaps), so every network of
+  the default design warned and was fitted at 1 K. The padding now uses
+  each pair's contributions times the multiplier, and the default design
+  keeps its approach.
+- Overdesign rated a network the fit to every period had fitted at the
+  1 K fallback at the design approach, which its 1 K areas cannot meet, so
+  ``overdesign_percentage=10`` raised ``WorkflowContractError``. A fitted
+  network is now rated at the approach its fit held.
+- ``overdesign_percentage="optimise"`` no longer drops a network when the
+  rating at a positive margin fails: the search leaves that margin out,
+  records it in the new ``NetworkOverdesign.failed_margins``, and after a
+  failed maximum searches up to the largest margin that rates. When no positive margin could be
+  rated, the result keeps 0 % and a ``UserWarning`` says so, rather than
+  reporting 0 % as the optimum.
 - **Breaking:** an overdesigned network carries its margin in a typed
   ``overdesign`` field (``NetworkOverdesign``), no longer in
   ``summary_metrics["overdesign"]``. Read ``selected_network.overdesign

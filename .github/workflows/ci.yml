@@ -2,6 +2,8 @@
 #
 #   pull_request -> develop : standard profile (solver tests without the
 #                             packaged HEN notebook runs)
+#   pull_request -> claude/** : standard profile (a stacked pull request,
+#                             based on the branch of the one below it)
 #   pull_request -> main    : full profile (+ solver notebook runs, + other
 #                             Python and dependency-floor lanes, + performance,
 #                             + version-bump check)
@@ -13,7 +15,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [develop, main, "claude/**"]
   push:
     branches: [develop]
   workflow_dispatch:

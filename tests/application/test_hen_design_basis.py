@@ -558,7 +558,7 @@ def test_the_fit_keeps_the_approach_the_network_was_designed_to(
     """A pinch design network keeps its contributions at its own dt_cont
     multiplier (7.5 K at 0.75x), not the reference 10 K; an evolved network
     keeps the 0.1 K floor it was designed to. The padding uses the same
-    approach."""
+    approach: the floor, or each pair's contributions at the multiplier."""
     from OpenPinch.analysis.heat_exchanger_networks import period_fit
     from OpenPinch.application._problem.accessors.design import _DesignAccessor
     from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -569,8 +569,8 @@ def test_the_fit_keeps_the_approach_the_network_was_designed_to(
         seen.append(kwargs)
         return "fitted"
 
-    def pad(problem, network, *, approach, levels=frozenset()):
-        padded.append(approach)
+    def pad(problem, network, *, approach, dt_cont_multiplier, levels=frozenset()):
+        padded.append((approach, dt_cont_multiplier))
         return network
 
     monkeypatch.setattr(_DesignAccessor, "_optimise_duties", fit)
@@ -585,10 +585,12 @@ def test_the_fit_keeps_the_approach_the_network_was_designed_to(
 
     for name, value in expected.items():
         assert seen[0][name] == pytest.approx(value)
-    pad = expected.get(
-        "min_approach_temperature", 10.0 * expected.get("dt_cont_multiplier", 1.0)
-    )
-    assert padded == [pytest.approx(pad)]
+    assert padded == [
+        (
+            expected.get("min_approach_temperature"),
+            pytest.approx(expected.get("dt_cont_multiplier", 1.0)),
+        )
+    ]
 
 
 def test_networks_that_differ_in_design_approach_or_levels_are_fitted_apart():

@@ -92,3 +92,33 @@ def test_an_end_utility_one_period_cannot_use_is_replaced():
     heaters = [p for p in _placements(padded) if p[0] == "hot_utility"]
     assert ("hot_utility", "Hot Utility.LPS", CIP) not in heaters
     assert ("hot_utility", "Hot Utility.HPS", CIP) in heaters
+
+
+def _dairy_chilling() -> PinchProblem:
+    return PinchProblem("dairy_chilling_multiperiod.json")
+
+
+def _ice_water_coolers(network):
+    return [
+        exchanger.sink_stream
+        for exchanger in network.exchangers
+        if exchanger.source_stream == "Dairy.Ice-water return"
+    ]
+
+
+def test_without_an_approach_each_pair_is_padded_at_its_contributions():
+    """Ice-water return (8 to 2 C, dt_cont 2.5) and Glycol (-5 to 0 C, dt_cont
+    1) need 3.5 K at multiplier 1, as the fit holds, with end gaps of 8 and
+    7 K: the cooler stays, where twice THERMAL_DT_CONT (10 K) dropped it. At
+    multiplier 3 the pair needs 10.5 K and the cooler goes."""
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[], coolers=[("Dairy.Ice-water return", "Cold Utility.Glycol")]
+    )
+
+    kept = with_stream_end_utilities(_dairy_chilling(), network, dt_cont_multiplier=1.0)
+    dropped = with_stream_end_utilities(
+        _dairy_chilling(), network, dt_cont_multiplier=3.0
+    )
+
+    assert _ice_water_coolers(kept) == ["Cold Utility.Glycol"]
+    assert "Cold Utility.Glycol" not in _ice_water_coolers(dropped)

@@ -278,6 +278,66 @@ def test_a_fitted_network_is_rated_at_its_designs_approach(monkeypatch):
     assert seen["approach"] == {"problem_approach": True, "dt_cont_multiplier": 0.75}
 
 
+def test_a_network_fitted_at_the_fallback_is_rated_at_the_fallback(monkeypatch):
+    """A fit that could not keep the design approach fits at 1 K; its areas
+    are sized for 1 K, so the rating holds 1 K too, not the design approach
+    those areas cannot meet."""
+    from types import SimpleNamespace
+
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+
+    designed = HeatExchangerNetwork(
+        exchangers=(), run_id="designed", method="PDM", summary_metrics={}
+    )
+    fitted = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="fitted",
+        method="network_evolution_method",
+        summary_metrics={"approach_temperature": 1.0},
+    )
+    seen = {}
+    monkeypatch.setattr(
+        _DesignAccessor,
+        "_fit_to_all_periods",
+        lambda self, network, **kwargs: SimpleNamespace(selected_network=fitted),
+    )
+
+    def overdesigned(self, network, margin, **kwargs):
+        seen.update(approach=kwargs.get("approach"))
+        return "rated"
+
+    monkeypatch.setattr(_DesignAccessor, "_overdesigned", overdesigned)
+    problem = _two_period_problem()
+
+    problem.design._finalise_network(
+        designed,
+        fit=True,
+        margin=10.0,
+        hens=problem.design._effective_hens(None),
+        options=None,
+        solver=None,
+        solve_tolerance=None,
+    )
+
+    assert seen["approach"] == {"min_approach_temperature": 1.0}
+
+
+def test_a_failed_margin_is_recorded_on_the_network():
+    from OpenPinch.domain.heat_exchanger_network import NetworkOverdesign
+
+    metrics = NetworkOverdesign(
+        mode="optimised",
+        percentage=0.0,
+        periods={},
+        cost_without_margin=1.0,
+        cost=1.0,
+        search=((0.0, 1.0),),
+        failed_margins=(50.0,),
+    )
+
+    assert metrics.failed_margins == (50.0,)
+
+
 def test_a_scaled_pinch_design_keeps_each_streams_contribution():
     """At a multiplier other than 1 a pinch design network keeps each
     stream's own contribution scaled by it, as synthesis does, not one
