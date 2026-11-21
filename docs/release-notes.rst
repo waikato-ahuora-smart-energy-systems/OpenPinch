@@ -93,6 +93,12 @@ Heat exchanger network synthesis
   to its own terminal segment's contribution (the inlet segment at the
   utility's inlet, the outlet segment at its outlet), as the fit's approach
   equations do.
+- The same screen skipped segmented process streams: it took a stream to
+  run in a period only when it had a heat capacity flowrate, which a
+  segmented stream does not, so any utility passed, and a segmented stream
+  could be given the cheapest end utility even when it could not reach the
+  stream's target. A segmented stream now runs where its segments carry
+  duty, and is screened like any other.
 - One network could carry two topology signatures when two matches that
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case
