@@ -210,6 +210,7 @@ class HensConfig:
     site_time_limit: float | None
     site_letdown_price: float
     site_level_holds: str
+    retrofit_loops: bool
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]

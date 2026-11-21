@@ -1494,6 +1494,7 @@ class _DesignAccessor:
         repiping_cost: float = 0.0,
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
+        heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1523,7 +1524,18 @@ class _DesignAccessor:
         streams span several process zones (a site's network given as this
         mapping), new matches and relocations join only streams of one
         process, and a ``UserWarning`` says the site utility balance is not
-        modelled: utilities are priced unit by unit.
+        modelled: utilities are priced unit by unit. With
+        ``HENS_RETROFIT_LOOPS`` (in ``options``; on by default) such a step
+        may instead link two processes through a new heat recovery loop, the
+        only link between processes: an intermediate fluid at one temperature,
+        midway between a hot stream's target in one process and a cold
+        stream's in another (at least twice ``min_approach_temperature`` and
+        1 K apart), heated by a loop cooler at the end of the hot stream and
+        giving the same heat, in every period and with no loss, to a loop
+        heater at the end of the cold stream. The loop's two exchangers cost
+        two ``new_unit_cost`` and their area, plus ``heat_recovery_loop_cost``
+        ($ per loop, its pump and piping) and ``repiping_cost`` for each of
+        the two streams; the loop's heat is not counted as utility.
 
         Added area costs ``COSTING_HX_AREA_COEFF * area **
         COSTING_HX_AREA_EXP``; a new exchanger adds ``new_unit_cost`` (default
@@ -1679,6 +1691,10 @@ class _DesignAccessor:
                     repiping_cost=float(repiping_cost),
                     heat_pump_cycle=heat_pump_cycle,
                     heat_pump_cost=float(heat_pump_cost),
+                    heat_recovery_loops=bool(
+                        isolated.master_zone.config.hens.retrofit_loops
+                    ),
+                    heat_recovery_loop_cost=float(heat_recovery_loop_cost),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):

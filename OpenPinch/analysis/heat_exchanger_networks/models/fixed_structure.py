@@ -133,6 +133,10 @@ class FixedStructureSpec:
     # by index in ``utilities``, whose duties the COP links in every period
     # (the condenser delivers the evaporator's heat plus the work).
     heat_pumps: tuple[tuple[int, int, float], ...] = ()
+    # Heat recovery loops, each (cooler, heater): two utility exchangers, by
+    # index in ``utilities``, with equal duties in every period (the loop
+    # delivers what it collects, with no loss).
+    loops: tuple[tuple[int, int], ...] = ()
     # Utility levels held at their targets, each (utilities, per-period
     # duties): the duties of those utility exchangers, by index in
     # ``utilities``, sum to the level's target in every period.
@@ -813,6 +817,8 @@ def build_fixed_structure_equations(owner) -> None:
                 owner.q_u[n][condenser] * (float(cop) - 1.0),
                 owner.q_u[n][evaporator] * float(cop),
             )
+        for cooler, heater in owner.spec.loops:
+            owner._equal(owner.q_u[n][heater], owner.q_u[n][cooler])
         for units, targets in owner.spec.level_holds:
             # A band, not an equality: a level at zero would otherwise pin
             # duties bounded at zero, which some Ipopt builds cannot solve.

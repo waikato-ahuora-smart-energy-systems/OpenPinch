@@ -841,6 +841,28 @@ Heat pumps
    (COP 1.92, 14.7 MW) is the best first step, at $2.06M/y net; at the
    case's $100/MWh, and with a single water stage (COP 1.62, $13.7M
    installed), new matches win.
+Sites and heat recovery loops
+   When the existing network's streams span several process zones (a
+   site's network given as a mapping), new matches and relocations join
+   only streams of one process, and a ``UserWarning`` says the site utility
+   balance is not modelled: utilities are priced unit by unit. Processes are
+   linked only through a heat recovery loop, which ``HENS_RETROFIT_LOOPS``
+   (default on) lets a step add: an intermediate fluid, hot water for
+   example, at one temperature midway between a hot stream's target in one
+   process and a cold stream's in another. A loop cooler at the end of the
+   hot stream heats it and a loop heater at the end of the cold stream takes
+   the same heat back, in every period and with no loss, so the hot stream
+   reaches its target ``min_approach_temperature`` above the loop and the
+   cold stream its target as far below (the loop circulates over 1 K, so
+   the two targets must be at least twice the approach and 1 K apart; a
+   pair closer than that needs a heat pump instead). Pairs are screened by
+   the utility the loop could relieve: the hot stream's cooling, capped by
+   the cold stream's heating. The two exchangers are priced like new
+   exchangers, plus ``heat_recovery_loop_cost`` ($ per loop, for its pump
+   and piping run; default 0) and repiping for both streams; the loop's
+   heat is not counted as utility. Each loop is one modification of kind
+   ``"heat_recovery_loop"`` with its ``loop_temperature`` (degC) and
+   ``loop_duty`` (kW).
 
 Heat pump targets
    ``design.retrofit_heat_pumps(existing, cycle=..., topology=...,

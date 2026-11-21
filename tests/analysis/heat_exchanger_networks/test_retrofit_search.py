@@ -2,7 +2,8 @@
 
 The fake keeps the real request building, structure and screen, and stands
 in for the NLP only: a design's utility cost falls by $100,000/y per
-recovery match, $150,000/y per heat pump and $20,000/y per enlarged or
+recovery match, $150,000/y per heat pump or heat recovery loop and
+$20,000/y per enlarged or
 enhanced unit, every exchanger carries 100 kW, every installed unit needs
 its whole widened area (so it is at its cap), and every new unit gets 25 m2.
 """
@@ -73,6 +74,7 @@ class _Backend:
         self.unbuildable = lambda spec: False
         self.rating_allowances = lambda spec: None
         self.heat_pumps: list = []
+        self.loops: list = []
 
 
 @pytest.fixture
@@ -101,11 +103,13 @@ def fake_solver(monkeypatch) -> _Backend:
             enlarged = len(spec.enlargeable_recovery) + len(spec.enlargeable_utilities)
             enhanced = len(spec.enhanced_recovery) + len(spec.enhanced_utilities)
             backend.heat_pumps.append((spec.utilities, spec.heat_pumps))
+            backend.loops.append(spec.loops)
             self.utility_cost_value = (
                 1_000_000.0
                 - 100_000.0 * len(spec.recovery)
                 - 20_000.0 * (enlarged + enhanced)
                 - 150_000.0 * len(spec.heat_pumps)
+                - 150_000.0 * len(spec.loops)
             )
             self.area_values = backend.area_values(spec)
             self.rating_allowances = backend.rating_allowances(spec)
@@ -1523,3 +1527,81 @@ def test_a_single_process_retrofit_screens_every_pair_without_a_site_warning(
     assert not [w for w in recwarn if "site utility balance" in str(w.message)]
     # H1 is matched with both cold streams, as before.
     assert {("H1", "C1"), ("H1", "C2")} <= set(tried)
+
+
+def test_a_two_process_retrofit_links_the_processes_through_a_heat_recovery_loop(
+    fake_solver,
+):
+    """Process A has only H1 and process B only C1, so no direct match is
+    allowed; a loop between them is proposed, priced as its two new
+    exchangers, the loop cost and two repiped streams, and it lowers the
+    retrofit objective. Its two utilities are linked as a balanced pair."""
+    from tests.analysis.heat_exchanger_networks.test_retrofit_loops import (
+        TWO_PROCESS_EXISTING,
+        _two_processes,
+    )
+
+    problem = _two_processes()
+    costing = problem.master_zone.config.costing
+    unit_area_cost = costing.hx_area_coeff * NEW_UNIT_AREA**costing.hx_area_exp
+    with pytest.warns(UserWarning, match="heat recovery loop"):
+        result = problem.design.retrofit(
+            TWO_PROCESS_EXISTING,
+            max_modifications=1,
+            new_unit_cost=34_600.0,
+            area_addition_cost=1.0,
+            repiping_cost=2_000.0,
+            heat_recovery_loop_cost=50_000.0,
+        )
+
+    base, design = result.frontier
+    # The fake also enlarges both existing units, as area additions.
+    (loop,) = [m for m in design.modifications if m.kind != "area_addition"]
+    assert loop.kind == "heat_recovery_loop"
+    assert (loop.hot_stream, loop.cold_stream) == ("A.H1", "B.C1")
+    # Midway between H1's target (120 C) and C1's (90 C).
+    assert loop.loop_temperature == pytest.approx(105.0)
+    assert loop.loop_duty == pytest.approx(100.0)
+    assert loop.exchanger_id == "new:A.H1->Loop A.H1->B.C1:cooler"
+    assert loop.utility_exchanger_id == "new:Loop A.H1->B.C1:heater->B.C1"
+    assert loop.repiped_streams == ("A.H1", "B.C1")
+    assert loop.fixed_cost == pytest.approx(2 * 34_600.0 + 50_000.0 + 2 * 2_000.0)
+    assert loop.area_cost == pytest.approx(2 * unit_area_cost)
+    assert design.net_annual_benefit > base.net_annual_benefit
+    # The loop's own heat is neither hot nor cold utility.
+    assert design.hot_utility == pytest.approx(design.utility_cost / 100.0 - 100.0)
+    (utilities, _pumps), loops = fake_solver.heat_pumps[-1], fake_solver.loops[-1]
+    ((cooler, heater),) = loops
+    assert (utilities[cooler].side, utilities[heater].side) == ("cold", "hot")
+
+
+def test_the_loop_option_turns_heat_recovery_loops_off(fake_solver):
+    from tests.analysis.heat_exchanger_networks.test_retrofit_loops import (
+        TWO_PROCESS_EXISTING,
+        _two_processes,
+    )
+
+    with pytest.warns(UserWarning, match="site utility balance") as caught:
+        result = _two_processes().design.retrofit(
+            TWO_PROCESS_EXISTING,
+            max_modifications=1,
+            new_unit_cost=0.0,
+            options={"HENS_RETROFIT_LOOPS": False},
+        )
+
+    assert len(result.frontier) == 1
+    assert not fake_solver.loops or not any(fake_solver.loops)
+    assert not [w for w in caught if "heat recovery loop" in str(w.message)]
+
+
+def test_a_single_process_retrofit_proposes_no_heat_recovery_loop(fake_solver):
+    result = _problem().design.retrofit(
+        _existing_network(), max_modifications=1, new_match_candidates=20
+    )
+
+    assert not any(fake_solver.loops)
+    assert all(
+        m.kind != "heat_recovery_loop"
+        for design in result.frontier
+        for m in design.modifications
+    )

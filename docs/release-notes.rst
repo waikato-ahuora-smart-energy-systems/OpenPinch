@@ -68,6 +68,21 @@ Heat exchanger network synthesis
   span several process zones, new matches and relocations are now screened
   only within one process, and a ``UserWarning`` says the site utility
   balance is not modelled. Single-process retrofits are unchanged.
+- A retrofit whose existing network spans several process zones may now
+  propose a new heat recovery loop, the only link it proposes between
+  processes: an intermediate fluid at one temperature, midway between a hot
+  stream's target in one process and a cold stream's in another (the
+  targets at least twice ``min_approach_temperature`` and 1 K apart), heated
+  by a loop cooler at the end of the hot stream and giving the same heat,
+  in every period and with no loss, to a loop heater at the end of the cold
+  stream. The two exchangers are priced like new exchangers, plus the new
+  ``heat_recovery_loop_cost`` ($ per loop, its pump and piping, default 0)
+  and repiping; the loop's heat is not counted as utility. The modification
+  has kind ``"heat_recovery_loop"`` and reports ``loop_temperature`` (degC)
+  and ``loop_duty`` (kW). ``HENS_RETROFIT_LOOPS`` (default on) turns the
+  proposals off. On a two-process case whose only option is a loop, the
+  loop now takes the cold stream's whole 100 kW of steam heating from the
+  other process's hot stream.
 - One network could carry two topology signatures when two matches that
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case
