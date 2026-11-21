@@ -82,7 +82,17 @@ Heat exchanger network synthesis
   and ``loop_duty`` (kW). ``HENS_RETROFIT_LOOPS`` (default on) turns the
   proposals off. On a two-process case whose only option is a loop, the
   loop now takes the cold stream's whole 100 kW of steam heating from the
-  other process's hot stream.
+  other process's hot stream. A loop's heater and cooler are named
+  ``Loop <hot>-><cold>:heater`` and ``:cooler``, with ``\`` and ``>`` in a
+  stream name escaped by a backslash, so streams whose names hold ``->``
+  cannot give two loops one name.
+- The fit to every period screened a segmented utility at a stream end with
+  its largest segment ``dt_cont`` at both ends, so a utility whose terminal
+  segments keep the approach was dropped or replaced by a dearer one when
+  another of its segments had a larger contribution. Each end is now held
+  to its own terminal segment's contribution (the inlet segment at the
+  utility's inlet, the outlet segment at its outlet), as the fit's approach
+  equations do.
 - One network could carry two topology signatures when two matches that
   share no stream were numbered in either stage order, so the ranking and
   the run record listed it twice. On the four-stream Yee and Grossmann case
@@ -97,7 +107,9 @@ Heat exchanger network synthesis
   at a cost that was not a converged optimum. Its outcome now records
   ``diagnostics["unconverged_termination"]``; a verified allocation is kept
   with a ``UserWarning`` to raise the limit in ``HENS_SOLVER_OPTIONS_EVM``,
-  and one that fails verification raises with that advice.
+  and one that fails verification fails with an error that names the
+  termination and gives that advice, so the ``WorkflowContractError``
+  repeats it.
 - ``optimise_duties(objective="rating")`` rated at 1 K when no
   ``min_approach_temperature`` was given, so it failed on the default
   design's own network whenever evolution had closed an approach below 1 K.
@@ -121,7 +133,9 @@ Heat exchanger network synthesis
   case now keeps the case's own utility that placement priced the fallback
   as (here cooling water at 20 to 25 C, or HPS), and a count fails as
   infeasible when the case has no such utility. Placed levels closer than
-  1 K at every temperature are one level: the case keeps the first.
+  1 K at every temperature are one level: the case keeps the first. When a
+  multiperiod placement falls back at a different temperature in each
+  period, the case keeps the utility nearest each period's fallback.
 - A site network could not be designed when a process stream held two
   utility levels between its recovery matches (for example a hot stream
   raising steam on two placed mains), as the placed steam-main site does

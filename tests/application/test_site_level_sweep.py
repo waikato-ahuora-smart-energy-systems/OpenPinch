@@ -572,10 +572,37 @@ def test_a_hot_and_a_cold_stand_in_may_share_a_name():
     problem = PinchProblem(source)
 
     kept = site_levels._stand_ins(
-        problem, {("HU", "Hot"): 300.0, ("CU", "Cold"): -30.0}
+        problem, {("HU", "Hot"): (300.0,), ("CU", "Cold"): (-30.0,)}
     )
 
     assert sorted((u["name"], u["type"]) for u in kept) == [
         ("EDGE", "Cold"),
         ("EDGE", "Hot"),
     ]
+
+
+def test_every_periods_fallback_keeps_its_nearest_utility():
+    """A multiperiod placement may fall back on HU at 145 C in one period and
+    at 300 C in another: the case keeps LPS (nearest 145 C) and HPS
+    (nearest 300 C), not only the utility nearest the last period's."""
+    from OpenPinch.contracts.utility_placement import QuantityValue, UtilitySide
+
+    def row(supply):
+        return SimpleNamespace(
+            utility="HU",
+            side=UtilitySide.HOT,
+            supply_temperature=QuantityValue(value=supply, unit="degC"),
+            is_fallback=True,
+        )
+
+    placed = SimpleNamespace(
+        utility_placement_result=SimpleNamespace(
+            retarget_comparison=(row(145.0), row(300.0))
+        )
+    )
+
+    fallbacks = site_levels._fallback_utilities(placed)
+    kept = site_levels._stand_ins(_site(), fallbacks)
+
+    assert fallbacks == {("HU", "Hot"): (145.0, 300.0)}
+    assert sorted(u["name"] for u in kept) == ["HPS", "LPS"]

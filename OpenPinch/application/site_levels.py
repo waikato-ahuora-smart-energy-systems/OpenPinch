@@ -146,17 +146,19 @@ def placed_case(
     return type(problem)(source, project_name=problem.project_name)
 
 
-def _fallback_utilities(placed) -> dict[tuple[str, str], float]:
-    """Placement's fallback utilities, ``(name, type)`` to supply (degC)."""
+def _fallback_utilities(placed) -> dict[tuple[str, str], tuple[float, ...]]:
+    """Placement's fallback utilities, ``(name, type)`` to every supply
+    (degC) a period placed it at, ascending: a multiperiod placement may
+    place one fallback at a different supply in each period."""
     from .utility_placement import _level_temperature
 
-    return {
-        (row.utility, row.side.value.capitalize()): _level_temperature(
-            row.supply_temperature
-        )
-        for row in placed.utility_placement_result.retarget_comparison
-        if row.is_fallback
-    }
+    supplies: dict[tuple[str, str], set[float]] = {}
+    for row in placed.utility_placement_result.retarget_comparison:
+        if row.is_fallback:
+            supplies.setdefault((row.utility, row.side.value.capitalize()), set()).add(
+                float(_level_temperature(row.supply_temperature))
+            )
+    return {key: tuple(sorted(values)) for key, values in supplies.items()}
 
 
 def _distinct_levels(utilities: list[dict]) -> list[dict]:
@@ -194,10 +196,11 @@ def _degc(quantity: Mapping, value: float) -> float:
 
 
 def _stand_ins(
-    problem: "PinchProblem", fallbacks: Mapping[tuple[str, str], float]
+    problem: "PinchProblem", fallbacks: Mapping[tuple[str, str], Sequence[float]]
 ) -> list[dict]:
     """The case's own utility for each fallback: its side's nearest by
-    supply temperature, as placement priced the fallback."""
+    supply temperature, as placement priced the fallback, for each supply
+    a period placed it at (their union)."""
     from ..analysis.utility_placement.errors import NoFeasiblePlacementError
     from .utility_placement import _resolve_placement_zone, _utility_sources
 
@@ -206,7 +209,7 @@ def _stand_ins(
     # By name and type: a hot and a cold utility may share a name, and a
     # ``Both`` utility serving both fallbacks is kept once.
     kept: dict[tuple[str, str], dict] = {}
-    for (name, side), supply in fallbacks.items():
+    for (name, side), supplies in fallbacks.items():
         own = [
             source
             for source in sources[side]
@@ -220,9 +223,10 @@ def _stand_ins(
                     f"{side.casefold()} utility of its own to take its place."
                 ),
             )
-        nearest = min(own, key=lambda source: abs(source[1] - supply))
-        raw = nearest[3]
-        kept.setdefault((raw["name"], raw["type"]), raw)
+        for supply in supplies:
+            nearest = min(own, key=lambda source: abs(source[1] - supply))
+            raw = nearest[3]
+            kept.setdefault((raw["name"], raw["type"]), raw)
     return list(kept.values())
 
 

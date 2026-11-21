@@ -122,3 +122,71 @@ def test_without_an_approach_each_pair_is_padded_at_its_contributions():
 
     assert _ice_water_coolers(kept) == ["Cold Utility.Glycol"]
     assert "Cold Utility.Glycol" not in _ice_water_coolers(dropped)
+
+
+def _plain_streams_with_segmented_steam(dt_cont: tuple[float, float]) -> PinchProblem:
+    # Steam gives 250 to 225 C over its inlet segment and 225 to 200 C over
+    # its outlet segment, heating a plain stream from 50 to 150 C: an inlet
+    # gap of 100 K and an outlet gap of 150 K.
+    def segment(t_supply, t_target, dt):
+        return {
+            "t_supply": t_supply,
+            "t_target": t_target,
+            "heat_flow": 100.0,
+            "htc": 1.0,
+            "price": 20.0,
+            "dt_cont": dt,
+        }
+
+    def stream(name, t_supply, t_target):
+        return {
+            "zone": "Site",
+            "name": name,
+            "t_supply": t_supply,
+            "t_target": t_target,
+            "heat_flow": 150.0,
+        }
+
+    return PinchProblem(
+        {
+            "streams": [stream("Hot", 200.0, 100.0), stream("Cold", 50.0, 150.0)],
+            "utilities": [
+                {
+                    "name": "HU",
+                    "type": "Hot",
+                    "segments": [
+                        segment(250.0, 225.0, dt_cont[0]),
+                        segment(225.0, 200.0, dt_cont[1]),
+                    ],
+                },
+                {"name": "CU", "type": "Cold", "t_supply": 20.0, "t_target": 20.01},
+            ],
+        },
+        project_name="Site",
+    )
+
+
+def _heaters(network):
+    return [p for p in _placements(network) if p[0] == "hot_utility"]
+
+
+def test_a_segmented_utility_is_screened_at_its_terminal_segments():
+    """A 120 K contribution on the steam's outlet segment fits the 150 K
+    outlet gap; the inlet segment's 0.1 K fits the 100 K inlet gap. The
+    profile's largest contribution at both ends would reject the steam, where
+    the fit's approach equations (inlet and outlet segments) accept it."""
+    network = HeatExchangerNetwork.from_structure(recovery=[])
+
+    terminal = with_stream_end_utilities(
+        _plain_streams_with_segmented_steam((0.1, 120.0)),
+        network,
+        dt_cont_multiplier=1.0,
+    )
+    inlet_too_large = with_stream_end_utilities(
+        _plain_streams_with_segmented_steam((120.0, 0.1)),
+        network,
+        dt_cont_multiplier=1.0,
+    )
+
+    assert _heaters(terminal) == [("hot_utility", "Hot Utility.HU", "Site.Cold")]
+    assert _heaters(inlet_too_large) == []

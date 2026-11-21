@@ -698,10 +698,20 @@ class FixedStructureDutyExecutor:
             return _failed_task_outcome(task, str(exc))
         if failures:
             # An unconverged point that fails verification keeps its
-            # termination, so the error says to raise the solver limit.
-            return _failed_task_outcome(
-                task, "verification failed: " + "; ".join(failures)
-            ).model_copy(update={"diagnostics": _unconverged_diagnostics(model)})
+            # termination, and its error says to raise the solver limit: a
+            # failure summary reads only the error.
+            diagnostics = _unconverged_diagnostics(model)
+            error = "verification failed: " + "; ".join(failures)
+            termination = diagnostics.get("unconverged_termination")
+            if termination is not None:
+                error += (
+                    f" (the solver stopped at a limit ({termination}) before "
+                    "converging: raise max_iter or max_wall_time in "
+                    "HENS_SOLVER_OPTIONS_EVM)"
+                )
+            return _failed_task_outcome(task, error).model_copy(
+                update={"diagnostics": diagnostics}
+            )
         if task.task_id is not None:
             self.models_by_task_id[task.task_id] = model
         return HeatExchangerNetworkSynthesisTaskOutcome(
