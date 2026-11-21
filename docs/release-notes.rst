@@ -538,8 +538,8 @@ Heat exchanger network synthesis
   network design holds each process's utility levels: ``"fixed"`` (the
   default, as before) at the duties its pinch design targeted, or
   ``"at_least"`` at or above them, so load may shift between processes
-  under the site utility balance. A network held at least ranks as holding
-  its levels when each is at or above its target.
+  under the site utility balance. The ranking still puts networks that
+  hold each level at its target first.
 
 Testing and CI
 ~~~~~~~~~~~~~~

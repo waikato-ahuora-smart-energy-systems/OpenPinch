@@ -405,10 +405,6 @@ def test_a_site_problem_holds_its_levels_at_least_when_asked():
     assert {target.at_least for target in targets("fixed").case.level_targets} == {
         False
     }
-    relaxed.case.optimise(False)
-    assert relaxed.case.mSuccess == 1
-    network = relaxed.extract_network(run_id="run")
-    assert network.source_metadata["utility_level_holds"] == "at_least"
 
 
 def test_a_site_seed_carries_its_process_targets_into_the_evolution_task():

@@ -336,11 +336,11 @@ class InternalHeatExchangerNetworkProblem:
             network = with_site_cost(network, balance)
         if self.utility_level_targets is None:
             return network
-        held = {"utility_level_targets": self.utility_level_targets}
-        if self.site_processes is not None and self.site_level_holds == "at_least":
-            held["utility_level_holds"] = "at_least"
         return network.model_copy(
-            update={"source_metadata": network.source_metadata | held}
+            update={
+                "source_metadata": network.source_metadata
+                | {"utility_level_targets": self.utility_level_targets}
+            }
         )
 
     def extract_result(
