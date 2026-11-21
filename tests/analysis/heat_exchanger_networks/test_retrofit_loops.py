@@ -159,6 +159,30 @@ def test_loop_utilities_join_the_solver_arrays_free_at_the_loop_temperature():
     assert len(arrays.axis_maps["hot_utilities"]) == 1
 
 
+def test_loop_names_stay_distinct_when_stream_names_hold_the_separator():
+    """Hot ``A->B`` with cold ``C`` and hot ``A`` with cold ``B->C`` are two
+    loops: each keeps its own heater and cooler, and a plain pair keeps its
+    readable name."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.loops import (
+        HeatRecoveryLoop,
+        loop_cooler_name,
+        loop_heater_name,
+    )
+
+    first = HeatRecoveryLoop("A->B", "C", 380.0)
+    second = HeatRecoveryLoop("A", "B->C", 380.0)
+    names = {
+        name(loop)
+        for loop in (first, second)
+        for name in (loop_heater_name, loop_cooler_name)
+    }
+
+    assert len(names) == 4
+    assert loop_heater_name(HeatRecoveryLoop("A.H1", "B.C1", 380.0)) == (
+        "Loop A.H1->B.C1:heater"
+    )
+
+
 def test_a_loop_delivers_the_heat_it_collects():
     """H1 (process A) and C1 (process B) share no recovery match. Unlinked,
     the two free loop utilities would each take what they can (160 kW from

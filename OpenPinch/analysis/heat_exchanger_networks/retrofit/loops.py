@@ -111,18 +111,30 @@ def screen_heat_recovery_loops(
     return ranked[: max(0, int(limit))]
 
 
+def _loop_pair(loop: HeatRecoveryLoop) -> str:
+    """``hot->cold``, each name with ``\\`` and ``>`` escaped by a backslash,
+    so the first unescaped ``>`` is the separator's and no two pairs share
+    an id (hot ``A->B`` with cold ``C`` and hot ``A`` with cold ``B->C``
+    differ). Names without either character read as given."""
+
+    def escaped(name: str) -> str:
+        return name.replace("\\", "\\\\").replace(">", "\\>")
+
+    return f"{escaped(loop.hot)}->{escaped(loop.cold)}"
+
+
 def loop_cooler_name(loop: HeatRecoveryLoop) -> str:
     """The cold utility through which a loop collects its hot stream's
     heat."""
 
-    return f"Loop {loop.hot}->{loop.cold}:cooler"
+    return f"Loop {_loop_pair(loop)}:cooler"
 
 
 def loop_heater_name(loop: HeatRecoveryLoop) -> str:
     """The hot utility through which a loop gives heat to its cold
     stream."""
 
-    return f"Loop {loop.hot}->{loop.cold}:heater"
+    return f"Loop {_loop_pair(loop)}:heater"
 
 
 def with_loop_utilities(

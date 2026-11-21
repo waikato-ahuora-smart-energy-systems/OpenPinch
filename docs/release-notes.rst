@@ -82,7 +82,10 @@ Heat exchanger network synthesis
   and ``loop_duty`` (kW). ``HENS_RETROFIT_LOOPS`` (default on) turns the
   proposals off. On a two-process case whose only option is a loop, the
   loop now takes the cold stream's whole 100 kW of steam heating from the
-  other process's hot stream.
+  other process's hot stream. A loop's heater and cooler are named
+  ``Loop <hot>-><cold>:heater`` and ``:cooler``, with ``\`` and ``>`` in a
+  stream name escaped by a backslash, so streams whose names hold ``->``
+  cannot give two loops one name.
 - The fit to every period screened a segmented utility at a stream end with
   its largest segment ``dt_cont`` at both ends, so a utility whose terminal
   segments keep the approach was dropped or replaced by a dearer one when
