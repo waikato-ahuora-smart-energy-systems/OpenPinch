@@ -9,6 +9,7 @@ on copied :class:`Zone` and :class:`Stream` objects.
 
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from typing import Literal
 
@@ -25,6 +26,7 @@ from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
 from .arrays import (
+    MINIMUM_PAIR_APPROACH,
     PreparedSolverArrays,
     _temperature_contribution,
     _value,
@@ -306,15 +308,23 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
     """Materialize effective contributions in a detached targeting zone."""
 
     # Capture every value before the zone setter changes inherited multipliers.
+    leasts = _partner_leasts(zone, dTmin=dTmin)
+    group_of = {
+        id(stream): group for group in _PARTNERS for stream in getattr(zone, group)
+    }
     prepared = []
     for stream in zone.all_streams:
         parts = stream.segments if stream.has_segments else (stream,)
+        partner_least = leasts[group_of[id(stream)]]
         contributions = [
-            _stream_dt_cont_with_fallback(
-                part,
-                dTmin=dTmin,
-                reference_dt_cont=zone.config.thermal.dt_cont,
-                locked=stream.delta_t_contribution_multiplier_locked,
+            _lifted_contribution(
+                _stream_dt_cont_with_fallback(
+                    part,
+                    dTmin=dTmin,
+                    reference_dt_cont=zone.config.thermal.dt_cont,
+                    locked=stream.delta_t_contribution_multiplier_locked,
+                ),
+                partner_least,
             )
             for part in parts
         ]
@@ -343,6 +353,77 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
     # zone's reference so applying the convention again leaves them unchanged.
     # The zone (and its config) is a detached copy, so the source is untouched.
     zone.config.update_values(THERMAL_DT_CONT=float(dTmin) / 2.0)
+
+
+# The groups whose streams each group's streams can exchange heat with.
+_PARTNERS = {
+    "hot_streams": ("cold_streams", "cold_utilities"),
+    "cold_streams": ("hot_streams", "hot_utilities"),
+    "hot_utilities": ("cold_streams",),
+    "cold_utilities": ("hot_streams",),
+}
+
+
+def _partner_leasts(zone: Zone, *, dTmin: float) -> dict[str, float]:
+    """For each stream group of ``zone``, the least contribution (at the
+    task's scale, over segments and periods) among the streams it can
+    exchange heat with; infinite for a group with no partner."""
+
+    def least(group: str) -> float:
+        return min(
+            (
+                value
+                for stream in getattr(zone, group)
+                for part in (stream.segments if stream.has_segments else (stream,))
+                for value in _contribution_values(
+                    _stream_dt_cont_with_fallback(
+                        part,
+                        dTmin=dTmin,
+                        reference_dt_cont=zone.config.thermal.dt_cont,
+                        locked=stream.delta_t_contribution_multiplier_locked,
+                    )
+                )
+            ),
+            default=math.inf,
+        )
+
+    group_least = {group: least(group) for group in _PARTNERS}
+    return {
+        group: min(group_least[partner] for partner in partners)
+        for group, partners in _PARTNERS.items()
+    }
+
+
+def _lift_for_pair_floor(values, partner_least: float):
+    """Contributions that keep every pair at the pair floor in targeting.
+
+    The models floor a pair's summed contributions at 0.1 K
+    (``pair_minimum_approach``), but targeting shifts each stream by its own
+    contribution, so a pair summing to less would be targeted closer than
+    the models allow. Where a contribution and the least of its possible
+    partners sum below the floor it is raised to half the floor, so the pair
+    targets at the floor or wider; every other contribution is unchanged.
+    """
+    values = np.asarray(values, dtype=float)
+    return np.where(
+        values + partner_least < MINIMUM_PAIR_APPROACH,
+        np.maximum(values, 0.5 * MINIMUM_PAIR_APPROACH),
+        values,
+    )
+
+
+def _contribution_values(contribution: dict) -> list[float]:
+    if "values" in contribution:
+        return [float(value) for value in contribution["values"]]
+    return [float(contribution["value"])]
+
+
+def _lifted_contribution(contribution: dict, partner_least: float) -> dict:
+    """``contribution`` (a value or period values) lifted for the pair floor."""
+    lifted = _lift_for_pair_floor(_contribution_values(contribution), partner_least)
+    if "values" in contribution:
+        return {**contribution, "values": [float(value) for value in lifted]}
+    return {**contribution, "value": float(lifted[0])}
 
 
 def _stream_dt_cont_with_fallback(

@@ -195,3 +195,71 @@ def test_a_segmented_heaters_outlet_holds_the_pair_floor():
     _set_hot_utility_approach_equations(model, 0, 0, 0)
 
     assert _broken(pyo, model)
+
+
+def _quantity(value, unit):
+    return {"value": value, "unit": unit}
+
+
+def _two_stream_problem(*, hot_dt_cont, cold_dt_cont):
+    """H1 100 to 50 degC against C1 50 to 100 degC, 2 kW/K each, with
+    utilities that contribute nothing."""
+    from OpenPinch.application.problem import PinchProblem
+
+    def stream(name, t_supply, t_target, dt_cont):
+        return {
+            "zone": "Site/A",
+            "name": name,
+            "t_supply": _quantity(t_supply, "degC"),
+            "t_target": _quantity(t_target, "degC"),
+            "heat_flow": _quantity(100.0, "kW"),
+            "dt_cont": _quantity(dt_cont, "delta_degC"),
+            "htc": _quantity(1.0, "kW/m^2/delta_degC"),
+        }
+
+    def utility(name, kind, t_supply, t_target):
+        return {
+            "name": name,
+            "type": kind,
+            "t_supply": _quantity(t_supply, "degC"),
+            "t_target": _quantity(t_target, "degC"),
+            "dt_cont": _quantity(0.0, "delta_degC"),
+            "price": _quantity(10.0, "$/MWh"),
+            "htc": _quantity(1.0, "kW/m^2/delta_degC"),
+        }
+
+    problem = PinchProblem(
+        source={
+            "streams": [
+                stream("H1", 100.0, 50.0, hot_dt_cont),
+                stream("C1", 50.0, 100.0, cold_dt_cont),
+            ],
+            "utilities": [
+                utility("HPS", "Hot", 250.0, 249.0),
+                utility("CW", "Cold", 10.0, 15.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "A", "type": "Process Zone"}],
+            },
+        }
+    )
+    problem.target.direct_heat_integration()
+    return problem
+
+
+def test_pinch_targets_hold_the_floor_for_a_pair_of_zero_contributions():
+    """The models hold a pair of zero contributions 0.1 K apart, so the
+    targets they must meet cannot assume the two streams meet at 0 K: at
+    2 kW/K the 0.1 K costs 0.2 kW of each utility."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.pinch_design_decomposition import (
+        _calculate_openpinch_targets,
+    )
+
+    problem = _two_stream_problem(hot_dt_cont=0.0, cold_dt_cont=0.0)
+
+    (target,) = _calculate_openpinch_targets(problem, dTmin=10.0)
+
+    assert target.hot_utility_target == pytest.approx(0.2, abs=1e-9)
+    assert target.cold_utility_target == pytest.approx(0.2, abs=1e-9)
