@@ -388,3 +388,33 @@ def test_a_loop_is_left_out_when_its_streams_never_run_together():
     kept = screen_heat_recovery_loops(network, [loop], limit=1, weights=[0.5, 0.5])
 
     assert kept == []
+
+
+# H1 (400 to 350 K) runs at 2 kW/K in the first period only and C1 (300 to
+# 340 K) at 2 kW/K in the second only: on average each runs at 1 kW/K.
+_NEVER_TOGETHER_ENDS = {"H1": (400.0, 350.0, 1.0), "C1": (300.0, 340.0, 1.0)}
+_NEVER_TOGETHER_PERIOD_ENDS = (
+    {"H1": (400.0, 350.0, 2.0), "C1": (300.0, 340.0, 0.0)},
+    {"H1": (400.0, 350.0, 0.0), "C1": (300.0, 340.0, 2.0)},
+)
+
+
+def test_a_match_has_no_potential_when_its_streams_never_run_together():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
+        match_potential,
+    )
+
+    network = _two_period_network({"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 80.0]})
+
+    # The period means give both streams 1 kW/K and so a potential; period
+    # by period the smaller flowrate is 0.
+    potential = match_potential(
+        network,
+        _NEVER_TOGETHER_ENDS,
+        NewMatch("H1", "C1", 1, new_stage=True),
+        approach=10.0,
+        weights=[0.5, 0.5],
+        period_ends=_NEVER_TOGETHER_PERIOD_ENDS,
+    )
+
+    assert potential == 0.0

@@ -175,6 +175,7 @@ def match_potential(
     *,
     approach: float,
     weights: Sequence[float] | None = None,
+    period_ends: Sequence[Mapping[str, tuple[float, float, float]]] | None = None,
 ) -> float:
     """Heat ``move`` could recover at its position in solved ``network``.
 
@@ -182,14 +183,53 @@ def match_potential(
     and heat capacity flowrate. The potential is the smaller heat capacity
     flowrate times the temperature difference, less ``approach``, between the
     hot and the cold stream where the match would sit, read from ``network``
-    as ``period_mean`` gives it; zero without overlap.
+    as ``period_mean`` gives it; zero without overlap. With ``period_ends``
+    (the same mapping for each period, matching ``weights``) it is the
+    ``period_mean`` of ``match_potentials``, each period's own potential, so
+    streams that never run together have none.
     """
 
+    if (
+        period_ends is not None
+        and weights is not None
+        and len(weights) == len(period_ends)
+    ):
+        return period_mean(
+            match_potentials(network, period_ends, move, approach=approach), weights
+        )
     hot = _hot_temperature(network, ends, move.hot, move.stage, weights)
     cold_boundary = move.stage - 1 if move.new_stage else move.stage
     cold = _cold_temperature(network, ends, move.cold, cold_boundary, weights)
     capacity = min(ends[move.hot][2], ends[move.cold][2])
     return capacity * max(0.0, hot - cold - approach)
+
+
+def match_potentials(
+    network: HeatExchangerNetwork,
+    period_ends: Sequence[Mapping[str, tuple[float, float, float]]],
+    move: NewMatch,
+    *,
+    approach: float,
+) -> list[float]:
+    """Heat ``move`` could recover in each period of solved ``network``.
+
+    ``period_ends`` holds each period's stream ends. A period's potential is
+    the smaller of the two heat capacity flowrates in that period (0 for a
+    stream that is off) times the temperature difference, less ``approach``,
+    between the streams where the match would sit, read from that period.
+    """
+
+    cold_boundary = move.stage - 1 if move.new_stage else move.stage
+    return [
+        min(ends[move.hot][2], ends[move.cold][2])
+        * max(
+            0.0,
+            _hot_temperature(network, ends, move.hot, move.stage, period=n)
+            - _cold_temperature(network, ends, move.cold, cold_boundary, period=n)
+            - approach,
+        )
+        for n, ends in enumerate(period_ends)
+    ]
 
 
 def utility_relief(
@@ -268,52 +308,64 @@ def period_mean(values: Sequence[float | None], weights: Sequence[float] | None)
     return sum(w * v for w, v in known) / total
 
 
-def _hot_temperature(network, ends, stream: str, stage: int, weights=None) -> float:
+def _reading(states, attribute: str, weights, period: int | None):
+    """An exchanger's reading: in ``period``, else ``period_mean``."""
+
+    if period is None:
+        return period_mean([getattr(state, attribute) for state in states], weights)
+    return getattr(states[period], attribute) if period < len(states) else None
+
+
+def _hot_temperature(
+    network, ends, stream: str, stage: int, weights=None, *, period=None
+) -> float:
     """A hot stream's temperature as it enters ``stage`` (1-based).
 
     The inlet of its first exchanger at or after that point, else its target.
+    With ``period`` the reading is that period's, from the first such
+    exchanger that has one there.
     """
 
     def key(exchanger: HeatExchanger) -> tuple[float, int]:
         position = math.inf if exchanger.stage is None else float(exchanger.stage)
         return position, int(exchanger.kind is not HeatExchangerKind.RECOVERY)
 
-    downstream = [
+    readings = [
         (
             key(e),
-            period_mean(
-                [state.source_inlet_temperature for state in e.period_states],
-                weights,
-            ),
+            _reading(e.period_states, "source_inlet_temperature", weights, period),
         )
         for e in network.exchangers
         if e.source_stream == stream and key(e) >= (stage, 0)
     ]
+    downstream = [item for item in readings if period is None or item[1] is not None]
     return min(downstream)[1] if downstream else ends[stream][1]
 
 
-def _cold_temperature(network, ends, stream: str, stage: int, weights=None) -> float:
+def _cold_temperature(
+    network, ends, stream: str, stage: int, weights=None, *, period=None
+) -> float:
     """A cold stream's temperature as it enters ``stage`` (1-based).
 
     Cold streams pass the stages from the last to the first. The inlet of
-    its first exchanger at or after that point, else its target.
+    its first exchanger at or after that point, else its target. With
+    ``period`` the reading is that period's, from the first such exchanger
+    that has one there.
     """
 
     def key(exchanger: HeatExchanger) -> tuple[float, int]:
         position = math.inf if exchanger.stage is None else -float(exchanger.stage)
         return position, int(exchanger.kind is not HeatExchangerKind.RECOVERY)
 
-    downstream = [
+    readings = [
         (
             key(e),
-            period_mean(
-                [state.sink_inlet_temperature for state in e.period_states],
-                weights,
-            ),
+            _reading(e.period_states, "sink_inlet_temperature", weights, period),
         )
         for e in network.exchangers
         if e.sink_stream == stream and key(e) >= (-stage, 0)
     ]
+    downstream = [item for item in readings if period is None or item[1] is not None]
     return min(downstream)[1] if downstream else ends[stream][1]
 
 
