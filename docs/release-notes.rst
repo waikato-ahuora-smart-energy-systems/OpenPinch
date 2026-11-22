@@ -74,7 +74,10 @@ Heat exchanger network synthesis
   give up. The utility a match, heat pump or loop could relieve pairs the
   hot stream's cooling with the cold stream's heating in each period before
   the mean, so a link between streams that never run together relieves
-  nothing.
+  nothing. A new match's potential is likewise read in each period, from
+  that period's flowrates and temperatures, and caps its relief period by
+  period, so a pair of streams that never run together is not proposed.
+  Relocation scoring still reads a match's potential from the period means.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.
