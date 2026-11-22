@@ -57,6 +57,21 @@ def test_sample_case_names_load_unchanged(name: str) -> None:
     assert renamed == []
 
 
+def test_no_sample_case_asks_for_worker_processes() -> None:
+    """A packaged case runs with the default of one worker: on cases this
+    small, starting worker processes costs far more than they save (the
+    four-stream case took 11.3 s with its 10 workers against 3.2 s with 1,
+    for the same networks)."""
+    asking = [
+        name
+        for name in list_sample_cases()
+        if "HENS_MAX_PARALLEL"
+        in (json.loads(read_sample_case(name)).get("options") or {})
+    ]
+
+    assert asking == []
+
+
 def test_hpr_performance_map_contract_resource_catalog_is_closed() -> None:
     assert (
         list_hpr_performance_map_contract_resources() == EXPECTED_HPR_CONTRACT_RESOURCES
