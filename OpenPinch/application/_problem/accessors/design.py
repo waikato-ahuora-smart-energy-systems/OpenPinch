@@ -91,8 +91,9 @@ def _fit_key(network, approach=None) -> str:
     stage count (``period_fit.py``). An exchanger idle in the basis case
     counts, as it may carry duty in another period. With these go
     ``approach``, the design approach the fit holds (``_design_approach``),
-    and the level targets it holds. Networks that share all of it have one
-    fit.
+    the level targets it holds and, for a network that holds levels, its
+    dt_cont multiplier, at which the fit may target them again
+    (``_period_level_targets``). Networks that share all of it have one fit.
     """
     from ....analysis.heat_exchanger_networks.solver.utility_slices import (
         slice_label,
@@ -108,13 +109,19 @@ def _fit_key(network, approach=None) -> str:
         )
         for exchanger in network.exchangers
     )
+    levels = (network.source_metadata or {}).get("utility_level_targets")
     return json.dumps(
         {
             "exchangers": exchangers,
             "stage_count": network.stage_count,
             "design_approach": approach,
-            "utility_level_targets": (network.source_metadata or {}).get(
-                "utility_level_targets"
+            "utility_level_targets": levels,
+            # Held levels that do not cover every period are targeted again
+            # at the network's own multiplier (``_period_level_targets``).
+            "level_multiplier": (
+                (network.summary_metrics or {}).get("dt_cont_multiplier", 1.0)
+                if levels
+                else None
             ),
         },
         sort_keys=True,

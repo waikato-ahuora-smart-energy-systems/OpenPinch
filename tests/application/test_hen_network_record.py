@@ -171,6 +171,30 @@ def test_networks_on_different_slices_of_a_utility_do_not_share_a_fit():
     assert _fit_key(first) == _fit_key(network("hot-utility:HU@1->C1"))
 
 
+def test_networks_holding_levels_at_different_multipliers_do_not_share_a_fit():
+    """The fit may target a level-holding network's levels again at the
+    network's own dt_cont multiplier, so that multiplier is part of what the
+    fit depends on."""
+    from OpenPinch.application._problem.accessors.design import _fit_key
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    def holding_levels(multiplier):
+        return HeatExchangerNetwork.from_structure(
+            recovery=[("H1", "C1", 1)],
+            heaters=["C1"],
+            coolers=["H1"],
+            hot_utility="HU",
+            cold_utility="CU",
+        ).model_copy(
+            update={
+                "summary_metrics": {"dt_cont_multiplier": multiplier},
+                "source_metadata": {"utility_level_targets": {"hot:HU": [10.0]}},
+            }
+        )
+
+    assert _fit_key(holding_levels(0.75)) != _fit_key(holding_levels(1.5))
+
+
 @pytest.mark.solver
 @pytest.mark.skipif(
     not _SOLVERS,
