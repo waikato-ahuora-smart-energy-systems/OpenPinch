@@ -947,7 +947,12 @@ class _DesignAccessor:
             if done is None:
                 return None
             view, fitted = done
-            network = view.selected_network
+            # The fit and rating are fixed-structure solves, run as network
+            # evolution tasks; the network stays the design of the method
+            # that made it.
+            network = view.selected_network.model_copy(
+                update={"method": outcome.network.method}
+            )
             final = outcome.model_copy(
                 update={
                     "network": network,
