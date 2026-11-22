@@ -9,7 +9,15 @@ from __future__ import annotations
 
 import pytest
 
-from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import _stream_ends
+from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
+    NewMatch,
+    utility_relief,
+)
+from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+    RetrofitSettings,
+    _stream_ends,
+    run_retrofit_search,
+)
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
@@ -109,3 +117,25 @@ def test_a_retrofit_finds_the_match_whichever_period_is_first(idle_first):
 
     # A new match takes the heater's duty in the period the cold stream runs.
     assert [m.kind for m in result.selected.modifications] == ["new_match"]
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.parametrize("idle_first", [True, False])
+def test_utility_relief_weights_the_networks_duties_over_the_periods(idle_first):
+    problem = _problem(idle_first=idle_first)
+    problem.target.direct_heat_integration()
+    rated = run_retrofit_search(
+        problem,
+        problem.design._network_from_structure(EXISTING),
+        RetrofitSettings(max_modifications=0),
+    )
+    network = rated.frontier[0].network
+    weights = [0.1, 0.9] if idle_first else [0.9, 0.1]
+
+    relief = utility_relief(
+        network, NewMatch("A.H1", "A.C1", 1, new_stage=False), 1000.0, weights=weights
+    )
+
+    # The heater runs at 100 kW for 90 % of the time; the cooler always runs.
+    assert relief == pytest.approx(90.0, abs=1e-3)
