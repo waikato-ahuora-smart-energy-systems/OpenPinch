@@ -116,6 +116,12 @@ Heat exchanger network synthesis
   staged unit the candidate no longer used still counted in the area check
   and the evolved multiperiod network was rejected ("verification failed:
   area").
+- The packaged ``Four-stream-Yee-and-Grossmann-1990-1.json`` sample case no
+  longer sets ``HENS_MAX_PARALLEL`` to 10, so it runs with the default of
+  one worker. On a case this small the worker processes cost more than they
+  save: the default design took 11.3 s with 10 workers and takes 3.2 s with
+  one, for the same two ranked networks. Set ``HENS_MAX_PARALLEL`` in the
+  case's ``options`` to use worker processes.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.
