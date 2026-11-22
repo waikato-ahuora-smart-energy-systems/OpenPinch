@@ -132,6 +132,14 @@ Heat exchanger network synthesis
   depth 2 and took 24.7 s; it now starts one pool and takes 7.4 s and
   10.9 s, for the same networks. A pool a stage fails in is replaced at
   the next stage.
+- A multiperiod design fits each network structure once at each design
+  approach. A fit to every period sets duties and areas afresh, so networks
+  that share a structure, the approach they were designed to and the levels
+  they hold have the same fit, but each was fitted again. The packaged
+  ``crude_preheat_train_multiperiod.json`` ran 26 fits for 5 ranked networks
+  and now runs 21 (9.2 s to 7.9 s); ``dairy_chilling_multiperiod.json`` ran
+  30 for 11 and now runs 17 (8.8 s to 6.8 s). The ranked networks and their
+  costs are unchanged.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.

@@ -81,6 +81,31 @@ def _finalise_key(network, approach=None) -> str:
     return json.dumps(_rounded(data), sort_keys=True)
 
 
+def _fit_key(network, approach=None) -> str:
+    """What fitting ``network`` to every period depends on, as a lookup key.
+
+    The fit sets every duty and area afresh, so of the network only its
+    structure counts (``network_structure_signature``), with ``approach``,
+    the design approach the fit holds (``_design_approach``), and the level
+    targets it holds. Networks that share all three have one fit.
+    """
+    from ....analysis.heat_exchanger_networks.reporting.ranking import (
+        network_structure_signature,
+    )
+
+    return json.dumps(
+        {
+            "structure": repr(network_structure_signature(network)),
+            "design_approach": approach,
+            "utility_level_targets": (network.source_metadata or {}).get(
+                "utility_level_targets"
+            ),
+        },
+        sort_keys=True,
+        default=repr,
+    )
+
+
 class UtilityChoiceError(ValueError):
     """A heater or cooler names no utility, and its side has several to choose from."""
 
@@ -873,8 +898,13 @@ class _DesignAccessor:
         finishing = threading.Lock()
 
         def finalise(outcome):
-            key = _finalise_key(
-                outcome.network, self._design_approach(outcome.network, hens)
+            approach = self._design_approach(outcome.network, hens)
+            # A fit sets duties and areas afresh, so networks of one
+            # structure share it; a rating alone keeps each network's areas.
+            key = (
+                _fit_key(outcome.network, approach)
+                if fit
+                else _finalise_key(outcome.network, approach)
             )
             with finishing:
                 if key not in finished:

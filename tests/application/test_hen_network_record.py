@@ -137,3 +137,37 @@ def test_a_network_offered_again_is_rated_once(monkeypatch):
     _assert_result_is_the_record(view, record)
     inputs = [_rating_input(network) for network in received]
     assert len(inputs) == len(set(inputs))
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    not _SOLVERS,
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_structure_is_fitted_once_at_each_design_approach(monkeypatch):
+    """A fit to every period sets a network's duties and areas afresh, so it
+    depends on the network's structure, the approach it was designed to and
+    the levels it holds, not on the duties it arrives with. Networks that
+    share those are fitted once (16 fits of 11 such networks before)."""
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+        network_structure_signature,
+    )
+
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+    hens = problem.master_zone.config.hens
+    received = _finalised_networks(monkeypatch)
+    record = HeatExchangerNetworkRecord()
+
+    view = problem.design.heat_exchanger_network(record=record)
+
+    _assert_result_is_the_record(view, record)
+    fitted = [
+        (
+            repr(network_structure_signature(network)),
+            repr(sorted(problem.design._design_approach(network, hens).items())),
+            repr((network.source_metadata or {}).get("utility_level_targets")),
+        )
+        for network in received
+    ]
+    assert len(fitted) > 1
+    assert len(fitted) == len(set(fitted))
