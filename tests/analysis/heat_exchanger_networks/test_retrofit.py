@@ -864,6 +864,21 @@ def test_a_retrofit_without_an_approach_keeps_each_streams_contribution():
     assert explicit == pytest.approx([4.0] * 4)
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_a_retrofit_match_of_two_zero_contributions_is_held_to_the_pair_floor():
+    """H1 and C1 contribute nothing: their match is held to the 0.1 K floor
+    of a pair, and C1's match with H3 (5 K) to H3's contribution alone."""
+    data = json.loads(CASE_JSON.read_text(encoding="utf-8"))
+    for stream in data["streams"]:
+        value = 0.0 if stream["name"] in {"H1", "C1"} else 5.0
+        stream["dt_cont"] = {"value": value, "unit": "delta_degC"}
+
+    default = _recovery_approaches(PinchProblem(data), None)
+
+    assert sorted(default) == pytest.approx([0.1, 5.0, 10.0, 10.0], abs=1e-12)
+
+
 def test_a_retrofit_without_an_approach_screens_at_the_cases_minimum_approach():
     """The screens take one approach: twice THERMAL_DT_CONT (10 K) when
     none is given, so a heat pump's evaporator sits 10 K below its hot
