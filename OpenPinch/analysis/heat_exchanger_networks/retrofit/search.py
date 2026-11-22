@@ -532,6 +532,7 @@ def _loop_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         parent.solved,
         [c for c in evaluator.loops if loop_heater_name(c) not in installed],
         limit=settings.new_match_candidates,
+        weights=evaluator.weights,
     ):
         cooler = NewUtility(loop.hot, loop_cooler_name(loop), False)
         cooler_id = _new_utility_id(network, cooler)

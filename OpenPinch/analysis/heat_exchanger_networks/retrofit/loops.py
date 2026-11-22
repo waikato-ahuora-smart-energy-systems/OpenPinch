@@ -10,13 +10,14 @@ balances: what the loop collects it delivers, in every period, with no loss.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..solver.arrays import PreparedSolverArrays
 from .heat_pumps import with_constant_utilities
+from .moves import period_mean
 
 # The loop circulates over this many K about its temperature, as a utility
 # needs a temperature change.
@@ -76,17 +77,20 @@ def screen_heat_recovery_loops(
     candidates: list[HeatRecoveryLoop],
     *,
     limit: int,
+    weights: Sequence[float] | None = None,
 ) -> list[HeatRecoveryLoop]:
     """The ``limit`` loops that could relieve the most utility in solved
-    ``network`` (first period), most first, ties broken by names.
+    ``network``, most first, ties broken by names.
 
     A loop takes at most its hot stream's cooler duty and gives at most its
-    cold stream's heater duty. Those that relieve none are left out.
+    cold stream's heater duty. Those that relieve none are left out. Duties
+    are the network's period-weighted means with ``weights``
+    (``moves.period_mean``), else its first period's.
     """
 
     def duty(kind: HeatExchangerKind, stream: str) -> float:
         return sum(
-            e.period_states[0].duty
+            period_mean([state.duty for state in e.period_states], weights)
             for e in network.exchangers
             if e.kind is kind
             and (
