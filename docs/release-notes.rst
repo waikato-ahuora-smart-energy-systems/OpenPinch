@@ -111,8 +111,11 @@ Heat exchanger network synthesis
   electricity, the as-piped target was a 17.5 MW heat pump at a COP of
   2.30 saving 0.31 M$/y; it is now 7.2 MW at 3.23 saving 0.95 M$/y. The
   ideal target goes from 10.6 MW saving 1.00 M$/y to 6.3 MW saving
-  1.13 M$/y, and ``heat_pump_gap`` from 0.69 to 0.18 M$/y. Those two
-  options no longer affect ``retrofit_heat_pumps``.
+  1.13 M$/y, and ``heat_pump_gap`` from 0.69 to 0.18 M$/y. Cooling left
+  below the cooling water level, which the search priced from a default
+  refrigeration machine's COP, is priced at the network's cold utility as
+  well. Those two options and ``COSTING_HPR_REFRIGERATION_ETA_II`` no
+  longer affect ``retrofit_heat_pumps``.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

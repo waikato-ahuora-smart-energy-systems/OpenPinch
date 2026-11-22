@@ -93,8 +93,13 @@ def _at_network_prices(config, prices: dict):
     The HPR search prices heat and cooling as ratios of the electricity
     price (``COSTING_HPR_PRICE_RATIO_*``). The targets are reported at the
     network's utility prices, so the search is given those: a machine sized
-    for other prices is not the best one at these. With no electricity
-    price there is no ratio and ``config`` is returned as it is.
+    for other prices is not the best one at these. Cooling left below the
+    cooling water level is refrigeration to the search, priced from a
+    default machine's COP; the targets report it at the cold utility price
+    too, so that machine is switched off (an efficiency of 0 prices
+    refrigeration as cooling water,
+    ``default_refrigeration_to_power_ratio``). With no electricity price
+    there is no ratio and ``config`` is returned as it is.
     """
 
     electricity = prices["electricity_price"]
@@ -106,6 +111,7 @@ def _at_network_prices(config, prices: dict):
         COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE=(
             prices["cold_utility_price"] / electricity
         ),
+        COSTING_HPR_REFRIGERATION_ETA_II=0.0,
     )
     return priced
 
