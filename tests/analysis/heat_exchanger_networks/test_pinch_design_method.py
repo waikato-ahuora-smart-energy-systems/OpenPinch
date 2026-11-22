@@ -1731,6 +1731,21 @@ def test_pdm_stages_set_the_pinch_design_stage_counts() -> None:
     assert _pdm_stage_selection(
         staged, task.model_copy(update={"settings": {"stage_selection": [2, 4]}})
     ) == [2, 4]
+
+
+def test_pdm_stages_leave_the_heuristic_pinch_design_its_own_stages() -> None:
+    """The heuristic pinch design sets each side's stages from its own
+    matches, so its decompositions are not built to the MILP's pair."""
+    from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
+
+    staged = _four_stream_problem(options={"HENS_PDM_STAGES": [1, 2]})
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(staged))[0]
+    heuristic = task.model_copy(
+        update={"method": HeatExchangerNetworkDesignMethod.HeuristicPinchDesign}
+    )
+
+    assert _pdm_stage_selection(staged, task) == [1, 2]
+    assert _pdm_stage_selection(staged, heuristic) == "automated"
     assert (
         _solver_status(
             SimpleNamespace(

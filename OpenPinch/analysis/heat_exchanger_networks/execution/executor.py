@@ -1102,13 +1102,16 @@ def _pdm_stage_selection(
 ) -> str | list[int]:
     """The pinch design stage counts above and below the pinch, or
     ``"automated"``: the task's own pair (a stage pair candidate), else
-    ``HENS_PDM_STAGES``."""
+    ``HENS_PDM_STAGES``. A heuristic pinch design task sets its own stages,
+    so the option does not reach it."""
     if task is not None:
         task_stage_selection = task.settings.get("stage_selection")
         if task_stage_selection is not None:
             selection = [int(value) for value in task_stage_selection]
             if len(selection) == 2:
                 return selection
+        if task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+            return "automated"
     pdm_stages = problem.master_zone.config.hens.pdm_stages
     if pdm_stages is not None:
         return [int(value) for value in pdm_stages]
