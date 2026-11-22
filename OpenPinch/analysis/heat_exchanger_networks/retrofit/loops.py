@@ -17,7 +17,7 @@ from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..solver.arrays import PreparedSolverArrays
 from .heat_pumps import with_constant_utilities
-from .moves import period_mean
+from .moves import joint_relief, utility_duties
 
 # The loop circulates over this many K about its temperature, as a utility
 # needs a temperature change.
@@ -83,28 +83,16 @@ def screen_heat_recovery_loops(
     ``network``, most first, ties broken by names.
 
     A loop takes at most its hot stream's cooler duty and gives at most its
-    cold stream's heater duty. Those that relieve none are left out. Duties
-    are the network's period-weighted means with ``weights``
-    (``moves.period_mean``), else its first period's.
+    cold stream's heater duty, in the same period. Those that relieve none
+    are left out. The two are paired in each period and then averaged with
+    ``weights`` (``moves.joint_relief``), else read in the first period.
     """
 
-    def duty(kind: HeatExchangerKind, stream: str) -> float:
-        return sum(
-            period_mean([state.duty for state in e.period_states], weights)
-            for e in network.exchangers
-            if e.kind is kind
-            and (
-                e.source_stream
-                if kind is HeatExchangerKind.COLD_UTILITY
-                else e.sink_stream
-            )
-            == stream
-        )
-
     relief = {
-        loop: min(
-            duty(HeatExchangerKind.COLD_UTILITY, loop.hot),
-            duty(HeatExchangerKind.HOT_UTILITY, loop.cold),
+        loop: joint_relief(
+            utility_duties(network, HeatExchangerKind.COLD_UTILITY, loop.hot),
+            utility_duties(network, HeatExchangerKind.HOT_UTILITY, loop.cold),
+            weights,
         )
         for loop in candidates
     }
