@@ -87,6 +87,8 @@ _MIN_KEPT_SHARE = 0.01
 # Area value ($/y per m2) below which more area on a unit is worth nothing.
 _MIN_AREA_VALUE = 1e-3
 _MIN_KEPT_AREA = 1.0
+# The search warns when more than this share of its solves failed.
+_FAILED_SOLVE_WARNING_SHARE = 0.25
 STRATEGIES = ("stepwise", "structure")
 HEAT_PUMP_CYCLES = (None, "carnot", "vapour_compression")
 # The solver axes whose names a heat pump or loop utility must not take.
@@ -319,8 +321,10 @@ def run_retrofit_search(
     beam = [base]
     seen = {_signature(base.state, evaluator.existing)}
     structural = settings.strategy == "structure"
+    failed: list[int] = []
     for _depth in range(max(0, int(settings.max_modifications))):
         children = []
+        failed_before = evaluator.failures
         for parent in beam:
             states = []
             for state in _children(parent, settings, evaluator):
@@ -339,13 +343,31 @@ def run_retrofit_search(
                 for evaluated in evaluator.map(solve, states)
                 if evaluated is not None
             )
+        if children:
+            children.sort(key=lambda child: -child.design.net_annual_benefit)
+            beam = children[: max(1, int(settings.beam_width))]
+            if structural:
+                # Only the depth's best design: each drop costs a solve, and
+                # the next depth sizes every kept design's area afresh.
+                beam[0] = evaluator.paying(beam[0])
+            frontier.append(beam[0].design)
+        failed.append(evaluator.failures - failed_before)
         if not children:
             break
-        children.sort(key=lambda child: -child.design.net_annual_benefit)
-        beam = children[: max(1, int(settings.beam_width))]
-        frontier.append(beam[0].design)
+    if sum(failed) > _FAILED_SOLVE_WARNING_SHARE * evaluator.evaluations:
+        warnings.warn(
+            f"{sum(failed)} of {evaluator.evaluations} retrofit candidate solves "
+            "failed (did not converge, or the solved network failed its "
+            "checks) and were dropped, so the frontier may miss better "
+            "designs; result.failed_solves counts them by step. A wider "
+            "area_tolerance or other solver options may recover them.",
+            UserWarning,
+            stacklevel=3,
+        )
     return HeatExchangerNetworkRetrofitResult(
-        frontier=mark_dominated(frontier), evaluated_designs=evaluator.evaluations
+        frontier=mark_dominated(frontier),
+        evaluated_designs=evaluator.evaluations,
+        failed_solves=tuple(failed),
     )
 
 
@@ -838,6 +860,8 @@ class _Evaluator:
             self.arrays = with_loop_utilities(self.arrays, self.loops)
         self.base_utility_cost: float | None = None
         self.evaluations = 0
+        # Solves that did not converge, or whose network failed its checks.
+        self.failures = 0
         self._count_lock = threading.Lock()
         costing = config.costing
         self.area_coeff = float(costing.hx_area_coeff)
@@ -845,6 +869,12 @@ class _Evaluator:
         self.recovery_factor = float(
             compute_capital_recovery_factor(costing.discount_rate, costing.service_life)
         )
+
+    def _failed(self) -> None:
+        """Count a solve that did not converge or failed its checks."""
+
+        with self._count_lock:
+            self.failures += 1
 
     def evaluate(self, state: _State) -> _Evaluated | None:
         """Solve ``state``; ``None`` if the solve fails."""
@@ -921,8 +951,10 @@ class _Evaluator:
                 # error stands.
                 if not state.moves:
                     raise
+                self._failed()
                 return None
             if getattr(model, "mSuccess", 0) != 1:
+                self._failed()
                 return None
             solved = build_solution_network(request, structure, model, self.arrays)
             # The solver accepts loosely converged points: drop a design whose
@@ -935,6 +967,7 @@ class _Evaluator:
             }
             widened = self._widened(solved, state.enhanced, allowances)
             if verify_solution(structure, model, widened):
+                self._failed()
                 return None
             solved = _with_rating_allowances(solved, widened)
             results = dict(zip(ids, structure.results(model), strict=True))
@@ -1104,11 +1137,13 @@ class _Evaluator:
         try:
             model.optimise(print_output=False)
             if getattr(model, "mSuccess", 0) != 1:
+                self._failed()
                 return None
             return float(model.utility_cost_value)
         except ValueError:
             # A solved duty the model cannot place on a segmented stream's
             # profile (raised while it reads the solution) has no ceiling.
+            self._failed()
             return None
         finally:
             model.cleanup()
@@ -1200,6 +1235,40 @@ class _Evaluator:
             )
         )
         return sized if sized is not None else self.evaluate(state)
+
+    def paying(self, sized: _Evaluated) -> _Evaluated:
+        """``sized`` without the area additions that do not pay.
+
+        The sizing solve weighs an addition's area cost against the utility
+        it saves but not its fixed cost (``area_addition_cost``), so it grows
+        units that do not earn that cost. The design is solved again with
+        each kept addition dropped in turn (on the search's threads, as its
+        other solves are); the drop that raises net annual benefit most
+        stands, and the rest are tried again from there until none does.
+        """
+
+        def net(evaluated: _Evaluated) -> float:
+            return evaluated.design.net_annual_benefit
+
+        best = sized
+        while True:
+            state = best.state
+            trials = self.map(
+                self.evaluate,
+                [
+                    replace(
+                        state,
+                        enlarged=state.enlarged - {move.exchanger_id},
+                        moves=tuple(m for m in state.moves if m is not move),
+                    )
+                    for move in state.moves
+                    if move.kind == "area_addition"
+                ],
+            )
+            better = max((t for t in trials if t is not None), key=net, default=None)
+            if better is None or net(better) <= net(best):
+                return best
+            best = better
 
     def _widened(
         self,

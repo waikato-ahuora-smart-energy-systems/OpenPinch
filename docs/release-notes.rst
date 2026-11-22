@@ -78,6 +78,22 @@ Heat exchanger network synthesis
   that period's flowrates and temperatures, and caps its relief period by
   period, so a pair of streams that never run together is not proposed.
   Relocation scoring still reads a match's potential from the period means.
+- The default (structure) retrofit search now drops area additions that do
+  not pay. The sizing solve weighs an addition's area cost against the
+  utility it saves but not its fixed cost (``area_addition_cost``), so it
+  grew units that did not earn that cost. Each step's best design is now
+  solved again without each of its area additions in turn, and an addition
+  whose removal raises the net annual benefit is dropped. On the Ciric and
+  Floudas case at the report's costs the three-change design drops 112 m2
+  on E1 and 33.5 m2 on E4: net annual benefit 1,960,807 to 1,963,253 $/y,
+  capital 3.97 to 3.87 M$, for 11 more solves (134 to 145). The guide's
+  solve counts for the structure search are updated.
+- A retrofit result now reports ``failed_solves``: for each search step,
+  the candidates dropped because their solve did not converge or their
+  solved network failed its checks. They were dropped silently before.
+  The search warns when more than a quarter of its solves failed: on the
+  Ciric and Floudas case with relocation at the report's costs, 136 of 491
+  did (28 %); without relocation 1 of 145.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.
