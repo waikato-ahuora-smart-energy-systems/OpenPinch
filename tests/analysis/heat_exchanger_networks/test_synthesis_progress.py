@@ -163,3 +163,43 @@ def test_a_session_keeps_one_worker_pool_for_every_stage(stub_solves, monkeypatc
 
     assert started == [2]
     assert closed == [True]
+
+
+def test_a_session_pool_outlives_a_stage_that_solves_in_process(
+    stub_solves, monkeypatch
+):
+    """A stage with one task left to solve does it in this process; the
+    session's pool stays open for the stages after it."""
+    started, closed = [], []
+
+    class Pool(_InProcessPool):
+        def __init__(self, workers):
+            started.append(workers)
+
+        def __exit__(self, *exc_info):
+            closed.append(True)
+            return False
+
+    def build_the_first_only(self, task, **kwargs):
+        if task.run_id != "task-0":
+            raise RuntimeError("bad build")
+        return task
+
+    monkeypatch.setattr(
+        executor_module, "supported_workers", lambda requested: requested
+    )
+    executor = LocalSynthesisExecutor(worker_pool_factory=Pool)
+    tasks = [_task(index) for index in range(3)]
+    # A parent outcome makes the stage build its tasks here, not in workers.
+    parents = {"a-parent": object()}
+
+    with executor.session():
+        executor.execute(tasks, problem=None, parent_outcomes=parents, max_parallel=2)
+        monkeypatch.setattr(
+            LocalSynthesisExecutor, "_build_problem", build_the_first_only
+        )
+        executor.execute(tasks, problem=None, parent_outcomes=parents, max_parallel=2)
+        assert closed == []
+
+    assert started == [2]
+    assert closed == [True]

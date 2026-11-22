@@ -171,8 +171,9 @@ class LocalSynthesisExecutor:
 
         worker_count = max(1, min(max_parallel, len(built)))
         if pool is not None and worker_count == 1:
-            # At most one task built: close the unused pool and solve here.
-            with pool:
+            # At most one task built: solve here, closing the unused pool
+            # unless a session keeps it for later stages.
+            with self._using(pool):
                 pass
             pool = None
         branch_parallel = max(1, max_parallel) if worker_count == 1 else 1
