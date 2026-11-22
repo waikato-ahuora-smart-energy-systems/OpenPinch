@@ -83,7 +83,10 @@ Heat exchanger network synthesis
   utility ran that much wider than its partner's contribution: a 5 K
   stream on a 0 K utility at 5.1 K, now 5.0 K. Pinch design targets move
   with it, since the copy of the case they are computed on keeps zero
-  contributions at zero too. On ``zonal_site.json``, whose six utilities
+  contributions at zero too, except where a hot and a cold contribution sum
+  below 0.1 K: each is then targeted at 0.05 K, and the streams split at the
+  pinch with it, so the targets never ask for more recovery than the 0.1 K
+  floor allows. On ``zonal_site.json``, whose six utilities
   have a contribution of 0, hot water now splits at 87 and 85 degC (87.1
   and 85.1 before). In the thermal derivative and evolution steps, which
   scale every contribution down to a nominal 0.1 K, a pair below the
