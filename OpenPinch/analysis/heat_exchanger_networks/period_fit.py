@@ -13,7 +13,11 @@ import numpy as np
 
 from ...domain.enums import HeatExchangerKind
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
-from .solver.arrays import nominal_approach_temperature, problem_to_solver_arrays
+from .solver.arrays import (
+    MINIMUM_PAIR_APPROACH,
+    nominal_approach_temperature,
+    problem_to_solver_arrays,
+)
 from .solver.utility_slices import (
     slice_label,
     slice_labels,
@@ -111,8 +115,16 @@ def with_stream_end_utilities(
         running = runs[side][:, stream_index]
         if approach is None:
             stream_cont, (inlet_cont, outlet_cont) = held[side]
-            needed_out = stream_cont[:, stream_index] + outlet_cont[:, utility_index]
-            needed_in = stream_cont[:, stream_index] + inlet_cont[:, utility_index]
+            # The pair's minimum approach, floored on the pair as the fit's
+            # model holds it (``pair_minimum_approach``).
+            needed_out = np.maximum(
+                stream_cont[:, stream_index] + outlet_cont[:, utility_index],
+                MINIMUM_PAIR_APPROACH,
+            )
+            needed_in = np.maximum(
+                stream_cont[:, stream_index] + inlet_cont[:, utility_index],
+                MINIMUM_PAIR_APPROACH,
+            )
         else:
             needed_out = needed_in = np.full(len(weights), float(approach))
         # Hot side: the utility's outlet against the stream's inlet, its inlet

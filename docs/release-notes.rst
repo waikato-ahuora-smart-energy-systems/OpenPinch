@@ -72,15 +72,6 @@ Heat exchanger network synthesis
   network's duties and temperatures as period-weighted means too, so a
   heater that is off in the first period no longer hides the heat it could
   give up.
-- The minimum approach of a match is now floored on the pair, at 0.1 K,
-  wherever a model adds its two sides' temperature contributions (recovery
-  matches, heaters and coolers). The thermal derivative and evolution steps
-  scale every contribution down to a nominal 0.1 K, so a pair whose
-  contributions are below the reference ``THERMAL_DT_CONT`` was held to
-  less than the documented 0.1 K: a 2.5 K stream on a 2.5 K stream to
-  0.05 K at the 5 K default. Such a pair is now held to 0.1 K. Pinch design
-  is unchanged by this entry: there a zero contribution is still replaced
-  by 0.1 K on the stream (to be changed next).
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.
