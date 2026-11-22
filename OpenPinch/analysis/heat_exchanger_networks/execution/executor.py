@@ -110,13 +110,6 @@ class LocalSynthesisExecutor:
         shared = _ZoneCopiedOnce(problem)
         max_parallel = supported_workers(int(max_parallel))
         worker_count = max(1, min(max_parallel, len(tasks)))
-        if all(
-            task.method is HeatExchangerNetworkDesignMethod.HeuristicPinchDesign
-            for task in tasks
-        ):
-            # A heuristic design takes far less time than a worker process
-            # takes to start, so these are solved here.
-            worker_count = 1
         pool = self._start_pool(worker_count, max_parallel)
         if pool is not None and _can_build_tasks_in_workers(tasks, parent_outcomes):
             # Workers get the problem itself; each copies the zone once.

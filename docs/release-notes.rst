@@ -125,12 +125,6 @@ Heat exchanger network synthesis
   save: the default design took 11.3 s with 10 workers and takes 3.2 s with
   one, for the same two ranked networks. Set ``HENS_MAX_PARALLEL`` in the
   case's ``options`` to use worker processes.
-- Heuristic pinch designs are always solved in the calling process, whatever
-  ``HENS_MAX_PARALLEL`` says. Each takes a fraction of a second, while a pool
-  of worker processes takes seconds to start: with 10 workers the three
-  heuristic designs of the four-stream case took 4.5 s in a pool against
-  0.1 s in process, and the whole default design now takes 8.0 s instead of
-  11.3 s (2.9 s with one worker).
 - A synthesis run with ``HENS_MAX_PARALLEL`` above 1 now starts one pool of
   worker processes for the whole run, not one for each stage. Starting a
   pool takes seconds: at search depth 2 with 10 workers the four-stream
