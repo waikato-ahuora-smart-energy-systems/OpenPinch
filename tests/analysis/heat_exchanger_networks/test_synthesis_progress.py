@@ -130,3 +130,36 @@ def test_a_stage_whose_tasks_all_fail_to_build_reports_it_finished(
         )
 
     assert [(event.done, event.total) for event in events] == [(0, 2), (2, 2)]
+
+
+def test_a_session_keeps_one_worker_pool_for_every_stage(stub_solves, monkeypatch):
+    """Worker processes take seconds to start (about 4 s for a pool on the
+    four-stream case), so a run starts one pool, not one for each stage."""
+    started, closed = [], []
+
+    class Pool(_InProcessPool):
+        def __init__(self, workers):
+            started.append(workers)
+
+        def __exit__(self, *exc_info):
+            closed.append(True)
+            return False
+
+    # On any runtime: under Emscripten no pool is ever started.
+    monkeypatch.setattr(
+        executor_module, "supported_workers", lambda requested: requested
+    )
+    executor = LocalSynthesisExecutor(worker_pool_factory=Pool)
+
+    with executor.session():
+        for _stage in range(2):
+            executor.execute(
+                [_task(index) for index in range(3)],
+                problem=None,
+                parent_outcomes={},
+                max_parallel=2,
+            )
+        assert closed == []
+
+    assert started == [2]
+    assert closed == [True]

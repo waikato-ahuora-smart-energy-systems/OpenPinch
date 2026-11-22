@@ -199,15 +199,70 @@ class LocalSynthesisExecutor:
 
         return self._collect_outcomes(tasks, solved_results, failed)
 
-    def _start_pool(self, worker_count: int):
-        """A pool of ``worker_count`` workers, or ``None`` to run serially."""
+    # Whether a session is open, and the pool it keeps for its stages.
+    _session_open = False
+    _session_pool = None
+
+    @contextmanager
+    def session(self):
+        """Keep one worker pool for every stage executed inside.
+
+        Worker processes take seconds to start, so a run of several stages
+        starts its pool once, at the first stage that needs one, and closes
+        it when the session ends. Outside a session each ``execute`` call
+        starts and closes its own pool.
+        """
+        self._session_open = True
+        try:
+            yield self
+        finally:
+            self._session_open = False
+            pool, self._session_pool = self._session_pool, None
+            if pool is not None:
+                pool.__exit__(None, None, None)
+
+    def _start_pool(self, worker_count: int, session_workers: int | None = None):
+        """A pool of ``worker_count`` workers, or ``None`` to run serially.
+
+        In a session the pool is the session's, started on first use with
+        ``session_workers`` workers (``worker_count`` when not given) so it
+        can serve the later stages too.
+        """
         if worker_count <= 1:
             return None
+        if self._session_pool is not None:
+            return self._session_pool
+        workers = (
+            (session_workers or worker_count) if self._session_open else worker_count
+        )
         try:
-            return self.worker_pool_factory(worker_count)
+            pool = self.worker_pool_factory(workers)
         except NotImplementedError as exc:
             logger.debug("Solving HEN tasks serially: %s", exc)
             return None
+        if self._session_open:
+            pool.__enter__()
+            self._session_pool = pool
+        return pool
+
+    @contextmanager
+    def _using(self, pool):
+        """Use ``pool`` for one stage.
+
+        A stage's own pool is closed after it. A session's pool stays open
+        for the stages to come, unless the stage fails in it: then it is
+        closed and dropped, so the next stage starts a new one.
+        """
+        if pool is not self._session_pool:
+            with pool:
+                yield
+            return
+        try:
+            yield
+        except BaseException:
+            self._session_pool = None
+            pool.__exit__(None, None, None)
+            raise
 
     def _run(self, pool, func, inputs):
         """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``.
@@ -224,10 +279,10 @@ class LocalSynthesisExecutor:
             return
         if not recording_active():
             # Nothing listens: workers have nothing to hand off.
-            with pool:
+            with self._using(pool):
                 yield from _as_completed(pool, func, inputs)
             return
-        with self._handoff() as handoff, pool:
+        with self._handoff() as handoff, self._using(pool):
             yield from _as_completed(
                 pool,
                 _handed_off,
