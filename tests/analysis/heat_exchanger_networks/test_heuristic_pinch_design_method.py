@@ -651,3 +651,42 @@ def test_heuristic_designs_never_start_worker_processes(monkeypatch):
     # A task may give more than one design; each is solved.
     assert len(outcomes) >= len(tasks)
     assert {outcome.status for outcome in outcomes} == {"success"}
+
+
+def test_the_workflow_runs_every_stage_in_one_executor_session():
+    """So a run with worker processes starts their pool once."""
+    from contextlib import contextmanager
+
+    class SessionExecutor(FakeSynthesisExecutor):
+        def __init__(self):
+            super().__init__()
+            self.sessions = 0
+            self.open = False
+            self.stages_in_session = []
+
+        @contextmanager
+        def session(self):
+            self.sessions += 1
+            self.open = True
+            try:
+                yield self
+            finally:
+                self.open = False
+
+        def execute(self, tasks, **kwargs):
+            self.stages_in_session.append(self.open)
+            return super().execute(tasks, **kwargs)
+
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_PDM_MILP": True}
+    )
+    executor = SessionExecutor()
+
+    workflow_module.execute_open_hens_method(
+        problem, workflow_settings_from_problem(problem), executor=executor
+    )
+
+    assert executor.sessions == 1
+    assert len(executor.stages_in_session) > 1
+    assert all(executor.stages_in_session)
+    assert not executor.open
