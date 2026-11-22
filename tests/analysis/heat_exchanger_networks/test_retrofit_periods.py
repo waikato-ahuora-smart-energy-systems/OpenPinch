@@ -96,6 +96,32 @@ def test_stream_ends_weight_the_flowrate_over_the_periods(idle_first):
     assert cold[1] == pytest.approx(90.0 + 273.15, abs=1e-9)
 
 
+@pytest.mark.parametrize("idle_first", [True, False])
+def test_period_stream_ends_give_each_periods_own_flowrate(idle_first):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _period_stream_ends,
+    )
+
+    problem = _problem(idle_first=idle_first)
+    problem.target.direct_heat_integration()
+
+    periods = _period_stream_ends(problem_to_solver_arrays(problem, 10.0))
+
+    # C1 runs at 2 kW/K in the "run" period and is off in the "idle" one.
+    idle, run = (0, 1) if idle_first else (1, 0)
+    cold = [
+        next(value for name, value in ends.items() if name.endswith("C1"))
+        for ends in periods
+    ]
+    assert cold[idle][2] == 0.0
+    assert cold[run] == pytest.approx((40.0 + 273.15, 90.0 + 273.15, 2.0), rel=1e-9)
+    hot = [
+        next(value for name, value in ends.items() if name.endswith("H1"))
+        for ends in periods
+    ]
+    assert hot[idle] == hot[run] == pytest.approx((473.15, 393.15, 2.0), rel=1e-9)
+
+
 EXISTING = {
     "recovery": [],
     "heaters": [{"stream": "C1", "utility": "HPS", "area": 20.0, "id": "E1"}],

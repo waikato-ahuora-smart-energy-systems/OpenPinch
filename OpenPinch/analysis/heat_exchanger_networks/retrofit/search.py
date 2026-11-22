@@ -1478,10 +1478,41 @@ def _stream_ends(arrays) -> dict[str, tuple[float, float, float]]:
     segments' duty over its temperature span.
     """
 
-    data = arrays.arrays
-    weights = np.asarray(data["period_weights"], dtype=float)
+    weights = np.asarray(arrays.arrays["period_weights"], dtype=float)
     weights = weights / weights.sum()
     ends: dict[str, tuple[float, float, float]] = {}
+    for name, supply, target, flows in _stream_rows(arrays):
+        running = weights * (flows > 0.0)
+        over = running / running.sum() if running.sum() > 0.0 else weights
+        ends[name] = (
+            float(over @ supply),
+            float(over @ target),
+            float(weights @ flows),
+        )
+    return ends
+
+
+def _period_stream_ends(arrays) -> tuple[dict[str, tuple[float, float, float]], ...]:
+    """Each period's own stream ends: every process stream's supply and
+    target temperature and heat capacity flowrate in that period (0 for a
+    stream that is off; a segmented stream's as in ``_stream_ends``)."""
+
+    rows = list(_stream_rows(arrays))
+    return tuple(
+        {
+            name: (float(supply[n]), float(target[n]), float(flows[n]))
+            for name, supply, target, flows in rows
+        }
+        for n in range(len(arrays.arrays["period_weights"]))
+    )
+
+
+def _stream_rows(arrays):
+    """Each process stream's name and, by period, its supply and target
+    temperature and heat capacity flowrate (a segmented stream's being its
+    segments' duty over its temperature span)."""
+
+    data = arrays.arrays
     for side, axis in (("h", "hot_process_streams"), ("c", "cold_process_streams")):
         for name, index in arrays.axis_maps[axis].items():
             flows = np.asarray(data[f"f_{side}_period"], dtype=float)[:, index]
@@ -1499,11 +1530,9 @@ def _stream_ends(arrays) -> dict[str, tuple[float, float, float]]:
             )
             segmented = (flows <= 0.0) & (duty > 0.0) & (span > 0.0)
             flows = np.where(segmented, duty / np.where(span > 0.0, span, 1.0), flows)
-            running = weights * (flows > 0.0)
-            over = running / running.sum() if running.sum() > 0.0 else weights
-            ends[str(name)] = (
-                float(over @ data[f"T_{side}_in_period"][:, index]),
-                float(over @ data[f"T_{side}_out_period"][:, index]),
-                float(weights @ flows),
+            yield (
+                str(name),
+                np.asarray(data[f"T_{side}_in_period"], dtype=float)[:, index],
+                np.asarray(data[f"T_{side}_out_period"], dtype=float)[:, index],
+                flows,
             )
-    return ends
