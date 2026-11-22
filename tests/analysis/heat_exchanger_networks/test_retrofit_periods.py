@@ -315,8 +315,10 @@ def test_the_search_screens_loops_with_the_period_weights(monkeypatch):
     assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
 
 
-def _two_period_network(duties):
-    """A cooler on H1 and a heater on C1 with the given duty in each period."""
+def _two_period_network(duties, heaters=("C1",), inlets=None):
+    """A cooler on H1 and a heater on C1 (or on each of ``heaters``) with the
+    given duty in each period and, with ``inlets``, the process stream's
+    temperature (K) entering it in each period (``None`` when it is off)."""
     from OpenPinch.domain._heat_exchanger.period_state import (
         HeatExchangerPeriodState,
     )
@@ -324,7 +326,7 @@ def _two_period_network(duties):
 
     structure = HeatExchangerNetwork.from_structure(
         recovery=[],
-        heaters=["C1"],
+        heaters=list(heaters),
         coolers=["H1"],
         hot_utility="HU",
         cold_utility="CU",
@@ -336,7 +338,10 @@ def _two_period_network(duties):
                     update={
                         "period_states": tuple(
                             HeatExchangerPeriodState(
-                                period_id=str(index), period_idx=index, duty=duty
+                                period_id=str(index),
+                                period_idx=index,
+                                duty=duty,
+                                **_process_inlet(e, inlets, index),
                             )
                             for index, duty in enumerate(
                                 duties[f"{e.source_stream}->{e.sink_stream}"]
@@ -348,6 +353,19 @@ def _two_period_network(duties):
             )
         }
     )
+
+
+def _process_inlet(exchanger, inlets, index):
+    """The process side's inlet temperature of a cooler or heater."""
+    if inlets is None:
+        return {}
+    field = (
+        "source_inlet_temperature"
+        if exchanger.source_stream == "H1"
+        else "sink_inlet_temperature"
+    )
+    key = f"{exchanger.source_stream}->{exchanger.sink_stream}"
+    return {field: inlets[key][index]}
 
 
 def test_a_match_relieves_nothing_when_its_streams_never_run_together():
@@ -404,7 +422,10 @@ def test_a_match_has_no_potential_when_its_streams_never_run_together():
         match_potential,
     )
 
-    network = _two_period_network({"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 80.0]})
+    network = _two_period_network(
+        {"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 80.0]},
+        inlets={"H1->CU": [400.0, None], "HU->C1": [None, 300.0]},
+    )
 
     # The period means give both streams 1 kW/K and so a potential; period
     # by period the smaller flowrate is 0.
@@ -425,7 +446,10 @@ def test_the_screen_proposes_no_match_between_streams_that_never_run_together():
         screen_new_matches,
     )
 
-    network = _two_period_network({"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 80.0]})
+    network = _two_period_network(
+        {"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 80.0]},
+        inlets={"H1->CU": [400.0, None], "HU->C1": [None, 300.0]},
+    )
 
     proposed = screen_new_matches(
         network,
@@ -437,3 +461,47 @@ def test_the_screen_proposes_no_match_between_streams_that_never_run_together():
     )
 
     assert proposed == ()
+
+
+def test_the_screen_caps_relief_by_each_periods_potential():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
+        screen_new_matches,
+    )
+
+    # Every stream runs at 2 kW/K. H1 (400 to 350 K) is cooled 100 kW in both
+    # periods. C2 (300 to 325 K) is heated 50 kW in both and could take
+    # 2 * (400 - 300 - 10) = 180 kW from H1 in each, so a match relieves
+    # 50 kW. C1 is heated 80 kW then 50 kW, but in the second period it runs
+    # from 395 to 420 K, too close to H1: its potential is 180 kW in the first
+    # period and none in the second, so a match relieves min(180, 100, 80) =
+    # 80 kW then nothing, 40 kW on average, and C2 leads. Capped by its mean
+    # potential (90 kW) in both periods, C1 looked like 65 kW and led.
+    network = _two_period_network(
+        {"H1->CU": [100.0, 100.0], "HU->C1": [80.0, 50.0], "HU->C2": [50.0, 50.0]},
+        heaters=("C1", "C2"),
+        inlets={
+            "H1->CU": [400.0, 400.0],
+            "HU->C1": [300.0, 395.0],
+            "HU->C2": [300.0, 300.0],
+        },
+    )
+    ends = {
+        "H1": (400.0, 350.0, 2.0),
+        "C1": (347.5, 380.0, 2.0),
+        "C2": (300.0, 325.0, 2.0),
+    }
+    period_ends = (
+        {**ends, "C1": (300.0, 340.0, 2.0)},
+        {**ends, "C1": (395.0, 420.0, 2.0)},
+    )
+
+    proposed = screen_new_matches(
+        network,
+        ends,
+        approach=10.0,
+        limit=1,
+        weights=[0.5, 0.5],
+        period_ends=period_ends,
+    )
+
+    assert [move.cold for move in proposed] == ["C2"]

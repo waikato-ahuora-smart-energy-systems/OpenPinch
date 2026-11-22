@@ -164,10 +164,25 @@ def screen_new_matches(
         )
         for move in moves
     ]
+    by_period = (
+        period_ends is not None
+        and weights is not None
+        and len(weights) == len(period_ends)
+    )
+
+    def relief(potential: float, move: NewMatch) -> float:
+        # Capped by each period's own potential where the periods are known.
+        cap = (
+            match_potentials(network, period_ends, move, approach=approach)
+            if by_period
+            else potential
+        )
+        return utility_relief(network, move, cap, weights=weights)
+
     ranked = sorted(
         ((potential, move) for potential, move in scored if potential > 0.0),
         key=lambda item: (
-            -utility_relief(network, item[1], item[0], weights=weights),
+            -relief(item[0], item[1]),
             -item[0],
             len(new_splits(network, item[1])),
             item[1].stage,
@@ -246,11 +261,12 @@ def match_potentials(
 def utility_relief(
     network: HeatExchangerNetwork,
     move: NewMatch,
-    potential: float,
+    potential: float | Sequence[float],
     *,
     weights: Sequence[float] | None = None,
 ) -> float:
-    """Utility a new match of ``potential`` could cut at first order.
+    """Utility a new match of ``potential`` (one value, or each period's
+    own) could cut at first order.
 
     Heat it moves cuts utility only as far as its hot stream is cooled and
     its cold stream heated in the same period: the least of ``potential``,
@@ -287,17 +303,19 @@ def joint_relief(
     heating: Sequence[float],
     weights: Sequence[float] | None,
     *,
-    cap: float = math.inf,
+    cap: float | Sequence[float] = math.inf,
 ) -> float:
     """Utility a link from a cooled to a heated stream could cut.
 
     ``cooling`` and ``heating`` hold what each side can give and take in
-    each period. The link moves the smaller of the two, at most ``cap``, in
-    each period; the result is ``period_mean`` of that, not the smaller of
-    the two means, so sides that never run together relieve nothing.
+    each period. The link moves the smaller of the two, at most ``cap`` (one
+    value, or one for each period), in each period; the result is
+    ``period_mean`` of that, not the smaller of the two means, so sides that
+    never run together relieve nothing.
     """
 
-    joint = [min(cap, c, h) for c, h in zip(cooling, heating)]
+    caps = cap if isinstance(cap, Sequence) else [cap] * len(cooling)
+    joint = [min(limit, c, h) for limit, c, h in zip(caps, cooling, heating)]
     return period_mean(joint, weights) if joint else 0.0
 
 
