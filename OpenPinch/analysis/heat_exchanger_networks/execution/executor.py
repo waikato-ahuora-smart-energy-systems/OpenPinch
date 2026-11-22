@@ -436,6 +436,15 @@ class LocalSynthesisExecutor:
             solver=_solver_for_task(problem, task.method),
             dTmin=dTmin,
             dt_cont_multiplier=task.dt_cont_multiplier,
+            approach_share=(
+                float(config.hens.min_exchanger_approach_share)
+                if task.method
+                in {
+                    HeatExchangerNetworkDesignMethod.ThermalDerivative,
+                    HeatExchangerNetworkDesignMethod.NetworkEvolution,
+                }
+                else None
+            ),
             min_dqda=(
                 0.0
                 if task.derivative_threshold is None

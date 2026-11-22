@@ -619,6 +619,30 @@ def test_an_evolved_networks_design_approach_is_its_pairs_share_of_pinch_design(
     }
 
 
+def test_an_evolved_networks_design_approach_uses_the_share_it_records():
+    """A network designed under a share of 0.5 says so in its metadata, and
+    is fitted and rated at that share whatever the configuration holds now."""
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    ).model_copy(
+        update={
+            "method": "ESM",
+            "summary_metrics": {"dt_cont_multiplier": 1.5},
+            "source_metadata": {"min_exchanger_approach_share": 0.5},
+        }
+    )
+    design = _two_period_problem().design
+
+    approach = design._design_approach(network, design._effective_hens(None))
+
+    assert approach == {
+        "problem_approach": True,
+        "dt_cont_multiplier": pytest.approx(1.5 * 0.5),
+    }
+
+
 def test_networks_that_differ_in_design_approach_or_levels_are_fitted_apart():
     from OpenPinch.application._problem.accessors.design import _finalise_key
     from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork

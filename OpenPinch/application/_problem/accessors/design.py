@@ -810,7 +810,14 @@ class _DesignAccessor:
         }:
             # Each pair's contributions at multiplier x share, floored on the
             # pair at 0.1 K, as the step that designed the network held them.
-            share = float(hens.min_exchanger_approach_share)
+            # The share the network records it was designed with; one that
+            # records none takes the configuration's.
+            recorded = (network.source_metadata or {}).get(
+                "min_exchanger_approach_share"
+            )
+            share = float(
+                hens.min_exchanger_approach_share if recorded is None else recorded
+            )
             return {
                 "problem_approach": True,
                 "dt_cont_multiplier": max(multiplier * share, _LEAST_MULTIPLIER),

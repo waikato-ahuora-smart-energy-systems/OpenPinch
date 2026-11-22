@@ -139,9 +139,11 @@ a match of two 5 K streams, held to 10 K in pinch design at a multiplier of
 The share must be below 1: at 1, evolution cannot start from a pinch design
 network whose exchangers sit exactly at that approach.
 ``verify_network_feasibility`` still checks approaches against the 0.1 K
-floor, not against this share. A network does not record the share it was
-designed with: to fit, rate or overdesign a network designed under another
-share, pass the same option to that call.
+floor, not against this share. A thermal derivative or evolution network
+records the share it was designed with
+(``source_metadata["min_exchanger_approach_share"]``), and a fit to every
+period, a rating or an overdesign of it holds that share, whatever the
+configuration says by then.
 
 Several Hot or Cold Utilities
 -----------------------------

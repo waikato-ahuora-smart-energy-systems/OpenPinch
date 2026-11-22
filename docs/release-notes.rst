@@ -93,6 +93,10 @@ Heat exchanger network synthesis
   evolved network hold the same pair values (each pair's contributions at
   multiplier x share) instead of one uniform approach, which could sit
   above a pair's own value and force the fit down to its 1 K fallback.
+  Each such network records the share it was designed with
+  (``source_metadata["min_exchanger_approach_share"]``), so
+  ``optimise_duties``, the fit and overdesign hold it whatever the
+  configuration says later.
 - Network evolution now adopts the areas of staged heaters and coolers with
   the rest of a better candidate. It kept the areas they had before, so a
   staged unit the candidate no longer used still counted in the area check
