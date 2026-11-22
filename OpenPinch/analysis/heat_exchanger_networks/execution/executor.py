@@ -507,7 +507,13 @@ class LocalSynthesisExecutor:
                 else float(task.derivative_threshold)
             ),
             z_restriction=_topology_restriction_values(task, arrays),
-            minimisation_goal=_model_objective(task.method),
+            minimisation_goal=_model_objective(
+                task.method,
+                utility_choice=any(
+                    len(arrays.axis_maps[side]) > 1
+                    for side in ("hot_utilities", "cold_utilities")
+                ),
+            ),
             non_isothermal_model=is_evolution,
             integers=not is_evolution,
             parent=parent_problem,
@@ -909,9 +915,20 @@ def _model_framework(method: HeatExchangerNetworkDesignMethod) -> str:
     }[method]
 
 
-def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
+def _model_objective(
+    method: HeatExchangerNetworkDesignMethod, *, utility_choice: bool = False
+) -> str:
+    """The goal a task's model minimises.
+
+    The thermal derivative step minimises hot utility duty, which is the
+    utility cost while each side has one utility. With a choice on a side
+    (``utility_choice``) the duty leaves the split between utilities free,
+    so it minimises their cost.
+    """
     if method == HeatExchangerNetworkDesignMethod.NetworkEvolution:
         return "variable total cost"
+    if method == HeatExchangerNetworkDesignMethod.ThermalDerivative and utility_choice:
+        return "utility costs"
     return "hot utility"
 
 
