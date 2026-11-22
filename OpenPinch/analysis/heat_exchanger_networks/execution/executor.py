@@ -1100,17 +1100,18 @@ def _pdm_stage_selection(
     problem,
     task: HeatExchangerNetworkSynthesisTask | None = None,
 ) -> str | list[int]:
+    """The pinch design stage counts above and below the pinch, or
+    ``"automated"``: the task's own pair (a stage pair candidate), else
+    ``HENS_PDM_STAGES``."""
     if task is not None:
         task_stage_selection = task.settings.get("stage_selection")
         if task_stage_selection is not None:
             selection = [int(value) for value in task_stage_selection]
             if len(selection) == 2:
                 return selection
-    selection = [
-        int(value) for value in problem.master_zone.config.hens.stage_selection
-    ]
-    if len(selection) == 2:
-        return selection
+    pdm_stages = problem.master_zone.config.hens.pdm_stages
+    if pdm_stages is not None:
+        return [int(value) for value in pdm_stages]
     return "automated"
 
 

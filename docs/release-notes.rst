@@ -148,6 +148,16 @@ Heat exchanger network synthesis
   a multiperiod case read as an evolution network designed at 1.0. A later
   ``optimise_duties(objective="rating")`` of a fitted network therefore
   holds the approach the network was designed to.
+- **Breaking:** ``HENS_PDM_STAGES`` now sets the MILP pinch design stage
+  counts above and below the pinch (two values, which may be equal; unset
+  lets each side take the count its streams need).
+  ``HENS_STAGE_SELECTION``, the ``stages`` argument, no longer does: a list
+  of exactly two values used to fix them as a side effect, could not hold
+  two equal counts, and a longer or shorter list did nothing. A call that
+  passed ``stages=[2, 3]`` for this now passes
+  ``options={"HENS_PDM_STAGES": [2, 3]}``. ``HENS_STAGE_SELECTION`` keeps
+  its one other use, the stage counts of the direct network evolution runs
+  made when Couenne is missing.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.
