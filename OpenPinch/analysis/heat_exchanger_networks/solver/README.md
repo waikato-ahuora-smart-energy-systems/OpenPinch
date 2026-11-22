@@ -15,6 +15,7 @@ Everything between a prepared problem and the equation models: solver arrays bui
 
 ## Invariants
 - Arrays accept only a live prepared problem with a `Zone` master zone, a finite positive `dTmin`, and at least one hot and cold stream and utility [arrays.py:problem_to_solver_arrays].
+- The process stream axes hold the zone's active streams only: a stream a process component (a process MVR) switched off is left out, as targeting leaves it out, so its replacement stands in for it [arrays.py:problem_to_solver_arrays, _active_items].
 - Units: temperatures K, heat capacity flowrate kW/K, HTC kW/m^2/K, utility price $/kW/y (price times `COSTING_ANNUAL_OP_TIME / 1000`), capital coefficients annualised by the capital recovery factor [arrays.py:annual_cost_scales, _solver_array_mapping].
 - Stream and utility order follows input order; a default backup utility is dropped when real ones exist [arrays.py:_ordered_utility_items].
 - Every stream, segment and utility contribution is its effective contribution (zone multiplier included) times the task's dt_cont multiplier `m = dTmin / (2 * THERMAL_DT_CONT)`, as targeting scales them, so `m = 1` gives the targeting contributions; a stream whose dt_cont multiplier is locked keeps its effective contribution. A contribution that is zero (at or below `tol`) after scaling becomes 0.1 K times `m` (0.1 K for a locked stream). The PDM decomposition bakes the same values into its copied zone [arrays.py:_temperature_contribution] [pinch_design_decomposition.py:_apply_hen_dt_cont_convention].

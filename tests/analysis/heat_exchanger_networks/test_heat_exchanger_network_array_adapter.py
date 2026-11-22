@@ -620,3 +620,55 @@ def test_pinch_problem_satisfies_prepared_problem_protocol() -> None:
         object(),
     ):
         assert not isinstance(value, PreparedProblem)
+
+
+def _process_mvr_problem() -> PinchProblem:
+    pytest.importorskip("CoolProp")
+    return PinchProblem(
+        REPO_ROOT / "OpenPinch" / "tutorials" / "sample_cases" / "process_mvr.json",
+        project_name="Site",
+    )
+
+
+def test_adapter_takes_the_replacement_of_a_stream_a_process_mvr_replaced() -> None:
+    problem = _process_mvr_problem()
+    component = problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    )
+
+    arrays = problem_to_solver_arrays(problem, 10.0)
+
+    # Targeting sees the compressed stream in place of the original; so must
+    # synthesis, or the vapour's heat is counted twice.
+    hot = arrays.stream_identities["hot_process_streams"]
+    assert len(hot) == len(component.replacement_streams)
+    assert all("direct_MVR" in name for name in hot)
+    assert arrays.arrays["f_h_period"].shape[1] == len(component.replacement_streams)
+
+
+def test_adapter_takes_the_original_stream_of_a_deactivated_process_mvr() -> None:
+    problem = _process_mvr_problem()
+    component = problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    )
+    component.deactivate()
+
+    arrays = problem_to_solver_arrays(problem, 10.0)
+
+    assert arrays.stream_identities["hot_process_streams"] == [
+        "Evaporation Train.Evaporator vapour"
+    ]
+
+
+@pytest.mark.solver
+def test_a_problem_with_a_deactivated_process_mvr_designs() -> None:
+    problem = _process_mvr_problem()
+    problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    ).deactivate()
+
+    design = problem.design.pinch_design(options={"HENS_MAX_PARALLEL": 1})
+
+    # The original vapour stream alone: 100 kW recovered, 20 kW of heating.
+    assert design.total_heat_recovery == pytest.approx(100.0, abs=1e-3)
+    assert design.total_hot_utility == pytest.approx(20.0, abs=1e-3)

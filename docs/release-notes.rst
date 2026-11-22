@@ -36,6 +36,14 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Synthesis leaves out a stream that a process component has switched off.
+  ``problem.components.add_process_mvr`` keeps the vapour stream it replaces
+  in the zone, inactive, beside the compressed stream; targeting skipped the
+  inactive one but the synthesis arrays took both, so the vapour's heat was
+  counted twice. A problem whose process MVR has been deactivated now
+  designs (``design.pinch_design`` raised before); one with the component
+  active still fails in the pinch design step, for a separate reason that
+  is being worked on.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.
