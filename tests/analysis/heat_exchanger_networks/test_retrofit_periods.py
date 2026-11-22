@@ -313,3 +313,50 @@ def test_the_search_screens_loops_with_the_period_weights(monkeypatch):
 
     assert seen
     assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
+
+
+def _two_period_network(duties):
+    """A cooler on H1 and a heater on C1 with the given duty in each period."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    structure = HeatExchangerNetwork.from_structure(
+        recovery=[],
+        heaters=["C1"],
+        coolers=["H1"],
+        hot_utility="HU",
+        cold_utility="CU",
+    )
+    return structure.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(
+                    update={
+                        "period_states": tuple(
+                            HeatExchangerPeriodState(
+                                period_id=str(index), period_idx=index, duty=duty
+                            )
+                            for index, duty in enumerate(
+                                duties[f"{e.source_stream}->{e.sink_stream}"]
+                            )
+                        )
+                    }
+                )
+                for e in structure.exchangers
+            )
+        }
+    )
+
+
+def test_a_match_relieves_nothing_when_its_streams_never_run_together():
+    # H1 is cooled only in the first period and C1 heated only in the second,
+    # so a match between them can move no heat in either.
+    network = _two_period_network({"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 100.0]})
+
+    relief = utility_relief(
+        network, NewMatch("H1", "C1", 1, new_stage=False), 1000.0, weights=[0.5, 0.5]
+    )
+
+    assert relief == 0.0
