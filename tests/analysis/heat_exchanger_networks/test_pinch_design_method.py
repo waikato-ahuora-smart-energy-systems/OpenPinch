@@ -3137,25 +3137,25 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
         )
 
     # dTmin 14 against THERMAL_DT_CONT 5 is a multiplier of 1.4; a missing or
-    # zero contribution becomes 0.1 K times it.
+    # zero contribution stays zero (the 0.1 K floor is on the pair).
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
         dTmin=14.0,
         reference_dt_cont=5.0,
-    ) == {"value": pytest.approx(0.14), "unit": "delta_degC"}
+    ) == {"value": pytest.approx(0.0, abs=1e-12), "unit": "delta_degC"}
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(
             effective_delta_t_contribution=Value([0.0, 1.0, 9.0], "delta_degC")
         ),
         dTmin=14.0,
         reference_dt_cont=5.0,
-    ) == {"values": pytest.approx([0.14, 1.4, 12.6]), "unit": "delta_degC"}
+    ) == {"values": pytest.approx([0.0, 1.4, 12.6], abs=1e-12), "unit": "delta_degC"}
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
         dTmin=14.0,
         reference_dt_cont=5.0,
         locked=True,
-    ) == {"value": pytest.approx(0.1), "unit": "delta_degC"}
+    ) == {"value": pytest.approx(0.0, abs=1e-12), "unit": "delta_degC"}
 
     assert (
         pdm_decomposition._shifted_pinch_temperature(

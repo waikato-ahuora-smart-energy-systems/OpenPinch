@@ -25,9 +25,7 @@ from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
 from .arrays import (
-    ZERO_CONTRIBUTION_REPLACEMENT,
     PreparedSolverArrays,
-    _array_dt_cont_multiplier,
     _temperature_contribution,
     _value,
     problem_to_solver_arrays,
@@ -357,13 +355,7 @@ def _stream_dt_cont_with_fallback(
     """Use the solver-array contribution policy for each effective period."""
     current = getattr(stream, "effective_delta_t_contribution", None)
     if current is None:
-        multiplier = (
-            1.0 if locked else _array_dt_cont_multiplier(dTmin, reference_dt_cont)
-        )
-        return {
-            "value": ZERO_CONTRIBUTION_REPLACEMENT * multiplier,
-            "unit": "delta_degC",
-        }
+        return {"value": 0.0, "unit": "delta_degC"}
 
     values = [
         _temperature_contribution(
@@ -501,8 +493,7 @@ def _build_decomposition(
         dt_cont_convention=(
             "Copied stream and explicit segment dt_cont values are the prepared "
             "effective contributions times the task's dt_cont multiplier "
-            "(unscaled for a locked stream), with 0.1 K times that multiplier "
-            "replacing a zero. "
+            "(unscaled for a locked stream); a zero stays zero. "
             "The copied zone dt_cont_multiplier is then set to 1.0."
         ),
     )

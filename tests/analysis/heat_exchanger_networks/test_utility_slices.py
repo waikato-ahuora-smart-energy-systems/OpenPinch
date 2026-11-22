@@ -66,11 +66,12 @@ def test_hot_water_splits_where_cooking_and_sterilisation_need_it(arrays):
     index = [sliced.axis_maps["hot_utilities"][name] for name in hot_water]
     inlets = sliced.arrays["T_hu_in_period"][0][index] - 273.15
     outlets = sliced.arrays["T_hu_out_period"][0][index] - 273.15
-    # Sterilisation enters at 82 C and Cooking at 80 C, each 5.1 K short.
-    np.testing.assert_allclose(inlets, [90.0, 87.1, 85.1], atol=1e-9)
-    np.testing.assert_allclose(outlets, [87.1, 85.1, 70.0], atol=1e-9)
+    # Sterilisation enters at 82 C and Cooking at 80 C, each 5 K short: the
+    # streams' own contribution, with nothing added for hot water's zero.
+    np.testing.assert_allclose(inlets, [90.0, 87.0, 85.0], atol=1e-9)
+    np.testing.assert_allclose(outlets, [87.0, 85.0, 70.0], atol=1e-9)
     fractions = [slices[name][1] for name in hot_water]
-    np.testing.assert_allclose(fractions, [0.145, 0.1, 0.755], atol=1e-9)
+    np.testing.assert_allclose(fractions, [0.15, 0.1, 0.75], atol=1e-9)
 
 
 def test_steam_and_every_other_utility_property_is_kept(arrays):
