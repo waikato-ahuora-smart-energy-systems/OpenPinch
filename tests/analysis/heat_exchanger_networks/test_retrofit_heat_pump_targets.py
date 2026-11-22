@@ -367,6 +367,76 @@ def test_an_unsolved_network_is_solved_as_the_retrofit_baseline(monkeypatch):
     assert targets.as_piped.hot_utility_before == pytest.approx(17518.7)
 
 
+def test_the_targets_rate_an_unsolved_network_as_design_retrofit_does(monkeypatch):
+    """``design.retrofit`` holds each exchanger to its two streams'
+    contributions by default. The targets rated an unsolved network to 1 K
+    instead: 186 kW of hot utility against 240 kW on a two-stream case."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    unsolved = HeatExchangerNetwork.from_structure(
+        recovery=[("H3", "C2", 1), ("H1", "C1", 1), ("H2", "C2", 2), ("H3", "C1", 2)],
+        heaters=["C2"],
+        coolers=["H1", "H2"],
+        hot_utility="HU",
+        cold_utility="CU",
+    )
+    rated_with = []
+
+    def fake_search(problem, existing, settings):
+        rated_with.append(settings)
+        return SimpleNamespace(frontier=(SimpleNamespace(network=_solved_network()),))
+
+    monkeypatch.setattr(heat_pump_targets, "run_retrofit_search", fake_search)
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", lambda **_k: None
+    )
+
+    heat_pump_targets.retrofit_heat_pumps(_problem(), unsolved)
+
+    (settings,) = rated_with
+    assert settings.approach is None
+
+
+def test_design_retrofit_heat_pumps_take_a_structure_mapping(monkeypatch):
+    """As ``design.retrofit`` does: recovery matches, heaters and coolers
+    with their installed areas."""
+    from OpenPinch.analysis.heat_exchanger_networks import context
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    received = []
+    monkeypatch.setattr(context, "ensure_target_results", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        heat_pump_targets,
+        "retrofit_heat_pumps",
+        lambda problem, existing, **_k: received.append(existing),
+    )
+    problem = PinchProblem(json.loads(read_sample_case(CASE)))
+
+    problem.design.retrofit_heat_pumps(
+        {
+            "recovery": [
+                {"hot": "H3", "cold": "C2", "stage": 1, "area": 609.7, "id": "E1"}
+            ],
+            "heaters": [{"stream": "C2", "area": 246.75, "id": "E7"}],
+            "coolers": [{"stream": "H1", "area": 787.5, "id": "E5"}],
+        }
+    )
+
+    (network,) = received
+    assert isinstance(network, HeatExchangerNetwork)
+    assert {e.exchanger_id: e.area for e in network.exchangers} == {
+        "E1": 609.7,
+        "E5": 787.5,
+        "E7": 246.75,
+    }
+
+
 def test_a_bare_stream_name_two_zones_share_is_refused_by_the_targets():
     from types import SimpleNamespace
 

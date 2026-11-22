@@ -1786,7 +1786,7 @@ class _DesignAccessor:
 
     def retrofit_heat_pumps(
         self,
-        existing: "HeatExchangerNetwork",
+        existing: "HeatExchangerNetwork | Mapping[str, Any]",
         *,
         cycle: str = "carnot",
         topology: str | None = None,
@@ -1795,6 +1795,12 @@ class _DesignAccessor:
         options: Mapping[str, Any] | None = None,
     ) -> "RetrofitHeatPumpTargets":
         """The ideal and the as-piped heat pump target of ``existing``.
+
+        ``existing`` is a network or, as for ``retrofit``, a mapping of its
+        recovery matches, heaters and coolers with their installed areas. One
+        that has not been solved is rated first as ``retrofit`` rates its
+        existing network by default, each exchanger held to its two streams'
+        temperature contributions.
 
         Both come from the HPR service with the ``cycle`` (``"carnot"`` or
         ``"vapour_compression"``) and ``topology`` (``"cascade"`` or
@@ -1831,6 +1837,8 @@ class _DesignAccessor:
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
+        if isinstance(existing, Mapping):
+            existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit_heat_pumps")
         spec = cycle_spec(cycle)
         _runtime, configuration = self._arguments(options=options, period_id=None)
