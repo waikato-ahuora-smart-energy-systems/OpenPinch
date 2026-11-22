@@ -19,6 +19,8 @@ from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 
+import numpy as np
+
 from ....contracts.synthesis.retrofit import (
     HeatExchangerNetworkRetrofitDesign,
     HeatExchangerNetworkRetrofitModification,
@@ -1432,15 +1434,27 @@ def _with_names(network: HeatExchangerNetwork, names) -> HeatExchangerNetwork:
 
 def _stream_ends(arrays) -> dict[str, tuple[float, float, float]]:
     """Each process stream's supply and target temperature and heat capacity
-    flowrate, in the first period."""
+    flowrate, over every period.
+
+    The flowrate is the period-weighted mean, so a stream that is off part
+    of the time counts for the share it runs. The temperatures are the
+    weighted mean over the periods the stream runs (every period for one
+    that never does). The screens that read these therefore do not depend on
+    which period is listed first.
+    """
 
     data = arrays.arrays
+    weights = np.asarray(data["period_weights"], dtype=float)
+    weights = weights / weights.sum()
     ends: dict[str, tuple[float, float, float]] = {}
     for side, axis in (("h", "hot_process_streams"), ("c", "cold_process_streams")):
         for name, index in arrays.axis_maps[axis].items():
+            flows = np.asarray(data[f"f_{side}_period"], dtype=float)[:, index]
+            running = weights * (flows > 0.0)
+            over = running / running.sum() if running.sum() > 0.0 else weights
             ends[str(name)] = (
-                float(data[f"T_{side}_in_period"][0][index]),
-                float(data[f"T_{side}_out_period"][0][index]),
-                float(data[f"f_{side}_period"][0][index]),
+                float(over @ data[f"T_{side}_in_period"][:, index]),
+                float(over @ data[f"T_{side}_out_period"][:, index]),
+                float(weights @ flows),
             )
     return ends
