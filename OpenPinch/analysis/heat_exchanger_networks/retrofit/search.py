@@ -450,6 +450,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
         limit=settings.new_match_candidates,
         processes=evaluator.processes,
         weights=evaluator.weights,
+        period_ends=evaluator.period_ends,
     )
     for match in matches:
         exchanger_id = _new_id(network, match)
@@ -767,6 +768,12 @@ class _Evaluator:
         self.ends = {
             self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
         }
+        # Each period's own ends, so the match screens read potential period
+        # by period.
+        self.period_ends = tuple(
+            {self.names[name]: ends for name, ends in period.items()}
+            for period in _period_stream_ends(self.arrays)
+        )
         # The period weights the screens average a solved network with.
         period_weights = np.asarray(self.arrays.arrays["period_weights"], dtype=float)
         self.weights = tuple(float(w) for w in period_weights / period_weights.sum())

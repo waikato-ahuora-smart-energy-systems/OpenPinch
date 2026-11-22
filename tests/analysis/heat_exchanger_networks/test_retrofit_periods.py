@@ -191,6 +191,32 @@ def test_the_search_screens_new_matches_with_the_period_weights(monkeypatch):
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+def test_the_search_screens_new_matches_with_each_periods_stream_ends(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    seen = []
+    screen = search.screen_new_matches
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("period_ends"))
+        return screen(*args, **kwargs)
+
+    monkeypatch.setattr(search, "screen_new_matches", spy)
+
+    _problem(idle_first=True).design.retrofit(
+        EXISTING, max_modifications=1, new_unit_cost=0.0, min_approach_temperature=10.0
+    )
+
+    # Under the existing network's stream names: C1 off in the first period,
+    # 2 kW/K in the second.
+    assert seen
+    for idle, run in seen:
+        assert idle["C1"][2] == 0.0
+        assert run["C1"][2] == pytest.approx(2.0, rel=1e-9)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
 def test_the_search_scores_relocations_with_the_period_weights(monkeypatch):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
 
