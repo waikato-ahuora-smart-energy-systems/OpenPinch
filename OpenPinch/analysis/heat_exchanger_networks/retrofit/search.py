@@ -343,6 +343,10 @@ def run_retrofit_search(
             break
         children.sort(key=lambda child: -child.design.net_annual_benefit)
         beam = children[: max(1, int(settings.beam_width))]
+        if structural:
+            # Only the depth's best design: each drop costs a solve, and the
+            # next depth sizes every kept design's area afresh.
+            beam[0] = evaluator.paying(beam[0])
         frontier.append(beam[0].design)
     return HeatExchangerNetworkRetrofitResult(
         frontier=mark_dominated(frontier), evaluated_designs=evaluator.evaluations
@@ -1200,6 +1204,40 @@ class _Evaluator:
             )
         )
         return sized if sized is not None else self.evaluate(state)
+
+    def paying(self, sized: _Evaluated) -> _Evaluated:
+        """``sized`` without the area additions that do not pay.
+
+        The sizing solve weighs an addition's area cost against the utility
+        it saves but not its fixed cost (``area_addition_cost``), so it grows
+        units that do not earn that cost. The design is solved again with
+        each kept addition dropped in turn (on the search's threads, as its
+        other solves are); the drop that raises net annual benefit most
+        stands, and the rest are tried again from there until none does.
+        """
+
+        def net(evaluated: _Evaluated) -> float:
+            return evaluated.design.net_annual_benefit
+
+        best = sized
+        while True:
+            state = best.state
+            trials = self.map(
+                self.evaluate,
+                [
+                    replace(
+                        state,
+                        enlarged=state.enlarged - {move.exchanger_id},
+                        moves=tuple(m for m in state.moves if m is not move),
+                    )
+                    for move in state.moves
+                    if move.kind == "area_addition"
+                ],
+            )
+            better = max((t for t in trials if t is not None), key=net, default=None)
+            if better is None or net(better) <= net(best):
+                return best
+            best = better
 
     def _widened(
         self,

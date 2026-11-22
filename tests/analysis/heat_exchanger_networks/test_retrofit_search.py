@@ -237,6 +237,32 @@ def test_every_frontier_design_is_priced_from_its_modifications(fake_solver):
     assert fake_solver.cleaned == fake_solver.solved == result.evaluated_designs
 
 
+def test_the_structure_search_drops_area_additions_that_do_not_pay(fake_solver):
+    """The sizing solve does not see an area addition's fixed cost, so it
+    grows every unit that earns its area cost. Here each addition saves
+    $20,000/y and costs (200,000 + 857 x 10) x 0.2 = $41,714/y: none pays,
+    and the design keeps the new match alone."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=1,
+            new_unit_cost=34_600.0,
+            area_addition_cost=200_000.0,
+            split_cost=1e4,
+        ),
+    )
+
+    kinds = [m.kind for m in result.frontier[1].modifications]
+    assert kinds == ["new_match"]
+    assert fake_solver.cleaned == fake_solver.solved == result.evaluated_designs
+
+
 def test_an_existing_network_that_does_not_solve_is_an_error(fake_solver):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
         RetrofitSettings,

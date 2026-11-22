@@ -714,7 +714,11 @@ solve:
    area of at least 1 % of its installed area (and 1 m2), each an area
    addition, and the structure is solved again with only those. Candidates
    are ranked by net annual benefit, savings less the annualised capital,
-   and the best ``beam_width`` go on to the next step. Every solved design
+   and the best ``beam_width`` go on to the next step. That solve does not
+   see an addition's fixed cost (``area_addition_cost``), so the best
+   design of each step is solved again without each of its area additions
+   in turn, and an addition whose removal raises the net annual benefit is
+   dropped. Every solved design
    is checked as optimised duties are (approach temperatures, heat balances
    and areas, with installed areas widened by ``area_tolerance``) and
    dropped if it fails.
@@ -941,7 +945,7 @@ Akpomiemie and Smith (2018), simplified crude preheat train
    structure reaches 10,960 kW (24.2 %, every cooler at zero), both as
    published. The search with its defaults reaches the same hot utility in
    three structural changes (three new matches, with added area on four
-   exchangers) in 141 solves, at $521k of capital; the paper does it with
+   exchangers) in 154 solves, at $521k of capital; the paper does it with
    two (moving one exchanger and adding one) and more area on several. The
    paper's $4,000 fixed cost per unit makes new exchangers cheap. The
    stepwise search, counting each enlarged exchanger as a step, needs seven
@@ -976,13 +980,13 @@ Table 5 costs at a 10 K approach):
      - Structure, 3 structural changes
    * - Ciric and Floudas, report costs
      - $1.83M/y net, 67 solves
-     - $1.98M/y net, 133 solves
+     - $1.96M/y net, 145 solves
    * - Ciric and Floudas, report rules
      - $1.15M/y net, 66 solves
-     - $1.29M/y net, 136 solves
+     - $1.29M/y net, 140 solves
    * - Akpomiemie and Smith
      - 11,777 kW hot utility, 76 solves
-     - 10,960 kW (the published target), 141 solves
+     - 10,960 kW (the published target), 154 solves
 
 Serialized Network Input
 ------------------------
