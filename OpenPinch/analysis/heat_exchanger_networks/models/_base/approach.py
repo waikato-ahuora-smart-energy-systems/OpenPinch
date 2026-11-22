@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from ...solver.arrays import pair_minimum_approach
 from . import execution as _execution
 from . import piecewise as _piecewise
 
@@ -17,7 +18,9 @@ def _set_minimum_approach_temperatures(model) -> None:
 
     Heaters are ``dT_hu_period[period][utility][cold]`` and coolers
     ``dT_cu_period[period][hot][utility]``, the orientation of the recovery
-    pairs. A model with no utility on a side gets one at ``dTmin / 2``.
+    pairs. A model with no utility on a side gets one at ``dTmin / 2``. Each
+    pair is the sum of its two contributions, floored on the pair
+    (``pair_minimum_approach``).
     """
 
     def contributions(values):
@@ -27,7 +30,9 @@ def _set_minimum_approach_temperatures(model) -> None:
         [
             [
                 [
-                    model.T_h_cont_period[n][i] + model.T_c_cont_period[n][j]
+                    pair_minimum_approach(
+                        model.T_h_cont_period[n][i], model.T_c_cont_period[n][j]
+                    )
                     for j in range(len(model.T_c_cont_period[n]))
                 ]
                 for i in range(len(model.T_h_cont_period[n]))
@@ -39,7 +44,10 @@ def _set_minimum_approach_temperatures(model) -> None:
     model.dT_hu_period = np.array(
         [
             [
-                [utility + cold for cold in model.T_c_cont_period[n]]
+                [
+                    pair_minimum_approach(utility, cold)
+                    for cold in model.T_c_cont_period[n]
+                ]
                 for utility in contributions(model.T_hu_cont_period[n])
             ]
             for n in range(model.N_periods)
@@ -49,7 +57,10 @@ def _set_minimum_approach_temperatures(model) -> None:
     model.dT_cu_period = np.array(
         [
             [
-                [hot + utility for utility in contributions(model.T_cu_cont_period[n])]
+                [
+                    pair_minimum_approach(hot, utility)
+                    for utility in contributions(model.T_cu_cont_period[n])
+                ]
                 for hot in model.T_h_cont_period[n]
             ]
             for n in range(model.N_periods)
@@ -87,7 +98,7 @@ def _hot_utility_inlet_approach_temperature(
         if hasattr(model, "T_hu_in_cont_by_period")
         else model.T_hu_cont_period[period_idx][u]
     )
-    return float(contribution + model.T_c_cont_period[period_idx][j])
+    return pair_minimum_approach(contribution, model.T_c_cont_period[period_idx][j])
 
 
 def _hot_utility_outlet_approach_temperature(
@@ -105,7 +116,7 @@ def _hot_utility_outlet_approach_temperature(
         utility=u,
         heat_duty=heat_duty,
     )
-    return contribution + model.T_c_cont_period[period_idx][j]
+    return _floored_pair(contribution, model.T_c_cont_period[period_idx][j])
 
 
 def _cold_utility_inlet_approach_temperature(
@@ -119,7 +130,7 @@ def _cold_utility_inlet_approach_temperature(
         if hasattr(model, "T_cu_in_cont_by_period")
         else model.T_cu_cont_period[period_idx][u]
     )
-    return float(model.T_h_cont_period[period_idx][i] + contribution)
+    return pair_minimum_approach(model.T_h_cont_period[period_idx][i], contribution)
 
 
 def _cold_utility_outlet_approach_temperature(
@@ -137,7 +148,20 @@ def _cold_utility_outlet_approach_temperature(
         utility=u,
         heat_duty=heat_duty,
     )
-    return model.T_h_cont_period[period_idx][i] + contribution
+    return _floored_pair(model.T_h_cont_period[period_idx][i], contribution)
+
+
+def _floored_pair(first, second):
+    """The pair's minimum approach, floored when both sides are numbers.
+
+    A segmented utility's outlet contribution at a duty the solver chooses is
+    an expression of the model; its sum is returned as it is.
+    """
+    if isinstance(first, (int, float, np.floating)) and isinstance(
+        second, (int, float, np.floating)
+    ):
+        return pair_minimum_approach(first, second)
+    return first + second
 
 
 def _utility_outlet_temperature_contribution(
@@ -246,7 +270,10 @@ def utility_minimum_approach_by_period(model, side: str) -> list:
                     least = float(
                         np.min(_utility_segment_contributions(model, "hot", n, u))
                     )
-                    rows[u] = [least + float(c) for c in model.T_c_cont_period[n]]
+                    rows[u] = [
+                        pair_minimum_approach(least, c)
+                        for c in model.T_c_cont_period[n]
+                    ]
         else:
             rows = [[float(value) for value in row] for row in model.dT_cu_period[n]]
             for u in range(len(rows[0]) if rows else 0):
@@ -255,7 +282,7 @@ def utility_minimum_approach_by_period(model, side: str) -> list:
                         np.min(_utility_segment_contributions(model, "cold", n, u))
                     )
                     for i, hot in enumerate(model.T_h_cont_period[n]):
-                        rows[i][u] = float(hot) + least
+                        rows[i][u] = pair_minimum_approach(hot, least)
         by_period.append(rows)
     return by_period
 
