@@ -141,12 +141,13 @@ Heat exchanger network synthesis
   30 for 11 and now runs 17 (8.8 s to 6.8 s). The ranked networks and their
   costs are unchanged.
 - A network fitted to every period, or rated at an overdesign margin, keeps
-  the method that designed it. Every such network reported
-  ``network_evolution_method``, because the fit and the rating run as
-  network evolution tasks; a heuristic pinch design fitted on a multiperiod
-  case now reports ``heuristic_pinch_design_method``. A later
-  ``optimise_duties(objective="rating")`` of a fitted pinch design therefore
-  holds the pinch design approach, not the evolution share of it.
+  the method, dt_cont multiplier and approach share it was designed with.
+  Every such network reported ``network_evolution_method`` and no
+  multiplier, because the fit and the rating run as network evolution
+  tasks; a heuristic pinch design made at a multiplier of 1.5 and fitted on
+  a multiperiod case read as an evolution network designed at 1.0. A later
+  ``optimise_duties(objective="rating")`` of a fitted network therefore
+  holds the approach the network was designed to.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.

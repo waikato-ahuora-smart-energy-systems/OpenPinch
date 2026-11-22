@@ -257,3 +257,31 @@ def test_a_fitted_network_keeps_the_method_that_designed_it(monkeypatch):
     methods = [designed_by[outcome.task.task_id] for outcome in ranked]
     assert "heuristic_pinch_design_method" in methods
     assert [outcome.network.method for outcome in ranked] == methods
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    not _SOLVERS,
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_fitted_network_keeps_the_approach_it_was_designed_to(monkeypatch):
+    """A later rating holds the approach a network was designed to, read from
+    its method, dt_cont multiplier and approach share. The fit must hand all
+    three on: a network designed at a multiplier of 1.5 is not one designed
+    at 1.0."""
+    problem = _periods_problem([1.0, 1.2, 1.5], [0.2, 0.5, 0.3])
+    hens = problem.master_zone.config.hens
+    received = _finalised_networks(monkeypatch)
+    record = HeatExchangerNetworkRecord()
+
+    problem.design.heat_exchanger_network(record=record)
+
+    offered = {network.task_id: network for network in received}
+    approach = problem.design._design_approach
+    designed = [
+        approach(offered[outcome.task.task_id], hens) for outcome in record.outcomes()
+    ]
+    assert {item["dt_cont_multiplier"] for item in designed} - {1.0, 0.25}
+    assert [
+        approach(outcome.network, hens) for outcome in record.outcomes()
+    ] == designed
