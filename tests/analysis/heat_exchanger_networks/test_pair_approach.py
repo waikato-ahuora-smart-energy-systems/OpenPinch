@@ -129,3 +129,69 @@ def test_a_heaters_and_a_coolers_end_approaches_floor_the_pair():
     assert _cold_utility_outlet_approach_temperature(model, 1, 0, 0) == pytest.approx(
         0.1, abs=1e-12
     )
+
+
+def _segmented_heater_model(pyo, *, outlet_difference):
+    """A heater on a two-segment hot utility whose outlet contribution is a
+    variable of the model, as it is at a duty the solver chooses. The utility
+    leaves ``outlet_difference`` K above the cold stream it heats; every
+    contribution is 0."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.pyomo_model import (
+        PyomoModel,
+    )
+
+    m = PyomoModel()
+    outlet = m.Var(value=300.0 + outlet_difference)
+    cold_inlet = m.Var(value=300.0)
+    arrays = {
+        "hot_utility_parent_segmented": np.array([True]),
+        "hot_utility_segment_count": np.array([2]),
+        "hot_utility_segment_dt_cont_period": np.zeros((1, 1, 2)),
+    }
+    model = SimpleNamespace(
+        m=m,
+        tol=1e-6,
+        dTmin=10.0,
+        solver_arrays=SimpleNamespace(arrays=arrays),
+        T_c_cont_period=np.array([[0.0]]),
+        T_hu_cont_period=np.array([[0.0]]),
+        T_hu_out_cont_by_period=[[[m.Var(value=0.0)]]],
+        T_hu_in_period=np.array([[400.0]]),
+        T_hu_out_period=np.array([[300.0]]),
+        T_c_in_period=np.array([[300.0]]),
+        T_c_out_period=np.array([[350.0]]),
+        z_hu=[[m.Param(value=1)]],
+        Q_h_by_period=[[[m.Var(value=5.0, lb=0.0, ub=10.0)]]],
+        T_c_by_period=[[[cold_inlet]]],
+        _utility_solved_outlet_temperature=lambda side, n, j, u: outlet,
+    )
+    return model
+
+
+def _broken(pyo, model):
+    def is_broken(constraint):
+        body = pyo.value(constraint.body)
+        return (
+            constraint.upper is not None and body > pyo.value(constraint.upper) + 1e-9
+        ) or (
+            constraint.lower is not None and body < pyo.value(constraint.lower) - 1e-9
+        )
+
+    return [
+        c for c in model.m.model.component_data_objects(pyo.Constraint) if is_broken(c)
+    ]
+
+
+def test_a_segmented_heaters_outlet_holds_the_pair_floor():
+    """A segmented utility's outlet contribution is a variable, so the pair's
+    sum cannot be floored as a number; the outlet end must still keep 0.1 K."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
+        _set_hot_utility_approach_equations,
+    )
+
+    pyo = pytest.importorskip("pyomo.environ")
+    model = _segmented_heater_model(pyo, outlet_difference=0.05)
+
+    _set_hot_utility_approach_equations(model, 0, 0, 0)
+
+    assert _broken(pyo, model)

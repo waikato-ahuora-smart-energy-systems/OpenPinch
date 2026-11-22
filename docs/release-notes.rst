@@ -71,7 +71,10 @@ Heat exchanger network synthesis
   and heat recovery loop screens and the relocation scoring read a solved
   network's duties and temperatures as period-weighted means too, so a
   heater that is off in the first period no longer hides the heat it could
-  give up.
+  give up. The utility a match, heat pump or loop could relieve pairs the
+  hot stream's cooling with the cold stream's heating in each period before
+  the mean, so a link between streams that never run together relieves
+  nothing.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.
