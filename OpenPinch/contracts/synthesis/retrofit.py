@@ -107,12 +107,18 @@ class HeatExchangerNetworkRetrofitResult(BaseModel):
     step is one structural change with the area additions it keeps (the
     structure strategy) or one modification (the stepwise strategy), so
     ``modification_count`` can exceed ``n``.
+
+    ``evaluated_designs`` counts every candidate the search tried, and
+    ``failed_solves[n - 1]`` those of step ``n`` whose solve did not
+    converge or whose solved network failed its checks; they are dropped
+    from the search.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     frontier: tuple[HeatExchangerNetworkRetrofitDesign, ...] = Field(min_length=1)
     evaluated_designs: int = 0
+    failed_solves: tuple[int, ...] = ()
 
     @property
     def selected(self) -> HeatExchangerNetworkRetrofitDesign:

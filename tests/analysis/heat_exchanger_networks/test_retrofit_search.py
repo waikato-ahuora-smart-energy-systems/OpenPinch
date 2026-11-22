@@ -263,6 +263,40 @@ def test_the_structure_search_drops_area_additions_that_do_not_pay(fake_solver):
     assert fake_solver.cleaned == fake_solver.solved == result.evaluated_designs
 
 
+def test_the_result_counts_the_candidate_solves_that_failed_at_each_step(fake_solver):
+    """A candidate whose solve does not converge is dropped. The result
+    says how many were at each step, and the search warns when over a
+    quarter of its solves went that way: a frontier built on the few that
+    solved may miss the better designs."""
+    import warnings
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    def run():
+        return run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            RetrofitSettings(max_modifications=2, **COSTS),
+        )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert run().failed_solves == (0, 0)
+
+    # No structure with a fifth recovery match solves, so step 1 ends the
+    # search with every candidate lost.
+    fake_solver.fail = lambda spec: len(spec.recovery) > 4
+    with pytest.warns(UserWarning, match="retrofit candidate solves failed"):
+        result = run()
+
+    assert len(result.frontier) == 1
+    assert result.failed_solves == (result.evaluated_designs - 1,)
+    assert result.failed_solves[0] > 0
+
+
 def test_an_existing_network_that_does_not_solve_is_an_error(fake_solver):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
         RetrofitSettings,

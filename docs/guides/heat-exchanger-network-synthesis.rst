@@ -728,6 +728,12 @@ structural changes, from the existing network (0) up to
 ``max_modifications``, so the trade-off between the size of the retrofit and
 its benefit is visible; each design also lists the area additions it needs.
 A design no better than one with fewer changes is marked ``dominated``.
+``result.evaluated_designs`` counts the candidates tried and
+``result.failed_solves`` those dropped at each step because their solve did
+not converge or their solved network failed its checks. The search warns
+when more than a quarter failed, as the frontier may then miss better
+designs; a wider ``area_tolerance`` or other solver options may recover
+them.
 ``result.selected`` is the design with the best net annual benefit.
 
 ``strategy="stepwise"`` instead makes one modification per step, an area
