@@ -501,6 +501,7 @@ def _heat_pump_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         parent.solved,
         [c for c in evaluator.heat_pumps if condenser_name(c) not in installed],
         limit=settings.new_match_candidates,
+        weights=evaluator.weights,
     ):
         evaporator = NewUtility(candidate.hot, evaporator_name(candidate), False)
         evaporator_id = _new_utility_id(network, evaporator)

@@ -194,3 +194,57 @@ def test_the_search_scores_relocations_with_the_period_weights(monkeypatch):
     # Relocation scoring is the search's own call to ``match_potential``.
     assert seen
     assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_the_heat_pump_screen_weights_the_networks_duties_over_the_periods():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pumps import (
+        HeatPumpCandidate,
+        screen_heat_pumps,
+    )
+
+    problem = _problem(idle_first=True)
+    problem.target.direct_heat_integration()
+    network = (
+        run_retrofit_search(
+            problem,
+            problem.design._network_from_structure(EXISTING),
+            RetrofitSettings(max_modifications=0),
+        )
+        .frontier[0]
+        .network
+    )
+    candidate = HeatPumpCandidate("A.H1", "A.C1", 383.15, 373.15, cop=3.0)
+
+    # The heater is off in the first period, so a first-period reading finds
+    # nothing to relieve; over the periods it runs 90 % of the time.
+    kept = screen_heat_pumps(network, [candidate], limit=1, weights=[0.1, 0.9])
+
+    assert kept == [candidate]
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_the_search_screens_heat_pumps_with_the_period_weights(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    seen = []
+    screen = search.screen_heat_pumps
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("weights"))
+        return screen(*args, **kwargs)
+
+    monkeypatch.setattr(search, "screen_heat_pumps", spy)
+
+    _problem(idle_first=True).design.retrofit(
+        EXISTING,
+        max_modifications=1,
+        new_unit_cost=0.0,
+        min_approach_temperature=10.0,
+        heat_pump_cycle="carnot",
+    )
+
+    assert seen
+    assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
