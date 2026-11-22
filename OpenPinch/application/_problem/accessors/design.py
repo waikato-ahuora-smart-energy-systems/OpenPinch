@@ -81,6 +81,54 @@ def _finalise_key(network, approach=None) -> str:
     return json.dumps(_rounded(data), sort_keys=True)
 
 
+def _fit_key(network, approach=None) -> str:
+    """What fitting ``network`` to every period depends on, as a lookup key.
+
+    The fit sets every duty and area afresh, so of the network it reads only
+    the structure: each exchanger's kind, streams and stage, the slice of
+    its utility a heater or cooler draws on (named in its id,
+    ``slice_label``; the fit holds that slice's temperatures), and the
+    stage count (``period_fit.py``). An exchanger idle in the basis case
+    counts, as it may carry duty in another period. With these go
+    ``approach``, the design approach the fit holds (``_design_approach``),
+    the level targets it holds and, for a network that holds levels, its
+    dt_cont multiplier, at which the fit may target them again
+    (``_period_level_targets``). Networks that share all of it have one fit.
+    """
+    from ....analysis.heat_exchanger_networks.solver.utility_slices import (
+        slice_label,
+    )
+
+    exchangers = sorted(
+        (
+            exchanger.kind.value,
+            str(exchanger.source_stream),
+            str(exchanger.sink_stream),
+            repr(exchanger.stage),
+            slice_label(exchanger) or "",
+        )
+        for exchanger in network.exchangers
+    )
+    levels = (network.source_metadata or {}).get("utility_level_targets")
+    return json.dumps(
+        {
+            "exchangers": exchangers,
+            "stage_count": network.stage_count,
+            "design_approach": approach,
+            "utility_level_targets": levels,
+            # Held levels that do not cover every period are targeted again
+            # at the network's own multiplier (``_period_level_targets``).
+            "level_multiplier": (
+                (network.summary_metrics or {}).get("dt_cont_multiplier", 1.0)
+                if levels
+                else None
+            ),
+        },
+        sort_keys=True,
+        default=repr,
+    )
+
+
 class UtilityChoiceError(ValueError):
     """A heater or cooler names no utility, and its side has several to choose from."""
 
@@ -873,8 +921,13 @@ class _DesignAccessor:
         finishing = threading.Lock()
 
         def finalise(outcome):
-            key = _finalise_key(
-                outcome.network, self._design_approach(outcome.network, hens)
+            approach = self._design_approach(outcome.network, hens)
+            # A fit sets duties and areas afresh, so networks of one
+            # structure share it; a rating alone keeps each network's areas.
+            key = (
+                _fit_key(outcome.network, approach)
+                if fit
+                else _finalise_key(outcome.network, approach)
             )
             with finishing:
                 if key not in finished:
