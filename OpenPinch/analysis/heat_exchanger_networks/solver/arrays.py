@@ -123,8 +123,10 @@ def problem_to_solver_arrays(
         raise ValueError("dTmin must be finite and positive.")
 
     zone = problem.master_zone
-    hot_items = _ordered_stream_items(problem, zone.hot_streams.items())
-    cold_items = _ordered_stream_items(problem, zone.cold_streams.items())
+    # A process component (a process MVR) leaves the stream it replaces in the
+    # zone, switched off; targeting skips inactive streams, and so does this.
+    hot_items = _ordered_stream_items(problem, _active_items(zone.hot_streams))
+    cold_items = _ordered_stream_items(problem, _active_items(zone.cold_streams))
     hot_utility_items = _ordered_utility_items(problem, zone.hot_utilities.items())
     cold_utility_items = _ordered_utility_items(problem, zone.cold_utilities.items())
 
@@ -592,10 +594,12 @@ def _stream_heat_capacity_flowrate(
     *,
     period_idx: int = 0,
 ) -> float:
-    if getattr(stream, "has_segments", False):
+    if getattr(stream, "segment_count", 0) > 1:
         # Parent axes require this placeholder to preserve the current equation
         # shape. A zero sentinel directs segmented equations to the authoritative
         # segment-profile tensors instead of the parent's effective flowrate.
+        # A stream with one segment is not segmented to the models (they read
+        # ``segment_count > 1``), so it keeps its own flowrate.
         return 0.0
     raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
     if raw_flowrate is not None:
@@ -607,6 +611,11 @@ def _stream_heat_capacity_flowrate(
         if parsed is not None:
             return parsed
     return _value(stream.heat_capacity_flowrate, "kW/delta_degC", period_idx=period_idx)
+
+
+def _active_items(streams) -> list[tuple[str, Stream]]:
+    """The ``(key, stream)`` items of the streams that are switched on."""
+    return [(key, stream) for key, stream in streams.items() if stream.is_active]
 
 
 def _ordered_stream_items(problem: PreparedProblem, items) -> list[_PreparedItem]:
