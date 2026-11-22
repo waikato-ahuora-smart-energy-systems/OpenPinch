@@ -84,18 +84,34 @@ def _finalise_key(network, approach=None) -> str:
 def _fit_key(network, approach=None) -> str:
     """What fitting ``network`` to every period depends on, as a lookup key.
 
-    The fit sets every duty and area afresh, so of the network only its
-    structure counts (``network_structure_signature``), with ``approach``,
-    the design approach the fit holds (``_design_approach``), and the level
-    targets it holds. Networks that share all three have one fit.
+    The fit sets every duty and area afresh, so of the network it reads only
+    the structure: each exchanger's kind, streams and stage, the slice of
+    its utility a heater or cooler draws on (named in its id,
+    ``slice_label``; the fit holds that slice's temperatures), and the
+    stage count (``period_fit.py``). An exchanger idle in the basis case
+    counts, as it may carry duty in another period. With these go
+    ``approach``, the design approach the fit holds (``_design_approach``),
+    and the level targets it holds. Networks that share all of it have one
+    fit.
     """
-    from ....analysis.heat_exchanger_networks.reporting.ranking import (
-        network_structure_signature,
+    from ....analysis.heat_exchanger_networks.solver.utility_slices import (
+        slice_label,
     )
 
+    exchangers = sorted(
+        (
+            exchanger.kind.value,
+            str(exchanger.source_stream),
+            str(exchanger.sink_stream),
+            repr(exchanger.stage),
+            slice_label(exchanger) or "",
+        )
+        for exchanger in network.exchangers
+    )
     return json.dumps(
         {
-            "structure": repr(network_structure_signature(network)),
+            "exchangers": exchangers,
+            "stage_count": network.stage_count,
             "design_approach": approach,
             "utility_level_targets": (network.source_metadata or {}).get(
                 "utility_level_targets"
