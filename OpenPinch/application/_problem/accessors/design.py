@@ -947,7 +947,25 @@ class _DesignAccessor:
             if done is None:
                 return None
             view, fitted = done
-            network = view.selected_network
+            # The fit and rating are fixed-structure solves, run as network
+            # evolution tasks; the network stays the design of the method
+            # that made it, at the multiplier and approach share it was
+            # designed with, which a later rating reads (_design_approach).
+            designed = outcome.network
+            recorded = designed.source_metadata or {}
+            metadata = dict(view.selected_network.source_metadata or {})
+            multiplier = (designed.summary_metrics or {}).get(
+                "dt_cont_multiplier"
+            ) or recorded.get("dt_cont_multiplier")
+            if multiplier is not None:
+                metadata["dt_cont_multiplier"] = float(multiplier)
+            if recorded.get("min_exchanger_approach_share") is not None:
+                metadata["min_exchanger_approach_share"] = recorded[
+                    "min_exchanger_approach_share"
+                ]
+            network = view.selected_network.model_copy(
+                update={"method": designed.method, "source_metadata": metadata}
+            )
             final = outcome.model_copy(
                 update={
                     "network": network,
