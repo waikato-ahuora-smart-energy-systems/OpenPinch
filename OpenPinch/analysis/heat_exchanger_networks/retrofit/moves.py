@@ -114,6 +114,7 @@ def screen_new_matches(
     limit: int,
     processes: Mapping[str, str] | None = None,
     weights: Sequence[float] | None = None,
+    period_ends: Sequence[Mapping[str, tuple[float, float, float]]] | None = None,
 ) -> tuple[NewMatch, ...]:
     """The ``limit`` most promising new matches for solved ``network``.
 
@@ -125,7 +126,10 @@ def screen_new_matches(
     ``match_potential`` are ranked by ``utility_relief``, then potential,
     then fewest new splits, then stage, joining before a new stage, and
     stream names. ``weights`` are the period weights the network's duties
-    and temperatures are averaged with (``period_mean``).
+    and temperatures are averaged with (``period_mean``); with
+    ``period_ends``, each period's stream ends, a match's potential is read
+    period by period (``match_potential``), so a pair that never runs
+    together is not proposed.
     """
 
     hot = sorted(name for name, (supply, target, _) in ends.items() if supply > target)
@@ -148,7 +152,14 @@ def screen_new_matches(
     ]
     scored = [
         (
-            match_potential(network, ends, move, approach=approach, weights=weights),
+            match_potential(
+                network,
+                ends,
+                move,
+                approach=approach,
+                weights=weights,
+                period_ends=period_ends,
+            ),
             move,
         )
         for move in moves

@@ -418,3 +418,22 @@ def test_a_match_has_no_potential_when_its_streams_never_run_together():
     )
 
     assert potential == 0.0
+
+
+def test_the_screen_proposes_no_match_between_streams_that_never_run_together():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
+        screen_new_matches,
+    )
+
+    network = _two_period_network({"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 80.0]})
+
+    proposed = screen_new_matches(
+        network,
+        _NEVER_TOGETHER_ENDS,
+        approach=10.0,
+        limit=5,
+        weights=[0.5, 0.5],
+        period_ends=_NEVER_TOGETHER_PERIOD_ENDS,
+    )
+
+    assert proposed == ()
