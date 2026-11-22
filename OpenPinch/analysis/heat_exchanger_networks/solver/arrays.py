@@ -594,10 +594,12 @@ def _stream_heat_capacity_flowrate(
     *,
     period_idx: int = 0,
 ) -> float:
-    if getattr(stream, "has_segments", False):
+    if getattr(stream, "segment_count", 0) > 1:
         # Parent axes require this placeholder to preserve the current equation
         # shape. A zero sentinel directs segmented equations to the authoritative
         # segment-profile tensors instead of the parent's effective flowrate.
+        # A stream with one segment is not segmented to the models (they read
+        # ``segment_count > 1``), so it keeps its own flowrate.
         return 0.0
     raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
     if raw_flowrate is not None:
