@@ -655,3 +655,28 @@ def test_the_workflow_runs_every_stage_in_one_executor_session():
     assert len(executor.stages_in_session) > 1
     assert all(executor.stages_in_session)
     assert not executor.open
+
+
+def test_the_workflows_run_time_covers_closing_the_session(monkeypatch):
+    """Closing a session joins its worker processes while the caller still
+    waits, so the reported run time includes it."""
+    from contextlib import contextmanager
+
+    clock = [0.0]
+    monkeypatch.setattr(workflow_module, "perf_counter", lambda: clock[0])
+
+    class SlowToClose(FakeSynthesisExecutor):
+        @contextmanager
+        def session(self):
+            try:
+                yield self
+            finally:
+                clock[0] += 5.0
+
+    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+
+    result = workflow_module.execute_open_hens_method(
+        problem, workflow_settings_from_problem(problem), executor=SlowToClose()
+    )
+
+    assert result.total_run_time == pytest.approx(5.0)

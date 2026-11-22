@@ -58,8 +58,12 @@ def execute_open_hens_method(
     session = getattr(executor, "session", None)
     if session is None:
         return _execute_stages(problem, settings, executor)
+    start = perf_counter()
     with session():
-        return _execute_stages(problem, settings, executor)
+        result = _execute_stages(problem, settings, executor)
+    # Closing the session joins its worker processes while the caller still
+    # waits, so the run time is taken after it.
+    return replace(result, total_run_time=perf_counter() - start)
 
 
 def _execute_stages(
