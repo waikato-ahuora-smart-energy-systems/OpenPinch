@@ -57,8 +57,10 @@ Heat exchanger network synthesis
   case with a cold stream off 10 % of the time found no step with the idle
   period first and a new match worth 32 k$/y with it last. Stream
   flowrates are now the period-weighted mean and stream temperatures the
-  weighted mean over the periods the stream runs. The screens still read
-  an existing network's duties and temperatures from its first period.
+  weighted mean over the periods the stream runs. The new-match screen and
+  the relocation scoring read a solved network's duties and temperatures
+  as period-weighted means too. The heat pump and heat recovery loop
+  screens still read the network's first period.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.

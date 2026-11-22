@@ -139,3 +139,58 @@ def test_utility_relief_weights_the_networks_duties_over_the_periods(idle_first)
 
     # The heater runs at 100 kW for 90 % of the time; the cooler always runs.
     assert relief == pytest.approx(90.0, abs=1e-3)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_the_search_screens_new_matches_with_the_period_weights(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    seen = []
+    screen = search.screen_new_matches
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("weights"))
+        return screen(*args, **kwargs)
+
+    monkeypatch.setattr(search, "screen_new_matches", spy)
+
+    _problem(idle_first=True).design.retrofit(
+        EXISTING, max_modifications=1, new_unit_cost=0.0, min_approach_temperature=10.0
+    )
+
+    assert seen
+    assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_the_search_scores_relocations_with_the_period_weights(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    seen = []
+    potential = search.match_potential
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("weights"))
+        return potential(*args, **kwargs)
+
+    monkeypatch.setattr(search, "match_potential", spy)
+    existing = {
+        "recovery": [{"hot": "H1", "cold": "C1", "stage": 1, "area": 5.0, "id": "E3"}],
+        "heaters": EXISTING["heaters"],
+        "coolers": EXISTING["coolers"],
+        "stage_count": 1,
+    }
+
+    _problem(idle_first=True).design.retrofit(
+        existing,
+        max_modifications=1,
+        new_unit_cost=0.0,
+        min_approach_temperature=10.0,
+        relocation_cost=1.0,
+    )
+
+    # Relocation scoring is the search's own call to ``match_potential``.
+    assert seen
+    assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
