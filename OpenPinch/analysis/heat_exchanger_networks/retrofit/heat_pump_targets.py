@@ -7,6 +7,8 @@ each evaporator goes in series with a cooler, each condenser with a heater.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import numpy as np
 
 from ....contracts.synthesis.retrofit import (
@@ -67,6 +69,7 @@ def retrofit_heat_pumps(
         "cold_utility_price": _utility_price(arrays, network, "cold"),
         "electricity_price": float(config.costing.hpr_ele_price) * price_scale,
     }
+    config = _at_network_prices(config, prices)
     # The first period, whose states the as-piped profiles and prices take.
     period_id = min(problem.period_ids.items(), key=lambda item: item[1])[0]
     targets = {}
@@ -82,6 +85,29 @@ def retrofit_heat_pumps(
         )
         targets[name] = _summary(result, H_hot, H_cold, prices)
     return RetrofitHeatPumpTargets(**targets)
+
+
+def _at_network_prices(config, prices: dict):
+    """A copy of ``config`` whose HPR price ratios are ``prices``' own.
+
+    The HPR search prices heat and cooling as ratios of the electricity
+    price (``COSTING_HPR_PRICE_RATIO_*``). The targets are reported at the
+    network's utility prices, so the search is given those: a machine sized
+    for other prices is not the best one at these. With no electricity
+    price there is no ratio and ``config`` is returned as it is.
+    """
+
+    electricity = prices["electricity_price"]
+    if electricity <= 0.0:
+        return config
+    priced = deepcopy(config)
+    priced.update_values(
+        COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE=prices["hot_utility_price"] / electricity,
+        COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE=(
+            prices["cold_utility_price"] / electricity
+        ),
+    )
+    return priced
 
 
 def _utility_price(arrays, network: HeatExchangerNetwork, side: str) -> float:

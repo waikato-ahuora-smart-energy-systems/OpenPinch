@@ -896,17 +896,23 @@ Heat pump targets
    repiping: each evaporator goes in series with a cooler, each condenser
    with a heater. Each target reports its levels, work and COP, and its hot
    utility, cold utility and operating cost before and after (utility
-   prices and ``COSTING_HPR_ELE_PRICE``; no heat pump capital). Their gap
+   prices and ``COSTING_HPR_ELE_PRICE``; no heat pump capital). The HPR
+   search sizes each heat pump at those same prices, in place of
+   ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` and
+   ``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE``, so a target serves only
+   the part of its load that is cheaper from the heat pump than from the
+   hot utility. Their gap
    splits into ``network_gap``, what the existing network costs beyond the
    targets before any heat pump, and ``heat_pump_gap``, how much less the
    as-piped heat pump saves than the ideal one. On the Ciric and Floudas
-   case with Carnot cycles at the case's prices, the network gap is
-   $2.84M/y. At full load the as-piped heat pump saves $0.31M/y against the
-   ideal's $1.00M/y (COP 2.30 against 2.85, lifting to 271 degC for the
-   existing heater); at half load it saves $0.95M/y against $1.08M/y. Most
+   case with Carnot cycles at the case's prices (heat at 0.41 of the
+   electricity price), the network gap is $2.84M/y. The as-piped heat pump
+   delivers 7.2 MW of the heaters' 17.5 MW at a COP of 3.23, condensing at
+   up to 218 degC, and saves $0.95M/y; the ideal one delivers 6.3 MW of
+   10.6 MW at a COP of 3.91 and saves $1.13M/y. Most
    of the heat pump's value is reachable on the existing pipework, and the
    network's own recovery is worth more. Each target runs the HPR search,
-   about 80 s each on this case.
+   about 75 s each on this case.
 
 Not covered: moving or repiping an existing heater or cooler, and new
 utility exchangers placed between stages. Next to a paired new utility
