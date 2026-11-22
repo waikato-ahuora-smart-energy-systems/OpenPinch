@@ -92,3 +92,60 @@ def test_the_existing_segmented_network_rates_close_to_its_published_utilities()
     base = result.frontier[0]
     assert base.hot_utility == pytest.approx(PUBLISHED_HOT_UTILITY, rel=0.015)
     assert base.cold_utility == pytest.approx(PUBLISHED_COLD_UTILITY, rel=0.005)
+
+
+def test_a_segmented_stream_has_a_flowrate_in_the_retrofit_screens():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        _stream_ends,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+
+    problem = PinchProblem(json.loads(CASE_JSON.read_text(encoding="utf-8")))
+    problem.target.direct_heat_integration()
+    arrays = problem_to_solver_arrays(problem, 10.0)
+
+    ends = _stream_ends(arrays)
+
+    # Eight of the thirteen streams have several segments. Their flowrate in
+    # the arrays is a zero placeholder; the screens need duty over span, or
+    # every match on them (the crude feed C1 among them) screens to nothing.
+    assert all(flow > 0.0 for _supply, _target, flow in ends.values())
+    (name,) = [key for key in ends if key.endswith("C1")]
+    index = arrays.axis_maps["cold_process_streams"][name]
+    duty = arrays.arrays["cold_segment_duty_period"][0][index].sum()
+    supply, target, flow = ends[name]
+    assert flow * (target - supply) == pytest.approx(duty, rel=1e-9)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_a_search_on_the_segmented_case_finishes_and_tries_the_crude_feed():
+    problem = PinchProblem(json.loads(CASE_JSON.read_text(encoding="utf-8")))
+
+    # A candidate whose duty the model cannot place on a segment profile is
+    # dropped; it must not end the search.
+    result = problem.design.retrofit(
+        EXISTING, max_modifications=1, area_tolerance=0.05, new_unit_cost=0.0
+    )
+
+    assert len(result.frontier) == 2
+    assert result.frontier[1].hot_utility < result.frontier[0].hot_utility
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_a_candidate_whose_duty_misses_its_segment_profile_is_dropped():
+    problem = PinchProblem(json.loads(CASE_JSON.read_text(encoding="utf-8")))
+
+    # At the second step one candidate's solved duty runs past a stream's
+    # segment profile ("Exchanger duty exceeds an available parent segment
+    # profile"). That candidate is dropped; the search goes on.
+    result = problem.design.retrofit(
+        EXISTING, max_modifications=2, area_tolerance=0.05, new_unit_cost=0.0
+    )
+
+    assert len(result.frontier) == 3
