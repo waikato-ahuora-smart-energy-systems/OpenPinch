@@ -50,6 +50,16 @@ Heat exchanger network synthesis
   at a 0.75 multiplier recovers 120 kW and cools 30.2 kW. Its default
   utilities sit 5 K from the stream targets, so the 1.0 and 1.5
   multipliers still find no network.
+- A retrofit now proposes matches on streams with several segments. Such a
+  stream has no single heat capacity flowrate, and the search read it as
+  0, so every match on it screened to nothing: on the Hallberg and
+  Scribner crude case (eight of thirteen streams segmented) the crude feed
+  was never matched. The screens now take a segmented stream's duty over
+  its temperature span. On that case the first step is a new match on the
+  crude feed that cuts hot utility from 68.9 to 51.9 MW, and two steps
+  reach 46.0 MW. A candidate whose solved duty the model cannot place on a
+  segment profile is dropped; before, the error it raised ended the
+  search.
 - A retrofit no longer depends on which operating period is listed first.
   The search read every stream's temperatures and heat capacity flowrate
   from the first period, so a stream that is off in that period had a

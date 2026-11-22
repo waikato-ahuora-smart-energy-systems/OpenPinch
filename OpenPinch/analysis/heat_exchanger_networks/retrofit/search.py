@@ -905,7 +905,16 @@ class _Evaluator:
         # Read the solved values, then remove the model's run directory
         # (Couenne writes one per model) whether or not it is kept.
         try:
-            model.optimise(print_output=False)
+            try:
+                model.optimise(print_output=False)
+            except ValueError:
+                # A solved duty the model cannot place on a segmented
+                # stream's profile (raised while it reads the solution):
+                # the candidate is dropped. For the existing network the
+                # error stands.
+                if not state.moves:
+                    raise
+                return None
             if getattr(model, "mSuccess", 0) != 1:
                 return None
             solved = build_solution_network(request, structure, model, self.arrays)
@@ -1090,6 +1099,10 @@ class _Evaluator:
             if getattr(model, "mSuccess", 0) != 1:
                 return None
             return float(model.utility_cost_value)
+        except ValueError:
+            # A solved duty the model cannot place on a segmented stream's
+            # profile (raised while it reads the solution) has no ceiling.
+            return None
         finally:
             model.cleanup()
 
@@ -1460,7 +1473,9 @@ def _stream_ends(arrays) -> dict[str, tuple[float, float, float]]:
     of the time counts for the share it runs. The temperatures are the
     weighted mean over the periods the stream runs (every period for one
     that never does). The screens that read these therefore do not depend on
-    which period is listed first.
+    which period is listed first. A stream with several segments has no
+    single flowrate (a zero placeholder in the arrays): it gets its
+    segments' duty over its temperature span.
     """
 
     data = arrays.arrays
@@ -1470,6 +1485,20 @@ def _stream_ends(arrays) -> dict[str, tuple[float, float, float]]:
     for side, axis in (("h", "hot_process_streams"), ("c", "cold_process_streams")):
         for name, index in arrays.axis_maps[axis].items():
             flows = np.asarray(data[f"f_{side}_period"], dtype=float)[:, index]
+            # A stream with several segments has a zero placeholder there:
+            # its flowrate is its segments' duty over its temperature span.
+            prefix = "hot" if side == "h" else "cold"
+            duty = np.where(
+                data[f"{prefix}_segment_mask_period"][:, index],
+                data[f"{prefix}_segment_duty_period"][:, index],
+                0.0,
+            ).sum(axis=1)
+            span = np.abs(
+                data[f"T_{side}_in_period"][:, index]
+                - data[f"T_{side}_out_period"][:, index]
+            )
+            segmented = (flows <= 0.0) & (duty > 0.0) & (span > 0.0)
+            flows = np.where(segmented, duty / np.where(span > 0.0, span, 1.0), flows)
             running = weights * (flows > 0.0)
             over = running / running.sum() if running.sum() > 0.0 else weights
             ends[str(name)] = (
