@@ -94,6 +94,13 @@ Heat exchanger network synthesis
   The search warns when more than a quarter of its solves failed: on the
   Ciric and Floudas case with relocation at the report's costs, 136 of 491
   did (28 %); without relocation 1 of 145.
+- ``design.retrofit_heat_pumps`` now rates an existing network that has not
+  been solved as ``design.retrofit`` does by default, each exchanger held
+  to its two streams' temperature contributions. It held every exchanger
+  to 1 K instead, so its as-piped target started from less utility than
+  the retrofit's base case: 186 kW of hot utility against 240 kW on a
+  two-stream case with one recovery match. It also accepts the structure
+  mapping ``design.retrofit`` takes; a mapping raised ``AttributeError``.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

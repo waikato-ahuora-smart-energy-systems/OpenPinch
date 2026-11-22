@@ -887,7 +887,9 @@ Sites and heat recovery loops
 Heat pump targets
    ``design.retrofit_heat_pumps(existing, cycle=..., topology=...,
    options=...)`` asks the HPR service how much a heat pump could save
-   before any search. The *ideal* target serves the process's heating
+   before any search. ``existing`` is a network or the structure mapping
+   ``design.retrofit`` takes; one that has not been solved is rated first
+   as ``design.retrofit`` rates its base case. The *ideal* target serves the process's heating
    target from its cooling target, as a new design could. The *as-piped*
    target serves only the existing heaters from only the existing coolers,
    at their solved temperatures and duties, so it needs no process-side

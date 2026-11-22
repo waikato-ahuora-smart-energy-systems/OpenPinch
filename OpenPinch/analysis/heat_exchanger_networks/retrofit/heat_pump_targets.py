@@ -34,11 +34,15 @@ def retrofit_heat_pumps(
     ``network``'s solved coolers and heaters (``as_piped_profiles``), with
     the zone's HPR configuration. A ``network`` whose heaters and coolers
     have no solved temperatures is solved first, as the retrofit search's
-    existing design. ``args`` takes the HPR search budget keys."""
+    existing design with ``design.retrofit``'s defaults (each exchanger held
+    to its two streams' contributions). ``args`` takes the HPR search
+    budget keys."""
 
     if not _solved(network):
         network = (
-            run_retrofit_search(problem, network, RetrofitSettings(max_modifications=0))
+            run_retrofit_search(
+                problem, network, RetrofitSettings(max_modifications=0, approach=None)
+            )
             .frontier[0]
             .network
         )
