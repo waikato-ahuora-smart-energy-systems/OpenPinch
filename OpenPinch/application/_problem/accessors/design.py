@@ -1858,10 +1858,12 @@ class _DesignAccessor:
           network's ``area`` (each needs one). Every period's duty must fit
           that area; a period needing less runs with a bypass.
           ``min_approach_temperature`` defaults to the approach the network
-          was designed to: 0.1 K (or ``HENS_MIN_EXCHANGER_APPROACH_SHARE``
-          of the nominal approach if larger) for a thermal derivative or
-          evolution network, else each exchanger's stream temperature
-          contributions, scaled by the network's dt_cont multiplier.
+          was designed to, exchanger by exchanger: the sum of its two
+          streams' temperature contributions, scaled by the network's
+          dt_cont multiplier and, for a thermal derivative or evolution
+          network, by the ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` it was
+          designed with (the configured one when it records none), and at
+          least 0.1 K.
 
         An exchanger left at zero duty in every period is removed, with its
         approach constraint, and the problem is solved again until every
