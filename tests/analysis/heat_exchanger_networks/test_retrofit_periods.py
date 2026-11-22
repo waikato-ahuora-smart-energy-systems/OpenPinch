@@ -557,3 +557,33 @@ def test_the_screen_caps_relief_by_each_periods_potential():
     )
 
     assert [move.cold for move in proposed] == ["C2"]
+
+
+def test_a_potential_without_weights_is_the_first_periods():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.moves import (
+        match_potential,
+    )
+
+    # C1 runs at 1 kW/K in the first period and 3 kW/K in the second, 2 kW/K
+    # on average; H1 at 2 kW/K throughout, entering at 400 K with C1 at 300 K.
+    network = _two_period_network(
+        {"H1->CU": [100.0, 100.0], "HU->C1": [40.0, 120.0]},
+        inlets={"H1->CU": [400.0, 400.0], "HU->C1": [300.0, 300.0]},
+    )
+    ends = {"H1": (400.0, 350.0, 2.0), "C1": (300.0, 340.0, 2.0)}
+    period_ends = (
+        {**ends, "C1": (300.0, 340.0, 1.0)},
+        {**ends, "C1": (300.0, 340.0, 3.0)},
+    )
+
+    # Without weights a screen reads the first period: 1 kW/K over
+    # 400 - 300 - 10 K, not the mean flowrate's 180 kW.
+    potential = match_potential(
+        network,
+        ends,
+        NewMatch("H1", "C1", 1, new_stage=True),
+        approach=10.0,
+        period_ends=period_ends,
+    )
+
+    assert potential == pytest.approx(90.0, abs=1e-9)

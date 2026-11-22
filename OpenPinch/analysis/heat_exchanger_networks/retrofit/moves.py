@@ -164,11 +164,7 @@ def screen_new_matches(
         )
         for move in moves
     ]
-    by_period = (
-        period_ends is not None
-        and weights is not None
-        and len(weights) == len(period_ends)
-    )
+    by_period = period_ends is not None
 
     def relief(potential: float, move: NewMatch) -> float:
         # Capped by each period's own potential where the periods are known.
@@ -210,16 +206,13 @@ def match_potential(
     flowrate times the temperature difference, less ``approach``, between the
     hot and the cold stream where the match would sit, read from ``network``
     as ``period_mean`` gives it; zero without overlap. With ``period_ends``
-    (the same mapping for each period, matching ``weights``) it is the
-    ``period_mean`` of ``match_potentials``, each period's own potential, so
-    streams that never run together have none.
+    (the same mapping for each period) it is the ``period_mean`` of
+    ``match_potentials``, each period's own potential, so streams that never
+    run together have none; without ``weights``, or with weights that do not
+    match the periods, that is the first period's potential.
     """
 
-    if (
-        period_ends is not None
-        and weights is not None
-        and len(weights) == len(period_ends)
-    ):
+    if period_ends is not None:
         return period_mean(
             match_potentials(network, period_ends, move, approach=approach), weights
         )
