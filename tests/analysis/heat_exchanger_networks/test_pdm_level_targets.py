@@ -12,9 +12,6 @@ import pytest
 from OpenPinch.analysis.heat_exchanger_networks.solver import (
     pinch_design_decomposition as decomposition_module,
 )
-from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
-    ZERO_CONTRIBUTION_REPLACEMENT,
-)
 from OpenPinch.application.case_derivation import _zone_case
 from OpenPinch.application.problem import PinchProblem
 from tests.support.paths import REPOSITORY_ROOT
@@ -25,14 +22,10 @@ ZONAL_SITE = REPOSITORY_ROOT / "OpenPinch/tutorials/sample_cases/zonal_site.json
 def _process(zone: str) -> PinchProblem:
     """One process of ``zonal_site``, as synthesis sees it.
 
-    Synthesis replaces a zero dt_cont with 0.1 K (``ZERO_CONTRIBUTION_REPLACEMENT``),
-    and the sample's utilities have zero contributions, so they are set to 0.1 K
-    here for targeting to see the same levels.
+    The sample's utilities have zero contributions. Synthesis keeps them at
+    zero, as targeting does, so both see the same levels.
     """
     source = json.loads(ZONAL_SITE.read_text(encoding="utf-8"))
-    for utility in source["utilities"]:
-        if utility["dt_cont"]["value"] == 0:
-            utility["dt_cont"]["value"] = ZERO_CONTRIBUTION_REPLACEMENT
     site = PinchProblem(source)
     return _zone_case(site, site._resolve_target_zone(zone))
 

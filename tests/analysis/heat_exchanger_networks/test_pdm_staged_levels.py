@@ -574,8 +574,12 @@ def test_heuristic_designs_hold_the_zonal_sites_levels(zone, caplog):
         )
         duties[utility] = duties.get(utility, 0.0) + exchanger.state().duty
     for name, target in targets.items():
-        # The heuristic counts a load within 0.1% as met.
-        assert duties.get(name, 0.0) == pytest.approx(target, rel=1e-3, abs=1e-3)
+        # The heuristic counts a load within 0.1% as met (a band of 1e-3 kW
+        # on a level below 1 kW). A level may sit on the edge of that band,
+        # as cooling water does here, so the tolerance must include the edge.
+        assert duties.get(name, 0.0) == pytest.approx(
+            target, rel=1e-3 + 1e-9, abs=1e-3 + 1e-9
+        )
     assert verify_network_feasibility(network) == ()
 
 

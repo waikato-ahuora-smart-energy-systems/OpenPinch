@@ -108,8 +108,9 @@ stream's, segment's and utility's ΔT contribution, as a zone ``dt_cont``
 multiplier does in targeting, so 1.0 designs at the contributions the pinch
 targets use, and a match between two streams needs the sum of their scaled
 contributions. A stream whose ``dt_cont`` multiplier is locked keeps its own
-contribution, as in targeting. A contribution of 0 runs at 0.1 K times the
-multiplier. Results, manifests and networks record the multiplier; to reuse
+contribution, as in targeting. A contribution of 0 stays 0: a match is held to the
+sum of its two sides' scaled contributions, and to 0.1 K only when that sum
+is smaller. Results, manifests and networks record the multiplier; to reuse
 an older approach-temperature grid, use multiplier = dTmin / (2 x
 ``THERMAL_DT_CONT``), so 14 K at the 5 K default is 1.4.
 

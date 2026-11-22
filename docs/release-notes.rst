@@ -75,6 +75,25 @@ Heat exchanger network synthesis
   hot stream's cooling with the cold stream's heating in each period before
   the mean, so a link between streams that never run together relieves
   nothing.
+- The minimum approach of a match is now the sum of its two sides'
+  temperature contributions (each scaled by the dt_cont multiplier), with a
+  floor of 0.1 K on the pair, for recovery matches, heaters and coolers.
+  Before, a contribution of 0 was replaced by 0.1 K times the multiplier on
+  the stream itself, so every match of a zero-contribution stream or
+  utility ran that much wider than its partner's contribution: a 5 K
+  stream on a 0 K utility at 5.1 K, now 5.0 K. Pinch design targets move
+  with it, since the copy of the case they are computed on keeps zero
+  contributions at zero too, except where a hot and a cold contribution sum
+  below 0.1 K: each is then targeted at 0.05 K, and the streams split at the
+  pinch with it, so the targets never ask for more recovery than the 0.1 K
+  floor allows. On ``zonal_site.json``, whose six utilities
+  have a contribution of 0, hot water now splits at 87 and 85 degC (87.1
+  and 85.1 before). In the thermal derivative and evolution steps, which
+  scale every contribution down to a nominal 0.1 K, a pair below the
+  reference ``THERMAL_DT_CONT`` was held to less than the documented
+  0.1 K (a 2.5 K stream on a 2.5 K stream to 0.05 K at the 5 K default);
+  it is now held to 0.1 K. ``ZERO_CONTRIBUTION_REPLACEMENT`` is removed;
+  ``pair_minimum_approach`` and ``MINIMUM_PAIR_APPROACH`` replace it.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.

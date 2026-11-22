@@ -49,6 +49,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..solver.arrays import pair_minimum_approach
 from ..solver.piecewise import (
     duty_aligned_area_contributions,
     profile_from_solver_arrays,
@@ -329,8 +330,10 @@ def prepare_fixed_structure(owner) -> None:
             _approach_limit(
                 owner,
                 spec.recovery_approach.get(r),
-                owner.hot_profiles[n][m.hot].max_contribution
-                + owner.cold_profiles[n][m.cold].max_contribution,
+                pair_minimum_approach(
+                    owner.hot_profiles[n][m.hot].max_contribution,
+                    owner.cold_profiles[n][m.cold].max_contribution,
+                ),
             )
             for r, m in enumerate(spec.recovery)
         ]
@@ -341,8 +344,10 @@ def prepare_fixed_structure(owner) -> None:
             _approach_limit(
                 owner,
                 spec.utility_approach.get(e),
-                _utility_contribution(owner, n, m)
-                + stream_profile(owner, n, m).max_contribution,
+                pair_minimum_approach(
+                    _utility_contribution(owner, n, m),
+                    stream_profile(owner, n, m).max_contribution,
+                ),
             )
             for e, m in enumerate(spec.utilities)
         ]

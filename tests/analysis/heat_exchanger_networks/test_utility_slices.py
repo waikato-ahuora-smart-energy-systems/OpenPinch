@@ -66,11 +66,12 @@ def test_hot_water_splits_where_cooking_and_sterilisation_need_it(arrays):
     index = [sliced.axis_maps["hot_utilities"][name] for name in hot_water]
     inlets = sliced.arrays["T_hu_in_period"][0][index] - 273.15
     outlets = sliced.arrays["T_hu_out_period"][0][index] - 273.15
-    # Sterilisation enters at 82 C and Cooking at 80 C, each 5.1 K short.
-    np.testing.assert_allclose(inlets, [90.0, 87.1, 85.1], atol=1e-9)
-    np.testing.assert_allclose(outlets, [87.1, 85.1, 70.0], atol=1e-9)
+    # Sterilisation enters at 82 C and Cooking at 80 C, each 5 K short: the
+    # streams' own contribution, with nothing added for hot water's zero.
+    np.testing.assert_allclose(inlets, [90.0, 87.0, 85.0], atol=1e-9)
+    np.testing.assert_allclose(outlets, [87.0, 85.0, 70.0], atol=1e-9)
     fractions = [slices[name][1] for name in hot_water]
-    np.testing.assert_allclose(fractions, [0.145, 0.1, 0.755], atol=1e-9)
+    np.testing.assert_allclose(fractions, [0.15, 0.1, 0.75], atol=1e-9)
 
 
 def test_steam_and_every_other_utility_property_is_kept(arrays):
@@ -409,3 +410,61 @@ def test_a_held_level_counts_its_slices():
     holds = _level_holds(request, [heater], [("utility", 0)], [0])
 
     assert holds == (((0,), (40.0,)),)
+
+
+def _quantity(value, unit):
+    return {"value": value, "unit": unit}
+
+
+def test_a_cut_between_two_zero_contributions_keeps_the_pair_floor():
+    """Hot water (90 to 70 C) and a cold stream entering at 80 C, both with
+    no contribution: the water can serve the stream down to 80.1 C, the
+    0.1 K floor of a pair, so that is where it is cut."""
+    from OpenPinch.application.problem import PinchProblem
+
+    def stream(name, t_supply, t_target, heat_flow):
+        return {
+            "zone": "Site/Plant",
+            "name": name,
+            "t_supply": _quantity(t_supply, "degC"),
+            "t_target": _quantity(t_target, "degC"),
+            "heat_flow": _quantity(heat_flow, "kW"),
+            "dt_cont": _quantity(0.0, "delta_degC"),
+            "htc": _quantity(1.0, "kW/m^2/degC"),
+        }
+
+    def utility(name, kind, t_supply, t_target):
+        return {
+            "name": name,
+            "type": kind,
+            "t_supply": _quantity(t_supply, "degC"),
+            "t_target": _quantity(t_target, "degC"),
+            "dt_cont": _quantity(0.0, "delta_degC"),
+            "price": _quantity(10.0, "$/MWh"),
+            "htc": _quantity(1.0, "kW/m^2/degC"),
+        }
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                stream("Hot", 60.0, 30.0, 100.0),
+                stream("Cold", 80.0, 85.0, 100.0),
+            ],
+            "utilities": [
+                utility("HW", "Hot", 90.0, 70.0),
+                utility("CW", "Cold", 10.0, 15.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "Plant", "type": "Process Zone"}],
+            },
+        }
+    )
+
+    sliced = with_utility_slices(problem_to_solver_arrays(problem, D_TMIN))
+
+    slices = sliced.preparation["utility_slices"]["hot_utilities"]
+    index = [sliced.axis_maps["hot_utilities"][name] for name in slices]
+    inlets = sliced.arrays["T_hu_in_period"][0][index] - 273.15
+    np.testing.assert_allclose(sorted(inlets, reverse=True), [90.0, 80.1], atol=1e-9)

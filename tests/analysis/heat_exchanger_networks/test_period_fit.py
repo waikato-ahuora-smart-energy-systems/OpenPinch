@@ -239,3 +239,33 @@ def test_a_segmented_stream_is_screened_like_a_plain_one():
     )
 
     assert _heaters(padded) == [("hot_utility", "Hot Utility.HPS", "Site.Cold")]
+
+
+def test_two_zero_contributions_are_padded_at_the_pair_floor():
+    # Every contribution is 0, so a pair is held to the 0.1 K floor. Steam at
+    # 500.05 K is 0.05 K above CIP Water's 500 K target: too close.
+    source = _two_period_problem().to_problem_json()
+    for record in source["streams"] + source["utilities"]:
+        record["dt_cont"] = {"value": 0.0, "unit": "delta_degC"}
+    steam = dict(source["utilities"][0])
+    steam |= {
+        "name": "LPS",
+        "t_supply": {"value": 500.05, "unit": "K"},
+        "t_target": {"value": 500.05, "unit": "K"},
+        "price": {"value": 30.0, "unit": "$/MWh"},
+    }
+    source["utilities"].append(steam)
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[(RAW, MILK, 1), (FLASH, CIP, 1)], stage_count=1
+    )
+
+    padded = with_stream_end_utilities(
+        PinchProblem(source, project_name="two-period"), network
+    )
+
+    heaters = {
+        exchanger.sink_stream: exchanger.source_stream
+        for exchanger in padded.exchangers
+        if exchanger.kind.value == "hot_utility"
+    }
+    assert heaters[CIP] == "Hot Utility.HPS"

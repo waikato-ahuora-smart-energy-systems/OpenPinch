@@ -454,13 +454,14 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
     [
         (3.0, 2.0, 6.0),
         (12.0, 2.0, 24.0),
-        (0.0, 2.0, 0.1),
-        (tol / 4.0, 2.0, 0.1),
-        (tol / 2.0, 2.0, 0.1),
+        # No per-stream fallback: the 0.1 K floor is on the pair
+        # (``pair_minimum_approach``), so a zero stays zero.
+        (0.0, 2.0, 0.0),
+        (tol / 4.0, 2.0, tol / 2.0),
         (tol, 2.0, 2.0 * tol),
     ],
 )
-def test_effective_temperature_contribution_uses_fallback_only(
+def test_effective_temperature_contribution_is_the_scaled_value(
     base, multiplier, expected
 ):
     stream = Stream(
@@ -470,7 +471,7 @@ def test_effective_temperature_contribution_uses_fallback_only(
         delta_t_contribution=base,
         delta_t_contribution_multiplier=multiplier,
     )
-    assert _temperature_contribution(stream, 20.0) == pytest.approx(expected)
+    assert _temperature_contribution(stream, 20.0) == pytest.approx(expected, abs=1e-12)
     assert stream.delta_t_contribution.value == pytest.approx(base)
 
 
@@ -484,7 +485,7 @@ def test_effective_temperature_contribution_selects_operating_period():
     )
     assert [
         _temperature_contribution(stream, 20.0, period_idx=n) for n in range(3)
-    ] == pytest.approx([0.1, 6.0, 24.0])
+    ] == pytest.approx([0.0, 6.0, 24.0], abs=1e-12)  # a zero stays zero
 
 
 @seed(20260918)
@@ -578,7 +579,7 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
 
     # Effective contributions (2, 18) scale by the multiplier
-    # dTmin / (2 * THERMAL_DT_CONT) = 14 / 10; a zero becomes 0.1 K times it.
+    # dTmin / (2 * THERMAL_DT_CONT) = 14 / 10; a zero stays zero.
     assert zone.dt_cont_multiplier == 1.0
     assert zone.config.thermal.dt_cont == pytest.approx(7.0)
     np.testing.assert_allclose(
@@ -587,7 +588,9 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     )
     np.testing.assert_allclose(
         stream.segments[1].delta_t_contribution.to("delta_degC").period_values,
-        [0.14, 0.14],
+        # 0 and tol / 4, times the zone multiplier 2 and the task's 1.4.
+        [0.0, tol / 4.0 * 2.0 * 1.4],
+        atol=1e-12,
     )
     np.testing.assert_allclose(
         stream.delta_t_contribution.to("delta_degC").period_values,
@@ -628,7 +631,8 @@ def test_pdm_fallback_matches_arrays_and_is_idempotent_for_segments(stream, dTmi
     effective = np.asarray(original) * 2.0
     task_multiplier = dTmin / (2.0 * reference)
     scaled = effective * task_multiplier
-    expected = np.where(scaled > tol, scaled, 0.1 * task_multiplier)
+    # A zero contribution stays zero: the 0.1 K floor is on the pair.
+    expected = scaled
     from_arrays = [
         _temperature_contribution(segment, dTmin, reference_dt_cont=reference)
         for segment in next(iter(zone.process_streams)).segments
@@ -1061,9 +1065,12 @@ def test_couenne_segmented_cold_utility_uses_exact_traversed_segment_cost():
     )
     contributions = model.segment_area_cu_contributions_by_period[0][0][0]
     assert contributions
-    assert {item.cold_segment_identity for item in contributions} == {
-        model.solver_arrays.stream_identities["cold_utility_segments"][0]
-    }
+    # The 50 kW exactly fills the first segment, so the solve may end a
+    # feasibility sliver (about 4e-6 kW) into the second; that is not a
+    # traversed segment.
+    assert {
+        item.cold_segment_identity for item in contributions if item.duty > 1e-3
+    } == {model.solver_arrays.stream_identities["cold_utility_segments"][0]}
 
 
 @pytest.mark.solver

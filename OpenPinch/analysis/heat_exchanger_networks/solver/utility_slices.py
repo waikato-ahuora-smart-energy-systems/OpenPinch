@@ -16,7 +16,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from .arrays import PreparedSolverArrays
+from .arrays import MINIMUM_PAIR_APPROACH, PreparedSolverArrays
 
 # Only a utility spanning more than this (K) is sliced: steam at 0.1 K is not.
 MINIMUM_SLICED_RANGE = 1.0
@@ -177,7 +177,11 @@ def _cuts(arrays: PreparedSolverArrays) -> dict[str, dict[str, list[float]]]:
                     break
                 contribution = float(values[f"T_{short}_cont_period"][n][u])
                 supplies = values[f"T_{matched}_in_period"][n]
-                approaches = values[f"T_{matched}_cont_period"][n] + contribution
+                # Each pair's minimum approach, floored on the pair.
+                approaches = np.maximum(
+                    values[f"T_{matched}_cont_period"][n] + contribution,
+                    MINIMUM_PAIR_APPROACH,
+                )
                 sign = 1.0 if side == "hot" else -1.0
                 for supply, approach in zip(supplies, approaches):
                     cut = float(supply) + sign * float(approach)

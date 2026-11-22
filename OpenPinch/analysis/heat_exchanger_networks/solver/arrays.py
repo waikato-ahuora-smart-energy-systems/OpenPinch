@@ -19,9 +19,30 @@ from ..prepared_problem import PreparedProblem
 
 _PreparedItem = tuple[str, Stream, Any | None]
 SEGMENT_PROFILE_VERSION = 2
-# A contribution of 0 (an explicit dt_cont of 0) runs at this many K, times
-# the task's dt_cont multiplier unless the stream's multiplier is locked.
-ZERO_CONTRIBUTION_REPLACEMENT = 0.1
+# No match is held to a smaller approach than this, K. It is a floor on the
+# pair, not on a stream, and the dt_cont multiplier does not scale it.
+MINIMUM_PAIR_APPROACH = 0.1
+
+
+def pair_minimum_approach(
+    source_contribution: float,
+    sink_contribution: float,
+    *,
+    share: float = 1.0,
+) -> float:
+    """Return the minimum approach temperature of one match, K.
+
+    ``source_contribution`` and ``sink_contribution`` are the two sides'
+    temperature contributions, already scaled by the task's dt_cont
+    multiplier. Pinch design holds their sum (``share`` 1); the thermal
+    derivative and evolution steps hold ``share`` of it. A pair whose value
+    falls below ``MINIMUM_PAIR_APPROACH`` is held to that floor, so a stream
+    with a zero contribution adds nothing to a partner that already supplies
+    an approach.
+    """
+
+    held = (float(source_contribution) + float(sink_contribution)) * float(share)
+    return max(held, MINIMUM_PAIR_APPROACH)
 
 
 def nominal_approach_temperature(config: Any, dt_cont_multiplier: float) -> float:
@@ -268,8 +289,8 @@ def problem_to_solver_arrays(
             "temperature_contribution": (
                 "K, effective_delta_t_contribution times the dt_cont multiplier "
                 "dTmin / (2 * THERMAL_DT_CONT), unscaled for a stream whose "
-                "multiplier is locked; 0.1 K times that multiplier replaces a "
-                "contribution <= tol"
+                "multiplier is locked; a zero stays zero, and the 0.1 K floor "
+                "is on each pair (pair_minimum_approach)"
             ),
             "utility_price": (
                 "$/kW/y: price in $/MWh times COSTING_ANNUAL_OP_TIME / 1000, "
@@ -561,18 +582,14 @@ def _temperature_contribution(
     nominal approach of :func:`nominal_approach_temperature`), and every
     effective contribution is scaled by it, as targeting scales them with a
     zone multiplier; a ``locked`` stream keeps its effective contribution. A
-    contribution that is zero after scaling becomes 0.1 K times the same
-    multiplier. Testing after scaling keeps the policy idempotent: applying it
-    again with ``reference_dt_cont = dTmin / 2`` returns the same values.
+    zero contribution stays zero: the 0.1 K floor is on a pair of streams
+    (:func:`pair_minimum_approach`), not on one stream.
     """
     contribution = _value(
         stream.effective_delta_t_contribution, "delta_degC", period_idx=period_idx
     )
     multiplier = 1.0 if locked else _array_dt_cont_multiplier(dTmin, reference_dt_cont)
-    contribution *= multiplier
-    if contribution <= tol:
-        return ZERO_CONTRIBUTION_REPLACEMENT * multiplier
-    return contribution
+    return contribution * multiplier
 
 
 def _utility_solver_target(
@@ -728,8 +745,9 @@ def _str_array(values) -> np.ndarray:
 
 __all__ = [
     "SEGMENT_PROFILE_VERSION",
-    "ZERO_CONTRIBUTION_REPLACEMENT",
+    "MINIMUM_PAIR_APPROACH",
     "PreparedSolverArrays",
     "nominal_approach_temperature",
+    "pair_minimum_approach",
     "problem_to_solver_arrays",
 ]

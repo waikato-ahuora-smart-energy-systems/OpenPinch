@@ -161,7 +161,7 @@ def test_multiplier_scales_unlocked_streams_and_keeps_locked_ones():
 
 
 @pytest.mark.parametrize("multiplier", [1.0, 2.0])
-def test_zero_contribution_becomes_a_tenth_of_a_kelvin_times_the_multiplier(
+def test_a_zero_contribution_stays_zero_at_any_multiplier(
     multiplier: float,
 ):
     problem = _basic_pinch(contributions=[0.0] * 7)
@@ -171,6 +171,7 @@ def test_zero_contribution_becomes_a_tenth_of_a_kelvin_times_the_multiplier(
 
     arrays = _arrays(problem, multiplier)
 
-    assert _contribution(arrays, keys[0]) == pytest.approx(0.1)
-    for key in keys[1:]:
-        assert _contribution(arrays, key) == pytest.approx(0.1 * multiplier)
+    # The 0.1 K floor is on a pair (``pair_minimum_approach``), not on a
+    # stream: a zero contribution adds nothing to a partner's approach.
+    for key in keys:
+        assert _contribution(arrays, key) == pytest.approx(0.0, abs=1e-12)
