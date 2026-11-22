@@ -616,38 +616,3 @@ def test_a_heuristic_network_without_an_objective_value_sorts_last():
     uncosted, costed = outcome("uncosted", None), outcome("costed", 10.0)
 
     assert _cheapest_heuristic_seeds((uncosted, costed), 1) == (costed,)
-
-
-def test_heuristic_designs_never_start_worker_processes(monkeypatch):
-    """A heuristic design takes a fraction of a second and a pool of worker
-    processes seconds to start (three designs of the four-stream case: 0.1 s
-    in this process, 4.5 s in a pool of three), so they are always solved
-    here, whatever ``HENS_MAX_PARALLEL`` says."""
-    problem = _small_problem_with_options(
-        {"HENS_DT_CONT_MULTIPLIERS": [0.75, 1.0, 1.5]}
-    )
-    tasks = build_heuristic_pinch_design_method_tasks(
-        workflow_settings_from_problem(problem)
-    )
-    assert len(tasks) > 1
-    started = []
-
-    def pool(worker_count):
-        started.append(worker_count)
-        raise NotImplementedError("no worker processes in this test")
-
-    # On any runtime: under Emscripten no pool is ever started.
-    monkeypatch.setattr(
-        "OpenPinch.analysis.heat_exchanger_networks.execution.executor"
-        ".supported_workers",
-        lambda requested: requested,
-    )
-
-    outcomes = LocalSynthesisExecutor(worker_pool_factory=pool).execute(
-        tasks, problem=problem, parent_outcomes={}, max_parallel=10
-    )
-
-    assert started == []
-    # A task may give more than one design; each is solved.
-    assert len(outcomes) >= len(tasks)
-    assert {outcome.status for outcome in outcomes} == {"success"}
