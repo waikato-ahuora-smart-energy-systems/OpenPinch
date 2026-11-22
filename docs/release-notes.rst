@@ -125,6 +125,13 @@ Heat exchanger network synthesis
   save: the default design took 11.3 s with 10 workers and takes 3.2 s with
   one, for the same two ranked networks. Set ``HENS_MAX_PARALLEL`` in the
   case's ``options`` to use worker processes.
+- A synthesis run with ``HENS_MAX_PARALLEL`` above 1 now starts one pool of
+  worker processes for the whole run, not one for each stage. Starting a
+  pool takes seconds: with 10 workers the four-stream case started two
+  pools at the default search depth and took 10.4 s, and five pools at
+  depth 2 and took 24.7 s; it now starts one pool and takes 7.4 s and
+  10.9 s, for the same networks. A pool a stage fails in is replaced at
+  the next stage.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.

@@ -53,6 +53,23 @@ def execute_open_hens_method(
         return utility_only_workflow(problem, settings)
     if executor is None:
         executor = LocalSynthesisExecutor()
+    # One session for the run, so its worker pool, if it needs one, starts
+    # once. An executor without sessions runs each stage on its own.
+    session = getattr(executor, "session", None)
+    if session is None:
+        return _execute_stages(problem, settings, executor)
+    start = perf_counter()
+    with session():
+        result = _execute_stages(problem, settings, executor)
+    # Closing the session joins its worker processes while the caller still
+    # waits, so the run time is taken after it.
+    return replace(result, total_run_time=perf_counter() - start)
+
+
+def _execute_stages(
+    problem, settings: SynthesisWorkflowSettings, executor: SynthesisExecutor
+) -> SynthesisWorkflowResult:
+    """The stages of ``execute_open_hens_method``, run in ``executor``."""
     start = perf_counter()
 
     pdm_tasks, pdm_outcomes, heuristic_tasks, heuristic_outcomes = (
