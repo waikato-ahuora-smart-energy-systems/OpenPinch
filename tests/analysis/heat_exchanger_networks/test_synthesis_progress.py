@@ -165,6 +165,33 @@ def test_a_session_keeps_one_worker_pool_for_every_stage(stub_solves, monkeypatc
     assert closed == [True]
 
 
+def test_a_session_pool_has_the_runs_workers_not_the_first_stages(
+    stub_solves, monkeypatch
+):
+    """The first stage may have fewer tasks than the stages after it, so the
+    session's pool is started with the workers the run may use."""
+    started = []
+
+    class Pool(_InProcessPool):
+        def __init__(self, workers):
+            started.append(workers)
+
+    monkeypatch.setattr(
+        executor_module, "supported_workers", lambda requested: requested
+    )
+    executor = LocalSynthesisExecutor(worker_pool_factory=Pool)
+
+    with executor.session():
+        executor.execute(
+            [_task(index) for index in range(2)],
+            problem=None,
+            parent_outcomes={},
+            max_parallel=4,
+        )
+
+    assert started == [4]
+
+
 def test_a_session_pool_outlives_a_stage_that_solves_in_process(
     stub_solves, monkeypatch
 ):

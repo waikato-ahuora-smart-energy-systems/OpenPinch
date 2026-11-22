@@ -130,7 +130,13 @@ Heat exchanger network synthesis
   of worker processes takes seconds to start: with 10 workers the three
   heuristic designs of the four-stream case took 4.5 s in a pool against
   0.1 s in process, and the whole default design now takes 8.0 s instead of
-  11.3 s (2.9 s with one worker). The later stages still start a pool each.
+  11.3 s (2.9 s with one worker).
+- A synthesis run with ``HENS_MAX_PARALLEL`` above 1 now starts one pool of
+  worker processes for the whole run, not one for each stage. Starting a
+  pool takes seconds: at search depth 2 with 10 workers the four-stream
+  case started four pools and took 20.1 s; it now starts one and takes
+  10.7 s, for the same networks. A pool a stage fails in is replaced at
+  the next stage.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.
