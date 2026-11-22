@@ -158,6 +158,17 @@ Heat exchanger network synthesis
   ``options={"HENS_PDM_STAGES": [2, 3]}``. ``HENS_STAGE_SELECTION`` keeps
   its one other use, the stage counts of the direct network evolution runs
   made when Couenne is missing.
+- The thermal derivative step (search depth 2 and above) now minimises
+  utility cost when a problem has more than one hot or more than one cold
+  utility. It minimised hot utility duty, which is the same thing with one
+  utility a side but leaves the split between two free. On the four-stream
+  case with warm water added at a third of the cooling water price, its
+  network at a multiplier of 1 put all 1,996 kW of cooling on cooling
+  water (57.7 k$/y of utilities); it now cools on warm water (37.7 k$/y)
+  at the same hot utility. Network evolution already corrected the split,
+  so the selected design on that case is unchanged; the thermal derivative
+  networks in the ranking are cheaper. Problems with one hot and one cold
+  utility are unaffected.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.
