@@ -8,7 +8,7 @@ are fixed per stream pair, so its coefficient of performance is too.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -24,6 +24,7 @@ from ...heat_pumps.common.shared import calc_carnot_heat_pump_cop
 from ...heat_pumps.cycles.limits import CycleLimits
 from ...heat_pumps.cycles.vapour_compression_cycle import VapourCompressionCycle
 from ..solver.arrays import PreparedSolverArrays
+from .moves import joint_relief, utility_duties
 
 
 @dataclass(frozen=True)
@@ -171,34 +172,28 @@ def screen_heat_pumps(
     candidates: list[HeatPumpCandidate],
     *,
     limit: int,
+    weights: Sequence[float] | None = None,
 ) -> list[HeatPumpCandidate]:
     """The ``limit`` heat pumps that could relieve the most utility in
-    solved ``network`` (first period), most first, ties broken by COP.
+    solved ``network``, most first, ties broken by COP.
 
     A heat pump's evaporator can take at most its hot stream's cooler duty,
     so its condenser can deliver that times COP / (COP - 1), and at most
-    its cold stream's heater duty. Those that relieve none are left out.
+    its cold stream's heater duty, in the same period. Those that relieve
+    none are left out. The two are paired in each period and then averaged
+    with ``weights`` (``moves.joint_relief``), else read in the first period.
     """
 
-    def duty(kind: HeatExchangerKind, stream: str) -> float:
-        return sum(
-            e.period_states[0].duty
-            for e in network.exchangers
-            if e.kind is kind
-            and (
-                e.source_stream
-                if kind is HeatExchangerKind.COLD_UTILITY
-                else e.sink_stream
-            )
-            == stream
-        )
-
     relief = {
-        candidate: min(
-            duty(HeatExchangerKind.COLD_UTILITY, candidate.hot)
-            * candidate.cop
-            / (candidate.cop - 1.0),
-            duty(HeatExchangerKind.HOT_UTILITY, candidate.cold),
+        candidate: joint_relief(
+            [
+                duty * candidate.cop / (candidate.cop - 1.0)
+                for duty in utility_duties(
+                    network, HeatExchangerKind.COLD_UTILITY, candidate.hot
+                )
+            ],
+            utility_duties(network, HeatExchangerKind.HOT_UTILITY, candidate.cold),
+            weights,
         )
         for candidate in candidates
     }

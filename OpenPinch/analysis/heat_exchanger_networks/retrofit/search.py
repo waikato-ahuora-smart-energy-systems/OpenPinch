@@ -19,6 +19,8 @@ from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 
+import numpy as np
+
 from ....contracts.synthesis.retrofit import (
     HeatExchangerNetworkRetrofitDesign,
     HeatExchangerNetworkRetrofitModification,
@@ -70,6 +72,7 @@ from .moves import (
     match_potential,
     new_splits,
     new_utility_candidates,
+    period_mean,
     screen_new_matches,
 )
 from .processes import stream_process_zones
@@ -446,6 +449,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
         approach=evaluator.screen_approach,
         limit=settings.new_match_candidates,
         processes=evaluator.processes,
+        weights=evaluator.weights,
     )
     for match in matches:
         exchanger_id = _new_id(network, match)
@@ -466,6 +470,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
         evaluator.existing,
         approach=evaluator.screen_approach,
         processes=evaluator.processes,
+        weights=evaluator.weights,
     ):
         remaining = network.model_copy(
             update={
@@ -496,6 +501,7 @@ def _heat_pump_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         parent.solved,
         [c for c in evaluator.heat_pumps if condenser_name(c) not in installed],
         limit=settings.new_match_candidates,
+        weights=evaluator.weights,
     ):
         evaporator = NewUtility(candidate.hot, evaporator_name(candidate), False)
         evaporator_id = _new_utility_id(network, evaporator)
@@ -526,6 +532,7 @@ def _loop_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         parent.solved,
         [c for c in evaluator.loops if loop_heater_name(c) not in installed],
         limit=settings.new_match_candidates,
+        weights=evaluator.weights,
     ):
         cooler = NewUtility(loop.hot, loop_cooler_name(loop), False)
         cooler_id = _new_utility_id(network, cooler)
@@ -600,6 +607,7 @@ def _relocations(
     *,
     approach,
     processes=None,
+    weights=None,
 ):
     """The relocations from ``parent``, most promising first.
 
@@ -620,7 +628,11 @@ def _relocations(
     solved = parent.solved
     moved = {m.exchanger_id for m in parent.state.moves if m.kind == "relocation"}
     duties = {
-        e.exchanger_id: (e.source_stream, e.sink_stream, e.period_states[0].duty)
+        e.exchanger_id: (
+            e.source_stream,
+            e.sink_stream,
+            period_mean([state.duty for state in e.period_states], weights),
+        )
         for e in solved.exchangers
         if e.kind is HeatExchangerKind.RECOVERY
         and e.exchanger_id in existing
@@ -633,11 +645,18 @@ def _relocations(
     )
     # Every screened match, not just the best few.
     pool = screen_new_matches(
-        solved, ends, approach=approach, limit=sys.maxsize, processes=processes
+        solved,
+        ends,
+        approach=approach,
+        limit=sys.maxsize,
+        processes=processes,
+        weights=weights,
     )
     scored = []
     for match in pool:
-        potential = match_potential(solved, ends, match, approach=approach)
+        potential = match_potential(
+            solved, ends, match, approach=approach, weights=weights
+        )
         for unit, (hot, cold, duty) in duties.items():
             stranded = (match.hot != hot and served[hot] == 1) or (
                 match.cold != cold and served[cold] == 1
@@ -748,6 +767,9 @@ class _Evaluator:
         self.ends = {
             self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
         }
+        # The period weights the screens average a solved network with.
+        period_weights = np.asarray(self.arrays.arrays["period_weights"], dtype=float)
+        self.weights = tuple(float(w) for w in period_weights / period_weights.sum())
         self.processes = _spanned_processes(problem, existing, self.names)
         axes = self.arrays.axis_maps
         self.utility_axes = {
@@ -1432,15 +1454,27 @@ def _with_names(network: HeatExchangerNetwork, names) -> HeatExchangerNetwork:
 
 def _stream_ends(arrays) -> dict[str, tuple[float, float, float]]:
     """Each process stream's supply and target temperature and heat capacity
-    flowrate, in the first period."""
+    flowrate, over every period.
+
+    The flowrate is the period-weighted mean, so a stream that is off part
+    of the time counts for the share it runs. The temperatures are the
+    weighted mean over the periods the stream runs (every period for one
+    that never does). The screens that read these therefore do not depend on
+    which period is listed first.
+    """
 
     data = arrays.arrays
+    weights = np.asarray(data["period_weights"], dtype=float)
+    weights = weights / weights.sum()
     ends: dict[str, tuple[float, float, float]] = {}
     for side, axis in (("h", "hot_process_streams"), ("c", "cold_process_streams")):
         for name, index in arrays.axis_maps[axis].items():
+            flows = np.asarray(data[f"f_{side}_period"], dtype=float)[:, index]
+            running = weights * (flows > 0.0)
+            over = running / running.sum() if running.sum() > 0.0 else weights
             ends[str(name)] = (
-                float(data[f"T_{side}_in_period"][0][index]),
-                float(data[f"T_{side}_out_period"][0][index]),
-                float(data[f"f_{side}_period"][0][index]),
+                float(over @ data[f"T_{side}_in_period"][:, index]),
+                float(over @ data[f"T_{side}_out_period"][:, index]),
+                float(weights @ flows),
             )
     return ends

@@ -50,6 +50,21 @@ Heat exchanger network synthesis
   at a 0.75 multiplier recovers 120 kW and cools 30.2 kW. Its default
   utilities sit 5 K from the stream targets, so the 1.0 and 1.5
   multipliers still find no network.
+- A retrofit no longer depends on which operating period is listed first.
+  The search read every stream's temperatures and heat capacity flowrate
+  from the first period, so a stream that is off in that period had a
+  flowrate of 0 and every match on it screened to nothing: a two-period
+  case with a cold stream off 10 % of the time found no step with the idle
+  period first and a new match worth 32 k$/y with it last. Stream
+  flowrates are now the period-weighted mean and stream temperatures the
+  weighted mean over the periods the stream runs. The new-match, heat pump
+  and heat recovery loop screens and the relocation scoring read a solved
+  network's duties and temperatures as period-weighted means too, so a
+  heater that is off in the first period no longer hides the heat it could
+  give up. The utility a match, heat pump or loop could relieve pairs the
+  hot stream's cooling with the cold stream's heating in each period before
+  the mean, so a link between streams that never run together relieves
+  nothing.
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.
