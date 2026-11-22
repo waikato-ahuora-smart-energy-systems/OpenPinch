@@ -86,8 +86,10 @@ Heat exchanger network synthesis
   ``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``: a quarter of its
   pinch design approach by default, where before every match could close
   to 0.1 K. Evolved networks therefore keep wider approaches and use more
-  utility and less area than before; set the option to 0 for the earlier
-  behaviour. A fit to every period, a rating and an overdesign of an
+  utility and less area than before; set the option to 0 to let every
+  match close to 0.1 K again. (At 0 a pair whose contributions sum above
+  twice ``THERMAL_DT_CONT`` was held to more than 0.1 K, 0.2 K for two 10 K
+  streams at the 5 K default; it is now 0.1 K like any other.) A fit to every period, a rating and an overdesign of an
   evolved network hold the same pair values (each pair's contributions at
   multiplier x share) instead of one uniform approach, which could sit
   above a pair's own value and force the fit down to its 1 K fallback.
