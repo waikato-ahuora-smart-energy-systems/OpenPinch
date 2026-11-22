@@ -1704,8 +1704,6 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     assert _optional_int(None) is None
     assert _optional_int("7") == 7
     assert _pdm_stage_selection(problem) == "automated"
-    two_stage_problem = _four_stream_problem(options={"HENS_STAGE_SELECTION": [2, 3]})
-    assert _pdm_stage_selection(two_stage_problem) == [2, 3]
     assert _pdm_stage_selection(
         problem,
         task.model_copy(update={"settings": {"stage_selection": [2, 4]}}),
@@ -1713,6 +1711,41 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     assert _solver_status(SimpleNamespace(case=SimpleNamespace(solver_run=None))) == (
         "success"
     )
+
+
+def test_pdm_stages_set_the_pinch_design_stage_counts() -> None:
+    """``HENS_PDM_STAGES`` holds the MILP pinch design stage counts above and
+    below the pinch, which may be equal. ``HENS_STAGE_SELECTION`` lists stage
+    counts for direct network evolution and sets neither, whatever its
+    length. A task's own pair, as the stage pair candidates carry, comes
+    first."""
+    listed = _four_stream_problem(options={"HENS_STAGE_SELECTION": [2, 3]})
+    assert _pdm_stage_selection(listed) == "automated"
+
+    staged = _four_stream_problem(
+        options={"HENS_PDM_STAGES": [3, 3], "HENS_SEARCH_DEPTH": 3}
+    )
+    assert _pdm_stage_selection(staged) == [3, 3]
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(staged))[0]
+    assert _pdm_stage_selection(staged, task) == [3, 3]
+    assert _pdm_stage_selection(
+        staged, task.model_copy(update={"settings": {"stage_selection": [2, 4]}})
+    ) == [2, 4]
+
+
+def test_pdm_stages_leave_the_heuristic_pinch_design_its_own_stages() -> None:
+    """The heuristic pinch design sets each side's stages from its own
+    matches, so its decompositions are not built to the MILP's pair."""
+    from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
+
+    staged = _four_stream_problem(options={"HENS_PDM_STAGES": [1, 2]})
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(staged))[0]
+    heuristic = task.model_copy(
+        update={"method": HeatExchangerNetworkDesignMethod.HeuristicPinchDesign}
+    )
+
+    assert _pdm_stage_selection(staged, task) == [1, 2]
+    assert _pdm_stage_selection(staged, heuristic) == "automated"
     assert (
         _solver_status(
             SimpleNamespace(

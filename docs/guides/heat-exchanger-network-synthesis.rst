@@ -525,7 +525,10 @@ ones, unless the same call sets them: ``heat_exchanger_network(width=2)`` on a p
 are in ``design.result.manifest.search_width`` and ``search_depth``. The other
 ``HENS_*`` keys, such as ``HENS_STAGE_SELECTION`` (the ``stages`` argument)
 and ``HENS_SOLVE_TOLERANCE``, are listed with
-their defaults in :doc:`../api/configuration-options`.
+their defaults in :doc:`../api/configuration-options`. ``stages`` lists the
+stage counts of the direct network evolution runs made when Couenne is
+missing; ``HENS_PDM_STAGES`` sets the MILP pinch design stage counts above
+and below the pinch.
 
 A solve that stopped before converging, for example at the IPOPT iteration
 limit, is logged as an ``[Unconverged]`` warning. Its network still seeds the

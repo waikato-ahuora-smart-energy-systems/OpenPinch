@@ -425,6 +425,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "HENS_PDM_MILP)."
         ),
     ),
+    "HENS_PDM_STAGES": FieldText(
+        "Pinch design stage counts", None,
+        (
+            "Two stage counts for the MILP pinch design, above then below the "
+            "pinch; they may be equal. None lets each side take the count its "
+            "streams need. A count too small for a side fails that design. The "
+            "heuristic pinch design sets its own stages."
+        ),
+    ),
     "HENS_UTILITY_PLACEMENT": FieldText(
         "Utility placement", None,
         (
@@ -586,9 +595,8 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "HEN stage counts", None,
         (
             "Stage counts for the direct network evolution runs made when Couenne "
-            "is missing. Exactly two values also fix the MILP pinch design stages "
-            "above and below the pinch; the heuristic sets its own. Other runs "
-            "choose their stage counts."
+            "is missing. Other runs choose their stage counts; HENS_PDM_STAGES "
+            "sets those of the MILP pinch design."
         ),
     ),
     "HENS_SOLVER_PDM": FieldText(

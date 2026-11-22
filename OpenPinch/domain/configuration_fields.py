@@ -141,6 +141,18 @@ def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
     return stages
 
 
+def _stage_pair_or_none(name: str, value: Any) -> list[int] | None:
+    """Two positive stage counts, which may be equal, or ``None``."""
+    if value is None:
+        return None
+    stages = [
+        _positive_int(name, item) for item in _sequence(name, value, allow_empty=False)
+    ]
+    if len(stages) != 2:
+        raise ValueError(f"{name} must hold exactly two stage counts.")
+    return stages
+
+
 def _site_level_counts(name: str, value: Any) -> list[int]:
     """Unique level counts of at least two, in ascending order."""
     counts = _positive_unique_int_grid(name, value)
@@ -448,6 +460,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.25, "hens", "min_exchanger_approach_share", validator=_share_below_one),
     "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
+    "HENS_PDM_STAGES": _spec(List[int] | None, None, "hens", "pdm_stages", validator=_stage_pair_or_none),
     "HENS_PDM_MIN_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_min_unit_networks", numeric_min=0.0),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_extra_unit_networks", numeric_min=0.0),
     "HENS_HEURISTIC_PDM_NETWORKS": _spec(int | None, None, "hens", "heuristic_pdm_networks", numeric_min=0.0),
