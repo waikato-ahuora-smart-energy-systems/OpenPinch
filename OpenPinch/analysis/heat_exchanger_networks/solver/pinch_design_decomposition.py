@@ -239,6 +239,7 @@ def build_pinch_design_decomposition(
         dTmin=float(dTmin),
         pinch_location=pinch_location,
         stage_selection=stage_selection,
+        partner_leasts=_partner_leasts(problem.master_zone, dTmin=float(dTmin)),
     )
 
 
@@ -478,6 +479,7 @@ def _build_decomposition(
     dTmin: float,
     pinch_location: PinchLocation,
     stage_selection: StageSelection,
+    partner_leasts: dict[str, float] | None = None,
 ) -> PinchDesignDecomposition:
     values = arrays.arrays
     period_count = len(period_targets)
@@ -499,9 +501,18 @@ def _build_decomposition(
     if any(rows.shape[0] != period_count for rows in state_rows.values()):
         raise ValueError("PDM period targets must match solver-array periods.")
     # Each stream meets the shifted pinch at its own contribution, so its real
-    # pinch temperature is T* + dt_cont (hot) or T* - dt_cont (cold).
+    # pinch temperature is T* + dt_cont (hot) or T* - dt_cont (cold). The
+    # targets were computed with contributions lifted for the pair floor
+    # (``partner_leasts`` given), so the split uses the same ones.
     hot_contributions = np.asarray(values["T_h_cont_period"], dtype=float)
     cold_contributions = np.asarray(values["T_c_cont_period"], dtype=float)
+    if partner_leasts is not None:
+        hot_contributions = _lift_for_pair_floor(
+            hot_contributions, partner_leasts["hot_streams"]
+        )
+        cold_contributions = _lift_for_pair_floor(
+            cold_contributions, partner_leasts["cold_streams"]
+        )
     z_i_active_period = []
     z_j_active_period = []
     for period_idx, target in enumerate(period_targets):
