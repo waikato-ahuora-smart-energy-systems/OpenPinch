@@ -62,6 +62,10 @@ class InternalHeatExchangerNetworkProblem:
     dTmin: float = 0.1
     # The synthesis task's dt_cont multiplier, recorded on extracted networks.
     dt_cont_multiplier: float | None = None
+    # The share of each match's pinch design approach a thermal derivative or
+    # evolution task holds (``HENS_MIN_EXCHANGER_APPROACH_SHARE``), recorded
+    # on extracted networks so a later fit or rating holds the same.
+    approach_share: float | None = None
     min_dqda: float = 0.0
     z_restriction: list | None = None
     minimisation_goal: str = "hot utility"
@@ -334,6 +338,13 @@ class InternalHeatExchangerNetworkProblem:
         balance = site_balance(candidate)
         if balance is not None:
             network = with_site_cost(network, balance)
+        if self.approach_share is not None:
+            network = network.model_copy(
+                update={
+                    "source_metadata": network.source_metadata
+                    | {"min_exchanger_approach_share": float(self.approach_share)}
+                }
+            )
         if self.utility_level_targets is None:
             return network
         return network.model_copy(

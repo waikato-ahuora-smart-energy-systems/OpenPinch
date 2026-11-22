@@ -393,7 +393,14 @@ class LocalSynthesisExecutor:
             nominal_approach,
             min_approach_share=config.hens.min_exchanger_approach_share,
         )
-        arrays = problem_to_solver_arrays(problem, dTmin)
+        arrays = problem_to_solver_arrays(
+            problem,
+            _task_array_approach_temperature(
+                task,
+                nominal_approach,
+                min_approach_share=config.hens.min_exchanger_approach_share,
+            ),
+        )
         # A site seed's task holds each process's levels within the process.
         site_processes = task.settings.get("site_processes")
         stage_selection = _pdm_stage_selection(problem, task)
@@ -429,6 +436,15 @@ class LocalSynthesisExecutor:
             solver=_solver_for_task(problem, task.method),
             dTmin=dTmin,
             dt_cont_multiplier=task.dt_cont_multiplier,
+            approach_share=(
+                float(config.hens.min_exchanger_approach_share)
+                if task.method
+                in {
+                    HeatExchangerNetworkDesignMethod.ThermalDerivative,
+                    HeatExchangerNetworkDesignMethod.NetworkEvolution,
+                }
+                else None
+            ),
             min_dqda=(
                 0.0
                 if task.derivative_threshold is None
@@ -862,6 +878,35 @@ def _task_model_approach_temperature(
         HeatExchangerNetworkDesignMethod.NetworkEvolution,
     }:
         return max(0.1, min_approach_share * float(nominal_approach))
+    return float(nominal_approach)
+
+
+# The smallest nominal approach a task's arrays are built at, K: a share of 0
+# leaves nothing of the contributions to scale, and the arrays need a
+# positive value to say so.
+_LEAST_ARRAY_APPROACH = 1e-6
+
+
+def _task_array_approach_temperature(
+    task: HeatExchangerNetworkSynthesisTask,
+    nominal_approach: float,
+    *,
+    min_approach_share: float = 0.0,
+) -> float:
+    """Return the nominal approach a task's arrays scale contributions to.
+
+    Pinch design scales each contribution by the task's multiplier. The
+    thermal derivative and evolution steps scale it by the multiplier times
+    ``min_approach_share``, so a match is held to that share of its pinch
+    design approach; the models floor each pair at 0.1 K
+    (``pair_minimum_approach``), which a nominal floor here would not do for
+    a pair above the reference contribution.
+    """
+    if task.method in {
+        HeatExchangerNetworkDesignMethod.ThermalDerivative,
+        HeatExchangerNetworkDesignMethod.NetworkEvolution,
+    }:
+        return max(_LEAST_ARRAY_APPROACH, min_approach_share * float(nominal_approach))
     return float(nominal_approach)
 
 

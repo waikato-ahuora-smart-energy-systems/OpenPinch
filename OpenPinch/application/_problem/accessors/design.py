@@ -44,6 +44,10 @@ _DEPTH_OPTIONS = (
 # Design bases synthesised on a derived case, whose networks are then fitted
 # to every period.
 _FITTED_BASES = ("median", "period")
+# The smallest dt_cont multiplier a fit is asked for. With a share of 0 every
+# contribution scales to nothing and each pair is held to its 0.1 K floor;
+# the arrays need a positive multiplier to say so.
+_LEAST_MULTIPLIER = 1e-6
 
 
 def _rounded(value):
@@ -785,15 +789,12 @@ class _DesignAccessor:
         """The minimum approach ``network``'s method designed it to, as
         duty optimisation arguments.
 
-        The thermal derivative and evolution steps design down to 0.1 K, or
-        ``hens``'s ``min_exchanger_approach_share`` of twice
-        ``THERMAL_DT_CONT`` times the multiplier if larger. Any other network
-        (a pinch design, or one of unknown method) keeps each stream's own
-        contribution scaled by its dt_cont multiplier, as synthesis does.
+        Every network keeps each stream's own contribution, as synthesis
+        does: a pinch design (or a network of unknown method) scaled by its
+        dt_cont multiplier, a thermal derivative or evolution network by
+        that multiplier times ``hens``'s ``min_exchanger_approach_share``.
+        The fixed-structure model floors each pair at 0.1 K.
         """
-        from ....analysis.heat_exchanger_networks.solver.arrays import (
-            nominal_approach_temperature,
-        )
         from ....domain.enums import HeatExchangerNetworkDesignMethod
 
         multiplier = float(
@@ -801,16 +802,26 @@ class _DesignAccessor:
             or (network.source_metadata or {}).get("dt_cont_multiplier")
             or 1.0
         )
-        root = self._problem._require_prepared_root_zone()
-        nominal = nominal_approach_temperature(root.config, multiplier)
         if network.method in {
             "TDM",
             "ESM",
             HeatExchangerNetworkDesignMethod.ThermalDerivative.value,
             HeatExchangerNetworkDesignMethod.NetworkEvolution.value,
         }:
-            share = float(hens.min_exchanger_approach_share)
-            return {"min_approach_temperature": max(0.1, share * nominal)}
+            # Each pair's contributions at multiplier x share, floored on the
+            # pair at 0.1 K, as the step that designed the network held them.
+            # The share the network records it was designed with; one that
+            # records none takes the configuration's.
+            recorded = (network.source_metadata or {}).get(
+                "min_exchanger_approach_share"
+            )
+            share = float(
+                hens.min_exchanger_approach_share if recorded is None else recorded
+            )
+            return {
+                "problem_approach": True,
+                "dt_cont_multiplier": max(multiplier * share, _LEAST_MULTIPLIER),
+            }
         return {"problem_approach": True, "dt_cont_multiplier": multiplier}
 
     def _effective_hens(self, options):
@@ -1847,10 +1858,12 @@ class _DesignAccessor:
           network's ``area`` (each needs one). Every period's duty must fit
           that area; a period needing less runs with a bypass.
           ``min_approach_temperature`` defaults to the approach the network
-          was designed to: 0.1 K (or ``HENS_MIN_EXCHANGER_APPROACH_SHARE``
-          of the nominal approach if larger) for a thermal derivative or
-          evolution network, else each exchanger's stream temperature
-          contributions, scaled by the network's dt_cont multiplier.
+          was designed to, exchanger by exchanger: the sum of its two
+          streams' temperature contributions, scaled by the network's
+          dt_cont multiplier and, for a thermal derivative or evolution
+          network, by the ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` it was
+          designed with (the configured one when it records none), and at
+          least 0.1 K.
 
         An exchanger left at zero duty in every period is removed, with its
         approach constraint, and the problem is solved again until every

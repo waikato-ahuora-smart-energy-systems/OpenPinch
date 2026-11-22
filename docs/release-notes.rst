@@ -94,6 +94,28 @@ Heat exchanger network synthesis
   0.1 K (a 2.5 K stream on a 2.5 K stream to 0.05 K at the 5 K default);
   it is now held to 0.1 K. ``ZERO_CONTRIBUTION_REPLACEMENT`` is removed;
   ``pair_minimum_approach`` and ``MINIMUM_PAIR_APPROACH`` replace it.
+- ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` now defaults to 0.25 (was 0). The
+  thermal derivative and network evolution steps hold each match to
+  ``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``: a quarter of its
+  pinch design approach by default, where before every match could close
+  to 0.1 K. Evolved networks therefore keep wider approaches and use more
+  utility and less area than before; set the option to 0 to let every
+  match close to 0.1 K again. (At 0 a pair whose contributions sum above
+  twice ``THERMAL_DT_CONT`` was held to more than 0.1 K, 0.2 K for two 10 K
+  streams at the 5 K default; it is now 0.1 K like any other.) A fit to
+  every period, a rating and an overdesign of an evolved network hold the
+  same pair values (each pair's contributions at multiplier x share)
+  instead of one uniform approach, which could sit above a pair's own
+  value and force the fit down to its 1 K fallback.
+  Each such network records the share it was designed with
+  (``source_metadata["min_exchanger_approach_share"]``), so
+  ``optimise_duties``, the fit and overdesign hold it whatever the
+  configuration says later.
+- Network evolution now adopts the areas of staged heaters and coolers with
+  the rest of a better candidate. It kept the areas they had before, so a
+  staged unit the candidate no longer used still counted in the area check
+  and the evolved multiperiod network was rejected ("verification failed:
+  area").
 - A split branch whose stream has a segment under twice the tolerance
   was floored above the whole stream's flow, so the branch carried more
   duty than its stream. The floor is now capped at the whole stream.

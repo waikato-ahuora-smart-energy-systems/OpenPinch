@@ -668,6 +668,16 @@ def _update_with_best_model(owner, best_model) -> None:
         owner.area_hu_shared = copy.deepcopy(best_model.area_hu_shared)
     if hasattr(best_model, "area_cu_shared"):
         owner.area_cu_shared = copy.deepcopy(best_model.area_cu_shared)
+    # The staged heaters' and coolers' areas too: a unit the candidate left
+    # without duty must not keep the area it had here, which the adopted
+    # cost totals no longer include.
+    for name in ("area_hs_shared", "area_cs_shared"):
+        if hasattr(best_model, name):
+            setattr(
+                owner,
+                name,
+                {key: _value(area) for key, area in getattr(best_model, name).items()},
+            )
     owner.hu_area_cost_total = copy.deepcopy(best_model.hu_area_cost_total)
     owner.cu_area_cost_total = copy.deepcopy(best_model.cu_area_cost_total)
     if hasattr(best_model, "solver_run"):
