@@ -202,20 +202,52 @@ def utility_relief(
     """Utility a new match of ``potential`` could cut at first order.
 
     Heat it moves cuts utility only as far as its hot stream is cooled and
-    its cold stream heated: the least of ``potential``, the hot stream's
-    cooler duty and the cold stream's heater duty, read from solved
-    ``network`` as ``period_mean`` gives them.
+    its cold stream heated in the same period: the least of ``potential``,
+    the hot stream's cooler duty and the cold stream's heater duty in each
+    period of solved ``network``, then ``period_mean`` over the periods. A
+    stream cooled only while the other is not heated relieves nothing.
     """
 
-    def duty(kind: HeatExchangerKind, stream: str) -> float:
-        return sum(
-            period_mean([state.duty for state in e.period_states], weights)
-            for e in network.exchangers
-            if e.kind is kind
-            and (e.source_stream if kind is COOLER else e.sink_stream) == stream
-        )
+    return joint_relief(
+        utility_duties(network, COOLER, move.hot),
+        utility_duties(network, HEATER, move.cold),
+        weights,
+        cap=potential,
+    )
 
-    return min(potential, duty(COOLER, move.hot), duty(HEATER, move.cold))
+
+def utility_duties(
+    network: HeatExchangerNetwork, kind: HeatExchangerKind, stream: str
+) -> list[float]:
+    """The duty of ``stream``'s coolers (``kind`` cold utility) or heaters
+    (hot utility) in each period of solved ``network``; empty with none."""
+
+    states = [
+        e.period_states
+        for e in network.exchangers
+        if e.kind is kind
+        and (e.source_stream if kind is COOLER else e.sink_stream) == stream
+    ]
+    return [sum(float(state.duty) for state in period) for period in zip(*states)]
+
+
+def joint_relief(
+    cooling: Sequence[float],
+    heating: Sequence[float],
+    weights: Sequence[float] | None,
+    *,
+    cap: float = math.inf,
+) -> float:
+    """Utility a link from a cooled to a heated stream could cut.
+
+    ``cooling`` and ``heating`` hold what each side can give and take in
+    each period. The link moves the smaller of the two, at most ``cap``, in
+    each period; the result is ``period_mean`` of that, not the smaller of
+    the two means, so sides that never run together relieve nothing.
+    """
+
+    joint = [min(cap, c, h) for c, h in zip(cooling, heating)]
+    return period_mean(joint, weights) if joint else 0.0
 
 
 def period_mean(values: Sequence[float | None], weights: Sequence[float] | None):
