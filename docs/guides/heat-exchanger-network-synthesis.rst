@@ -115,17 +115,19 @@ an older approach-temperature grid, use multiplier = dTmin / (2 x
 ``THERMAL_DT_CONT``), so 14 K at the 5 K default is 1.4.
 
 The multipliers set the pinch design step: the energy targets the seed
-networks meet and the minimum approach of their exchangers. The thermal
-derivative and network evolution steps that follow minimise total annual cost
-and choose each exchanger's approach from the cost settings, down to 0.1 K.
-With cheap area, exchangers can close well below the pinch design approach;
-with dear area, they open up and the network uses more utility than the
-target.
+networks meet and the minimum approach of their exchangers, which for each
+match is ``max((dtcont_src + dtcont_snk) x m, 0.1 K)``: the sum of its two
+sides' contributions times the multiplier ``m``. The thermal derivative and
+network evolution steps that follow minimise total annual cost and choose
+each exchanger's approach from the cost settings, down to a share of that
+pinch design approach: ``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``.
+With cheap area, exchangers close toward that floor; with dear area, they
+open up and the network uses more utility than the target.
 
-``HENS_MIN_EXCHANGER_APPROACH_SHARE`` raises that floor to a share of twice
-the scaled ``THERMAL_DT_CONT``. It defaults to 0, which keeps the 0.1 K floor.
-At 0.5, a multiplier of 1.0 with the 5 K default keeps every exchanger at 5 K
-or more:
+``HENS_MIN_EXCHANGER_APPROACH_SHARE`` is the share. It defaults to 0.25, so
+a match of two 5 K streams, held to 10 K in pinch design at a multiplier of
+1.0, may close to 2.5 K afterwards. At 0 every match may close to 0.1 K. At
+0.5 the same match keeps 5 K or more:
 
 .. code-block:: python
 
@@ -137,7 +139,9 @@ or more:
 The share must be below 1: at 1, evolution cannot start from a pinch design
 network whose exchangers sit exactly at that approach.
 ``verify_network_feasibility`` still checks approaches against the 0.1 K
-floor, not against this share.
+floor, not against this share. A network does not record the share it was
+designed with: to fit, rate or overdesign a network designed under another
+share, pass the same option to that call.
 
 Several Hot or Cold Utilities
 -----------------------------

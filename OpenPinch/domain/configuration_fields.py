@@ -446,7 +446,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_OVERDESIGN_MAX": _spec(float, 50.0, "hens", "overdesign_max", numeric_min=0.0),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
-    "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),
+    "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.25, "hens", "min_exchanger_approach_share", validator=_share_below_one),
     "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
     "HENS_PDM_MIN_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_min_unit_networks", numeric_min=0.0),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_extra_unit_networks", numeric_min=0.0),

@@ -2051,12 +2051,24 @@ def test_a_rating_off_its_design_point_is_verified_with_its_allowance():
 @pytest.mark.solver
 def test_rating_the_default_designs_own_network_keeps_its_design_approach():
     """Evolution closes this network's approach below 1 K; rating it at its
-    own areas holds the approach it was designed to, not 1 K, so it rates."""
+    own areas holds the approach it was designed to, not 1 K, so it rates.
+
+    The share is set to 0 so that evolution may close to the 0.1 K floor:
+    at the default quarter it stops at 2.5 K, above the 1 K this test is
+    about."""
     problem = PinchProblem(_small_payload())
-    network = problem.design.heat_exchanger_network(width=0, depth=1).selected_network
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=1, options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0}
+    ).selected_network
     assert min(_recovery_approaches(network)) < 1.0
 
-    rated = problem.design.optimise_duties(network, objective="rating")
+    # The rating reads the share from the configuration, as the design did,
+    # so it is given the same option.
+    rated = problem.design.optimise_duties(
+        network,
+        objective="rating",
+        options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0},
+    )
 
     assert rated.selected_network.total_annual_cost == pytest.approx(
         network.total_annual_cost, rel=1e-2

@@ -549,7 +549,11 @@ def test_a_fit_that_cannot_hold_the_levels_says_so():
     [
         ("PDM", 0.75, {"problem_approach": True, "dt_cont_multiplier": 0.75}),
         ("PDM", 1.0, {"problem_approach": True, "dt_cont_multiplier": 1.0}),
-        ("ESM", 1.0, {"min_approach_temperature": 0.1}),
+        # An evolved network was designed to a share (a quarter by default)
+        # of each pair's pinch design approach, so it is fitted to the same
+        # pair values, not to one uniform floor. See
+        # test_an_evolved_networks_design_approach_is_its_pairs_share_of_pinch_design.
+        ("ESM", 1.0, {"problem_approach": True, "dt_cont_multiplier": 0.25}),
     ],
 )
 def test_the_fit_keeps_the_approach_the_network_was_designed_to(
@@ -557,8 +561,8 @@ def test_the_fit_keeps_the_approach_the_network_was_designed_to(
 ):
     """A pinch design network keeps its contributions at its own dt_cont
     multiplier (7.5 K at 0.75x), not the reference 10 K; an evolved network
-    keeps the 0.1 K floor it was designed to. The padding uses the same
-    approach: the floor, or each pair's contributions at the multiplier."""
+    keeps its pairs' share of that (a quarter by default). The padding uses
+    the same approach: each pair's contributions at the multiplier given."""
     from OpenPinch.analysis.heat_exchanger_networks import period_fit
     from OpenPinch.application._problem.accessors.design import _DesignAccessor
     from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -591,6 +595,28 @@ def test_the_fit_keeps_the_approach_the_network_was_designed_to(
             pytest.approx(expected.get("dt_cont_multiplier", 1.0)),
         )
     ]
+
+
+def test_an_evolved_networks_design_approach_is_its_pairs_share_of_pinch_design():
+    """Evolution holds each match to a share (a quarter by default) of the
+    pair's pinch design approach, so a fit or rating of the evolved network
+    holds the same pair values: the contributions at multiplier x share, not
+    one uniform approach."""
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    ).model_copy(
+        update={"method": "ESM", "summary_metrics": {"dt_cont_multiplier": 1.5}}
+    )
+    design = _two_period_problem().design
+
+    approach = design._design_approach(network, design._effective_hens(None))
+
+    assert approach == {
+        "problem_approach": True,
+        "dt_cont_multiplier": pytest.approx(1.5 * 0.25),
+    }
 
 
 def test_networks_that_differ_in_design_approach_or_levels_are_fitted_apart():

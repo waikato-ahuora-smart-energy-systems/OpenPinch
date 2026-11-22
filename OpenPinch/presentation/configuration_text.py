@@ -408,10 +408,12 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Minimum exchanger approach share", None,
         (
             "Smallest exchanger approach the thermal derivative and network evolution "
-            "steps may choose, as a share of twice THERMAL_DT_CONT times the dt_cont "
-            "multiplier, from 0 up to but not including 1. Those steps choose "
-            "approaches by cost, down to 0.1 K by default (0); at 0.5 a multiplier "
-            "of 1.0 with a 5 K THERMAL_DT_CONT keeps every exchanger at 5 K or more."
+            "steps may choose, as a share of each match's pinch design approach "
+            "(the sum of its two sides' dt_cont contributions times the dt_cont "
+            "multiplier), from 0 up to but not including 1, with a floor of 0.1 K "
+            "on the match. At the default a match of two 5 K streams, held to 10 K "
+            "in pinch design at a multiplier of 1.0, may close to 2.5 K; at 0 every "
+            "match may close to 0.1 K."
         ),
     ),
     "HENS_PDM_STAGE_PAIR_LIMIT": FieldText(

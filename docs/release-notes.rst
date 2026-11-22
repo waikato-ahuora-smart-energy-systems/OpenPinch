@@ -72,6 +72,30 @@ Heat exchanger network synthesis
   network's duties and temperatures as period-weighted means too, so a
   heater that is off in the first period no longer hides the heat it could
   give up.
+- The minimum approach of a match is now floored on the pair, at 0.1 K,
+  wherever a model adds its two sides' temperature contributions (recovery
+  matches, heaters and coolers). The thermal derivative and evolution steps
+  scale every contribution down to a nominal 0.1 K, so a pair whose
+  contributions are below the reference ``THERMAL_DT_CONT`` was held to
+  less than the documented 0.1 K: a 2.5 K stream on a 2.5 K stream to
+  0.05 K at the 5 K default. Such a pair is now held to 0.1 K. Pinch design
+  is unchanged by this entry: there a zero contribution is still replaced
+  by 0.1 K on the stream (to be changed next).
+- ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` now defaults to 0.25 (was 0). The
+  thermal derivative and network evolution steps hold each match to
+  ``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``: a quarter of its
+  pinch design approach by default, where before every match could close
+  to 0.1 K. Evolved networks therefore keep wider approaches and use more
+  utility and less area than before; set the option to 0 for the earlier
+  behaviour. A fit to every period, a rating and an overdesign of an
+  evolved network hold the same pair values (each pair's contributions at
+  multiplier x share) instead of one uniform approach, which could sit
+  above a pair's own value and force the fit down to its 1 K fallback.
+- Network evolution now adopts the areas of staged heaters and coolers with
+  the rest of a better candidate. It kept the areas they had before, so a
+  staged unit the candidate no longer used still counted in the area check
+  and the evolved multiperiod network was rejected ("verification failed:
+  area").
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

@@ -112,7 +112,10 @@ def test_a_network_offered_again_is_rated_once(monkeypatch):
     from tests.support.paths import REPOSITORY_ROOT
 
     # Ten dt_cont multipliers make pinch design networks that evolve into the
-    # same network, so the search offers it many times.
+    # same network, so the search offers it many times. That needs evolution
+    # to be free of the multiplier, so the share is 0 (every match may close
+    # to 0.1 K); at the default quarter the floor follows the multiplier and
+    # the same network, designed to different approaches, is rated for each.
     path = (
         REPOSITORY_ROOT
         / "tests/fixtures/openhens/Four-stream-Yee-and-Grossmann-1990-1.json"
@@ -122,7 +125,7 @@ def test_a_network_offered_again_is_rated_once(monkeypatch):
         key: value
         for key, value in payload["options"].items()
         if key != "HENS_OUTPUT_FOLDER"
-    } | {"HENS_OUTPUT_FORMATS": []}
+    } | {"HENS_OUTPUT_FORMATS": [], "HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0}
     problem = PinchProblem(source=payload, project_name="Yee")
     received = _finalised_networks(monkeypatch)
     record = HeatExchangerNetworkRecord()
