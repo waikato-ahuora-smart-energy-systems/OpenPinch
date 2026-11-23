@@ -148,9 +148,10 @@ Interaction Matrix
      - zone
      - re-prepare; clears stale results
      - base
-   * - ``residual_utility``, ``with_utilities_from``
-     - Derive a new unsolved problem from a residual HPR target or a donor's
-       utilities
+   * - ``residual_utility``, ``with_utilities_from``,
+       ``with_heat_pump_streams``
+     - Derive a new unsolved problem from a residual HPR target, a donor's
+       utilities or a heat pump target's streams
      - new problem
      - source unchanged
      - base
@@ -399,6 +400,14 @@ retaining the frozen HPR residual. ``problem.with_utilities_from(other_problem,
 project_name=None)`` creates an unsolved receiver-based study with the donor's
 canonical utilities. Matching period sets are required and arrays follow period
 identity; runtime components and receiver thermal inputs are preserved.
+
+``problem.with_heat_pump_streams(target, zone=None, machine="HP",
+project_name=None)`` creates an unsolved case that holds the problem's
+streams and the streams of a direct heat pump target: each condenser a hot
+stream, each evaporator a cold stream, at ``HPR_DT_CONT``, each marked
+``heat_pump: {"machine": ..., "role": ...}``. Direct heat integration
+targeting of the new case gives the heat pump target's utilities. See
+:doc:`../guides/heat-pump-workflows`.
 
 The keyword-only ``base_target=None`` on direct/all integration and utility
 placement selects a compatible scalar HPR residual. Without it, the established

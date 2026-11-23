@@ -17,6 +17,22 @@ Heat pumps and refrigeration
   utility-placement case the parallel seed now costs 431.4 k$/y rather than
   446.6 k$/y (refrigeration 79.0 kW rather than 105.5 kW), and a search that
   kept the seed kept the dearer design.
+- ``problem.with_heat_pump_streams(target)`` returns a new unsolved case
+  that holds the problem's streams and the streams of a direct heat pump
+  target: each condenser a hot stream and each evaporator a cold stream, at
+  ``HPR_DT_CONT``, with their segments. The air an evaporator draws on is
+  added as a hot stream; the air a condenser rejects to is not. Direct heat
+  integration targeting of the new case gives the heat pump target's
+  utilities (on the basic pinch sample at full load: no hot utility and
+  513.4 kW of cooling, against 750 and 1000 kW without the heat pump), so
+  heat exchanger network synthesis can design the process and the heat
+  pump together. Electricity and the compressor are not in the new case's
+  costs. A target from another problem, a stale one, a utility heat pump's
+  and a problem with several periods are refused.
+- Stream records take an optional ``heat_pump`` mark,
+  ``{"machine": ..., "role": ...}`` with role ``condenser``, ``evaporator``
+  or ``ambient_source``. ``with_heat_pump_streams`` sets it; the mark
+  changes no result yet.
 
 Zones and targeting
 ~~~~~~~~~~~~~~~~~~~

@@ -253,6 +253,45 @@ limits are retained. Period sets must match; ordered values are aligned by ID.
 Use ``project_name=`` to override the receiver's name. To keep the fixed HPR study,
 continue analysing ``optimized`` or derive from an existing residual receiver.
 
+A heat pump as streams of the case
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A heat pump of a fixed size is a set of streams with fixed duties: each
+condenser gives heat like a hot stream and each evaporator takes it like a
+cold stream. ``with_heat_pump_streams`` writes a solved target that way::
+
+   target = problem.target.carnot_heat_pump(load_fraction=1.0)
+   with_pump = problem.with_heat_pump_streams(target)
+   with_pump.target.direct_heat_integration()
+
+``with_pump`` starts unsolved with the problem's own streams and utilities,
+plus:
+
+- one hot stream per condenser and one cold stream per evaporator of the
+  target, with their segments when the cycle has them (a vapour compression
+  condenser desuperheats, condenses and subcools);
+- ``dt_cont`` equal to ``HPR_DT_CONT`` on each, the approach the target
+  assumed between the heat pump and the process, so direct heat integration
+  targeting of ``with_pump`` gives the heat pump target's hot utility and
+  the process cooling less the evaporator duty;
+- the air an evaporator draws on, when the process has too little heat
+  below the pinch, as a hot stream at ambient temperature with
+  ``HPR_DT_ENV_CONT``. The air a condenser rejects heat to is not added:
+  the case's cold utility takes that heat;
+- a mark on each added stream, ``heat_pump: {"machine": "HP", "role":
+  "condenser"}`` (or ``"evaporator"``, ``"ambient_source"``), which travels
+  with the stream record. ``machine=`` sets the name.
+
+The streams go in the process zone the target was solved on, or the only
+process zone under it; on a site with several, name one with ``zone=``.
+
+It takes the target of a heat pump placed on the process, solved on this
+problem as it stands: a target from another problem, one solved before the
+inputs changed, and a utility heat pump's target are refused. A problem with
+several periods is refused for now. Electricity and the compressor are not
+in the new case: its targets and any network designed on it price the
+exchangers and the utilities only.
+
 The three HPR shortcuts accept a current, local, unmodified scalar HPR result;
 strings, whole result collections and other target kinds are unsupported.
 Omitted zone and period selectors inherit the HPR result. Explicit conflicts,
