@@ -135,39 +135,39 @@ def heat_pump_step(
     return step, solved
 
 
-def joined(base, pumped) -> HeatExchangerNetworkRetrofitResult:
+def joined(base, *sized) -> HeatExchangerNetworkRetrofitResult:
     """One result from the search without the heat pump (``base``) and the
-    one started from it (``pumped``).
+    searches started from a heat pump step (``sized``, one per size).
 
-    The heat pump step is the second search's first step, so its design
+    A heat pump step is its search's first step, so that search's design
     after ``n`` further steps stands at step ``n + 1``. Each number of
-    steps keeps the design with the better net annual benefit; the
-    candidates of both are counted and their failed solves added step by
+    steps keeps the design with the best net annual benefit; the
+    candidates of all are counted and their failed solves added step by
     step.
     """
 
-    steps = max(len(base.frontier), len(pumped.frontier) + 1)
+    results = ((base, 0), *((result, 1) for result in sized))
+    steps = max(len(result.frontier) + offset for result, offset in results)
     frontier = [base.frontier[0]]
     for step in range(1, steps):
         designs = [
-            series[index]
-            for series, index in ((base.frontier, step), (pumped.frontier, step - 1))
-            if index < len(series)
+            result.frontier[step - offset]
+            for result, offset in results
+            if step - offset < len(result.frontier)
         ]
         frontier.append(max(designs, key=lambda design: design.net_annual_benefit))
     # A search that ran out of candidates also counts the failures of the
     # last depth it tried, which gave no design: its failed solves can run
     # one step past its frontier.
-    series = ((base.failed_solves, 0), (pumped.failed_solves, 1))
     failed = [0] * max(
-        [steps - 1, *(len(counts) + offset for counts, offset in series)]
+        [steps - 1, *(len(r.failed_solves) + offset for r, offset in results)]
     )
-    for counts, offset in series:
-        for index, count in enumerate(counts):
+    for result, offset in results:
+        for index, count in enumerate(result.failed_solves):
             failed[index + offset] += int(count)
     return HeatExchangerNetworkRetrofitResult(
         frontier=mark_dominated(frontier),
-        evaluated_designs=base.evaluated_designs + pumped.evaluated_designs,
+        evaluated_designs=sum(result.evaluated_designs for result, _ in results),
         failed_solves=tuple(failed),
     )
 
