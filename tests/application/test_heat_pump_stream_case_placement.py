@@ -31,8 +31,8 @@ def test_a_utility_heat_pump_target_is_refused():
     target = problem.target.carnot_heat_pump(
         is_utility_heat_pump=True,
         load_fraction=1.0,
-        maximum_restarts=1,
-        maximum_evaluations=100,
+        maximum_restarts=0,
+        maximum_evaluations=1,
     )
 
     with pytest.raises(ValueError, match="placed on the process"):
