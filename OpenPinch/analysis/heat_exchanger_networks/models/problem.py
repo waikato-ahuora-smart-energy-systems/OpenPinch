@@ -30,6 +30,7 @@ from ..solver.utility_slices import (
 )
 from ._base.execution import _assign_value, _set_value, _value
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
+from ._pinch_design.equations import replay_interior_cuts
 from ._stagewise import staged_utilities as _staged
 from ._stagewise.level_targets import site_level_targets
 from ._stagewise.site_utilities import SiteUtilities, site_balance, with_site_cost
@@ -1385,6 +1386,10 @@ def _start_from_side(sparse, side) -> None:
     matches, and the solution is a feasible warm start for it.
     """
 
+    # The side's interior approach cuts were added as it solved; the sparse
+    # model gets them too, so it cannot re-admit a crossing and the two
+    # models' variables line up.
+    replay_interior_cuts(sparse, side)
     for target, source in zip(
         sparse.m.variables,
         side.m.variables,

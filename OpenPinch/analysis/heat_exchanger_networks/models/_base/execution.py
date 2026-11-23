@@ -50,7 +50,11 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             if not piecewise_mappings
             else not _piecewise._update_piecewise_active_segments(model)
         )
-        if active_mapping_stable:
+        if not active_mapping_stable:
+            continue
+        # A model may check each solution and add constraints it breaks.
+        add_cuts = getattr(model, "_add_lazy_cuts", None)
+        if add_cuts is None or not add_cuts():
             break
     model.solve_time = total_solve_time
 
