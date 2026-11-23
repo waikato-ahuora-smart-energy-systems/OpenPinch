@@ -1818,7 +1818,9 @@ class _DesignAccessor:
         Returns a ``RetrofitHeatPumpTargets``: each target's heat, work,
         levels and operating cost before and after, each side priced at the
         utilities the network's heaters (or coolers) use, weighted by their
-        first-period duties, and at ``COSTING_HPR_ELE_PRICE``; and the gap between
+        first-period duties, and at ``COSTING_HPR_ELE_PRICE``; the HPR search
+        sizes each heat pump at those same prices, in place of
+        ``COSTING_HPR_PRICE_RATIO_*``; and the gap between
         them split into the network's (``network_gap``) and the heat
         pump's (``heat_pump_gap``). The problem's cached design is not
         changed.

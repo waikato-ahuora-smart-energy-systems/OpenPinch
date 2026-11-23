@@ -101,6 +101,21 @@ Heat exchanger network synthesis
   the retrofit's base case: 186 kW of hot utility against 240 kW on a
   two-stream case with one recovery match. It also accepts the structure
   mapping ``design.retrofit`` takes; a mapping raised ``AttributeError``.
+- ``design.retrofit_heat_pumps`` now sizes each heat pump at the prices its
+  target is reported at: the network's utility prices and
+  ``COSTING_HPR_ELE_PRICE``. The HPR search priced heat and cooling by
+  ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` and
+  ``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE`` instead (heat at the
+  electricity price by default), so it sized a heat pump for other
+  economics. On the Ciric and Floudas case, where heat costs 0.41 of
+  electricity, the as-piped target was a 17.5 MW heat pump at a COP of
+  2.30 saving 0.31 M$/y; it is now 7.2 MW at 3.23 saving 0.95 M$/y. The
+  ideal target goes from 10.6 MW saving 1.00 M$/y to 6.3 MW saving
+  1.13 M$/y, and ``heat_pump_gap`` from 0.69 to 0.18 M$/y. Cooling left
+  below the cooling water level, which the search priced from a default
+  refrigeration machine's COP, is priced at the network's cold utility as
+  well. Those two options and ``COSTING_HPR_REFRIGERATION_ETA_II`` no
+  longer affect ``retrofit_heat_pumps``.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

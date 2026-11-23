@@ -437,6 +437,74 @@ def test_design_retrofit_heat_pumps_take_a_structure_mapping(monkeypatch):
     }
 
 
+def test_the_targets_are_sized_at_the_prices_they_are_reported_at(monkeypatch):
+    """The summary prices heat and cooling at the network's utilities. The
+    HPR search priced them by ``COSTING_HPR_PRICE_RATIO_*`` (heat at the
+    electricity price by default), so it sized a heat pump for other
+    economics: on this case 17.5 MW as piped where 7.2 MW costs $640k/y
+    less to run at the network's prices."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    configs = []
+
+    def fake_target(*, config, **_kwargs):
+        configs.append(config)
+
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", fake_target
+    )
+    problem = _problem()
+
+    piped = heat_pump_targets.retrofit_heat_pumps(problem, _solved_network()).as_piped
+
+    assert len(configs) == 2
+    for config in configs:
+        costing = config.costing
+        assert costing.hpr_price_ratio_heat_to_ele == pytest.approx(
+            piped.hot_utility_price / piped.electricity_price
+        )
+        assert costing.hpr_price_ratio_cooling_water_to_ele == pytest.approx(
+            piped.cold_utility_price / piped.electricity_price
+        )
+    # The problem's own configuration is left as it was.
+    assert problem.master_zone.config.costing.hpr_price_ratio_heat_to_ele == 1.0
+
+
+def test_the_targets_price_refrigeration_at_the_networks_cold_utility(monkeypatch):
+    """Cooling left below the cooling water level is refrigeration to the
+    HPR search, priced from a default machine's COP (0.55 of the
+    electricity price per unit of heat at -20 degC, against 0.086 for this
+    network's cold utility). The targets report all remaining cooling at
+    the network's cold utility price, so the search prices it there too."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+    from OpenPinch.analysis.heat_pumps.common.preprocessing import (
+        default_refrigeration_to_power_ratio,
+    )
+
+    configs = []
+
+    def fake_target(*, config, **_kwargs):
+        configs.append(config)
+
+    monkeypatch.setattr(
+        heat_pump_targets, "compute_profile_heat_pump_target", fake_target
+    )
+
+    piped = heat_pump_targets.retrofit_heat_pumps(
+        _problem(), _solved_network()
+    ).as_piped
+
+    assert len(configs) == 2
+    for config in configs:
+        assert default_refrigeration_to_power_ratio(
+            T_min=-20.0, costing=config.costing
+        ) == pytest.approx(piped.cold_utility_price / piped.electricity_price)
+
+
 def test_a_bare_stream_name_two_zones_share_is_refused_by_the_targets():
     from types import SimpleNamespace
 
