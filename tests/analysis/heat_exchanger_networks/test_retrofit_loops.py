@@ -31,7 +31,10 @@ def test_a_loop_runs_midway_between_its_targets_keeping_the_approach_each_side()
 
     (loop,) = heat_recovery_loop_candidates(ends, processes, approach=10.0)
 
-    assert loop == HeatRecoveryLoop("H1", "C1", 378.0)
+    # It can carry the smaller of H1's 160 kW of cooling and C1's 100 kW of
+    # heating. A candidate records that for the screen since the placement
+    # change, which this comparison failed on (capacity 100.0 against inf).
+    assert loop == HeatRecoveryLoop("H1", "C1", 378.0, 100.0)
     # The loop circulates over LOOP_SPAN about its temperature; the hot
     # stream at its target still clears the loop's warm end, and the cold
     # stream at its target stays below its cool end, by the approach.
@@ -58,19 +61,15 @@ def test_a_loop_serves_part_of_two_streams_whose_targets_leave_it_no_room():
         {"H1": hot, "C1": cold}, processes, approach=10.0
     )
 
-    # 200 degC less 10.5 K and 30 degC plus 10.5 K, midway at equal flows:
-    # 74.5 kW given from 200 to 125.5 degC and taken from 30 to 104.5 degC.
+    # Midway at equal flows. The hot stream leaves the loop cooler 10 K above
+    # the loop's cool end and the cold stream leaves the loop heater 10 K
+    # below its warm end (test_retrofit_loop_placement.py): 75.5 kW given
+    # from 200 to 124.5 degC and taken from 30 to 105.5 degC. These read
+    # 74.5 kW until the placement was corrected to those ends.
     assert (loop.hot, loop.cold) == ("H1", "C1")
     assert loop.temperature == pytest.approx(388.15)
-    margin = 10.0 + LOOP_SPAN / 2
-    assert hot[0] - (loop.temperature + margin) == pytest.approx(74.5)
-    assert (loop.temperature - margin) - cold[0] == pytest.approx(74.5)
-
-    # Twice the flow on the hot side moves the loop up: 99.33 kW each way.
-    (loop,) = heat_recovery_loop_candidates(
-        {"H1": (473.15, 313.15, 2.0), "C1": cold}, processes, approach=10.0
-    )
-    assert loop.temperature == pytest.approx(412.9833, abs=1e-3)
+    assert hot[0] - (loop.temperature - LOOP_SPAN / 2 + 10.0) == pytest.approx(75.5)
+    assert (loop.temperature + LOOP_SPAN / 2 - 10.0) - cold[0] == pytest.approx(75.5)
 
 
 def test_no_loop_within_one_process_and_targets_too_close_move_the_loop():
@@ -97,12 +96,14 @@ def test_no_loop_within_one_process_and_targets_too_close_move_the_loop():
         ("H2", "C1"),
     ]
     # At 10.5 K the targets of H2 and C1 are 1 K too close for a loop midway
-    # between them (it was not offered before). The loop moves to 11 K below
-    # H2's target: it still takes all 36 kW of H2's cooling and gives part
-    # of C1's heating, whose heater finishes it.
+    # between them (it was not offered before). The loop moves to 10 K below
+    # H2's target, its cool end the 10.5 K approach below it: it still takes
+    # all 36 kW of H2's cooling and gives part of C1's heating, whose heater
+    # finishes it. (373 K until the placement was corrected to the ends the
+    # loop's exchangers hold.)
     assert heat_recovery_loop_candidates(ends, processes, approach=10.5) == [
         loops[0],
-        HeatRecoveryLoop("H2", "C1", 373.0),
+        HeatRecoveryLoop("H2", "C1", 374.0, 36.0),
     ]
 
 

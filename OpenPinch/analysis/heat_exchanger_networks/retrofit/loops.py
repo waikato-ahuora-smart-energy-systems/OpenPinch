@@ -10,6 +10,7 @@ balances: what the loop collects it delivers, in every period, with no loss.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -27,11 +28,13 @@ LOOP_SPAN = 1.0
 @dataclass(frozen=True)
 class HeatRecoveryLoop:
     """A loop from hot stream ``hot`` to cold stream ``cold`` (of another
-    process) at ``temperature`` (K)."""
+    process) at ``temperature`` (K). ``capacity`` (kW) is the most it can
+    carry there, read from the two streams' ends; unlimited when not given."""
 
     hot: str
     cold: str
     temperature: float
+    capacity: float = math.inf
 
 
 def heat_recovery_loop_candidates(
@@ -46,7 +49,8 @@ def heat_recovery_loop_candidates(
     ``ends`` maps each process stream to its supply and target temperature
     (K) and heat capacity flowrate; a hot stream's supply is above its
     target. ``processes`` maps streams to their process zone; a stream it
-    leaves out joins no loop. The loop's temperature is ``loop_temperature``.
+    leaves out joins no loop. The loop's temperature and the heat it can
+    carry are ``loop_placement``'s.
     """
 
     candidates = []
@@ -60,30 +64,28 @@ def heat_recovery_loop_candidates(
                 or processes[cold] == processes[hot]
             ):
                 continue
-            temperature = loop_temperature(hot_ends, cold_ends, approach=approach)
-            if temperature is not None:
-                candidates.append(HeatRecoveryLoop(hot, cold, temperature))
+            placement = loop_placement(hot_ends, cold_ends, approach=approach)
+            if placement is not None:
+                candidates.append(HeatRecoveryLoop(hot, cold, *placement))
     return candidates
 
 
-def loop_temperature(
+def loop_placement(
     hot: tuple[float, float, float],
     cold: tuple[float, float, float],
     *,
     approach: float,
-) -> float | None:
+) -> tuple[float, float] | None:
     """The temperature (K) of a loop from a hot stream to a cold one, each
-    given as supply, target and heat capacity flowrate; ``None`` when no
-    loop can carry heat between them.
+    given as supply, target and heat capacity flowrate, and the heat (kW) it
+    can carry there; ``None`` when no loop can carry heat between them.
 
-    The hot stream must leave the loop cooler at least ``approach`` above
-    the loop's warm end and the cold stream leave the loop heater at least
-    ``approach`` below its cool end. Where the targets are
-    ``2 * approach + LOOP_SPAN`` apart the loop runs midway between them
-    and can take all of the hot stream's end cooling and give all of the
-    cold stream's end heating. Otherwise it serves part of each, the hot
-    stream above the loop and the cold stream below it, with their own
-    cooler and heater finishing them, and it runs where the heat it can
+    Where the targets are ``2 * approach + LOOP_SPAN`` apart the loop runs
+    midway between them, each target ``approach`` clear of the loop's
+    farther end, and can take all of the hot stream's end cooling and give
+    all of the cold stream's end heating. Otherwise it serves part of each,
+    the hot stream above the loop and the cold stream below it, with their
+    own cooler and heater finishing them, and it runs where the heat it can
     collect and the heat it can deliver, both read from the stream ends,
     are largest together.
     """
@@ -92,24 +94,39 @@ def loop_temperature(
     cold_supply, cold_target, cold_flow = cold
     margin = approach + 0.5 * LOOP_SPAN
     if hot_target - cold_target >= 2.0 * margin - 1e-9:
-        return 0.5 * (hot_target + cold_target)
+        return 0.5 * (hot_target + cold_target), min(
+            hot_flow * (hot_supply - hot_target),
+            cold_flow * (cold_target - cold_supply),
+        )
+
+    # Each loop exchanger is counter-current: the hot stream leaves the loop
+    # cooler ``approach`` above the loop's cool end, and the cold stream
+    # leaves the loop heater ``approach`` below its warm end.
+    outlet = approach - 0.5 * LOOP_SPAN
 
     def carried(temperature: float) -> float:
-        collected = hot_flow * (hot_supply - max(hot_target, temperature + margin))
-        delivered = cold_flow * (min(cold_target, temperature - margin) - cold_supply)
+        collected = hot_flow * (hot_supply - max(hot_target, temperature + outlet))
+        delivered = cold_flow * (min(cold_target, temperature - outlet) - cold_supply)
         return min(collected, delivered)
 
     # The collected heat falls and the delivered heat rises with the loop's
     # temperature, each flat once it covers its whole stream, so the most
     # they carry together is where they cross or at an end of a flat.
-    points = [hot_target - margin, cold_target + margin]
+    points = [hot_target - outlet, cold_target + outlet]
     if hot_flow + cold_flow > 0.0:
         points.append(
-            (hot_flow * (hot_supply - margin) + cold_flow * (cold_supply + margin))
+            (hot_flow * (hot_supply - outlet) + cold_flow * (cold_supply + outlet))
             / (hot_flow + cold_flow)
         )
-    best = max(points, key=carried)
-    return best if carried(best) > 0.0 else None
+    # At their inlets the streams face the loop's other ends: the hot stream
+    # enters against the warm end and the cold stream against the cool end.
+    # ``margin`` from each supply bounds the loop; the heat carried has one
+    # peak, so the best within the bounds is the nearest bound.
+    lowest, highest = cold_supply + margin, hot_supply - margin
+    if lowest > highest:
+        return None
+    best = max((min(max(p, lowest), highest) for p in points), key=carried)
+    return (best, carried(best)) if carried(best) > 0.0 else None
 
 
 def screen_heat_recovery_loops(
@@ -123,9 +140,11 @@ def screen_heat_recovery_loops(
     ``network``, most first, ties broken by names.
 
     A loop takes at most its hot stream's cooler duty and gives at most its
-    cold stream's heater duty, in the same period. Those that relieve none
-    are left out. The two are paired in each period and then averaged with
-    ``weights`` (``moves.joint_relief``), else read in the first period.
+    cold stream's heater duty, in the same period, and no more than its
+    ``capacity``, the heat it can carry at its temperature. Those that
+    relieve none are left out. The two duties are paired in each period,
+    capped, and then averaged with ``weights`` (``moves.joint_relief``),
+    else read in the first period.
     """
 
     relief = {
@@ -133,6 +152,7 @@ def screen_heat_recovery_loops(
             utility_duties(network, HeatExchangerKind.COLD_UTILITY, loop.hot),
             utility_duties(network, HeatExchangerKind.HOT_UTILITY, loop.cold),
             weights,
+            cap=loop.capacity,
         )
         for loop in candidates
     }
@@ -192,7 +212,7 @@ __all__ = [
     "heat_recovery_loop_candidates",
     "loop_cooler_name",
     "loop_heater_name",
-    "loop_temperature",
+    "loop_placement",
     "screen_heat_recovery_loops",
     "with_loop_utilities",
 ]
