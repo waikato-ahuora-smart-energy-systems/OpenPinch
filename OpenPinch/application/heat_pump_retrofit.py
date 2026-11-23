@@ -180,6 +180,7 @@ def retrofit_with_heat_pump(
     configuration=None,
     limits=None,
     machine: str = "HP",
+    sizes=(None,),
 ) -> HeatExchangerNetworkRetrofitResult:
     """The retrofit search of ``existing``, and a second search started
     from its as-piped heat pump added as streams, as one result.
@@ -202,27 +203,39 @@ def retrofit_with_heat_pump(
             stacklevel=2,
         )
         return base
-    step, solved = heat_pump_step(
-        problem, base.frontier[0], settings, limits=limits, machine=machine
-    )
-    if step is None:
-        return base
-    # A case that refuses the streams (process components, several process
-    # zones) or a network that cannot serve them is a heat pump this
-    # retrofit cannot use, not a failed retrofit.
-    try:
-        case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
-        with temporary_zone_configuration(
-            case._build_execution_master_zone(), configuration
-        ):
-            pumped = run_retrofit_search(
-                case, existing, replace(settings, heat_pump_cycle=None), heat_pump=step
-            )
-    except ValueError as error:
-        warnings.warn(
-            f"the heat pump step was left out of the retrofit: {error}",
-            UserWarning,
-            stacklevel=2,
+    sized = []
+    for size in sizes:
+        step, solved = heat_pump_step(
+            problem,
+            base.frontier[0],
+            settings,
+            limits=limits,
+            machine=machine,
+            load_fraction=size,
         )
-        return base
-    return joined(base, pumped)
+        if step is None:
+            continue
+        # A case that refuses the streams (process components, several
+        # process zones) or a network that cannot serve them is a heat pump
+        # this retrofit cannot use, not a failed retrofit.
+        try:
+            case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
+            with temporary_zone_configuration(
+                case._build_execution_master_zone(), configuration
+            ):
+                sized.append(
+                    run_retrofit_search(
+                        case,
+                        existing,
+                        replace(settings, heat_pump_cycle=None),
+                        heat_pump=step,
+                    )
+                )
+        except ValueError as error:
+            label = "" if size is None else f" at size {size:g}"
+            warnings.warn(
+                f"the heat pump step{label} was left out of the retrofit: {error}",
+                UserWarning,
+                stacklevel=2,
+            )
+    return joined(base, *sized) if sized else base
