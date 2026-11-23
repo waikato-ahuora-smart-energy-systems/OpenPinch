@@ -29,8 +29,8 @@ def test_direct_targets_of_the_new_case_are_the_heat_pump_targets_utilities():
         project_name="basic",
     )
     base = problem.target.direct_heat_integration()
-    # A small search leaves 35 kW of hot utility where the full one leaves
-    # none; the case must reproduce the target it is given either way.
+    # The target's first start, unsearched: the case must reproduce the
+    # target it is given, whatever it is.
     target = full_load_target(problem)
     evaporator = sum(
         float(stream.heat_flow.value)
