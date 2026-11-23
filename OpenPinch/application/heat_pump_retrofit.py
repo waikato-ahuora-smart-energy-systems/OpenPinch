@@ -73,7 +73,9 @@ def heat_pump_case(problem, solved, *, machine: str):
             hpr_hot_streams={s.name: s for s in _carrying(solved.hpr_hot_streams)},
             hpr_cold_streams={s.name: s for s in _carrying(solved.hpr_cold_streams)},
         ),
-        dt_cont=float(root.config.hpr.dt_cont),
+        # The zone scales every stream's contribution by its multiplier;
+        # the target stood the heat pump HPR_DT_CONT off as given.
+        dt_cont=float(root.config.hpr.dt_cont) / float(root.dt_cont_multiplier),
         machine=machine,
     )
 
