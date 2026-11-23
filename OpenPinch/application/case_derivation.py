@@ -286,7 +286,10 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
     outputs hold every period's.
     """
     outputs = target.hpr_details.period_outputs
-    if any(float(outputs[period].get("Q_amb_hot") or 0.0) > 0.0 for period in periods):
+    # A period the machine is off in (an off season, a load too small to
+    # run for) is left out of the outputs, or is there without streams.
+    each_output = [outputs.get(period) or {} for period in periods]
+    if any(float(output.get("Q_amb_hot") or 0.0) > 0.0 for output in each_output):
         raise ValueError(
             "The heat pump draws on ambient air, and the air's stream is not "
             "built for a problem with several periods yet."
@@ -296,10 +299,12 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
         ("condenser", "hpr_hot_streams"),
         ("evaporator", "hpr_cold_streams"),
     ):
-        each = [dict(outputs[period][group].items()) for period in periods]
-        found[role] = {name: [streams[name] for streams in each] for name in each[0]}
+        each = [dict((output.get(group) or {}).items()) for output in each_output]
+        names = list(dict.fromkeys(name for streams in each for name in streams))
+        # ``None`` where the stream is off in a period.
+        found[role] = {name: [streams.get(name) for streams in each] for name in names}
         for name, streams in found[role].items():
-            if any(stream.has_segments for stream in streams):
+            if any(stream is not None and stream.has_segments for stream in streams):
                 raise ValueError(
                     f"The heat pump stream {name!r} has segments, and a "
                     "segmented stream is not built for a problem with several "
@@ -309,19 +314,31 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
 
 
 def _period_thermal_record(streams) -> dict:
-    """The temperatures and duty of one stream in each period, in order."""
+    """The temperatures and duty of one stream in each period, in order.
 
-    def values(attribute: str) -> dict:
-        per_period = [_value_record(getattr(s, attribute)) for s in streams]
+    Where the stream is off in a period (``None``) it has no duty there,
+    at the temperatures of the first period it runs in: a stream needs a
+    value in every period, and one with no heat flow takes no part.
+    """
+    running = next(stream for stream in streams if stream is not None)
+
+    def values(attribute: str, off=None) -> dict:
+        per_period = [
+            _value_record(getattr(running if s is None else s, attribute))
+            for s in streams
+        ]
         return {
-            "values": [record["value"] for record in per_period],
+            "values": [
+                record["value"] if s is not None or off is None else off
+                for s, record in zip(streams, per_period)
+            ],
             "unit": per_period[0]["unit"],
         }
 
     return {
         "t_supply": values("supply_temperature"),
         "t_target": values("target_temperature"),
-        "heat_flow": values("heat_flow"),
+        "heat_flow": values("heat_flow", off=0.0),
     }
 
 
@@ -375,11 +392,21 @@ def _case_with_heat_pump_streams(
     ]
     periods = list(problem.period_ids)
     by_period = _period_heat_pump_streams(target, periods) if len(periods) > 1 else {}
-    for role, streams in (
-        ("condenser", [s for _key, s in target.hpr_hot_streams.items()]),
-        ("evaporator", [s for _key, s in target.hpr_cold_streams.items()]),
-        ("ambient_source", air),
-    ):
+    groups = {
+        "condenser": [s for _key, s in target.hpr_hot_streams.items()],
+        "evaporator": [s for _key, s in target.hpr_cold_streams.items()],
+        "ambient_source": air,
+    }
+    if by_period:
+        # A shared design: the target's own collections hold one period,
+        # which may be one the machine is off in. Each stream is taken
+        # from the first period it runs in. Air over several periods is
+        # refused where the period outputs are read.
+        groups = {
+            role: [next(s for s in each if s is not None) for each in named.values()]
+            for role, named in by_period.items()
+        }
+    for role, streams in groups.items():
         for stream in streams:
             if stream.name in taken:
                 raise ValueError(

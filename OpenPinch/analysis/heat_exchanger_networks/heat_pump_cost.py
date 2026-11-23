@@ -48,11 +48,24 @@ def heat_pump_record(
         # hold one period, its period outputs every one.
         total = float(sum(period_weights.values()))
         share = {period: weight / total for period, weight in period_weights.items()}
-        delivered = {p: _duty(outputs[p]["hpr_hot_streams"]) for p in share}
-        work = sum(share[p] * float(outputs[p]["w_net"]) for p in share)
-        cop = sum(share[p] * delivered[p] for p in share) / work if work else cop
-        condenser = max(delivered.values())
-        evaporator = max(_duty(outputs[p]["hpr_cold_streams"]) for p in share)
+        # A period the machine is off in (an off season, a load too small
+        # to run for) has no output, or one without streams: it draws no
+        # work and gives no heat, and keeps its share of the year.
+        running = {
+            p: outputs[p]
+            for p in share
+            if p in outputs and _duty(outputs[p]["hpr_hot_streams"]) > 0.0
+        }
+        delivered = {
+            p: _duty(output["hpr_hot_streams"]) for p, output in running.items()
+        }
+        work = sum(share[p] * float(output["w_net"]) for p, output in running.items())
+        cop = sum(share[p] * delivered[p] for p in running) / work if work else cop
+        condenser = max(delivered.values(), default=0.0)
+        evaporator = max(
+            (_duty(output["hpr_cold_streams"]) for output in running.values()),
+            default=0.0,
+        )
     capital = float(cost_per_kw) * condenser
     return NetworkHeatPump(
         machine=machine,

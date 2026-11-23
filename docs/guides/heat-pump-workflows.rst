@@ -427,6 +427,11 @@ compressor is sized on its largest condenser duty, and
 ``NetworkHeatPump.condenser_duty`` and ``evaporator_duty`` are those
 largest duties. Without a ``load`` the sizes tried are the load kinks of
 every period, since the profile and its kinks differ between periods.
+A period the machine is off in (an off season, or a load too small to run
+for) gives its streams no heat flow there and adds no work, while keeping
+its share of the year. An air-source heat pump and segmented (vapour
+compression) streams are not built over several periods yet and are
+refused.
 
 It takes the target of a heat pump placed on the process, solved on this
 problem as it stands: a target from another problem, one solved before the
