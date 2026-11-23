@@ -111,6 +111,20 @@ class TemperatureHeatProfileSchema(BaseModel):
         return float(value)
 
 
+class HeatPumpStreamSchema(BaseModel):
+    """Marks a process stream as one side of a heat pump of a fixed size.
+
+    ``machine`` names the heat pump; the streams of one machine share it.
+    A condenser is a hot stream, an evaporator a cold stream, and an ambient
+    source the hot stream of the air an evaporator draws on.
+    """
+
+    machine: Annotated[str, non_empty_str("heat pump machine name must be non-empty")]
+    role: Literal["condenser", "evaporator", "ambient_source"]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""
 
@@ -133,6 +147,8 @@ class StreamSchema(BaseModel):
     fluid_name: Optional[str] = None
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
+    # Set on the streams a heat pump target adds to a case.
+    heat_pump: Optional[HeatPumpStreamSchema] = None
 
     model_config = ConfigDict(
         use_enum_values=True,

@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from ..domain.enums import StreamType, ZoneType
+from ..domain.targets import DirectHeatPumpTarget
 from ._problem.input.utilities import _set_utilities_for_zone_and_subzones
 from ._problem.targeting.state import snapshot_problem
 
@@ -171,6 +173,146 @@ def with_utilities_from(receiver, donor, *, project_name=None):
     )
     derived._invalidate_analysis()
     return derived
+
+
+def _value_record(value) -> dict:
+    """A value as an input record: one number, or one per period."""
+    record = value.to_dict()
+    if "values" in record:
+        return {"values": [float(v) for v in record["values"]], "unit": record["unit"]}
+    return {"value": float(record["value"]), "unit": record["unit"]}
+
+
+def _heat_pump_stream_record(stream, *, zone: str, dt_cont: dict, mark: dict) -> dict:
+    """One heat pump stream of a target as a process stream input record.
+
+    A segmented stream (a vapour compression condenser: desuperheating,
+    condensing, subcooling) keeps its segments, each with its own film
+    coefficient; every segment takes the stream's contribution.
+    """
+    record = {"zone": zone, "name": stream.name, "dt_cont": dt_cont, "heat_pump": mark}
+    if not stream.has_segments:
+        return record | _thermal_record(stream)
+    return record | {
+        "segments": [
+            {"name": segment.name} | _thermal_record(segment)
+            for segment in stream.segments
+        ]
+    }
+
+
+def _thermal_record(part) -> dict:
+    """The temperatures, duty and film coefficient of a stream or segment."""
+    return {
+        "t_supply": _value_record(part.supply_temperature),
+        "t_target": _value_record(part.target_temperature),
+        "heat_flow": _value_record(part.heat_flow),
+        "htc": _value_record(part.heat_transfer_coefficient),
+    }
+
+
+def _heat_pump_zone_address(problem, target, zone) -> str:
+    """The process zone a heat pump target's streams are added to: the
+    target's own zone, or the process zone under it that ``zone`` names
+    (by name or address), or the only one."""
+    root = problem._require_prepared_root_zone()
+    zones = {z.address: z for z in problem._walk_zone_tree(root)}
+    scope = target.provenance.zone_address
+    if zones[scope].type == ZoneType.P.value:
+        return scope
+    below = [
+        address
+        for address, z in zones.items()
+        if _within(address, scope) and z.type == ZoneType.P.value
+    ]
+    if zone is not None:
+        named = [address for address in below if zone in (address, zones[address].name)]
+        if not named:
+            raise ValueError(
+                f"The heat pump target of {scope!r} covers no process zone "
+                f"{zone!r}. It covers: "
+                + ", ".join(repr(address) for address in below)
+                + "."
+            )
+        below = named
+    if len(below) != 1:
+        raise ValueError(
+            f"The heat pump target of {scope!r} covers {len(below)} process "
+            "zones; say which takes its streams with zone=. They are: "
+            + ", ".join(repr(address) for address in below)
+            + "."
+        )
+    return below[0]
+
+
+def with_heat_pump_streams(
+    problem, target, *, zone=None, machine="HP", project_name=None
+):
+    """A new problem holding ``problem``'s streams and a heat pump target's.
+
+    Each condenser stream of ``target`` is added as a hot stream and each
+    evaporator stream as a cold stream, marked with ``machine`` and its
+    role. They carry ``HPR_DT_CONT``, the approach the target assumed
+    between the heat pump and the process, so the new case's direct
+    integration targets are the heat pump target's utilities.
+    """
+    from .hpr_selection import validate_hpr_target
+
+    validate_hpr_target(problem, target)
+    if not isinstance(target, DirectHeatPumpTarget):
+        raise ValueError(
+            "with_heat_pump_streams takes the target of a heat pump placed on "
+            f"the process; this is a {target.type} target."
+        )
+    if len(problem.period_ids) > 1:
+        raise ValueError(
+            f"The problem has {len(problem.period_ids)} periods. Heat pump "
+            "streams that vary by period are not built yet; derive a "
+            "single-period case and target the heat pump on it."
+        )
+    root = problem._require_prepared_root_zone()
+    address = _heat_pump_zone_address(problem, target, zone)
+    dt_cont = {"value": float(root.config.hpr.dt_cont), "unit": "delta_degC"}
+    source = problem.to_problem_json()
+    taken = {
+        record["name"] for record in source["streams"] if record["zone"] == address
+    }
+    # The air an evaporator draws on, at the air's own contribution
+    # (HPR_DT_ENV_CONT). The air a condenser rejects to is left out: the
+    # case's cold utility takes that heat.
+    air = [
+        stream
+        for _key, stream in target.hpr_details.amb_streams.items()
+        if stream.stream_type == StreamType.Hot.value
+    ]
+    for role, streams in (
+        ("condenser", [s for _key, s in target.hpr_hot_streams.items()]),
+        ("evaporator", [s for _key, s in target.hpr_cold_streams.items()]),
+        ("ambient_source", air),
+    ):
+        for stream in streams:
+            if stream.name in taken:
+                raise ValueError(
+                    f"Zone {address!r} already has a stream named "
+                    f"{stream.name!r}, the name of a heat pump stream; rename "
+                    "the process stream."
+                )
+            source["streams"].append(
+                _heat_pump_stream_record(
+                    stream,
+                    zone=address,
+                    dt_cont=(
+                        _value_record(stream.delta_t_contribution)
+                        if role == "ambient_source"
+                        else dt_cont
+                    ),
+                    mark={"machine": machine, "role": role},
+                )
+            )
+    return type(problem)(
+        source,
+        project_name=problem.project_name if project_name is None else project_name,
+    )
 
 
 def single_period_case(problem, period_id, *, project_name=None):
