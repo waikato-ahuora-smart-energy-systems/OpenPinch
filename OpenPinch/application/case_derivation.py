@@ -258,23 +258,12 @@ def with_heat_pump_streams(
     """
     from .hpr_selection import validate_hpr_target
 
-    if problem._process_components:
-        raise ValueError(
-            "heat pump streams cannot be added to a problem with process "
-            "components: the new case is built from the input records, which "
-            "do not hold them."
-        )
+    _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
     if not isinstance(target, DirectHeatPumpTarget):
         raise ValueError(
             "with_heat_pump_streams takes the target of a heat pump placed on "
             f"the process; this is a {target.type} target."
-        )
-    if len(problem.period_ids) > 1:
-        raise ValueError(
-            f"The problem has {len(problem.period_ids)} periods. Heat pump "
-            "streams that vary by period are not built yet; derive a "
-            "single-period case and target the heat pump on it."
         )
     # The value the target was solved with: a per-call
     # ``minimum_approach_temperature`` or a zone's own setting can differ
@@ -287,6 +276,22 @@ def with_heat_pump_streams(
         machine=machine,
         project_name=project_name,
     )
+
+
+def _require_heat_pump_stream_support(problem) -> None:
+    """Raise for a problem heat pump streams cannot be added to yet."""
+    if problem._process_components:
+        raise ValueError(
+            "heat pump streams cannot be added to a problem with process "
+            "components: the new case is built from the input records, which "
+            "do not hold them."
+        )
+    if len(problem.period_ids) > 1:
+        raise ValueError(
+            f"The problem has {len(problem.period_ids)} periods. Heat pump "
+            "streams that vary by period are not built yet; derive a "
+            "single-period case and target the heat pump on it."
+        )
 
 
 def _case_with_heat_pump_streams(

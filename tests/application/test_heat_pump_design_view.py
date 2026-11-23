@@ -50,7 +50,7 @@ def designs():
         1.0,
         cycle="carnot",
         levels={"condensers": 1, "evaporators": 1},
-        search={"restarts": 1, "evaluations": 100},
+        search={"restarts": 0, "evaluations": 1},
         cost_per_kw=200.0,
     )
     pumped = run.case.design.heat_exchanger_network(dt_cont_multipliers=[1.0], **DESIGN)

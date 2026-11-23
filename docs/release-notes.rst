@@ -29,10 +29,25 @@ Heat pumps and refrigeration
   pump together. Electricity and the compressor are not in the new case's
   costs. A target from another problem, a stale one, a utility heat pump's
   and a problem with several periods are refused.
+- ``design.heat_exchanger_network(heat_pump=..., heat_pump_cost=...)``
+  designs with a heat pump as well as without and ranks both. ``heat_pump``
+  is a cycle name or a mapping of ``target.heat_pump_and_refrigeration``
+  arguments. At each dt_cont multiplier the heat pump is targeted with
+  every contribution at that multiplier, its streams join the case and a
+  network is designed around them; each such network counts the machine's
+  electricity (``COSTING_HPR_ELE_PRICE`` over ``COSTING_ANNUAL_OP_TIME``)
+  and its compressor (``heat_pump_cost`` $ per kW of condenser capacity,
+  annualised) in its total annual cost. On the basic pinch sample a Carnot
+  heat pump at full load returns a network at its target at multipliers
+  0.75, 1.0 and 1.5; at 1.0 it draws 263.4 kW (218,636 $/y). With the
+  compressor at 200 $/kW its best network (at 0.75) costs 380,786 $/y
+  against 229,354 $/y without a heat pump, which is selected; with steam at
+  200 $/MWh in place of 10 the heat pump design is selected. ``record=`` is not available with it, and a problem with
+  several periods is refused.
 - A ``HeatExchangerNetwork`` has a ``heat_pumps`` field: the heat pumps
   whose streams it serves, each a ``NetworkHeatPump`` with its duties,
-  work, COP, electricity cost and compressor capital. It is empty for
-  every design today. A network that records a heat pump counts the
+  work, COP, electricity cost and compressor capital. It is empty for a
+  design without a heat pump. A network that records a heat pump counts the
   machine's electricity and annualised capital in its total annual cost,
   and verification checks the total against all three parts.
 - Stream records take an optional ``heat_pump`` mark,

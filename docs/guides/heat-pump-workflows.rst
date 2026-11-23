@@ -300,6 +300,66 @@ stream-end utilities of a fit to every period):
 
 These are the masks ``HENS_FORBIDDEN_MATCHES`` fills, so the two combine.
 
+Designing a network with and without the heat pump
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``design.heat_exchanger_network(heat_pump=...)`` does the steps above for
+every dt_cont multiplier of the search and ranks the results with the
+designs that have no heat pump::
+
+   design = problem.design.heat_exchanger_network(
+       heat_pump="carnot",
+       heat_pump_cost=200.0,  # $ per kW of condenser capacity
+   )
+   design.selected_network.heat_pumps   # () when the heat pump does not pay
+   for outcome in design.top(10):
+       network = outcome.network
+       network.total_annual_cost, network.heat_pumps
+
+``heat_pump`` is a cycle name, or a mapping with ``cycle`` and any of
+``load``, ``levels``, ``cycle_options``, ``search`` and ``options`` as
+``target.heat_pump_and_refrigeration`` takes them, for a part load or a
+given number of levels::
+
+   heat_pump = {"cycle": "carnot", "load": {"fraction": 0.5},
+                "levels": {"condensers": 1, "evaporators": 1}}
+
+At each multiplier the heat pump is targeted afresh, with every
+contribution (``HPR_DT_CONT`` included) at that multiplier, because a
+design at 0.75 sees every stream at 0.75 of its contribution and a heat
+pump targeted at 1.0 would sit at the wrong levels there.
+
+Each network designed around the heat pump's streams carries a
+``NetworkHeatPump`` in ``network.heat_pumps`` (duties, work, COP,
+electricity cost, compressor capital) and its total annual cost is
+
+.. code-block:: text
+
+   utility cost + exchanger capital
+     + work x COSTING_HPR_ELE_PRICE x COSTING_ANNUAL_OP_TIME
+     + annualised (heat_pump_cost x condenser capacity)
+
+``utility_cost`` and ``capital_cost`` stay the network's own utilities
+and exchangers; the condenser and the evaporator are exchangers of the
+network and are priced there. ``heat_pump_cost`` prices the compressor
+and its motor for every cycle for now; left at 0 the design warns that the
+compressor is free.
+
+On the basic pinch sample (steam at 10 $/MWh, electricity at 100 $/MWh) a
+Carnot heat pump at full load draws 263.4 kW at multiplier 1.0, 218,636
+$/y. With the compressor at 200 $/kW the best heat pump network, at
+multiplier 0.75 where the machine draws 219.4 kW, costs 380,786 $/y against
+229,354 $/y for the best design without a heat pump, which is selected.
+With steam at 200 $/MWh the design without it costs 1,254,404 $/y and the
+heat pump design is selected. At half load (``"load": {"fraction": 0.5}``)
+the best heat pump network costs 297,124 $/y.
+
+A multiplier at which no heat pump target is found, or no network is
+designed around its streams, is left out with a warning. ``record=`` is
+not available with ``heat_pump=``, and a problem with several periods is
+refused. The size is the one asked for: to compare sizes, design each and
+compare the selected costs.
+
 It takes the target of a heat pump placed on the process, solved on this
 problem as it stands: a target from another problem, one solved before the
 inputs changed, and a utility heat pump's target are refused. A problem with

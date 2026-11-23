@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from ..analysis.heat_exchanger_networks.errors import WorkflowContractError
 from ..analysis.heat_exchanger_networks.heat_pump_cost import (
     heat_pump_record,
     network_with_heat_pumps,
 )
-from ..contracts.hpr import HprLevels
-from .case_derivation import _case_with_heat_pump_streams
+from ..contracts.hpr import HprLevels, HPRTargetingError
+from .case_derivation import (
+    _case_with_heat_pump_streams,
+    _require_heat_pump_stream_support,
+)
 
 
 @dataclass(frozen=True)
@@ -51,6 +57,7 @@ def heat_pump_design_case(
     stream's. ``load``, ``levels``, ``cycle_options``, ``search`` and
     ``options`` are those of ``target.heat_pump_and_refrigeration``.
     """
+    _require_heat_pump_stream_support(problem)
     multiplier = float(multiplier)
     root = problem._require_prepared_root_zone()
     levels = HprLevels.model_validate(levels or {})
@@ -88,6 +95,84 @@ def heat_pump_design_case(
             cost_per_kw=cost_per_kw,
         ),
     )
+
+
+_REQUEST_KEYS = (
+    "cycle",
+    "load",
+    "levels",
+    "cycle_options",
+    "search",
+    "options",
+    "machine",
+)
+
+
+def heat_pump_request(heat_pump) -> dict[str, Any]:
+    """The ``heat_pump=`` argument of a design as keyword arguments.
+
+    A cycle name (``"carnot"``), or a mapping with any of ``cycle``
+    (``"carnot"`` when left out), ``load``, ``levels``, ``cycle_options``,
+    ``search`` and ``options`` as ``target.heat_pump_and_refrigeration``
+    takes them, and ``machine``, the name the heat pump's streams and
+    record carry.
+    """
+    if isinstance(heat_pump, str):
+        return {"cycle": heat_pump}
+    if not isinstance(heat_pump, Mapping):
+        raise TypeError(
+            "heat_pump must be a cycle name or a mapping with 'cycle' and the "
+            "arguments of target.heat_pump_and_refrigeration."
+        )
+    unknown = sorted(set(heat_pump) - set(_REQUEST_KEYS))
+    if unknown:
+        raise ValueError(
+            f"heat_pump does not take {', '.join(map(repr, unknown))}; it takes "
+            + ", ".join(_REQUEST_KEYS)
+            + "."
+        )
+    return {"cycle": "carnot"} | dict(heat_pump)
+
+
+def design_with_heat_pump(
+    problem, heat_pump, *, cost_per_kw: float, multipliers, arguments: Mapping
+):
+    """Design ``problem`` without a heat pump and, at each of
+    ``multipliers``, with one, and rank every network together.
+
+    ``heat_pump`` is a cycle name or a mapping of the keyword arguments of
+    ``heat_pump_design_case``; ``arguments`` are those of
+    ``design.heat_exchanger_network``.
+    """
+    request = heat_pump_request(heat_pump)
+    if not cost_per_kw:
+        warnings.warn(
+            "heat_pump_cost is 0, so the heat pump designs are ranked with a "
+            "free compressor: on electricity and their exchangers alone. Give "
+            "heat_pump_cost in $ per kW of condenser capacity.",
+            UserWarning,
+            stacklevel=2,
+        )
+    plain = problem.design.heat_exchanger_network(**arguments)
+    runs = []
+    for multiplier in multipliers:
+        try:
+            run = heat_pump_design_case(
+                problem, multiplier, cost_per_kw=cost_per_kw, **request
+            )
+            view = run.case.design.heat_exchanger_network(
+                **dict(arguments) | {"dt_cont_multipliers": [multiplier]}
+            )
+        except (HPRTargetingError, WorkflowContractError) as error:
+            # No target at this multiplier, or no network around its streams.
+            warnings.warn(
+                f"No heat pump network at dt_cont multiplier {multiplier:g}: {error}",
+                UserWarning,
+                stacklevel=2,
+            )
+            continue
+        runs.append((run, view))
+    return heat_pump_design_view(problem, plain, runs)
 
 
 def heat_pump_design_view(problem, plain, runs):

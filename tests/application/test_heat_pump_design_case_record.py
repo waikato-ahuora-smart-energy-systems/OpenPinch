@@ -23,7 +23,7 @@ def test_the_case_prices_its_heat_pump_at_the_problems_electricity_price():
         1.0,
         cycle="carnot",
         levels={"condensers": 1, "evaporators": 1},
-        search={"restarts": 1, "evaluations": 100},
+        search={"restarts": 0, "evaluations": 1},
         cost_per_kw=200.0,
     )
 

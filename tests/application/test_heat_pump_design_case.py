@@ -17,8 +17,8 @@ from OpenPinch import PinchProblem
 from OpenPinch.application.heat_pump_design import heat_pump_design_case
 from tests.application.heat_pump_stream_cases import basic_source
 
-# One start and 100 evaluations: see ``full_load_target``.
-SMALL_SEARCH = {"restarts": 1, "evaluations": 100}
+# The target's first start alone: see ``full_load_target``.
+SMALL_SEARCH = {"restarts": 0, "evaluations": 1}
 ONE_LEVEL = {"condensers": 1, "evaporators": 1}
 
 
