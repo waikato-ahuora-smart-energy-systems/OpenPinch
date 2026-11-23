@@ -178,20 +178,22 @@ def retrofit_with_heat_pump(
     )
     if step is None:
         return base
-    case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
-    with temporary_zone_configuration(
-        case._build_execution_master_zone(), configuration
-    ):
-        try:
+    # A case that refuses the streams (process components, several process
+    # zones) or a network that cannot serve them is a heat pump this
+    # retrofit cannot use, not a failed retrofit.
+    try:
+        case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
+        with temporary_zone_configuration(
+            case._build_execution_master_zone(), configuration
+        ):
             pumped = run_retrofit_search(
                 case, existing, replace(settings, heat_pump_cycle=None), heat_pump=step
             )
-        except ValueError as error:
-            # A heat pump the network cannot take, not a failed retrofit.
-            warnings.warn(
-                f"the heat pump step was left out of the retrofit: {error}",
-                UserWarning,
-                stacklevel=2,
-            )
-            return base
+    except ValueError as error:
+        warnings.warn(
+            f"the heat pump step was left out of the retrofit: {error}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return base
     return joined(base, pumped)
