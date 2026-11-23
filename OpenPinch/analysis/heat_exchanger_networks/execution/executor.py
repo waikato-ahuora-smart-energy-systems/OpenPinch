@@ -545,6 +545,7 @@ class LocalSynthesisExecutor:
             utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
             site_processes=site_processes,
             site_level_holds=str(problem.master_zone.config.hens.site_level_holds),
+            level_holds=str(problem.master_zone.config.hens.evolution_level_holds),
             site_utility_system=(
                 None
                 if site_processes is None

@@ -172,6 +172,16 @@ finished by the cheapest utility that reaches its target. In
   names the task and the side: its networks may then hold some levels and
   not others (a heat pump's evaporator kept and its condenser replaced by
   steam, for example).
+  The thermal derivative and network evolution steps that follow do not
+  hold the levels: they trade utility for area by price, and only the
+  ranking keeps a level-holding network first.
+  ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``) holds each
+  level at its target in those steps too, for a single process. On the
+  four-stream Yee and Grossmann case with a second level added on each side,
+  the pinch design holds 450 kW of HP steam at a total annual cost of
+  145,644; unheld, its evolved networks use 496 to 588 kW and the design
+  selected is still the pinch design; held, the evolved networks keep
+  450 kW and the best costs 138,442.
   The main MILP network then drops stages that carry a small share of its
   recovery, which can move that recovery to utility (about 10% more utility
   on the ten-stream Ahmad case).

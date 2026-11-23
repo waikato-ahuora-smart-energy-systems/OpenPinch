@@ -36,6 +36,18 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``, today's
+  behaviour) makes the thermal derivative and network evolution steps of a
+  single process keep each utility level at the duty its pinch design held
+  (utility placement by temperature). They took no level targets unless the
+  design was a total site's, so they traded utility for area by price and
+  only the ranking kept a level-holding network first. On the four-stream
+  Yee and Grossmann case with a second utility level added on each side,
+  the pinch design holds 450 kW of HP steam (total annual cost 145,644);
+  its evolved networks used 496 to 588 kW and the pinch design was
+  selected. With the option, the evolved networks keep 450 kW and the
+  selected design is an evolved one at 138,442; at search depth 2 the
+  thermal derivative network holds the levels as well.
 - A pinch design that cannot hold the utility levels on one side of the
   pinch now says so with a ``UserWarning`` naming the task and the side.
   The side is designed without the levels, choosing them by price, and

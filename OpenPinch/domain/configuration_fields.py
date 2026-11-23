@@ -57,6 +57,10 @@ HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period", "median"})
 # placed by utility placement over a sweep of level counts.
 HENS_SITE_LEVELS_VALUES = frozenset({"given", "placed"})
 HENS_SITE_LEVEL_HOLDS_VALUES = frozenset({"fixed", "at_least"})
+# Whether network evolution of a single process keeps the utility levels
+# its pinch design held. There is no "at_least" as for a site: a level held
+# at or above its target does not bind, so the networks are those of "none".
+HENS_EVOLUTION_LEVEL_HOLDS_VALUES = frozenset({"none", "fixed"})
 # Which median-basis clusters a design is synthesised from.
 HENS_BASIS_CANDIDATES_VALUES = frozenset({"dominant", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
@@ -476,6 +480,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_SITE_TIME_LIMIT": _spec(float | None, None, "hens", "site_time_limit", validator=_positive_float_or_none),
     "HENS_SITE_LETDOWN_PRICE": _spec(float, 0.0, "hens", "site_letdown_price", numeric_min=0.0),
     "HENS_SITE_LEVEL_HOLDS": _spec(str, "fixed", "hens", "site_level_holds", validator=partial(_string_choice, choices=HENS_SITE_LEVEL_HOLDS_VALUES)),
+    "HENS_EVOLUTION_LEVEL_HOLDS": _spec(str, "none", "hens", "evolution_level_holds", validator=partial(_string_choice, choices=HENS_EVOLUTION_LEVEL_HOLDS_VALUES)),
     "HENS_RETROFIT_LOOPS": _spec(bool, True, "hens", "retrofit_loops"),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
