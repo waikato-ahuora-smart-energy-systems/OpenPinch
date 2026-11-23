@@ -196,8 +196,9 @@ def problem_to_solver_arrays(
             [
                 *hens.forbidden_matches,
                 *_heat_pump_match_rules(
-                    hot_items,
-                    cold_items,
+                    heat_pump_stream_roles(problem),
+                    hot=[key for key, _, _ in hot_items],
+                    cold=[key for key, _, _ in cold_items],
                     hot_utilities=[key for key, _, _ in hot_utility_items],
                     cold_utilities=[key for key, _, _ in cold_utility_items],
                 ),
@@ -322,20 +323,15 @@ def problem_to_solver_arrays(
     )
 
 
-def _heat_pump_role(record) -> str | None:
-    """The heat pump role an input record marks its stream with, if any."""
-    mark = getattr(record, "heat_pump", None)
-    return None if mark is None else mark.role
-
-
 def _heat_pump_match_rules(
-    hot_items,
-    cold_items,
+    roles: dict[str, str],
     *,
+    hot: Sequence[str],
+    cold: Sequence[str],
     hot_utilities: Sequence[str],
     cold_utilities: Sequence[str],
 ) -> list[tuple[str, str]]:
-    """The pairs, by key, that the streams' heat pump marks rule out.
+    """The pairs, by key, that the streams' heat pump roles rule out.
 
     A condenser may not heat an evaporator: the pair is feasible and would
     hand the machine's output back to its input. No cold utility may cool
@@ -345,10 +341,10 @@ def _heat_pump_match_rules(
     the process, nor heat to cool away.
     """
 
-    condensers = [k for k, _, r in hot_items if _heat_pump_role(r) == "condenser"]
-    evaporators = [k for k, _, r in cold_items if _heat_pump_role(r) == "evaporator"]
-    air = [k for k, _, r in hot_items if _heat_pump_role(r) == "ambient_source"]
-    others = [k for k, _, r in cold_items if _heat_pump_role(r) != "evaporator"]
+    condensers = [key for key in hot if roles.get(key) == "condenser"]
+    evaporators = [key for key in cold if roles.get(key) == "evaporator"]
+    air = [key for key in hot if roles.get(key) == "ambient_source"]
+    others = [key for key in cold if roles.get(key) != "evaporator"]
     return (
         [(hot, cold) for hot in condensers for cold in evaporators]
         + [(hot, utility) for hot in condensers + air for utility in cold_utilities]
