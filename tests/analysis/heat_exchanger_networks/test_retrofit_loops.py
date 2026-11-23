@@ -31,7 +31,10 @@ def test_a_loop_runs_midway_between_its_targets_keeping_the_approach_each_side()
 
     (loop,) = heat_recovery_loop_candidates(ends, processes, approach=10.0)
 
-    assert loop == HeatRecoveryLoop("H1", "C1", 378.0)
+    # It can carry the smaller of H1's 160 kW of cooling and C1's 100 kW of
+    # heating. A candidate records that for the screen since the placement
+    # change, which this comparison failed on (capacity 100.0 against inf).
+    assert loop == HeatRecoveryLoop("H1", "C1", 378.0, 100.0)
     # The loop circulates over LOOP_SPAN about its temperature; the hot
     # stream at its target still clears the loop's warm end, and the cold
     # stream at its target stays below its cool end, by the approach.
@@ -40,8 +43,38 @@ def test_a_loop_runs_midway_between_its_targets_keeping_the_approach_each_side()
     assert (loop.temperature - LOOP_SPAN / 2) - 363.0 >= 10.0
 
 
-def test_no_loop_within_one_process_or_between_targets_too_close_for_the_approach():
+def test_a_loop_serves_part_of_two_streams_whose_targets_leave_it_no_room():
+    """A hot stream cooled to 40 degC and a cold stream heated to 150 degC
+    have no room for a loop between their targets, but a loop takes the hot
+    stream's heat above it and gives the cold stream's heating below it;
+    the existing cooler and heater finish each stream. The loop sits where
+    the two amounts are equal, so it carries the most it can."""
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.loops import (
+        LOOP_SPAN,
+        heat_recovery_loop_candidates,
+    )
+
+    processes = {"H1": "Site/A", "C1": "Site/B"}
+    hot, cold = (473.15, 313.15, 1.0), (303.15, 423.15, 1.0)
+
+    (loop,) = heat_recovery_loop_candidates(
+        {"H1": hot, "C1": cold}, processes, approach=10.0
+    )
+
+    # Midway at equal flows. The hot stream leaves the loop cooler 10 K above
+    # the loop's cool end and the cold stream leaves the loop heater 10 K
+    # below its warm end (test_retrofit_loop_placement.py): 75.5 kW given
+    # from 200 to 124.5 degC and taken from 30 to 105.5 degC. These read
+    # 74.5 kW until the placement was corrected to those ends.
+    assert (loop.hot, loop.cold) == ("H1", "C1")
+    assert loop.temperature == pytest.approx(388.15)
+    assert hot[0] - (loop.temperature - LOOP_SPAN / 2 + 10.0) == pytest.approx(75.5)
+    assert (loop.temperature + LOOP_SPAN / 2 - 10.0) - cold[0] == pytest.approx(75.5)
+
+
+def test_no_loop_within_one_process_and_targets_too_close_move_the_loop():
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.loops import (
+        HeatRecoveryLoop,
         heat_recovery_loop_candidates,
     )
 
@@ -62,7 +95,16 @@ def test_no_loop_within_one_process_or_between_targets_too_close_for_the_approac
         ("H1", "C1"),
         ("H2", "C1"),
     ]
-    assert heat_recovery_loop_candidates(ends, processes, approach=10.5) == [loops[0]]
+    # At 10.5 K the targets of H2 and C1 are 1 K too close for a loop midway
+    # between them (it was not offered before). The loop moves to 10 K below
+    # H2's target, its cool end the 10.5 K approach below it: it still takes
+    # all 36 kW of H2's cooling and gives part of C1's heating, whose heater
+    # finishes it. (373 K until the placement was corrected to the ends the
+    # loop's exchangers hold.)
+    assert heat_recovery_loop_candidates(ends, processes, approach=10.5) == [
+        loops[0],
+        HeatRecoveryLoop("H2", "C1", 374.0, 36.0),
+    ]
 
 
 def _network(duties):

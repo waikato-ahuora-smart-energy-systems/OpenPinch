@@ -868,14 +868,23 @@ Sites and heat recovery loops
    balance is not modelled: utilities are priced unit by unit. Processes are
    linked only through a heat recovery loop, which ``HENS_RETROFIT_LOOPS``
    (default on) lets a step add: an intermediate fluid, hot water for
-   example, at one temperature midway between a hot stream's target in one
-   process and a cold stream's in another. A loop cooler at the end of the
-   hot stream heats it and a loop heater at the end of the cold stream takes
-   the same heat back, in every period and with no loss, so the hot stream
-   reaches its target ``min_approach_temperature`` above the loop and the
-   cold stream its target as far below (the loop circulates over 1 K, so
-   the two targets must be at least twice the approach and 1 K apart; a
-   pair closer than that needs a heat pump instead). Pairs are screened by
+   example, at one temperature between a hot stream in one process and a
+   cold stream in another. A loop cooler at the end of the hot stream heats
+   it and a loop heater at the end of the cold stream takes the same heat
+   back, in every period and with no loss. The hot stream leaves the loop
+   cooler ``min_approach_temperature`` above the loop and the cold stream
+   leaves the loop heater as far below (the loop circulates over 1 K).
+   Where the two targets are at least twice the approach and 1 K apart, the
+   loop runs midway between them and can carry all of the hot stream's end
+   cooling to the cold stream. Where they are closer, or the cold stream is
+   heated above the hot stream's target, the loop serves part of each: the
+   hot stream above the loop and the cold stream below it, with their own
+   cooler and heater finishing them. It then runs at the temperature where
+   the heat it can collect and the heat it can deliver, read from the
+   streams' supply temperatures and flowrates, are largest together: a
+   stream cooled from 200 to 40 degC and one heated from 30 to 150 degC,
+   each at 1 kW/K with a 10 K approach, get a loop at 115 degC that carries
+   75 kW. Pairs are screened by
    the utility the loop could relieve: the hot stream's cooling, capped by
    the cold stream's heating. The two exchangers are priced like new
    exchangers, plus ``heat_recovery_loop_cost`` ($ per loop, for its pump
