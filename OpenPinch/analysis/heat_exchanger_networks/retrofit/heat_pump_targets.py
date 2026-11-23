@@ -72,7 +72,9 @@ def retrofit_heat_pumps(
     )
 
 
-def as_piped_heat_pump(problem, network: HeatExchangerNetwork, *, args=None):
+def as_piped_heat_pump(
+    problem, network: HeatExchangerNetwork, *, args=None, load_fraction=None
+):
     """The as-piped heat pump target of ``network`` as the heat pump
     service solved it (``HeatPumpTargetOutputs``), with its condenser
     streams (``hpr_hot_streams``), evaporator streams
@@ -86,6 +88,7 @@ def as_piped_heat_pump(problem, network: HeatExchangerNetwork, *, args=None):
         as_piped_profiles(problem, network),
         _network_prices(problem, network),
         args,
+        load_fraction=load_fraction,
     )
 
 
@@ -104,17 +107,24 @@ def _network_prices(problem, network: HeatExchangerNetwork) -> dict:
     }
 
 
-def _profile_target(problem, profile, prices: dict, args):
+def _profile_target(problem, profile, prices: dict, args, load_fraction=None):
     """The heat pump service's result on ``profile`` (shifted temperatures,
     source and sink) at ``prices``, in the first period, whose states the
-    as-piped profiles and prices take."""
+    as-piped profiles and prices take. ``load_fraction`` caps the load at
+    that share of the sink's, on a copy of the configuration."""
 
     T_vals, H_hot, H_cold = profile
+    config = _at_network_prices(problem.master_zone.config, prices)
+    if load_fraction is not None:
+        config = deepcopy(config)
+        config.update_values(
+            HPR_LOAD_MODE="fraction", HPR_LOAD_FRACTION=float(load_fraction)
+        )
     return compute_profile_heat_pump_target(
         T_vals=T_vals,
         H_hot=H_hot,
         H_cold=H_cold,
-        config=_at_network_prices(problem.master_zone.config, prices),
+        config=config,
         args=args,
         period_id=min(problem.period_ids.items(), key=lambda item: item[1])[0],
         period_idx=0,
