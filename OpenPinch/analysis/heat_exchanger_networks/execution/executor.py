@@ -23,6 +23,7 @@ from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models._stagewise.evolution import reporting_improvements
 from ..models.problem import InternalHeatExchangerNetworkProblem
+from ..reporting.ranking import held_utility_levels
 from ..results.record import admit, recording_active
 from ..site.levels import site_utility_system, utility_capacities
 from ..solver.arrays import (
@@ -485,7 +486,7 @@ class LocalSynthesisExecutor:
                 ),
             }
 
-        return InternalHeatExchangerNetworkProblem(
+        internal = InternalHeatExchangerNetworkProblem(
             solver_arrays=arrays,
             name=_task_model_name(task),
             framework=_model_framework(task.method),
@@ -546,6 +547,7 @@ class LocalSynthesisExecutor:
             site_processes=site_processes,
             site_level_holds=str(problem.master_zone.config.hens.site_level_holds),
             level_holds=str(problem.master_zone.config.hens.evolution_level_holds),
+            held_level_targets=_held_level_targets(problem, task, parent_outcomes),
             site_utility_system=(
                 None
                 if site_processes is None
@@ -556,6 +558,12 @@ class LocalSynthesisExecutor:
                 )
             ),
         )
+        # A seeded task has no parent problem to take its levels from: its
+        # settings carry the seed's (``../targeting/_stage.py``).
+        seed_targets = task.settings.get("utility_level_targets")
+        if seed_targets is not None:
+            internal.utility_level_targets = dict(seed_targets)
+        return internal
 
     def _parent_problem(
         self,
@@ -1117,6 +1125,27 @@ def _site_letdown_price(config) -> float:
 
 def _solve_tolerance(problem) -> float:
     return float(problem.master_zone.config.hens.solve_tolerance)
+
+
+def _held_level_targets(
+    problem,
+    task: HeatExchangerNetworkSynthesisTask,
+    parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+) -> dict[str, list[float]] | None:
+    """The utility levels ``task`` is to hold with
+    ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"``: those its parent's network
+    holds, which leaves out a pinch side that dropped its levels, or for a
+    seeded task those its seed holds (its ``held_utility_levels`` setting).
+    ``None`` without the option, or with neither, when the problem's own
+    targets stand."""
+
+    if str(problem.master_zone.config.hens.evolution_level_holds) == "none":
+        return None
+    parent = parent_outcomes.get(task.parent_task_id or "")
+    network = getattr(parent, "network", None)
+    if network is not None:
+        return held_utility_levels(network)
+    return task.settings.get("held_utility_levels")
 
 
 def _pdm_stage_selection(

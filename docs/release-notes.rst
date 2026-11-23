@@ -47,7 +47,12 @@ Heat exchanger network synthesis
   its evolved networks used 496 to 588 kW and the pinch design was
   selected. With the option, the evolved networks keep 450 kW and the
   selected design is an evolved one at 138,442; at search depth 2 the
-  thermal derivative network holds the levels as well.
+  thermal derivative network holds the levels as well. The standalone
+  ``design.thermal_derivative`` and ``design.network_evolution`` hold the
+  levels of the network they start from too, and their networks now record
+  its level targets. A step holds only the levels its starting network
+  holds: a pinch design that dropped the levels on one side of the pinch
+  is evolved keeping the others.
 - A pinch design that cannot hold the utility levels on one side of the
   pinch now says so with a ``UserWarning`` naming the task and the side.
   The side is designed without the levels, choosing them by price, and

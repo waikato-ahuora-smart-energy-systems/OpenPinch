@@ -18,6 +18,7 @@ from ..execution.task_builders import (
     dt_cont_multiplier_from_network,
     topology_restrictions_from_network,
 )
+from ..reporting.ranking import held_utility_levels
 from ..results.assembly import (
     SynthesisWorkflowResult,
     build_synthesis_result,
@@ -138,6 +139,15 @@ def build_seeded_quality_tasks(
         task_settings = (
             {} if site_processes is None else {"site_processes": site_processes}
         )
+        # A seed that records utility level targets passes them on, with the
+        # part of them it holds: its tasks have no parent task to take
+        # either from (``HENS_EVOLUTION_LEVEL_HOLDS``).
+        level_targets = network.source_metadata.get("utility_level_targets")
+        if level_targets and site_processes is None:
+            task_settings = task_settings | {
+                "utility_level_targets": level_targets,
+                "held_utility_levels": held_utility_levels(network),
+            }
         for derivative_threshold in derivative_thresholds(network):
             key = (
                 (dt_cont_multiplier, derivative_threshold, signature)

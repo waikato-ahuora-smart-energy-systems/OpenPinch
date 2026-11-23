@@ -100,9 +100,21 @@ def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
     name to per-period kW), recorded by a design that holds the levels and
     by the tasks built on it. A network without them holds no level to miss.
     """
+    targets = (network.source_metadata or {}).get("utility_level_targets") or {}
+    return len(held_utility_levels(network)) == len(targets)
+
+
+def held_utility_levels(network: HeatExchangerNetwork) -> dict[str, list[float]]:
+    """The level targets of ``network`` that it holds: each utility whose
+    duty meets its target in every period, with that target.
+
+    A design that dropped the levels on one side of the pinch still records
+    every target, so that it does not rank as a holder; this gives the part
+    it does hold, which is what a later step can be asked to keep.
+    """
     targets = (network.source_metadata or {}).get("utility_level_targets")
     if not targets:
-        return True
+        return {}
     duties: dict[str, dict[int, float]] = {}
     for exchanger in network.exchangers:
         if exchanger.kind.value == "hot_utility":
@@ -116,12 +128,19 @@ def holds_utility_levels(network: HeatExchangerNetwork) -> bool:
             by_period[state.period_idx] = by_period.get(state.period_idx, 0.0) + (
                 float(state.duty) if state.active else 0.0
             )
-    for name, by_period in targets.items():
-        for period, target in enumerate(by_period):
-            duty = duties.get(name, {}).get(period, 0.0)
-            if abs(duty - float(target)) > LEVEL_TOLERANCE * max(1.0, abs(target)):
-                return False
-    return True
+
+    def met(name: str, by_period) -> bool:
+        return all(
+            abs(duties.get(name, {}).get(period, 0.0) - float(target))
+            <= LEVEL_TOLERANCE * max(1.0, abs(target))
+            for period, target in enumerate(by_period)
+        )
+
+    return {
+        name: [float(target) for target in by_period]
+        for name, by_period in targets.items()
+        if met(name, by_period)
+    }
 
 
 # A site network's total annual cost with site utility accounting
@@ -177,6 +196,7 @@ def _ranked_candidate_outcomes(
 
 __all__ = [
     "LEVEL_TOLERANCE",
+    "held_utility_levels",
     "holds_utility_levels",
     "network_structure_signature",
     "SITE_TOTAL_ANNUAL_COST",
