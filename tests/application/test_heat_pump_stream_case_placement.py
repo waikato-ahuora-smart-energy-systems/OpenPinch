@@ -26,8 +26,13 @@ def test_a_utility_heat_pump_target_is_refused():
         source=json.loads(BASIC_PINCH.read_text(encoding="utf-8")),
         project_name="basic",
     )
+    # A small search, as ``full_load_target`` takes: the refusal does not
+    # depend on how good the target is.
     target = problem.target.carnot_heat_pump(
-        is_utility_heat_pump=True, load_fraction=1.0, maximum_restarts=1
+        is_utility_heat_pump=True,
+        load_fraction=1.0,
+        maximum_restarts=1,
+        maximum_evaluations=100,
     )
 
     with pytest.raises(ValueError, match="placed on the process"):
