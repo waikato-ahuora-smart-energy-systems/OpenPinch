@@ -359,7 +359,10 @@ own target and its own networks. Without a ``load`` the design tries every
 size worth trying, the load fractions at the kinks of the net load profile
 where the lift a heat pump needs jumps or steepens
 (``target.hpr_load_kinks().logical_load_fractions``) and the full load, at
-every multiplier, and ranks them all; ``network.heat_pumps[0].load_fraction``
+every multiplier, and ranks them all. The kinks are those of the profile
+at each multiplier, which scaling the contributions moves: the basic pinch
+sample's profile steps at 0.4 of its load up to multiplier 1.5 and has no
+step at 2.0, where only the full load is designed; ``network.heat_pumps[0].load_fraction``
 says which size a network has. With a ``load`` it designs that size alone.
 The run count is multipliers times sizes, plus the design without a heat
 pump.
