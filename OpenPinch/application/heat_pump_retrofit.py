@@ -90,7 +90,9 @@ def _carrying(streams) -> tuple:
     )
 
 
-def heat_pump_step(problem, base, settings, *, limits=None, machine: str = "HP"):
+def heat_pump_step(
+    problem, base, settings, *, limits=None, machine: str = "HP", load_fraction=None
+):
     """The heat pump step a second retrofit search starts from, and the
     as-piped heat pump target it was built from.
 
@@ -101,7 +103,10 @@ def heat_pump_step(problem, base, settings, *, limits=None, machine: str = "HP")
     """
 
     solved = as_piped_heat_pump(
-        problem, base.network, args=dict(limits) if limits else None
+        problem,
+        base.network,
+        args=dict(limits) if limits else None,
+        load_fraction=load_fraction,
     )
     if solved is None:
         # The heaters carry no load: no heat pump to add.
@@ -113,7 +118,7 @@ def heat_pump_step(problem, base, settings, *, limits=None, machine: str = "HP")
             cycle=str(settings.heat_pump_cycle),
             cost_per_kw=settings.heat_pump_cost,
             costing=problem.master_zone.config.costing,
-        ),
+        ).model_copy(update={"load_fraction": load_fraction}),
         # A level the target left without duty is not a stream: it would
         # need a match it may not be able to have.
         condensers=_carrying(solved.hpr_hot_streams),
