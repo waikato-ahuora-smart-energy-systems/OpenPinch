@@ -36,6 +36,14 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A pinch design that cannot hold the utility levels on one side of the
+  pinch now says so with a ``UserWarning`` naming the task and the side.
+  The side is designed without the levels, choosing them by price, and
+  that was a log line only, lost in a worker process. With utility
+  placement by temperature and a heat pump's condenser and evaporator as
+  utility levels on ``basic_pinch.json``, the heuristic designs at
+  multipliers of 0.75 and 1.0 dropped the levels above the pinch and
+  returned 24 and 22 networks with no warning.
 - A problem with a process MVR component can now be designed
   (``design.pinch_design`` and ``design.heat_exchanger_network`` raised
   before, with the component active or deactivated). Two faults:
