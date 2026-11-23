@@ -1669,6 +1669,7 @@ class _DesignAccessor:
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
+        heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
@@ -1790,10 +1791,13 @@ class _DesignAccessor:
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
+        from functools import partial
+
         from ....analysis.heat_exchanger_networks.retrofit.search import (
             RetrofitSettings,
             run_retrofit_search,
         )
+        from ...heat_pump_retrofit import retrofit_with_heat_pump
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
@@ -1834,7 +1838,15 @@ class _DesignAccessor:
                     UserWarning,
                     stacklevel=2,
                 )
-            result = run_retrofit_search(
+            search = run_retrofit_search
+            if heat_pump_cycle == "carnot":
+                # Also try the as-piped heat pump added as streams.
+                search = partial(
+                    retrofit_with_heat_pump,
+                    configuration=configuration,
+                    limits=heat_pump_search,
+                )
+            result = search(
                 isolated,
                 existing,
                 RetrofitSettings(
