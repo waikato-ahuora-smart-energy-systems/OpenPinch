@@ -20,7 +20,7 @@ Heat pumps and refrigeration
 - ``problem.with_heat_pump_streams(target)`` returns a new unsolved case
   that holds the problem's streams and the streams of a direct heat pump
   target: each condenser a hot stream and each evaporator a cold stream, at
-  ``HPR_DT_CONT``, with their segments. The air an evaporator draws on is
+  the ``HPR_DT_CONT`` the target was solved with, with their segments. The air an evaporator draws on is
   added as a hot stream; the air a condenser rejects to is not. Direct heat
   integration targeting of the new case gives the heat pump target's
   utilities (on the basic pinch sample at full load: no hot utility and

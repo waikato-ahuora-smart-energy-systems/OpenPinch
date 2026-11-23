@@ -404,7 +404,8 @@ identity; runtime components and receiver thermal inputs are preserved.
 ``problem.with_heat_pump_streams(target, zone=None, machine="HP",
 project_name=None)`` creates an unsolved case that holds the problem's
 streams and the streams of a direct heat pump target: each condenser a hot
-stream, each evaporator a cold stream, at ``HPR_DT_CONT``, each marked
+stream, each evaporator a cold stream, at the ``HPR_DT_CONT`` the target
+was solved with, each marked
 ``heat_pump: {"machine": ..., "role": ...}``. Direct heat integration
 targeting of the new case gives the heat pump target's utilities. See
 :doc:`../guides/heat-pump-workflows`.
