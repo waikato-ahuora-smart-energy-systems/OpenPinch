@@ -55,7 +55,16 @@ def heat_pump_record(
         capital_cost=capital,
         annual_capital_cost=capital
         * compute_capital_recovery_factor(costing.discount_rate, costing.service_life),
+        load_fraction=_load_fraction(getattr(target, "hpr_load", None)),
     )
+
+
+def _load_fraction(load) -> float | None:
+    """The share of the available heat pump load a target's summary says it
+    took, or None without a summary or an available load."""
+    if load is None or not float(load.available) > 0.0:
+        return None
+    return float(load.selected) / float(load.available)
 
 
 def _duty(streams) -> float:

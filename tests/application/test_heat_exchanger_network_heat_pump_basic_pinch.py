@@ -39,6 +39,9 @@ def test_the_basic_pinch_sample_with_a_searched_carnot_heat_pump():
         source=basic_source(), project_name="basic"
     ).design.heat_exchanger_network(
         heat_pump={
+            # The review's numbers are for the full load; without a load
+            # the sizes at the load kinks are designed as well.
+            "load": {"fraction": 1.0},
             "levels": {"condensers": 1, "evaporators": 1},
             "search": {"restarts": 1},
         },

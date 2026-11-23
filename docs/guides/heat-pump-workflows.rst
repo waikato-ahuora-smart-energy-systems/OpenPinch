@@ -354,11 +354,55 @@ With steam at 200 $/MWh the design without it costs 1,254,404 $/y and the
 heat pump design is selected. At half load (``"load": {"fraction": 0.5}``)
 the best heat pump network costs 297,124 $/y.
 
-A multiplier at which no heat pump target is found, or no network is
-designed around its streams, is left out with a warning. ``record=`` is
+The size of a heat pump is not a variable of the design: each size is its
+own target and its own networks. Without a ``load`` the design tries every
+size worth trying, the load fractions at the kinks of the net load profile
+where the lift a heat pump needs jumps or steepens
+(``target.hpr_load_kinks().logical_load_fractions``) and the full load, at
+every multiplier, and ranks them all; ``network.heat_pumps[0].load_fraction``
+says which size a network has. With a ``load`` it designs that size alone.
+The run count is multipliers times sizes, plus the design without a heat
+pump.
+
+On the basic pinch sample the sizes are 0.4 and 1.0. With the compressor
+at 200 $/kW the best network of each size costs, at multiplier 1.0:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Steam, $/MWh
+     - No heat pump
+     - 0.4 of the load
+     - Full load
+     - Selected
+   * - 10
+     - 238,776
+     - 306,868
+     - 409,423
+     - no heat pump
+   * - 30
+     - 363,276
+     - 381,568
+     - 409,423
+     - no heat pump
+   * - 40
+     - 425,526
+     - 418,918
+     - 409,423
+     - full load
+   * - 100
+     - 799,026
+     - 643,018
+     - 409,423
+     - full load
+
+The part-load size is the cheapest only between 37.35 and 37.46 $/MWh on
+this sample: a kW of heat pump costs almost the same at either size.
+
+A multiplier and size at which no heat pump target is found, or no network
+is designed around its streams, is left out with a warning. ``record=`` is
 not available with ``heat_pump=``, and a problem with several periods is
-refused. The size is the one asked for: to compare sizes, design each and
-compare the selected costs.
+refused.
 
 It takes the target of a heat pump placed on the process, solved on this
 problem as it stands: a target from another problem, one solved before the

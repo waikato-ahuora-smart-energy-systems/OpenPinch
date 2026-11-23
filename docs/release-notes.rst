@@ -44,6 +44,16 @@ Heat pumps and refrigeration
   against 229,354 $/y without a heat pump, which is selected; with steam at
   200 $/MWh in place of 10 the heat pump design is selected. ``record=`` is not available with it, and a problem with
   several periods is refused.
+- Without a ``load``, ``heat_exchanger_network(heat_pump=...)`` designs
+  every heat pump size worth trying at each multiplier, the load fractions
+  at the kinks of the net load profile (``target.hpr_load_kinks``) and the
+  full load, and ranks them with the designs that have no heat pump.
+  ``NetworkHeatPump.load_fraction`` names a network's size. With a
+  ``load`` it designs that size alone. On the basic pinch sample the sizes
+  are 0.4 and 1.0; with the compressor at 200 $/kW the design without a
+  heat pump is selected up to steam at 30 $/MWh and the full-load one from
+  40 $/MWh, the part-load size being cheapest only between 37.35 and 37.46
+  $/MWh.
 - A ``HeatExchangerNetwork`` has a ``heat_pumps`` field: the heat pumps
   whose streams it serves, each a ``NetworkHeatPump`` with its duties,
   work, COP, electricity cost and compressor capital. It is empty for a

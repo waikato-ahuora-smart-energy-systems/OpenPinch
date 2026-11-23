@@ -36,6 +36,9 @@ pytestmark = [
 # The target's first start alone: see ``full_load_target``.
 HEAT_PUMP = {
     "cycle": "carnot",
+    # The full load alone: without a load every size at the load kinks is
+    # designed too, and a part-load heat pump leaves hot utility.
+    "load": {"fraction": 1.0},
     "levels": {"condensers": 1, "evaporators": 1},
     "search": {"restarts": 0, "evaluations": 1},
 }
