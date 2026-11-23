@@ -970,7 +970,12 @@ class _Evaluator:
             if getattr(model, "mSuccess", 0) != 1:
                 self._failed()
                 return None
-            solved = build_solution_network(request, structure, model, self.arrays)
+            results = dict(zip(ids, structure.results(model), strict=True))
+            solved = _with_owned_areas(
+                build_solution_network(request, structure, model, self.arrays),
+                results,
+                self.installed,
+            )
             # The solver accepts loosely converged points: drop a design whose
             # approaches, heat balances or areas fail the duty optimiser's
             # checks, judging installed areas as the model did (widened).
@@ -984,7 +989,6 @@ class _Evaluator:
                 self._failed()
                 return None
             solved = _with_rating_allowances(solved, widened)
-            results = dict(zip(ids, structure.results(model), strict=True))
             widen = 1.0 + float(settings.area_tolerance)
             values = getattr(model, "area_values", None)
             worth = (
@@ -1506,6 +1510,37 @@ def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]
         ]
         names[key] = matches[0] if len(matches) == 1 else key
     return names
+
+
+def _with_owned_areas(
+    network: HeatExchangerNetwork, results: Mapping, installed: Mapping[str, float]
+) -> HeatExchangerNetwork:
+    """``network`` with each existing unit's area the one it has after the
+    retrofit: installed plus any added, as the model holds it (``results``,
+    by exchanger id). A solved network otherwise gives a unit the area its
+    duty needs, which for a unit on a segmented stream is the sum of its
+    slices and can be far below what is installed.
+
+    A unit rated within the area tolerance may need a little more by its
+    slices than it has. It then keeps the slices' area: an exchanger whose
+    area is below its slices' is not a valid one, and could not be read
+    back from the design's own dump.
+    """
+
+    def owned(exchanger):
+        area = float(results[exchanger.exchanger_id].area)
+        return max(area, exchanger.segment_design_area or 0.0)
+
+    return network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": owned(e)})
+                if e.exchanger_id in installed and e.exchanger_id in results
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
 
 
 def _with_rating_allowances(
