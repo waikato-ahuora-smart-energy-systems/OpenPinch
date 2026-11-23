@@ -427,10 +427,14 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         # The base design's network names streams as the solver does; the
         # matches name them as the existing network does.
         solved=_with_names(step.base.network, evaluator.names),
+        ambient_sources=step.ambient_sources,
     )
     # The heat pump's streams are new: only the process stream of each
     # match has piping to change.
-    pumped = {stream.name for stream in step.condensers + step.evaporators}
+    pumped = {
+        stream.name
+        for stream in step.condensers + step.evaporators + step.ambient_sources
+    }
     moves = tuple(
         _Move(
             "new_match",
@@ -876,7 +880,12 @@ class _Evaluator:
         pumped = (
             ()
             if heat_pump is None
-            else [s.name for s in heat_pump.condensers + heat_pump.evaporators]
+            else [
+                s.name
+                for s in heat_pump.condensers
+                + heat_pump.evaporators
+                + heat_pump.ambient_sources
+            ]
         )
 
         def offered(name: str) -> bool:

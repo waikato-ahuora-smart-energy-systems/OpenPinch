@@ -1669,6 +1669,7 @@ class _DesignAccessor:
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
+        heat_pump_streams: bool = False,
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
@@ -1839,7 +1840,7 @@ class _DesignAccessor:
                     stacklevel=2,
                 )
             search = run_retrofit_search
-            if heat_pump_cycle == "carnot":
+            if heat_pump_cycle == "carnot" and heat_pump_streams:
                 # Also try the as-piped heat pump added as streams.
                 search = partial(
                     retrofit_with_heat_pump,

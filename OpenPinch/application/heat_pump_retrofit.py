@@ -13,6 +13,7 @@ from ..analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
 from ..analysis.heat_exchanger_networks.retrofit.search import run_retrofit_search
 from ..analysis.heat_exchanger_networks.solver.arrays import annual_cost_scales
 from ..contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitResult
+from ..domain.enums import StreamType
 from ..domain.heat_exchanger_network import NetworkHeatPump
 from ._problem.arguments import temporary_zone_configuration
 from ._problem.targeting.state import snapshot_problem
@@ -102,6 +103,13 @@ def heat_pump_step(problem, base, settings, *, limits=None, machine: str = "HP")
         condensers=tuple(stream for _key, stream in solved.hpr_hot_streams.items()),
         evaporators=tuple(stream for _key, stream in solved.hpr_cold_streams.items()),
         base=base,
+        # The air the evaporators draw on; air that takes heat the heat
+        # pump leaves is not a stream of the case.
+        ambient_sources=tuple(
+            stream
+            for _key, stream in solved.amb_streams.items()
+            if stream.stream_type == StreamType.Hot.value
+        ),
     )
     return step, solved
 

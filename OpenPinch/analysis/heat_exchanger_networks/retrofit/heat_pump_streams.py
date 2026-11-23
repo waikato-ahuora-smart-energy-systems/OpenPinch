@@ -29,6 +29,8 @@ class HeatPumpStep:
     condensers: tuple
     evaporators: tuple
     base: HeatExchangerNetworkRetrofitDesign
+    # The hot streams of the air the evaporators draw on, if any.
+    ambient_sources: tuple = ()
 
 
 @dataclass(frozen=True)
