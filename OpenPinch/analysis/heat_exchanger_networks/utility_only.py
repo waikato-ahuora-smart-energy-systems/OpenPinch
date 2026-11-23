@@ -113,6 +113,7 @@ def utility_only_workflow(
             "method": task.method,
         }
     )
+    _refuse_forbidden_pairs(problem, network)
     outcome = HeatExchangerNetworkSynthesisTaskOutcome(
         task=task,
         status="success",
@@ -128,6 +129,38 @@ def utility_only_workflow(
         accepted_result=build_synthesis_result(settings, (task,), outcomes),
         total_run_time=perf_counter() - start,
     )
+
+
+def _refuse_forbidden_pairs(
+    problem: PreparedProblem, network: HeatExchangerNetwork
+) -> None:
+    """Raise when ``network`` uses a pair ``HENS_FORBIDDEN_MATCHES`` names.
+
+    A one-sided problem's network is set by its utility targets: each level
+    carries the duty targeting gives it, on the streams it reaches. There is
+    no other match to move a forbidden pair's duty to, so the design is
+    refused rather than returned with it.
+    """
+
+    def named(name: str, key: str) -> bool:
+        return key == name or key.endswith("." + name)
+
+    used = [
+        (hot, cold)
+        for hot, cold in problem.master_zone.config.hens.forbidden_matches
+        if any(
+            named(hot, str(e.source_stream)) and named(cold, str(e.sink_stream))
+            for e in network.exchangers
+        )
+    ]
+    if used:
+        pairs = ", ".join(f"{hot} to {cold}" for hot, cold in used)
+        raise ValueError(
+            "HENS_FORBIDDEN_MATCHES cannot be honoured: a problem with only "
+            "hot or only cold streams has one network, set by its utility "
+            f"targets, and it needs {pairs}. Change the utilities the "
+            "targets may use (a utility's maximum heat flow, say) instead."
+        )
 
 
 def utility_only_network(problem: PreparedProblem) -> HeatExchangerNetwork:

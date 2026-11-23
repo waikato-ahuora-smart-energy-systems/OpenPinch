@@ -187,6 +187,24 @@ finished by the cheapest utility that reaches its target. In
   on the ten-stream Ahmad case).
 - The default ``HU`` and ``CU`` that input preparation adds as backups take
   part only when they are the only utility on their side.
+- ``HENS_FORBIDDEN_MATCHES`` rules matches out, for layout, safety or
+  operability reasons the stream data cannot show. Each entry is a pair of
+  names, the hot side then the cold side, and either may be a process
+  stream or a utility: ``["H1", "C2"]`` forbids that recovery match,
+  ``["HPS", "C1"]`` heating C1 with HPS, ``["H1", "CW"]`` cooling H1 with
+  CW. A name is the stream's or utility's name, or its full key
+  (``"Plant.H1"``, ``"Hot Utility.HPS"``) where two zones share a name.
+  Every step honours the list. A pinch side takes no heater below the pinch
+  and no cooler above it, so it cannot make up for a recovery match it may
+  not use: when the list leaves pinch design no network, the run warns and
+  starts network evolution directly, at the ``HENS_STAGE_SELECTION`` stage
+  counts. Forbidding the only utility that can finish a stream leaves no
+  design at all, and the run fails with no successful task. A problem with
+  only hot or only cold streams has one network, of heaters or coolers at
+  the levels its utility targets give, so nothing can be traded: when that
+  network needs a forbidden pair the run raises ``ValueError`` naming it,
+  and the way round is to change what the targets may use (a utility's
+  maximum heat flow, say). Retrofit does not read the list.
 
 Named Advanced Methods
 ----------------------

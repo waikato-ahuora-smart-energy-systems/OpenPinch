@@ -87,7 +87,26 @@ def _execute_stages(
             executor=executor,
         )
 
-    if not settings.runs_evolution:
+    if _forbidden_matches_left_no_pinch_design(
+        problem, pdm_outcomes, heuristic_outcomes
+    ):
+        # At any depth, depth 0 (pinch design alone) included: there is no
+        # other network to return.
+        warnings.warn(
+            "Pinch design found no network without the HENS_FORBIDDEN_MATCHES "
+            "pairs: a pinch side takes no heater below the pinch and no "
+            "cooler above it, so it cannot make up for a recovery match it "
+            "may not use. The design starts network evolution directly, at "
+            "the HENS_STAGE_SELECTION stage counts.",
+            UserWarning,
+            stacklevel=2,
+        )
+        esm_tasks, esm_outcomes = execute_direct_network_evolution_method_stage(
+            problem=problem,
+            settings=settings,
+            executor=executor,
+        )
+    elif not settings.runs_evolution:
         pass
     elif _can_skip_preliminary_stages_for_missing_couenne(
         settings,
@@ -182,6 +201,17 @@ def _execute_stages(
         outcomes=outcomes,
         accepted_result=build_synthesis_result(settings, tasks, outcomes),
         total_run_time=perf_counter() - start,
+    )
+
+
+def _forbidden_matches_left_no_pinch_design(problem, *outcome_groups) -> bool:
+    """Whether ``HENS_FORBIDDEN_MATCHES`` is set and no pinch design task,
+    MILP or heuristic, returned a network."""
+
+    if not problem.master_zone.config.hens.forbidden_matches:
+        return False
+    return not any(
+        outcome.status == "success" for group in outcome_groups for outcome in group
     )
 
 

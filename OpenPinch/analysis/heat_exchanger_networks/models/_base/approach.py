@@ -313,7 +313,8 @@ def utility_match_feasibility(owner) -> tuple[list[list[int]], list[list[int]]]:
     A heater's utility inlet faces the cold stream's target, and a cooler's
     utility inlet the hot stream's target. Both temperatures are fixed, so a
     pair below its least approach there in any period the stream runs can
-    never be used.
+    never be used. A pair ``HENS_FORBIDDEN_MATCHES`` names is not used
+    either.
     """
 
     def periods(side: str, index: int) -> list[int]:
@@ -347,6 +348,18 @@ def utility_match_feasibility(owner) -> tuple[list[list[int]], list[list[int]]]:
         ]
         for i in range(owner.I)
     ]
+    # ``HENS_FORBIDDEN_MATCHES``: masks by utility then stream, present only
+    # when the option names a heater or cooler (``solver/arrays.py``).
+    for flags, mask in (
+        (hot, getattr(owner, "forbidden_hu", None)),
+        (cold, getattr(owner, "forbidden_cu", None)),
+    ):
+        if mask is None:
+            continue
+        for stream, row in enumerate(flags):
+            for u in range(len(row)):
+                if mask[u][stream]:
+                    row[u] = 0
     return hot, cold
 
 

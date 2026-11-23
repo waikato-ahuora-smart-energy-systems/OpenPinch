@@ -203,6 +203,7 @@ class HensConfig:
     pdm_milp: bool | None
     utility_placement: str
     utility_slices: bool
+    forbidden_matches: list[list[str]]
     site_levels: str
     site_level_counts: list[int]
     site_level_early_stop: bool
