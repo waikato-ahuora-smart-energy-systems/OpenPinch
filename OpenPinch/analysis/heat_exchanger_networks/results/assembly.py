@@ -52,6 +52,7 @@ def build_synthesis_result(
     from .record import run_record
 
     _warn_skipped_evolutions(outcomes)
+    _warn_dropped_levels(outcomes)
     outcomes = demote_infeasible_outcomes(outcomes)
     ranked = run_record(outcomes).outcomes()
     if not ranked:
@@ -147,6 +148,27 @@ def _warn_skipped_evolutions(
         warnings.warn(
             f"{_task_label(outcome.task)}: its initial model was not solved "
             f"({reason}), so its network evolution was skipped.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
+def _warn_dropped_levels(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    """Warn for each outcome whose task designed a pinch side without its
+    utility levels (``diagnostics["levels_dropped"]``, where). A task's
+    networks share the message, which Python shows once by default."""
+
+    for outcome in outcomes:
+        sides = outcome.diagnostics.get("levels_dropped")
+        if not sides:
+            continue
+        warnings.warn(
+            f"{_task_label(outcome.task)}: no design {sides} the pinch held "
+            "the utility levels at their targets, so it was designed there "
+            "without them, choosing levels by price. Its networks may hold "
+            "some levels and not others.",
             UserWarning,
             stacklevel=3,
         )
