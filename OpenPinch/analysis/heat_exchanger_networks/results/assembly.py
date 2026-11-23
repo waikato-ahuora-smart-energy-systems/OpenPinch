@@ -157,20 +157,29 @@ def _warn_dropped_levels(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> None:
     """Warn for each outcome whose task designed a pinch side without its
-    utility levels (``diagnostics["levels_dropped"]``, where). A task's
-    networks share the message, which Python shows once by default."""
+    utility levels (``diagnostics["levels_dropped"]``, where).
 
+    A task's networks share the message. Python's default filter shows a
+    message once and remembers it for the life of the process, which would
+    silence a second run of the same design; the record of what was shown is
+    therefore this call's own, so each run shows the message once per task.
+    """
+
+    shown: dict = {}
     for outcome in outcomes:
         sides = outcome.diagnostics.get("levels_dropped")
         if not sides:
             continue
-        warnings.warn(
+        warnings.warn_explicit(
             f"{_task_label(outcome.task)}: no design {sides} the pinch held "
             "the utility levels at their targets, so it was designed there "
             "without them, choosing levels by price. Its networks may hold "
             "some levels and not others.",
             UserWarning,
-            stacklevel=3,
+            filename=__file__,
+            lineno=_warn_dropped_levels.__code__.co_firstlineno,
+            module=__name__,
+            registry=shown,
         )
 
 
