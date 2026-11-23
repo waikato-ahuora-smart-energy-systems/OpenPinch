@@ -457,6 +457,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "each heater and cooler on the utility's whole range."
         ),
     ),
+    "HENS_FORBIDDEN_MATCHES": FieldText(
+        "Forbidden matches", None,
+        (
+            "Matches a design may not use, as pairs of names: the hot side then "
+            "the cold side. Either may be a process stream or a utility, so "
+            "[\"H1\", \"C2\"] forbids that recovery match and [\"HPS\", \"C1\"] "
+            "forbids heating C1 with HPS."
+        ),
+    ),
     "HENS_SITE_LEVELS": FieldText(
         "Total site utility levels", None,
         (

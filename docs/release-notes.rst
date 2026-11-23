@@ -36,6 +36,21 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``HENS_FORBIDDEN_MATCHES`` lists matches a design may not use, as pairs
+  of names, the hot side then the cold side. Either may be a process
+  stream or a utility: ``["H1", "C2"]`` forbids that recovery match,
+  ``["HPS", "C1"]`` forbids heating C1 with HPS and ``["H1", "CW"]``
+  cooling H1 with CW. The pinch design (MILP and heuristic), the thermal
+  derivative and network evolution steps with their add moves, and the
+  stream-end utilities of a fit to every period all honour the list; a
+  sliced utility's slices inherit it. Retrofit does not read it. A pinch
+  side takes no heater below the pinch and no cooler above it, so a
+  forbidden recovery match can leave pinch design with no network; the run
+  then starts network evolution directly, with a warning. On the
+  four-stream Yee and Grossmann case with a second utility level on each
+  side, forbidding a match the best design uses gives seven ranked
+  networks without it (best 187,837 against 137,745 unrestricted), and
+  forbidding one cooler moves that cooling to the other utility (153,874).
 - ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``, today's
   behaviour) makes the thermal derivative and network evolution steps of a
   single process keep each utility level at the duty its pinch design held

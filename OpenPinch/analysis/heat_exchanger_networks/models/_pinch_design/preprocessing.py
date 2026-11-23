@@ -228,6 +228,14 @@ def _set_multiperiod_preprocessing(owner) -> None:
         ),
         (owner.I, owner.J, owner.S),
     )
+    # ``HENS_FORBIDDEN_MATCHES``: hot by cold, present only when the option
+    # names a recovery match (``solver/arrays.py``).
+    forbidden = getattr(owner, "forbidden_recovery", None)
+    if forbidden is not None:
+        for i in range(owner.I):
+            for j in range(owner.J):
+                if forbidden[i][j]:
+                    owner.z_feasible[i][j] = [0] * owner.S
     # Heaters only above the pinch and coolers only below, each on a stream
     # this side has and a utility that can meet its approach at the target.
     hot_reachable, cold_reachable = _approach.utility_match_feasibility(owner)

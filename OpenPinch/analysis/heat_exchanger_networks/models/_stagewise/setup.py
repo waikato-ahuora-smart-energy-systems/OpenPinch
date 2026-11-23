@@ -147,6 +147,14 @@ def set_preprocessing(owner) -> None:
             for j in range(owner.J):
                 if hot_groups[i] != cold_groups[j]:
                     owner.z_feasible[i][j] = [0] * owner.S
+    # ``HENS_FORBIDDEN_MATCHES``: hot by cold, present only when the option
+    # names a recovery match (``solver/arrays.py``).
+    forbidden = getattr(owner, "forbidden_recovery", None)
+    if forbidden is not None:
+        for i in range(owner.I):
+            for j in range(owner.J):
+                if forbidden[i][j]:
+                    owner.z_feasible[i][j] = [0] * owner.S
     owner.z_hu_feasible, owner.z_cu_feasible = _approach.utility_match_feasibility(
         owner
     )

@@ -103,7 +103,11 @@ def with_stream_end_utilities(
     def reaches(side: str, stream_index: int, utility_index: int) -> bool:
         """Whether a utility at the stream's end keeps the pair's approach in
         every period the stream runs: a heater (``side="hot"``) on a cold
-        stream, or a cooler on a hot stream."""
+        stream, or a cooler on a hot stream. A pair that
+        ``HENS_FORBIDDEN_MATCHES`` names reaches nowhere."""
+        forbidden = values.get("forbidden_hu" if side == "hot" else "forbidden_cu")
+        if forbidden is not None and forbidden[utility_index][stream_index]:
+            return False
         if side == "hot":
             stream_in, stream_out = values["T_c_in_period"], values["T_c_out_period"]
             util_in, util_out = values["T_hu_in_period"], values["T_hu_out_period"]

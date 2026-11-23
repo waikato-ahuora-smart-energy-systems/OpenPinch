@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -190,6 +191,15 @@ def problem_to_solver_arrays(
                 price_scale=annual_cost_scales(costing)[0],
             )
         )
+    arrays.update(
+        _forbidden_match_arrays(
+            hens.forbidden_matches,
+            hot=[key for key, _, _ in hot_items],
+            cold=[key for key, _, _ in cold_items],
+            hot_utilities=[key for key, _, _ in hot_utility_items],
+            cold_utilities=[key for key, _, _ in cold_utility_items],
+        )
+    )
 
     axis_maps = {
         "cold_process_streams": {
@@ -302,6 +312,77 @@ def problem_to_solver_arrays(
             "hot_utilities": [key for key, _, _ in hot_utility_items],
         },
     )
+
+
+def _forbidden_match_arrays(
+    pairs: Sequence[Sequence[str]],
+    *,
+    hot: Sequence[str],
+    cold: Sequence[str],
+    hot_utilities: Sequence[str],
+    cold_utilities: Sequence[str],
+) -> dict[str, np.ndarray]:
+    """``HENS_FORBIDDEN_MATCHES`` as masks by index (1 forbids), or nothing
+    when there are no pairs.
+
+    Each pair names the hot side then the cold side, either a process stream
+    or a utility, by its key (``Plant.H1``, ``Hot Utility.HPS``) or the tail
+    of it (``H1``, ``HPS``): a recovery match (``forbidden_recovery``,
+    hot by cold), a heater (``forbidden_hu``, hot utility by cold stream) or
+    a cooler (``forbidden_cu``, cold utility by hot stream). The two utility
+    masks run along the utility axis first and carry ``hu`` or ``cu`` in
+    their names, as ``utility_slices`` needs to give a utility's slices
+    their parent's row.
+    """
+
+    if not pairs:
+        return {}
+
+    def index(name: str, keys: Sequence[str]) -> int | None:
+        found = [
+            n for n, key in enumerate(keys) if key == name or key.endswith("." + name)
+        ]
+        if len(found) > 1:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {name!r} names more than one of "
+                f"{[keys[n] for n in found]}; give its full key."
+            )
+        return found[0] if found else None
+
+    def side(name: str, streams: Sequence[str], utilities: Sequence[str], kind: str):
+        stream, utility = index(name, streams), index(name, utilities)
+        if stream is not None and utility is not None:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {name!r} is both a {kind} stream and "
+                f"a {kind} utility; give its full key."
+            )
+        if stream is None and utility is None:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {name!r} is not a {kind} stream or "
+                f"{kind} utility of this problem."
+            )
+        return stream, utility
+
+    masks = {
+        "forbidden_recovery": np.zeros((len(hot), len(cold)), dtype=int),
+        "forbidden_hu": np.zeros((len(hot_utilities), len(cold)), dtype=int),
+        "forbidden_cu": np.zeros((len(cold_utilities), len(hot)), dtype=int),
+    }
+    for hot_name, cold_name in pairs:
+        i, hot_utility = side(hot_name, hot, hot_utilities, "hot")
+        j, cold_utility = side(cold_name, cold, cold_utilities, "cold")
+        if i is not None and j is not None:
+            masks["forbidden_recovery"][i][j] = 1
+        elif j is not None:
+            masks["forbidden_hu"][hot_utility][j] = 1
+        elif i is not None:
+            masks["forbidden_cu"][cold_utility][i] = 1
+        else:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {hot_name!r} and {cold_name!r} are "
+                "two utilities; a pair needs a process stream."
+            )
+    return masks
 
 
 # fmt: off

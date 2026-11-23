@@ -85,6 +85,17 @@ def _sequence(name: str, value: Any, *, allow_empty: bool) -> Sequence:
     return value
 
 
+def _name_pairs(name: str, value: Any) -> list[list[str]]:
+    """A list of pairs of non-empty names, each pair as a two-item list."""
+    pairs = []
+    for item in _sequence(name, value, allow_empty=True):
+        pair = _sequence(name, item, allow_empty=False)
+        if len(pair) != 2:
+            raise ValueError(f"{name} entries must be pairs of names; got {item!r}.")
+        pairs.append([_non_empty_string(name, entry) for entry in pair])
+    return pairs
+
+
 def _positive_float_grid(name: str, value: Any) -> list[float]:
     return [
         _positive_float(name, item)
@@ -472,6 +483,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_PDM_MILP": _spec(bool | None, None, "hens", "pdm_milp"),
     "HENS_UTILITY_PLACEMENT": _spec(str, "auto", "hens", "utility_placement", validator=partial(_string_choice, choices=HENS_UTILITY_PLACEMENT_VALUES)),
     "HENS_UTILITY_SLICES": _spec(bool, True, "hens", "utility_slices"),
+    "HENS_FORBIDDEN_MATCHES": _spec(List[List[str]], [], "hens", "forbidden_matches", validator=_name_pairs),
     "HENS_SITE_LEVELS": _spec(str, "given", "hens", "site_levels", validator=partial(_string_choice, choices=HENS_SITE_LEVELS_VALUES)),
     "HENS_SITE_LEVEL_COUNTS": _spec(List[int], [2, 3, 4, 5], "hens", "site_level_counts", validator=_site_level_counts),
     "HENS_SITE_LEVEL_EARLY_STOP": _spec(bool, False, "hens", "site_level_early_stop"),
