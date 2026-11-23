@@ -262,6 +262,12 @@ def with_heat_pump_streams(
     _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
     if isinstance(target, IndirectHeatPumpTarget):
+        if len(problem.period_ids) > 1:
+            raise ValueError(
+                "The zones of a heat pump on the utility system are not built "
+                f"for a problem with {len(problem.period_ids)} periods yet; "
+                "derive a single-period case and target the heat pump on it."
+            )
         case = _case_with_utility_heat_pump_zones(
             problem,
             target,
