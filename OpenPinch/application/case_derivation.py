@@ -286,6 +286,11 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
     outputs hold every period's.
     """
     outputs = target.hpr_details.period_outputs
+    if any(float(outputs[period].get("Q_amb_hot") or 0.0) > 0.0 for period in periods):
+        raise ValueError(
+            "The heat pump draws on ambient air, and the air's stream is not "
+            "built for a problem with several periods yet."
+        )
     found = {}
     for role, group in (
         ("condenser", "hpr_hot_streams"),
@@ -293,6 +298,13 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
     ):
         each = [dict(outputs[period][group].items()) for period in periods]
         found[role] = {name: [streams[name] for streams in each] for name in each[0]}
+        for name, streams in found[role].items():
+            if any(stream.has_segments for stream in streams):
+                raise ValueError(
+                    f"The heat pump stream {name!r} has segments, and a "
+                    "segmented stream is not built for a problem with several "
+                    "periods yet."
+                )
     return found
 
 
