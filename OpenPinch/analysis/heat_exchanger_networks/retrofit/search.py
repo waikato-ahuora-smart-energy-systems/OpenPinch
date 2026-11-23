@@ -42,8 +42,10 @@ from ..duty_optimisation import (
     verify_solution,
 )
 from ..execution.settings import configured_stage_solver, stage_solver_options
+from ..heat_pump_cost import network_with_heat_pumps
 from ..solver.arrays import annual_cost_scales
 from .frontier import mark_dominated
+from .heat_pump_streams import with_heat_pump_matches
 from .heat_pumps import (
     HeatPumpCandidate,
     carnot_rating,
@@ -206,6 +208,9 @@ class _Move:
     repiped: tuple[str, ...] = ()
     heat_pump: HeatPumpCandidate | None = None
     loop: HeatRecoveryLoop | None = None
+    # The heat pump whose stream this new match serves, when the search
+    # started from a heat pump step.
+    machine: str | None = None
 
 
 @dataclass(frozen=True)
@@ -226,7 +231,11 @@ class _Evaluated:
 
 
 def run_retrofit_search(
-    problem, existing: HeatExchangerNetwork, settings: RetrofitSettings
+    problem,
+    existing: HeatExchangerNetwork,
+    settings: RetrofitSettings,
+    *,
+    heat_pump=None,
 ) -> HeatExchangerNetworkRetrofitResult:
     """Search modifications of ``existing``, one at a time.
 
@@ -306,7 +315,7 @@ def run_retrofit_search(
                 + "."
             )
     ensure_target_results(problem, {}, None)
-    evaluator = _Evaluator(problem, existing, settings)
+    evaluator = _Evaluator(problem, existing, settings, heat_pump)
     if evaluator.processes is not None:
         warnings.warn(
             "the existing network spans the process zones "
@@ -322,7 +331,17 @@ def run_retrofit_search(
             UserWarning,
             stacklevel=3,
         )
-    base = evaluator.evaluate(_State(existing, frozenset(), ()))
+    base = evaluator.evaluate(
+        _State(existing, frozenset(), ())
+        if heat_pump is None
+        else _heat_pump_root(existing, heat_pump, evaluator)
+    )
+    if base is None and heat_pump is not None:
+        raise ValueError(
+            f"the existing network with the heat pump {heat_pump.record.machine!r} "
+            "added as streams does not solve: its coolers and heaters cannot "
+            "serve the machine's duties at their approaches."
+        )
     if base is None:
         raise ValueError(
             "the existing network does not meet its targets at its installed "
@@ -333,7 +352,9 @@ def run_retrofit_search(
     seen = {_signature(base.state, evaluator.existing)}
     structural = settings.strategy == "structure"
     failed: list[int] = []
-    for _depth in range(max(0, int(settings.max_modifications))):
+    # A heat pump step is the first of the modifications allowed.
+    taken = 0 if heat_pump is None else 1
+    for _depth in range(max(0, int(settings.max_modifications) - taken)):
         children = []
         failed_before = evaluator.failures
         for parent in beam:
@@ -380,6 +401,52 @@ def run_retrofit_search(
         evaluated_designs=evaluator.evaluations,
         failed_solves=tuple(failed),
     )
+
+
+def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
+    """The state a search with a heat pump step starts from: ``existing``
+    with the matches that serve the machine's streams, each a new match.
+
+    The matches are placed from the base design's solved coolers and
+    heaters. A match stands off by the search's approach, or with none by
+    the case's process contribution and the heat pump's own.
+    """
+
+    config = evaluator.config
+    approach = (
+        float(config.thermal.dt_cont) + float(config.hpr.dt_cont)
+        if evaluator.settings.approach is None
+        else float(evaluator.settings.approach)
+    )
+    network, added = with_heat_pump_matches(
+        existing,
+        condensers=step.condensers,
+        evaporators=step.evaporators,
+        approach=approach,
+        machine=step.record.machine,
+        # The base design's network names streams as the solver does; the
+        # matches name them as the existing network does.
+        solved=_with_names(step.base.network, evaluator.names),
+    )
+    # The heat pump's streams are new: only the process stream of each
+    # match has piping to change.
+    pumped = {stream.name for stream in step.condensers + step.evaporators}
+    moves = tuple(
+        _Move(
+            "new_match",
+            placed.exchanger_id,
+            match=placed.match,
+            splits=placed.splits,
+            repiped=tuple(
+                stream
+                for stream in (placed.match.hot, placed.match.cold)
+                if stream not in pumped
+            ),
+            machine=step.record.machine,
+        )
+        for placed in added
+    )
+    return _State(network, frozenset(), moves)
 
 
 def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
@@ -775,11 +842,16 @@ def _signature(state: _State, existing):
 class _Evaluator:
     """Solves retrofit structures on one problem's solver arrays."""
 
-    def __init__(self, problem, existing: HeatExchangerNetwork, settings) -> None:
+    def __init__(
+        self, problem, existing: HeatExchangerNetwork, settings, heat_pump=None
+    ) -> None:
         from ..solver.arrays import problem_to_solver_arrays
 
         config = problem.master_zone.config
+        self.config = config
         self.settings = settings
+        # The heat pump step the search starts from, if any.
+        self.heat_pump = heat_pump
         self.existing = frozenset(
             e.exchanger_id for e in _structural_exchangers(existing)
         )
@@ -798,13 +870,27 @@ class _Evaluator:
         self.tol = float(hens.solve_tolerance)
         self.max_parallel = supported_workers(max(1, int(hens.max_parallel)))
         self.names = _existing_names(self.arrays.axis_maps, existing)
+        # The streams the screens offer new matches and utility units on. A
+        # heat pump step's own streams are left out: its step gave them
+        # their matches, and a condenser must not heat its evaporator.
+        pumped = (
+            ()
+            if heat_pump is None
+            else [s.name for s in heat_pump.condensers + heat_pump.evaporators]
+        )
+
+        def offered(name: str) -> bool:
+            return not any(name == p or name.endswith("." + p) for p in pumped)
+
         self.ends = {
-            self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
+            self.names[name]: ends
+            for name, ends in _stream_ends(self.arrays).items()
+            if offered(name)
         }
         # Each period's own ends, so the match screens read potential period
         # by period.
         self.period_ends = tuple(
-            {self.names[name]: ends for name, ends in period.items()}
+            {self.names[name]: ends for name, ends in period.items() if offered(name)}
             for period in _period_stream_ends(self.arrays)
         )
         # The period weights the screens average a solved network with.
@@ -872,7 +958,11 @@ class _Evaluator:
                 )
             ]
             self.arrays = with_loop_utilities(self.arrays, self.loops)
-        self.base_utility_cost: float | None = None
+        # Savings are measured against the existing network: the first
+        # design solved, or with a heat pump step the base search's.
+        self.base_utility_cost: float | None = (
+            None if heat_pump is None else float(heat_pump.base.utility_cost)
+        )
         self.evaluations = 0
         # Solves that did not converge, or whose network failed its checks.
         self.failures = 0
@@ -1030,6 +1120,9 @@ class _Evaluator:
                 if m.kind in _UTILITY_PAIRS
             ]
             utility_cost = float(model.utility_cost_value)
+            if self.heat_pump is not None:
+                # The machine's electricity, a constant of the step.
+                utility_cost += float(self.heat_pump.record.electricity_cost)
             if self.base_utility_cost is None:
                 self.base_utility_cost = utility_cost
             savings = self.base_utility_cost - utility_cost
@@ -1045,6 +1138,21 @@ class _Evaluator:
             )
             if any(m is None for m in modifications):
                 return None
+            if self.heat_pump is not None:
+                # The machine itself, ahead of the matches that serve it:
+                # its compressor is a constant of the step.
+                record = self.heat_pump.record
+                solved = network_with_heat_pumps(solved, (record,))
+                modifications = (
+                    HeatExchangerNetworkRetrofitModification(
+                        kind="heat_pump",
+                        exchanger_id=record.machine,
+                        fixed_cost=float(record.capital_cost),
+                        heat_pump_cop=float(record.cop),
+                        heat_pump_capacity=float(record.condenser_duty),
+                    ),
+                    *modifications,
+                )
             capital = sum(m.fixed_cost + m.area_cost for m in modifications)
             annualised = self.recovery_factor * capital
             design = HeatExchangerNetworkRetrofitDesign(
