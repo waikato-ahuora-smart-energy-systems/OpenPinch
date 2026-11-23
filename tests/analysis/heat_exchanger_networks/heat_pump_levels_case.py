@@ -11,6 +11,7 @@ places its levels along the cooler and the heater, gives 3.28.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 from OpenPinch import PinchProblem
@@ -68,6 +69,81 @@ def levels_problem() -> PinchProblem:
             },
         }
     )
+
+
+def solvers_available() -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend("ipopt-pyomo")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+def heat_pump_search(*, max_modifications: int = 1, **costs) -> SimpleNamespace:
+    """A retrofit search of the levels case started from its as-piped heat
+    pump, with the base design it is measured against.
+
+    The heat pump search stops at 200 evaluations (0.4 s; a full one takes
+    64 s and finds 186.5 kW delivered at a COP of 3.28), which gives a
+    machine of three condensers and two evaporators delivering 156 kW.
+    ``costs`` are the machine's ``electricity_cost`` ($/y), ``capital_cost``
+    ($) and ``annual_capital_cost`` ($/y), each 0 unless given.
+    """
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_streams import (
+        HeatPumpStep,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
+        as_piped_heat_pump,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+    from OpenPinch.domain.heat_exchanger_network import NetworkHeatPump
+
+    problem = levels_problem()
+    existing = problem.design._network_from_structure(EXISTING)
+    settings = RetrofitSettings(
+        max_modifications=max_modifications, approach=None, new_unit_cost=0.0
+    )
+    base = run_retrofit_search(
+        problem, existing, replace(settings, max_modifications=0)
+    ).frontier[0]
+    machine = as_piped_heat_pump(
+        problem, base.network, args={"maximum_evaluations": 200}
+    )
+
+    def duty(streams) -> float:
+        return sum(float(stream.heat_flow.value) for _key, stream in streams.items())
+
+    record = NetworkHeatPump(
+        machine="HP",
+        cycle="carnot",
+        condenser_duty=duty(machine.hpr_hot_streams),
+        evaporator_duty=duty(machine.hpr_cold_streams),
+        work=float(machine.w_net),
+        cop=float(machine.cop_h),
+        **(
+            {"electricity_cost": 0.0, "capital_cost": 0.0, "annual_capital_cost": 0.0}
+            | costs
+        ),
+    )
+    step = HeatPumpStep(
+        record=record,
+        condensers=tuple(s for _key, s in machine.hpr_hot_streams.items()),
+        evaporators=tuple(s for _key, s in machine.hpr_cold_streams.items()),
+        base=base,
+    )
+    result = run_retrofit_search(
+        with_machine_streams(problem, machine), existing, settings, heat_pump=step
+    )
+    return SimpleNamespace(base=base, step=step, record=record, result=result)
 
 
 def with_machine_streams(problem: PinchProblem, machine) -> PinchProblem:

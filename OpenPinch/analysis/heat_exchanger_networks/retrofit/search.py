@@ -314,7 +314,7 @@ def run_retrofit_search(
                 + "."
             )
     ensure_target_results(problem, {}, None)
-    evaluator = _Evaluator(problem, existing, settings)
+    evaluator = _Evaluator(problem, existing, settings, heat_pump)
     if evaluator.processes is not None:
         warnings.warn(
             "the existing network spans the process zones "
@@ -834,12 +834,16 @@ def _signature(state: _State, existing):
 class _Evaluator:
     """Solves retrofit structures on one problem's solver arrays."""
 
-    def __init__(self, problem, existing: HeatExchangerNetwork, settings) -> None:
+    def __init__(
+        self, problem, existing: HeatExchangerNetwork, settings, heat_pump=None
+    ) -> None:
         from ..solver.arrays import problem_to_solver_arrays
 
         config = problem.master_zone.config
         self.config = config
         self.settings = settings
+        # The heat pump step the search starts from, if any.
+        self.heat_pump = heat_pump
         self.existing = frozenset(
             e.exchanger_id for e in _structural_exchangers(existing)
         )
@@ -932,7 +936,11 @@ class _Evaluator:
                 )
             ]
             self.arrays = with_loop_utilities(self.arrays, self.loops)
-        self.base_utility_cost: float | None = None
+        # Savings are measured against the existing network: the first
+        # design solved, or with a heat pump step the base search's.
+        self.base_utility_cost: float | None = (
+            None if heat_pump is None else float(heat_pump.base.utility_cost)
+        )
         self.evaluations = 0
         # Solves that did not converge, or whose network failed its checks.
         self.failures = 0
@@ -1090,6 +1098,9 @@ class _Evaluator:
                 if m.kind in _UTILITY_PAIRS
             ]
             utility_cost = float(model.utility_cost_value)
+            if self.heat_pump is not None:
+                # The machine's electricity, a constant of the step.
+                utility_cost += float(self.heat_pump.record.electricity_cost)
             if self.base_utility_cost is None:
                 self.base_utility_cost = utility_cost
             savings = self.base_utility_cost - utility_cost
