@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from ...indexing import build_index_grid
+from ...solver.arrays import pair_minimum_approach
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 from .._base import utility_slices as _slices
@@ -313,7 +316,6 @@ def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
                     h_out = value(owner.T_h_mid_by_period[n][i][k + 1])
                     c_in = value(owner.T_c_by_period[n][j][k + 1])
                     c_out = value(owner.T_c_mid_by_period[n][j][k])
-                    approach = _approach._recovery_approach_temperature(owner, i, j, n)
                     hot_span = hot.heat_at_temperature(h_out) - hot.heat_at_temperature(
                         h_in
                     )
@@ -323,42 +325,60 @@ def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
                     for boundary in (float(t) for t in hot.temperatures_in[1:]):
                         if not h_out < boundary < h_in or hot_span <= 0.0:
                             continue
-                        share = (
-                            hot.heat_at_temperature(boundary)
-                            - hot.heat_at_temperature(h_in)
-                        ) / hot_span
-                        partner = cold.temperature_at_heat(
+                        heat = hot.heat_at_temperature(boundary)
+                        share = (heat - hot.heat_at_temperature(h_in)) / hot_span
+                        partner_heat = (
                             cold.heat_at_temperature(c_out) - share * cold_span
                         )
-                        if boundary - partner < approach - _CUT_TOLERANCE:
+                        partner = cold.temperature_at_heat(partner_heat)
+                        # The segments meeting here set the approach, not
+                        # the parent streams.
+                        local = pair_minimum_approach(
+                            hot.temperature_contribution_at_heat(heat),
+                            cold.temperature_contribution_at_heat(partner_heat),
+                        )
+                        if boundary - partner < local - _CUT_TOLERANCE:
+                            # The cut cannot know where the partner will
+                            # sit, so it holds the partner's largest.
+                            approach = pair_minimum_approach(
+                                hot.temperature_contribution_at_heat(heat),
+                                float(np.max(cold.temperature_contributions)),
+                            )
                             added |= _cut_pair(
-                                owner, M_ij_period, n, i, j, "hot", boundary
+                                owner, M_ij_period, n, i, j, "hot", boundary, approach
                             )
                     for boundary in (float(t) for t in cold.temperatures_in[1:]):
                         if not c_in < boundary < c_out or cold_span <= 0.0:
                             continue
-                        share = (
-                            cold.heat_at_temperature(boundary)
-                            - cold.heat_at_temperature(c_in)
-                        ) / cold_span
-                        partner = hot.temperature_at_heat(
-                            hot.heat_at_temperature(h_out) - share * hot_span
+                        heat = cold.heat_at_temperature(boundary)
+                        share = (heat - cold.heat_at_temperature(c_in)) / cold_span
+                        partner_heat = hot.heat_at_temperature(h_out) - share * hot_span
+                        partner = hot.temperature_at_heat(partner_heat)
+                        local = pair_minimum_approach(
+                            hot.temperature_contribution_at_heat(partner_heat),
+                            cold.temperature_contribution_at_heat(heat),
                         )
-                        if partner - boundary < approach - _CUT_TOLERANCE:
+                        if partner - boundary < local - _CUT_TOLERANCE:
+                            approach = pair_minimum_approach(
+                                float(np.max(hot.temperature_contributions)),
+                                cold.temperature_contribution_at_heat(heat),
+                            )
                             added |= _cut_pair(
-                                owner, M_ij_period, n, i, j, "cold", boundary
+                                owner, M_ij_period, n, i, j, "cold", boundary, approach
                             )
     return added
 
 
-def _cut_pair(owner, M_ij_period, n, i, j, side: str, boundary: float) -> bool:
+def _cut_pair(
+    owner, M_ij_period, n, i, j, side: str, boundary: float, approach: float
+) -> bool:
     """Cut the pair at ``boundary`` in every stage it may use: cut in one
     stage only, the match moves to the next and crosses there."""
 
     added = False
     for k in range(owner.S):
         if owner.z_allowed[i][j][k] > 0:
-            added |= _cut(owner, M_ij_period, n, i, j, k, side, boundary)
+            added |= _cut(owner, M_ij_period, n, i, j, k, side, boundary, approach)
     return added
 
 
@@ -367,19 +387,21 @@ def replay_interior_cuts(target, source) -> None:
     same superstructure, in the order they were made, so their variables
     line up."""
 
-    for (n, i, j, k, side, _key), boundary in getattr(
+    for (n, i, j, k, side, _key), (boundary, approach) in getattr(
         source, "_interior_cuts", {}
     ).items():
-        _cut(target, target._interior_big_m, n, i, j, k, side, boundary)
+        _cut(target, target._interior_big_m, n, i, j, k, side, boundary, approach)
 
 
-def _cut(owner, M_ij_period, n, i, j, k, side: str, boundary: float) -> bool:
+def _cut(
+    owner, M_ij_period, n, i, j, k, side: str, boundary: float, approach: float
+) -> bool:
     """Add the linear cut for one match, stage and segment boundary, once."""
 
     key = (n, i, j, k, side, round(boundary, 9))
     if key in owner._interior_cuts:
         return False
-    owner._interior_cuts[key] = boundary
+    owner._interior_cuts[key] = (boundary, approach)
     m = owner.m
     if side == "hot":
         ends = (owner.T_h_by_period[n][i][k], owner.T_h_mid_by_period[n][i][k + 1])
@@ -403,11 +425,7 @@ def _cut(owner, M_ij_period, n, i, j, k, side: str, boundary: float) -> bool:
         else owner.T_h_mid_by_period[n][i][k + 1] - boundary
     )
     m.Equation(
-        gap
-        >= _approach._recovery_approach_temperature(owner, i, j, n)
-        - big * (1 - owner.z[i][j][k])
-        - big * (1 - upper)
-        - big * lower
+        gap >= approach - big * (1 - owner.z[i][j][k]) - big * (1 - upper) - big * lower
     )
     return True
 

@@ -137,7 +137,10 @@ Heat exchanger network synthesis
   their duties from one side model, which now checks each solution at the
   boundaries and, where a match falls short, cuts that pair at that
   boundary and solves again; a side with no crossing keeps its solution.
-  The basic pinch sample with a water vapour compression heat pump at a
+  The approach at a boundary is the one of the segments meeting there
+  (the stricter of the two at the boundary), not the parent streams'.
+  A solve that runs out of attempts while still adding cuts is a failed
+  solve. The basic pinch sample with a water vapour compression heat pump at a
   quarter load now designs, with the condenser's desuperheat matched.
   The heuristic's fixed structures can still be left with no feasible
   duties by a cut; the MILP then designs in its place.
