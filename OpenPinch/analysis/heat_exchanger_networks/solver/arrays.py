@@ -716,6 +716,19 @@ def _active_items(streams) -> list[tuple[str, Stream]]:
     return [(key, stream) for key, stream in streams.items() if stream.is_active]
 
 
+def heat_pump_stream_keys(problem: PreparedProblem) -> frozenset[str]:
+    """Keys of the process streams whose input record is marked as one side
+    of a heat pump (``heat_pump``): its condensers, evaporators and ambient
+    sources."""
+    zone = problem.master_zone
+    return frozenset(
+        key
+        for streams in (zone.hot_streams, zone.cold_streams)
+        for key, _stream, record in _ordered_stream_items(problem, streams.items())
+        if getattr(record, "heat_pump", None) is not None
+    )
+
+
 def _ordered_stream_items(problem: PreparedProblem, items) -> list[_PreparedItem]:
     item_list = list(items)
     input_streams = getattr(getattr(problem, "_validated_data", None), "streams", ())
@@ -828,6 +841,7 @@ __all__ = [
     "SEGMENT_PROFILE_VERSION",
     "MINIMUM_PAIR_APPROACH",
     "PreparedSolverArrays",
+    "heat_pump_stream_keys",
     "nominal_approach_temperature",
     "pair_minimum_approach",
     "problem_to_solver_arrays",

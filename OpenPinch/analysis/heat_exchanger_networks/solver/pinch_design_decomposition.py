@@ -30,6 +30,7 @@ from .arrays import (
     PreparedSolverArrays,
     _temperature_contribution,
     _value,
+    heat_pump_stream_keys,
     problem_to_solver_arrays,
 )
 
@@ -251,6 +252,10 @@ def _calculate_openpinch_targets(
     cold_utilities: tuple[str, ...] = (),
 ) -> tuple[PinchDesignTarget, ...]:
     zone = _zone_with_hen_dt_contribution(problem, dTmin=dTmin)
+    # A heat pump's condenser and evaporator, each sized to its pocket, make
+    # pinches of their own. The case is split at the process pinch: the
+    # pinch of the same zone without the heat pump's streams.
+    process = _without_streams(zone, heat_pump_stream_keys(problem))
     period_ids = ordered_mapping_keys(zone.period_ids or {"0": 0})
     targets = []
     for period_idx, period_id in enumerate(period_ids):
@@ -258,11 +263,18 @@ def _calculate_openpinch_targets(
             zone,
             args={"period_id": period_id},
         )
+        split = (
+            target
+            if process is None
+            else compute_direct_integration_targets(
+                process, args={"period_id": period_id}
+            )
+        )
         shifted_pinch_temperature = _shifted_pinch_temperature(
-            hot_utility_target=target.hot_utility_target,
-            cold_utility_target=target.cold_utility_target,
-            hot_pinch=target.hot_pinch,
-            cold_pinch=target.cold_pinch,
+            hot_utility_target=split.hot_utility_target,
+            cold_utility_target=split.cold_utility_target,
+            hot_pinch=split.hot_pinch,
+            cold_pinch=split.cold_pinch,
         )
         targets.append(
             PinchDesignTarget(
@@ -283,6 +295,19 @@ def _calculate_openpinch_targets(
             )
         )
     return tuple(targets)
+
+
+def _without_streams(zone: Zone, keys: frozenset[str]) -> Zone | None:
+    """A copy of ``zone`` with the streams of ``keys`` switched off, which
+    targeting then skips; ``None`` when there are none to switch off."""
+    if not keys:
+        return None
+    copy = deepcopy(zone)
+    for streams in (copy.hot_streams, copy.cold_streams):
+        for key, stream in streams.items():
+            if key in keys:
+                stream.is_active = False
+    return copy
 
 
 def _level_targets(
