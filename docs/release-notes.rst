@@ -64,8 +64,9 @@ Heat exchanger network synthesis
   Carnot heat pump target's two streams it now returns networks at the heat
   pump's target at multipliers 0.75, 1.0 and 1.5 (full load) and 1.0 and
   1.5 (half load), the best 1 to 2% cheaper than the MILP's. A cascade
-  counts as closed within 1e-4 of the side's load (was 1e-6), which a
-  condenser or evaporator written with a 0.01 K glide needs.
+  counts as closed within 1e-5 of the side's load (was 1e-6: a heat pump
+  target sizes its condenser within 2e-6), and a condenser or evaporator
+  written with a 0.01 K glide closes it where it would as a point.
 - ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``, today's
   behaviour) makes the thermal derivative and network evolution steps of a
   single process keep each utility level at the duty its pinch design held
