@@ -148,7 +148,11 @@ Heat exchanger network synthesis
   the 18 existing units read differently from their installed area (E1
   3,262 m2 against 4,303 m2), and the rating allowance recorded on a
   design, each unit's rated area over its reported one, read up to 2.33
-  where it is 1.26. The frontier on that case is unchanged.
+  where it is 1.26. A unit rated within the area tolerance whose slices
+  need a little more than it has keeps the slices' area, as an exchanger
+  must (two units on that case's existing network, 0.9 % and 1.9 % above
+  installed), so the network still reads back from its own dump. The
+  frontier on that case is unchanged.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

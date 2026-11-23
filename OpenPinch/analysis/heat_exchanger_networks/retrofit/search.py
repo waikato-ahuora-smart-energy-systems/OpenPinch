@@ -1519,12 +1519,22 @@ def _with_owned_areas(
     retrofit: installed plus any added, as the model holds it (``results``,
     by exchanger id). A solved network otherwise gives a unit the area its
     duty needs, which for a unit on a segmented stream is the sum of its
-    slices and can be far below what is installed."""
+    slices and can be far below what is installed.
+
+    A unit rated within the area tolerance may need a little more by its
+    slices than it has. It then keeps the slices' area: an exchanger whose
+    area is below its slices' is not a valid one, and could not be read
+    back from the design's own dump.
+    """
+
+    def owned(exchanger):
+        area = float(results[exchanger.exchanger_id].area)
+        return max(area, exchanger.segment_design_area or 0.0)
 
     return network.model_copy(
         update={
             "exchangers": tuple(
-                e.model_copy(update={"area": float(results[e.exchanger_id].area)})
+                e.model_copy(update={"area": owned(e)})
                 if e.exchanger_id in installed and e.exchanger_id in results
                 else e
                 for e in network.exchangers
