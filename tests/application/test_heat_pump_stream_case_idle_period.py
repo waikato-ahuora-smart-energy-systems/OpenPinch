@@ -35,7 +35,9 @@ def test_streams_come_from_the_running_periods_when_the_shown_period_is_idle():
     )
     outputs = dict(solved.hpr_details.period_outputs)
     base = float(
-        next(s for _key, s in outputs["base"]["hpr_hot_streams"].items()).heat_flow.value
+        next(
+            s for _key, s in outputs["base"]["hpr_hot_streams"].items()
+        ).heat_flow.value
     )
     # The same design with the machine off at turndown, the period shown.
     del outputs["turndown"]

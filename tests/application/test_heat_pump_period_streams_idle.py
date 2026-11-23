@@ -43,9 +43,7 @@ def test_a_period_left_out_or_without_streams_gives_the_stream_no_duty():
     # Left out altogether in "off season"; present with no streams in "idle".
     idle = {"hpr_hot_streams": {}, "hpr_cold_streams": {}, "Q_amb_hot": 0.0}
     target = SimpleNamespace(
-        hpr_details=SimpleNamespace(
-            period_outputs={"idle": idle, "season": _running()}
-        )
+        hpr_details=SimpleNamespace(period_outputs={"idle": idle, "season": _running()})
     )
 
     found = _period_heat_pump_streams(target, ["off season", "idle", "season"])
