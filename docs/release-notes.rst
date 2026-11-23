@@ -54,6 +54,13 @@ Heat pumps and refrigeration
   heat pump is selected up to steam at 30 $/MWh and the full-load one from
   40 $/MWh, the part-load size being cheapest only between 37.35 and 37.46
   $/MWh.
+- ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` (default 2) is the most exchangers
+  a network designed with a heat pump may put on one heat pump stream (a
+  condenser or an evaporator). A network over it is left out of the
+  ranking and a warning says how many were. The cap is applied to the
+  designed networks, not inside the design models. On the basic pinch
+  sample no network exceeds the default; a cap of 1 keeps the networks
+  with one exchanger on each heat pump stream.
 - A ``HeatExchangerNetwork`` has a ``heat_pumps`` field: the heat pumps
   whose streams it serves, each a ``NetworkHeatPump`` with its duties,
   work, COP, electricity cost and compressor capital. It is empty for a

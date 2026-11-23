@@ -204,6 +204,7 @@ class HensConfig:
     utility_placement: str
     utility_slices: bool
     forbidden_matches: list[list[str]]
+    heat_pump_stream_exchangers: int
     site_levels: str
     site_level_counts: list[int]
     site_level_early_stop: bool

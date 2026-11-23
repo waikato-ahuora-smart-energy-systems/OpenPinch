@@ -399,6 +399,15 @@ at 200 $/kW the best network of each size costs, at multiplier 1.0:
 The part-load size is the cheapest only between 37.35 and 37.46 $/MWh on
 this sample: a kW of heat pump costs almost the same at either size.
 
+A condenser or an evaporator is one piece of equipment, or a few on the
+working fluid. ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` (2 by default) is the
+most exchangers a network may put on one heat pump stream: a network over
+it is left out of the ranking, and a warning says how many were. The cap is
+applied to the designed networks, not inside the design models, so with a
+low cap a size can lose every network; on the basic pinch sample the
+heuristic's networks put one or two exchangers on each heat pump stream,
+and a cap of 1 keeps those with one.
+
 A multiplier and size at which no heat pump target is found, or no network
 is designed around its streams, is left out with a warning. ``record=`` is
 not available with ``heat_pump=``, and a problem with several periods is

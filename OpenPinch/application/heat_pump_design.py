@@ -147,6 +147,7 @@ def design_with_heat_pump(
     multipliers,
     arguments: Mapping,
     costing=None,
+    max_exchangers: int | None = None,
 ):
     """Design ``problem`` without a heat pump and, at each of
     ``multipliers``, with one, and rank every network together.
@@ -201,10 +202,23 @@ def design_with_heat_pump(
                 )
                 continue
             runs.append((run, view))
-    return heat_pump_design_view(problem, plain, runs)
+    return heat_pump_design_view(problem, plain, runs, max_exchangers=max_exchangers)
 
 
-def heat_pump_design_view(problem, plain, runs):
+def _most_exchangers(network, names: set[str]) -> int:
+    """The most exchangers with duty that one stream of ``names`` has."""
+    counts = dict.fromkeys(names, 0)
+    for exchanger in network.exchangers:
+        if max(state.duty for state in exchanger.period_states) <= 0.0:
+            continue
+        for key in (exchanger.source_stream, exchanger.sink_stream):
+            name = key.rsplit(".", 1)[-1]
+            if name in counts:
+                counts[name] += 1
+    return max(counts.values(), default=0)
+
+
+def heat_pump_design_view(problem, plain, runs, *, max_exchangers: int | None = None):
     """One view ranking the designs without the heat pump and with it.
 
     ``plain`` is the problem's design without a heat pump and ``runs`` pairs
@@ -213,6 +227,10 @@ def heat_pump_design_view(problem, plain, runs):
     (``network_with_heat_pumps``) and is ranked on that total among the
     rest. The view is ``plain``, its result holding them all and the
     cheapest selected.
+
+    A network that serves a heat pump stream through more than
+    ``max_exchangers`` exchangers (``HENS_HEAT_PUMP_STREAM_EXCHANGERS``) is
+    left out, and a warning says how many were.
     """
     from ..analysis.heat_exchanger_networks.results.selection import (
         ranked_networks,
@@ -221,8 +239,21 @@ def heat_pump_design_view(problem, plain, runs):
 
     result = plain.result
     ranked = list(ranked_networks(result))
+    kept = dropped = 0
     for run, view in runs:
+        names = {
+            record["name"]
+            for record in run.case.to_problem_json()["streams"]
+            if record["heat_pump"] is not None
+        }
         for outcome in ranked_networks(view.result):
+            if (
+                max_exchangers is not None
+                and _most_exchangers(outcome.network, names) > max_exchangers
+            ):
+                dropped += 1
+                continue
+            kept += 1
             network = network_with_heat_pumps(outcome.network, (run.record,))
             ranked.append(
                 outcome.model_copy(
@@ -232,6 +263,15 @@ def heat_pump_design_view(problem, plain, runs):
                     }
                 )
             )
+    if dropped:
+        warnings.warn(
+            f"{dropped} heat pump network(s) put more than {max_exchangers} "
+            "exchanger(s) on a heat pump stream "
+            f"(HENS_HEAT_PUMP_STREAM_EXCHANGERS) and were left out; {kept} "
+            "are ranked.",
+            UserWarning,
+            stacklevel=2,
+        )
     result.ranked_networks = tuple(ranked)
     select_network(result)
     return plain

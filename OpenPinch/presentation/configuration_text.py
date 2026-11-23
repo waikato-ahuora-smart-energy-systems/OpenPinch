@@ -466,6 +466,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "forbids heating C1 with HPS."
         ),
     ),
+    "HENS_HEAT_PUMP_STREAM_EXCHANGERS": FieldText(
+        "Exchangers per heat pump stream", None,
+        (
+            "The most exchangers one heat pump stream (a condenser or an "
+            "evaporator) may have in a network designed with a heat pump. A "
+            "network over it is left out of the ranking, and the design says "
+            "how many were."
+        ),
+    ),
     "HENS_SITE_LEVELS": FieldText(
         "Total site utility levels", None,
         (
