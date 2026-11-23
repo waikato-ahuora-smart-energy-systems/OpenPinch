@@ -1785,10 +1785,13 @@ class _DesignAccessor:
         ``"heat_pump"``, which holds the compressor at ``heat_pump_cost``
         per kW of condenser capacity, followed by its exchangers as new
         matches; the machine's electricity is in the design's utility
-        cost and its network records the machine in ``heat_pumps``. Each
-        step of the result holds the better design of the two searches.
-        The machine's size is fixed, so it is not traded against exchanger
-        area as the linked heat pump's duty is. ``heat_pump_search`` bounds
+        cost and its network records the machine in ``heat_pumps``. The
+        machine is tried at each of ``heat_pump_sizes`` (shares of the
+        heaters' load: ``HPR_LOAD_FRACTION`` of the target), one search per
+        size, and records its share in ``load_fraction``; each step of the
+        result holds the best design of the plain search and every size's.
+        Within one search the machine's size is fixed, not traded against
+        exchanger area as the linked heat pump's duty is. ``heat_pump_search`` bounds
         the target's search (``maximum_iterations``,
         ``maximum_evaluations``); the full search can take more than a
         minute. The step is left out, with a ``UserWarning`` giving the
