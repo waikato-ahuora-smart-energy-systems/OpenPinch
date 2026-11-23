@@ -262,6 +262,13 @@ def with_heat_pump_streams(
     _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
     if isinstance(target, IndirectHeatPumpTarget):
+        if zone is not None:
+            raise ValueError(
+                "zone= names the process zone that takes the streams of a "
+                "heat pump on the process. A heat pump on the utility system "
+                "gets zones of its own under the zone it was targeted on; "
+                "drop zone=."
+            )
         if len(problem.period_ids) > 1:
             raise ValueError(
                 "The zones of a heat pump on the utility system are not built "
