@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ...indexing import build_index_grid
 from .._base import approach as _approach
+from .._base import interior_approach as _interior
 from .._base import piecewise as _piecewise
 from .._base import utility_slices as _slices
 from .._base.superstructure import create_match_binaries, create_utility_duty_grids
@@ -271,6 +272,9 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         _set_multiperiod_non_isothermal_equations(owner)
     elif not owner.values_only:
         _set_multiperiod_isothermal_approach_equations(owner)
+        # The approach inside a match on a segmented stream, checked on each
+        # solution as the pinch design side model does.
+        _interior.install_interior_cuts(owner, owner.M_ij_period)
 
     owner.dqda = []
     owner.alpha = []

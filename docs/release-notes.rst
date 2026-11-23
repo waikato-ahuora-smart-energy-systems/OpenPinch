@@ -144,6 +144,13 @@ Heat exchanger network synthesis
   quarter load now designs, with the condenser's desuperheat matched.
   The heuristic's fixed structures can still be left with no feasible
   duties by a cut; the MILP then designs in its place.
+- The thermal derivative step keeps the minimum approach inside a match on
+  a segmented stream too, by the same check and cuts as pinch design. On
+  a stream that kinks inside a match (a condenser's desuperheat, then its
+  plateau) it matched the stream whole across the kink and the task
+  failed when its areas were taken; it now designs. Network evolution,
+  which solves without integers, still holds the approach at match ends
+  only.
 - The retrofit search can start from a heat pump added to the case as
   streams. ``run_retrofit_search(problem, existing, settings,
   heat_pump=HeatPumpStep(...))`` takes a machine of a fixed size whose
