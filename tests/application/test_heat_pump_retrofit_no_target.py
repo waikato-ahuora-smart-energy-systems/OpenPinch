@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+    RetrofitSettings,
+)
 from OpenPinch.application import heat_pump_retrofit
 
 
@@ -28,7 +31,7 @@ def test_with_no_as_piped_target_the_result_is_the_search_without_a_heat_pump(
         heat_pump_retrofit, "as_piped_heat_pump", lambda *args, **kwargs: None
     )
 
-    settings = SimpleNamespace(
+    settings = RetrofitSettings(
         heat_pump_cycle="carnot", heat_pump_cost=0.0, max_modifications=1
     )
     problem = SimpleNamespace(

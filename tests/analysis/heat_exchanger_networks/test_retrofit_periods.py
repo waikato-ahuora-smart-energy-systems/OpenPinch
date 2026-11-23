@@ -296,6 +296,8 @@ def test_the_search_screens_heat_pumps_with_the_period_weights(monkeypatch):
         new_unit_cost=0.0,
         min_approach_temperature=10.0,
         heat_pump_cycle="carnot",
+        # The linked heat pump move (the stream step is the Carnot default).
+        heat_pump_streams=False,
     )
 
     assert seen

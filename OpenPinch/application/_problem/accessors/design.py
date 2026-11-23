@@ -1669,7 +1669,7 @@ class _DesignAccessor:
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
-        heat_pump_streams: bool = False,
+        heat_pump_streams: bool | None = None,
         heat_pump_sizes: Sequence[float] = (1.0, 0.75, 0.5),
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
@@ -1834,8 +1834,14 @@ class _DesignAccessor:
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit")
+        if heat_pump_streams and heat_pump_cycle != "carnot":
+            raise ValueError(
+                "heat_pump_streams is built for heat_pump_cycle='carnot' only; "
+                f"got {heat_pump_cycle!r}, which takes the linked heat pump move."
+            )
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
-        if heat_pump_streams and outside:
+        streams = heat_pump_cycle == "carnot" and heat_pump_streams is not False
+        if streams and outside:
             raise ValueError(
                 "heat_pump_sizes are shares of the existing heaters' load, "
                 f"between 0 and 1; got {', '.join(repr(s) for s in outside)}."
@@ -1875,12 +1881,18 @@ class _DesignAccessor:
                     stacklevel=2,
                 )
             search = run_retrofit_search
-            if heat_pump_cycle == "carnot" and heat_pump_streams:
-                # Also try the as-piped heat pump added as streams.
+            if streams:
+                # The as-piped heat pump added as streams, at each size.
                 search = partial(
                     retrofit_with_heat_pump,
                     configuration=configuration,
-                    limits=heat_pump_search,
+                    # 2000 evaluations unless told: on the guide's case the
+                    # full search found the same machine ten times slower.
+                    limits=(
+                        {"maximum_evaluations": 2000}
+                        if heat_pump_search is None
+                        else heat_pump_search
+                    ),
                     sizes=tuple(float(size) for size in heat_pump_sizes),
                 )
             result = search(

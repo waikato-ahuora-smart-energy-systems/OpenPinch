@@ -189,7 +189,11 @@ def retrofit_with_heat_pump(
     as the first runs on ``problem``, from ``heat_pump_step``.
     """
 
-    base = run_retrofit_search(problem, existing, settings)
+    # The stream step replaces the linked heat pump move: the plain search
+    # offers none of its own.
+    base = run_retrofit_search(
+        problem, existing, replace(settings, heat_pump_cycle=None)
+    )
     if int(settings.max_modifications) < 1:
         # The heat pump step is a modification.
         return base
