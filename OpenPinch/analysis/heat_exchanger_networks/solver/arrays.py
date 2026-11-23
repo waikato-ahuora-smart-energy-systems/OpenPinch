@@ -193,7 +193,16 @@ def problem_to_solver_arrays(
         )
     arrays.update(
         _forbidden_match_arrays(
-            hens.forbidden_matches,
+            [
+                *hens.forbidden_matches,
+                *_heat_pump_match_rules(
+                    heat_pump_stream_roles(problem),
+                    hot=[key for key, _, _ in hot_items],
+                    cold=[key for key, _, _ in cold_items],
+                    hot_utilities=[key for key, _, _ in hot_utility_items],
+                    cold_utilities=[key for key, _, _ in cold_utility_items],
+                ),
+            ],
             hot=[key for key, _, _ in hot_items],
             cold=[key for key, _, _ in cold_items],
             hot_utilities=[key for key, _, _ in hot_utility_items],
@@ -311,6 +320,36 @@ def problem_to_solver_arrays(
             "cold_utilities": [key for key, _, _ in cold_utility_items],
             "hot_utilities": [key for key, _, _ in hot_utility_items],
         },
+    )
+
+
+def _heat_pump_match_rules(
+    roles: dict[str, str],
+    *,
+    hot: Sequence[str],
+    cold: Sequence[str],
+    hot_utilities: Sequence[str],
+    cold_utilities: Sequence[str],
+) -> list[tuple[str, str]]:
+    """The pairs, by key, that the streams' heat pump roles rule out.
+
+    A condenser may not heat an evaporator: the pair is feasible and would
+    hand the machine's output back to its input. No cold utility may cool
+    a condenser: its heat is the machine's product. No hot utility may heat
+    an evaporator: it is there to take waste heat. An ambient source (the
+    air an evaporator draws on) meets evaporators only: it is not heat for
+    the process, nor heat to cool away.
+    """
+
+    condensers = [key for key in hot if roles.get(key) == "condenser"]
+    evaporators = [key for key in cold if roles.get(key) == "evaporator"]
+    air = [key for key in hot if roles.get(key) == "ambient_source"]
+    others = [key for key in cold if roles.get(key) != "evaporator"]
+    return (
+        [(hot, cold) for hot in condensers for cold in evaporators]
+        + [(hot, utility) for hot in condensers + air for utility in cold_utilities]
+        + [(utility, cold) for utility in hot_utilities for cold in evaporators]
+        + [(hot, cold) for hot in air for cold in others]
     )
 
 

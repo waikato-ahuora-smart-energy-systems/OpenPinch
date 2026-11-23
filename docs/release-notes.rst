@@ -93,6 +93,15 @@ Heat exchanger network synthesis
   returned a network, the MILP now returns one at the target (325.0 kW of
   hot utility, total annual cost 224,536) and the heuristic 28 (best
   221,279). A case without marked streams is split as before.
+- Heat pump streams (streams marked ``heat_pump``) keep to the process in
+  every design step. A condenser stream may not be matched to an evaporator
+  stream or take a cooler, an evaporator stream may not take a heater, and
+  an ambient source stream may only heat an evaporator. The rules use the
+  masks of ``HENS_FORBIDDEN_MATCHES``. On the basic pinch sample with the
+  Carnot heat pump's streams and free utilities, network evolution put a
+  486.6 kW heater on the evaporator and a 750 kW cooler on the condenser
+  (best total annual cost 54,355); it now returns networks with neither
+  (best 57,739). At the sample's own prices no ranked network changes.
 - ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``, today's
   behaviour) makes the thermal derivative and network evolution steps of a
   single process keep each utility level at the duty its pinch design held
