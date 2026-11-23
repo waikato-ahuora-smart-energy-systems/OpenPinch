@@ -55,7 +55,7 @@ from ._shared.air import (
 from ._shared.air import (
     utility_bands as _utility_bands,
 )
-from .capital import installed_capital
+from .capital import MachineComponents, installed_capital
 from .machine_capital import machine_components, process_side_areas
 
 __all__ = [
@@ -602,6 +602,12 @@ def evaluate_vapour_hpr_result(
         hpr_machine_capital_costs=cost_accounting.hpr_machine_capital_costs,
         hpr_machine_annualized_capital_costs=(
             cost_accounting.hpr_machine_annualized_capital_costs
+        ),
+        hpr_machine_compressor_capital_costs=tuple(
+            installed_capital(
+                MachineComponents(compressors=machine.compressors, exchanger_areas=())
+            )
+            for machine in components
         ),
         hpr_hot_utility_annualized_capital_cost=(
             cost_accounting.hpr_hot_utility_annualized_capital_cost

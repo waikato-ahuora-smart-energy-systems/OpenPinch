@@ -15,6 +15,8 @@ import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_
 from OpenPinch.analysis.heat_pumps.common.capital import (
     ANNEX_68_COST_AT_1_MW,
     REFERENCE_MACHINE,
+    CompressorDuty,
+    MachineComponents,
     compressor_pec,
     exchanger_pec,
     installed_capital,
@@ -267,6 +269,30 @@ def test_a_heat_pumps_capital_is_its_components_installed_capital():
     assert result.hpr_machine_capital_costs == pytest.approx(
         (installed_capital(machine),)
     )
+
+
+def test_a_heat_pump_reports_its_compressors_capital_alone():
+    # A retrofit that places the machine's exchangers in the network itself
+    # pays the machine for its compressors and motors only.
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.4)
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
+
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args)
+
+    compressors = MachineComponents(
+        compressors=tuple(
+            CompressorDuty(s.refrigerant, s.suction_volume_flow, s.shaft_power)
+            for s in cycle._subcycles
+        ),
+        exchanger_areas=(),
+    )
+    assert result.hpr_machine_compressor_capital_costs == pytest.approx(
+        (installed_capital(compressors),)
+    )
+    assert installed_capital(compressors) < result.hpr_machine_capital_costs[0]
 
 
 def test_the_evaluator_sizes_the_air_exchangers_for_the_cascades_air_duties(

@@ -467,6 +467,8 @@ class HeatPumpTargetOutputs(BaseModel):
     hpr_total_annualized_cost: Optional[Any] = None
     hpr_machine_capital_costs: Optional[tuple[float, ...]] = None
     hpr_machine_annualized_capital_costs: Optional[tuple[float, ...]] = None
+    # Each machine's compressors and motors alone, installed ($).
+    hpr_machine_compressor_capital_costs: Optional[tuple[float, ...]] = None
     Q_amb_hot: float
     Q_amb_cold: float
     cop_h: Optional[float | list | np.ndarray] = None
@@ -596,6 +598,8 @@ class HPRBackendResult(BaseModel):
     hpr_utility_annualized_capital_cost: Any = None
     hpr_machine_capital_costs: tuple[float, ...] | None = None
     hpr_machine_annualized_capital_costs: tuple[float, ...] | None = None
+    # Each machine's compressors and motors alone, installed ($).
+    hpr_machine_compressor_capital_costs: tuple[float, ...] | None = None
     feasibility_penalty: float = 0.0
     Q_cooling_water: float = 0.0
     Q_refrigeration: float = 0.0
@@ -687,6 +691,9 @@ class HPRBackendResult(BaseModel):
             "hpr_machine_capital_costs": self.hpr_machine_capital_costs,
             "hpr_machine_annualized_capital_costs": (
                 self.hpr_machine_annualized_capital_costs
+            ),
+            "hpr_machine_compressor_capital_costs": (
+                self.hpr_machine_compressor_capital_costs
             ),
             "Q_amb_hot": self.Q_amb_hot,
             "Q_amb_cold": self.Q_amb_cold,
