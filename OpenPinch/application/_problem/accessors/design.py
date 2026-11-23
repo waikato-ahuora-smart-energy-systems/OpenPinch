@@ -1669,6 +1669,8 @@ class _DesignAccessor:
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
+        heat_pump_streams: bool = False,
+        heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
@@ -1769,6 +1771,31 @@ class _DesignAccessor:
         ``COSTING_HPR_ELE_PRICE``; the heat pump's duties are not counted as
         utility.
 
+        With ``heat_pump_streams`` (and the "carnot" cycle) the retrofit
+        also tries the existing network's as-piped heat pump target as one
+        machine of that size: its condensers and evaporators, placed along
+        the heaters' and coolers' own temperatures, join the case as
+        streams, and a second search starts from the existing network with
+        the matches that serve them (each evaporator on every hot stream
+        whose cooler starts hot enough, each condenser on every cold stream
+        whose heater starts cold enough, and the air an evaporator draws on
+        to the evaporators). One machine can so serve several exchangers
+        at several levels. That step is one modification of kind
+        ``"heat_pump"``, which holds the compressor at ``heat_pump_cost``
+        per kW of condenser capacity, followed by its exchangers as new
+        matches; the machine's electricity is in the design's utility
+        cost and its network records the machine in ``heat_pumps``. Each
+        step of the result holds the better design of the two searches.
+        The machine's size is fixed, so it is not traded against exchanger
+        area as the linked heat pump's duty is. ``heat_pump_search`` bounds
+        the target's search (``maximum_iterations``,
+        ``maximum_evaluations``); the full search can take more than a
+        minute. The step is left out, with a ``UserWarning`` giving the
+        reason, on a problem with several periods, on one with process
+        components or a site of several process zones, and when the
+        network cannot serve the machine's duties; it is not built when
+        ``max_modifications`` is 0.
+
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked
         by the utility cost their structure reaches with unlimited area (its
@@ -1790,10 +1817,13 @@ class _DesignAccessor:
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
+        from functools import partial
+
         from ....analysis.heat_exchanger_networks.retrofit.search import (
             RetrofitSettings,
             run_retrofit_search,
         )
+        from ...heat_pump_retrofit import retrofit_with_heat_pump
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
@@ -1834,7 +1864,15 @@ class _DesignAccessor:
                     UserWarning,
                     stacklevel=2,
                 )
-            result = run_retrofit_search(
+            search = run_retrofit_search
+            if heat_pump_cycle == "carnot" and heat_pump_streams:
+                # Also try the as-piped heat pump added as streams.
+                search = partial(
+                    retrofit_with_heat_pump,
+                    configuration=configuration,
+                    limits=heat_pump_search,
+                )
+            result = search(
                 isolated,
                 existing,
                 RetrofitSettings(

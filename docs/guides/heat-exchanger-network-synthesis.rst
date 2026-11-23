@@ -902,6 +902,52 @@ Heat pumps
    Carnot heat pump from H2 to C2 (COP 1.89, 7.7 MW, $2.39M fixed cost) is
    the best first step at $1.22M/y net, level with the best new match
    ($1.21M/y). At the case's $100/MWh new matches win.
+The as-piped heat pump as streams
+   The heat pump above is one evaporator linked to one condenser, each at
+   the end of its stream, so it lifts through the whole range the cooler
+   and the heater cover. With ``heat_pump_streams=True`` (and
+   ``heat_pump_cycle="carnot"``) the retrofit also tries the machine the
+   as-piped target of ``design.retrofit_heat_pumps`` describes, which
+   places several condensers along the heaters' temperatures and several
+   evaporators along the coolers'. Its condensers and evaporators join
+   the case as streams of fixed duty and a second search starts from the
+   existing network with the matches that serve them. The step is one
+   ``heat_pump`` modification (the compressor at ``heat_pump_cost`` per kW
+   of condenser capacity) and one new match per exchanger; the electricity
+   is in the design's utility cost and the network records the machine in
+   ``heat_pumps``. Each step of the result holds the better design of the
+   two searches, so the result is never worse than without the option.
+
+   On a process cooled from 54 degC and heated from 80 degC, with steam at
+   $40/MWh and electricity at $100/MWh, a heat pump pays above a COP of
+   2.5. The linked heat pump lifts from 20 to 130 degC at a COP of 2.33
+   and is never selected; the as-piped machine reaches 3.1 to 3.3 with
+   three condensers and two evaporators and takes 156 to 187 kW of the
+   240 kW of steam.
+
+   The machine's size is fixed at the target's, so the search cannot
+   trade it against exchanger area as it does the linked heat pump's
+   duty, and the target stands its levels close to the streams
+   (``HPR_DT_CONT`` beyond their own contributions). On the case above
+   the exchangers at the default area price cost as much as the machine
+   saves. On Ciric and Floudas at the settings of the paragraph above the
+   linked heat pump, sized by the search at 14.7 MW, nets $2.95M/y with
+   no new unit cost, while the as-piped target at the network's prices
+   settles on a 5 to 7 MW machine at a COP near 3.2 that nets slightly
+   below zero, whatever ``HPR_LOAD_FRACTION`` asks: the target caps its
+   load there, it does not set the machine's size. (One short target
+   search returned a 17.5 MW machine at a COP of 2.37, which netted
+   $2.81M/y.) ``heat_pump_search`` bounds the target's search
+   (``{"maximum_evaluations": 2000}``): the full search can take more
+   than a minute. A level the target leaves without duty is not added.
+   The step is left out, with a ``UserWarning`` giving the reason, on a
+   problem with several periods, on one with process components or a
+   site of several process zones (the machine's streams cannot be added
+   to the case), and when the network cannot serve the machine's duties.
+   With ``min_approach_temperature`` not given, the heat pump's matches
+   are placed at ``THERMAL_DT_CONT`` plus ``HPR_DT_CONT`` (air at
+   ``HPR_DT_ENV_CONT`` plus ``HPR_DT_CONT``); a stream with its own
+   ``dt_cont`` is not read for that.
 Sites and heat recovery loops
    When the existing network's streams span several process zones (a
    site's network given as a mapping), new matches and relocations join

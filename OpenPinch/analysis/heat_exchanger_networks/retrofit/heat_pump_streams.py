@@ -11,6 +11,8 @@ from .moves import NewMatch, apply_new_match, new_splits, stage_count
 
 # Solved network states carry temperatures in K; streams in degC.
 _KELVIN = 273.15
+# Kelvin a match may fall short of its approach by rounding alone.
+_APPROACH_TOLERANCE = 1e-6
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class HeatPumpStep:
     condensers: tuple
     evaporators: tuple
     base: HeatExchangerNetworkRetrofitDesign
+    # The hot streams of the air the evaporators draw on, if any.
+    ambient_sources: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,9 @@ def with_heat_pump_matches(
     approach: float,
     machine: str = "HP",
     solved: HeatExchangerNetwork | None = None,
-) -> tuple[HeatExchangerNetwork, tuple[str, ...]]:
+    ambient_sources=(),
+    ambient_approach: float | None = None,
+) -> tuple[HeatExchangerNetwork, tuple[PlacedMatch, ...]]:
     """``network`` with the matches that serve a heat pump's streams, and
     the ids of the exchangers added.
 
@@ -102,6 +108,24 @@ def with_heat_pump_matches(
         stage = stage_count(network) + 1
         for position, hot in enumerate(served):
             add(hot, evaporator.name, stage, position == 0)
+    # The air an evaporator draws on, after everything else: every
+    # evaporator at least the approach below it, at both ends of a
+    # counter-current match, takes a share. The target places an
+    # evaporator at the limit, so the comparison allows rounding.
+    gap = approach if ambient_approach is None else float(ambient_approach)
+    for air in ambient_sources:
+        below = sorted(
+            evaporator.name
+            for evaporator in evaporators
+            if min(
+                _hot_end(air) - _hot_end(evaporator),
+                _cold_end(air) - _cold_end(evaporator),
+            )
+            >= gap - _APPROACH_TOLERANCE
+        )
+        stage = stage_count(network) + 1
+        for position, cold in enumerate(below):
+            add(air.name, cold, stage, position == 0)
     return network, tuple(added)
 
 

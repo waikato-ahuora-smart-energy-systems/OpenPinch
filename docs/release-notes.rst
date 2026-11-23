@@ -140,8 +140,27 @@ Heat exchanger network synthesis
   measured against the existing network without the heat pump, and the
   network records the machine in ``heat_pumps``.
   ``as_piped_heat_pump(problem, network)`` gives the as-piped heat pump
-  target with its streams. These are the analysis functions;
-  ``design.retrofit`` does not use them yet.
+  target with its streams. The air an evaporator draws on is matched to
+  the evaporators.
+- ``design.retrofit(heat_pump_cycle="carnot", heat_pump_streams=True)``
+  also tries the existing network's as-piped heat pump target as one
+  machine added as streams: several condensers along the heaters'
+  temperatures and several evaporators along the coolers', where the
+  linked heat pump is one evaporator and one condenser at the ends of two
+  streams. The step is one ``heat_pump`` modification with the compressor
+  at ``heat_pump_cost`` per kW of condenser capacity and one new match per
+  exchanger; each step of the result holds the better design of the search
+  with it and the search without. On a process where a heat pump pays
+  above a COP of 2.5 the linked heat pump reaches 2.33 and was never
+  selected; the as-piped machine reaches 3.1 to 3.3. The machine's size is
+  fixed at the target's and is not traded against exchanger area: on Ciric
+  and Floudas the target settles on a 5 to 7 MW machine that nets
+  slightly below zero where the linked heat pump, sized by the search,
+  nets $2.95M/y, so the option is off by default. ``heat_pump_search``
+  bounds the target's search. The step is left out with a warning on a
+  problem with several periods, on one with process components or a site
+  of several process zones, and when the network cannot serve the
+  machine's duties.
 - ``HENS_FORBIDDEN_MATCHES`` lists matches a design may not use, as pairs
   of names, the hot side then the cold side. Either may be a process
   stream or a utility: ``["H1", "C2"]`` forbids that recovery match,
