@@ -863,13 +863,27 @@ class _Evaluator:
         self.tol = float(hens.solve_tolerance)
         self.max_parallel = supported_workers(max(1, int(hens.max_parallel)))
         self.names = _existing_names(self.arrays.axis_maps, existing)
+        # The streams the screens offer new matches and utility units on. A
+        # heat pump step's own streams are left out: its step gave them
+        # their matches, and a condenser must not heat its evaporator.
+        pumped = (
+            ()
+            if heat_pump is None
+            else [s.name for s in heat_pump.condensers + heat_pump.evaporators]
+        )
+
+        def offered(name: str) -> bool:
+            return not any(name == p or name.endswith("." + p) for p in pumped)
+
         self.ends = {
-            self.names[name]: ends for name, ends in _stream_ends(self.arrays).items()
+            self.names[name]: ends
+            for name, ends in _stream_ends(self.arrays).items()
+            if offered(name)
         }
         # Each period's own ends, so the match screens read potential period
         # by period.
         self.period_ends = tuple(
-            {self.names[name]: ends for name, ends in period.items()}
+            {self.names[name]: ends for name, ends in period.items() if offered(name)}
             for period in _period_stream_ends(self.arrays)
         )
         # The period weights the screens average a solved network with.
