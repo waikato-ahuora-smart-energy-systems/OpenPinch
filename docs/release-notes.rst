@@ -127,6 +127,21 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The retrofit search can start from a heat pump added to the case as
+  streams. ``run_retrofit_search(problem, existing, settings,
+  heat_pump=HeatPumpStep(...))`` takes a machine of a fixed size whose
+  condensers and evaporators are process streams of ``problem``. Its first
+  design is the existing network with the matches that serve those streams
+  (``with_heat_pump_matches``: each evaporator on every hot stream whose
+  cooler starts hot enough, each condenser on every cold stream whose
+  heater starts cold enough), each priced as a new match, and one
+  ``heat_pump`` modification that holds the compressor's cost. The
+  machine's electricity is in every design's utility cost, savings are
+  measured against the existing network without the heat pump, and the
+  network records the machine in ``heat_pumps``.
+  ``as_piped_heat_pump(problem, network)`` gives the as-piped heat pump
+  target with its streams. These are the analysis functions;
+  ``design.retrofit`` does not use them yet.
 - ``HENS_FORBIDDEN_MATCHES`` lists matches a design may not use, as pairs
   of names, the hot side then the cold side. Either may be a process
   stream or a utility: ``["H1", "C2"]`` forbids that recovery match,

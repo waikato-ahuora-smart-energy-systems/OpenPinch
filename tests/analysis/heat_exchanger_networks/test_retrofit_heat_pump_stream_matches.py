@@ -62,7 +62,7 @@ def test_each_heat_pump_stream_is_matched_where_a_cooler_or_heater_can_serve_it(
     by_id = {
         e.exchanger_id: (e.source_stream, e.sink_stream) for e in network.exchangers
     }
-    assert sorted(by_id[exchanger_id] for exchanger_id in added) == [
+    assert sorted(by_id[placed.exchanger_id] for placed in added) == [
         ("H1", "HP_C2"),
         ("H2", "HP_C1"),
         ("H2", "HP_C2"),

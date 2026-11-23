@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitDesign
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork, NetworkHeatPump
-from .moves import NewMatch, apply_new_match, stage_count
+from .moves import NewMatch, apply_new_match, new_splits, stage_count
 
 # Solved network states carry temperatures in K; streams in degC.
 _KELVIN = 273.15
@@ -29,6 +29,16 @@ class HeatPumpStep:
     condensers: tuple
     evaporators: tuple
     base: HeatExchangerNetworkRetrofitDesign
+
+
+@dataclass(frozen=True)
+class PlacedMatch:
+    """A match added for a heat pump's stream: the new exchanger's id, the
+    move that placed it and the streams it split."""
+
+    exchanger_id: str
+    match: NewMatch
+    splits: tuple[str, ...]
 
 
 def with_heat_pump_matches(
@@ -57,15 +67,21 @@ def with_heat_pump_matches(
 
     coolers = _starts(solved or network, HeatExchangerKind.COLD_UTILITY)
     heaters = _starts(solved or network, HeatExchangerKind.HOT_UTILITY)
-    added: list[str] = []
+    added: list[PlacedMatch] = []
 
     def add(hot: str, cold: str, stage: int, new_stage: bool) -> None:
         nonlocal network
-        exchanger_id = f"new:{machine}:{hot}->{cold}"
-        network = apply_new_match(
-            network, NewMatch(hot, cold, stage, new_stage), exchanger_id
-        )
-        added.append(exchanger_id)
+        move = NewMatch(hot, cold, stage, new_stage)
+        # ``:2``, ``:3`` and so on when the id is taken, as any new match.
+        taken = {e.exchanger_id for e in network.exchangers}
+        stem = f"new:{machine}:{hot}->{cold}"
+        exchanger_id, n = stem, 1
+        while exchanger_id in taken:
+            n += 1
+            exchanger_id = f"{stem}:{n}"
+        splits = new_splits(network, move)
+        network = apply_new_match(network, move, exchanger_id)
+        added.append(PlacedMatch(exchanger_id, move, splits))
 
     # Rising, each ahead of the last: the hottest condenser ends at stage 1.
     for condenser in sorted(condensers, key=_cold_end):
