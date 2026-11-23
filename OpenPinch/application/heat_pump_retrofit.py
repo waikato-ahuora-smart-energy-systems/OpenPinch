@@ -184,6 +184,9 @@ def retrofit_with_heat_pump(
     """
 
     base = run_retrofit_search(problem, existing, settings)
+    if int(settings.max_modifications) < 1:
+        # The heat pump step is a modification.
+        return base
     periods = len(getattr(problem, "period_ids", None) or ())
     if periods > 1:
         # The as-piped target reads the first period alone.

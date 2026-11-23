@@ -28,7 +28,9 @@ def test_with_no_as_piped_target_the_result_is_the_search_without_a_heat_pump(
         heat_pump_retrofit, "as_piped_heat_pump", lambda *args, **kwargs: None
     )
 
-    settings = SimpleNamespace(heat_pump_cycle="carnot", heat_pump_cost=0.0)
+    settings = SimpleNamespace(
+        heat_pump_cycle="carnot", heat_pump_cost=0.0, max_modifications=1
+    )
     problem = SimpleNamespace(
         master_zone=SimpleNamespace(config=SimpleNamespace(costing=None))
     )
