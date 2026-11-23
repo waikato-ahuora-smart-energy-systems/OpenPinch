@@ -193,7 +193,15 @@ def problem_to_solver_arrays(
         )
     arrays.update(
         _forbidden_match_arrays(
-            hens.forbidden_matches,
+            [
+                *hens.forbidden_matches,
+                *_heat_pump_match_rules(
+                    hot_items,
+                    cold_items,
+                    hot_utilities=[key for key, _, _ in hot_utility_items],
+                    cold_utilities=[key for key, _, _ in cold_utility_items],
+                ),
+            ],
             hot=[key for key, _, _ in hot_items],
             cold=[key for key, _, _ in cold_items],
             hot_utilities=[key for key, _, _ in hot_utility_items],
@@ -311,6 +319,41 @@ def problem_to_solver_arrays(
             "cold_utilities": [key for key, _, _ in cold_utility_items],
             "hot_utilities": [key for key, _, _ in hot_utility_items],
         },
+    )
+
+
+def _heat_pump_role(record) -> str | None:
+    """The heat pump role an input record marks its stream with, if any."""
+    mark = getattr(record, "heat_pump", None)
+    return None if mark is None else mark.role
+
+
+def _heat_pump_match_rules(
+    hot_items,
+    cold_items,
+    *,
+    hot_utilities: Sequence[str],
+    cold_utilities: Sequence[str],
+) -> list[tuple[str, str]]:
+    """The pairs, by key, that the streams' heat pump marks rule out.
+
+    A condenser may not heat an evaporator: the pair is feasible and would
+    hand the machine's output back to its input. No cold utility may cool
+    a condenser: its heat is the machine's product. No hot utility may heat
+    an evaporator: it is there to take waste heat. An ambient source (the
+    air an evaporator draws on) meets evaporators only: it is not heat for
+    the process, nor heat to cool away.
+    """
+
+    condensers = [k for k, _, r in hot_items if _heat_pump_role(r) == "condenser"]
+    evaporators = [k for k, _, r in cold_items if _heat_pump_role(r) == "evaporator"]
+    air = [k for k, _, r in hot_items if _heat_pump_role(r) == "ambient_source"]
+    others = [k for k, _, r in cold_items if _heat_pump_role(r) != "evaporator"]
+    return (
+        [(hot, cold) for hot in condensers for cold in evaporators]
+        + [(hot, utility) for hot in condensers + air for utility in cold_utilities]
+        + [(utility, cold) for utility in hot_utilities for cold in evaporators]
+        + [(hot, cold) for hot in air for cold in others]
     )
 
 

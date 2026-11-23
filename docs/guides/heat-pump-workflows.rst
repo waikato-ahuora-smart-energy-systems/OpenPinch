@@ -287,6 +287,19 @@ plus:
 The streams go in the process zone the target was solved on, or the only
 process zone under it; on a site with several, name one with ``zone=``.
 
+A network designed on ``with_pump`` keeps the heat pump's streams on the
+process. The marks rule out, in every design step (pinch design, the
+thermal derivative and network evolution steps with their moves, and the
+stream-end utilities of a fit to every period):
+
+- a match between a condenser stream and an evaporator stream, which would
+  hand the machine's output back to its input;
+- a cooler on a condenser stream and a heater on an evaporator stream,
+  which would call the stream served while the process went without;
+- any use of an ambient source stream other than heating an evaporator.
+
+These are the masks ``HENS_FORBIDDEN_MATCHES`` fills, so the two combine.
+
 It takes the target of a heat pump placed on the process, solved on this
 problem as it stands: a target from another problem, one solved before the
 inputs changed, and a utility heat pump's target are refused. A problem with
