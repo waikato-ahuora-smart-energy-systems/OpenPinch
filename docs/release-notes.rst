@@ -54,6 +54,18 @@ Heat exchanger network synthesis
   side, forbidding a match the best design uses gives seven ranked
   networks without it (best 187,837 against 137,745 unrestricted), and
   forbidding one cooler moves that cooling to the other utility (153,874).
+- The heuristic pinch design splits a pinch side at every pinch inside it,
+  not only at the utility pinches of held utility levels: wherever the
+  side's heat cascade closes (its own utility counted at the far end), the
+  region on each side is designed on its own. A case with a heat pump's
+  condenser and evaporator among its streams, each sized to its pocket, has
+  such a pinch on each side; the heuristic realised none of its proposals
+  there and the MILP ran in its place. On the basic pinch sample with the
+  Carnot heat pump target's two streams it now returns networks at the heat
+  pump's target at multipliers 0.75, 1.0 and 1.5 (full load) and 1.0 and
+  1.5 (half load), the best 1 to 2% cheaper than the MILP's. A cascade
+  counts as closed within 1e-4 of the side's load (was 1e-6), which a
+  condenser or evaporator written with a 0.01 K glide needs.
 - ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``, today's
   behaviour) makes the thermal derivative and network evolution steps of a
   single process keep each utility level at the duty its pinch design held

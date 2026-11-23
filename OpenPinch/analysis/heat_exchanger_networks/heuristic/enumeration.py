@@ -21,7 +21,7 @@ from dataclasses import dataclass, replace
 from itertools import combinations, islice
 from typing import Iterator
 
-from .regions import utility_pinch_regions
+from .regions import pinch_regions
 from .rules import cp_feasible, cp_rule_met, pinch_streams, split_counts
 from .side_streams import PinchSide, SideStream
 
@@ -334,11 +334,11 @@ def _union(side: PinchSide, designs: list[SideProposal]) -> SideProposal:
 def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SideProposal]:
     """Up to ``limit`` distinct topologies for one single-period side.
 
-    A side split by utility pinches has each region designed on its own;
+    A side with pinches inside it has each region designed on its own;
     a proposal stacks one design per region, nearest the pinch first.
     """
 
-    regions = utility_pinch_regions(side)
+    regions = pinch_regions(side)
     if len(regions) == 1:
         return _region_topologies(side, limit=limit)
     designs = [_region_topologies(region, limit=limit) for region in regions]
