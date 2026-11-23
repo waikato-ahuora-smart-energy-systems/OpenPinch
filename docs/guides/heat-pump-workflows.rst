@@ -333,7 +333,9 @@ and a target ends its streams inside those bands. A level serves a stream
 whole or not at all, so a condenser inside the band of a level that takes
 heat is moved up to the band's top and an evaporator inside the band of a
 level that gives heat down to its bottom. The move is at most the band's
-width.
+width. Where the site has a dt_cont multiplier the new zones inherit it, and
+the streams are written with ``HPR_DT_CONT`` over the multiplier, so they
+stand off the levels as the target put them.
 
 The new case is checked before it is returned. It is refused when it would
 not target as the heat pump did: when a level the heat pump delivers into

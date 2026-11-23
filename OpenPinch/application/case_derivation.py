@@ -343,9 +343,13 @@ def _require_heat_pump_site_target(case, target) -> None:
     )
 
 
-def _band_move(stream, role: str, approach: float, levels) -> float:
+def _band_move(
+    stream, role: str, approach: float, levels, multiplier: float = 1.0
+) -> float:
     """The kelvin to move a utility heat pump stream by so that the
-    utility level whose band it lies in serves all of it.
+    utility level whose band it lies in serves all of it. ``approach`` is
+    the heat pump's own contribution as the target used it; each level's
+    contribution counts ``multiplier`` times, the zone's dt_cont multiplier.
 
     A utility level is written as a narrow band of temperature (a steam
     main as 0.1 K), and a heat pump target places its streams against the
@@ -365,7 +369,7 @@ def _band_move(stream, role: str, approach: float, levels) -> float:
         )
         if not 0.0 < ends[1] - ends[0] <= UTILITY_BAND_MAX_SPAN_K:
             continue
-        gap = approach + float(level.delta_t_contribution.value)
+        gap = approach + multiplier * float(level.delta_t_contribution.value)
         for part in stream.segments or (stream,):
             end = float(part.supply_temperature.value)
             if role == "condenser" and ends[0] + gap <= end < ends[1] + gap:
@@ -414,8 +418,13 @@ def _case_with_utility_heat_pump_zones(
         )
     source = problem.to_problem_json()
     node = _tree_node(source["zone_tree"], _ancestry(scope))
+    # The target stands its streams off a level by ``dt_cont`` as given plus
+    # the level's contribution times the zone's multiplier. The new zones
+    # inherit that multiplier, which scales every stream in them, so the
+    # heat pump's contribution is written over it.
     approach = float(dt_cont)
-    dt_cont = {"value": approach, "unit": "delta_degC"}
+    multiplier = float(scope.dt_cont_multiplier)
+    dt_cont = {"value": approach / multiplier, "unit": "delta_degC"}
     for role, streams, levels in (
         ("condenser", target.hpr_hot_streams, scope.cold_utilities),
         ("evaporator", target.hpr_cold_streams, scope.hot_utilities),
@@ -438,9 +447,8 @@ def _case_with_utility_heat_pump_zones(
                 dt_cont=dt_cont,
                 mark={"machine": machine, "role": role, "placement": "utility"},
             )
-            source["streams"].append(
-                _moved_record(record, _band_move(stream, role, approach, levels))
-            )
+            move = _band_move(stream, role, approach, levels, multiplier)
+            source["streams"].append(_moved_record(record, move))
     return type(problem)(
         source,
         project_name=problem.project_name if project_name is None else project_name,
