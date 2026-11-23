@@ -1116,6 +1116,20 @@ class _Evaluator:
             )
             if any(m is None for m in modifications):
                 return None
+            if self.heat_pump is not None:
+                # The machine itself, ahead of the matches that serve it:
+                # its compressor is a constant of the step.
+                record = self.heat_pump.record
+                modifications = (
+                    HeatExchangerNetworkRetrofitModification(
+                        kind="heat_pump",
+                        exchanger_id=record.machine,
+                        fixed_cost=float(record.capital_cost),
+                        heat_pump_cop=float(record.cop),
+                        heat_pump_capacity=float(record.condenser_duty),
+                    ),
+                    *modifications,
+                )
             capital = sum(m.fixed_cost + m.area_cost for m in modifications)
             annualised = self.recovery_factor * capital
             design = HeatExchangerNetworkRetrofitDesign(
