@@ -428,6 +428,12 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         # matches name them as the existing network does.
         solved=_with_names(step.base.network, evaluator.names),
         ambient_sources=step.ambient_sources,
+        # Air carries the ambient contribution, not a process stream's.
+        ambient_approach=(
+            float(config.hpr.dt_env_cont) + float(config.hpr.dt_cont)
+            if evaluator.settings.approach is None
+            else float(evaluator.settings.approach)
+        ),
     )
     matched = {
         name for placed in added for name in (placed.match.hot, placed.match.cold)

@@ -52,6 +52,7 @@ def with_heat_pump_matches(
     machine: str = "HP",
     solved: HeatExchangerNetwork | None = None,
     ambient_sources=(),
+    ambient_approach: float | None = None,
 ) -> tuple[HeatExchangerNetwork, tuple[PlacedMatch, ...]]:
     """``network`` with the matches that serve a heat pump's streams, and
     the ids of the exchangers added.
@@ -106,12 +107,13 @@ def with_heat_pump_matches(
         for position, hot in enumerate(served):
             add(hot, evaporator.name, stage, position == 0)
     # The air an evaporator draws on, after everything else: every
-    # evaporator colder than it takes a share.
+    # evaporator at least the approach below it takes a share.
+    gap = approach if ambient_approach is None else float(ambient_approach)
     for air in ambient_sources:
         below = sorted(
             evaporator.name
             for evaporator in evaporators
-            if _hot_end(evaporator) < _cold_end(air)
+            if _cold_end(air) - _hot_end(evaporator) >= gap
         )
         stage = stage_count(network) + 1
         for position, cold in enumerate(below):
