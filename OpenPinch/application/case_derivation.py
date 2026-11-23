@@ -399,6 +399,12 @@ def _case_with_utility_heat_pump_zones(
         for zone in problem._walk_zone_tree(root)
         if zone.address == target.provenance.zone_address
     )
+    if scope.type == ZoneType.P.value:
+        raise ValueError(
+            f"The heat pump was targeted on the process zone {scope.address!r}. "
+            "A heat pump on the utility system is added as process zones of "
+            "a site; target it on the site that holds the process."
+        )
     source = problem.to_problem_json()
     node = _tree_node(source["zone_tree"], _ancestry(scope))
     approach = float(dt_cont)
