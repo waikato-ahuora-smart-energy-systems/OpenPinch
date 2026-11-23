@@ -1790,8 +1790,9 @@ class _DesignAccessor:
         to the evaporators). One machine can so serve several exchangers
         at several levels. That step is one modification of kind
         ``"heat_pump"``, which holds the compressor at ``heat_pump_cost``
-        per kW of condenser capacity (a "vapour_compression" machine at its
-        compressors' and motors' installed capital from the HPR service,
+        per kW of condenser capacity (a "vapour_compression" machine at the
+        HPR service's installed capital without its process and air
+        exchangers: compressors, motors, cascade exchangers and IHXs;
         ``heat_pump_cost`` unused), followed by its exchangers as new
         matches; the machine's electricity is in the design's utility
         cost and its network records the machine in ``heat_pumps``. The

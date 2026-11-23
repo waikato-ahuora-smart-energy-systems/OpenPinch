@@ -360,15 +360,15 @@ def test_result_translation_attaches_ambient_streams_and_validates_output():
     assert output.success is True
 
 
-def test_the_output_carries_each_machines_compressor_capital():
+def test_the_output_carries_each_machines_internal_capital():
     # The solver attaches the ambient streams; none here.
     result = _result(0.2).with_updates(
-        amb_streams=StreamCollection(), hpr_machine_compressor_capital_costs=(5.0,)
+        amb_streams=StreamCollection(), hpr_machine_internal_capital_costs=(5.0,)
     )
 
     output = adapter.translate_hpr_output(result)
 
-    assert output.hpr_machine_compressor_capital_costs == (5.0,)
+    assert output.hpr_machine_internal_capital_costs == (5.0,)
 
 
 def test_solver_resolves_only_the_best_ranked_candidate():

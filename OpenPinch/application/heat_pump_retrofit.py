@@ -31,10 +31,11 @@ def heat_pump_machine(
     The electricity is its work at ``COSTING_HPR_ELE_PRICE`` over the
     year's operating hours; the compressor costs ``cost_per_kw`` ($) per
     kW of condenser capacity, annualised as exchanger capital is. A
-    "vapour_compression" machine's compressors and motors cost what the
-    HPR service installs them at instead
-    (``hpr_machine_compressor_capital_costs``): its condensers and
-    evaporators are the network's exchangers, priced there.
+    "vapour_compression" machine costs what the HPR service installs it
+    at without its process and air exchangers instead
+    (``hpr_machine_internal_capital_costs``: compressors, motors, cascade
+    exchangers and IHXs): its condensers and evaporators are the
+    network's exchangers, priced there.
     """
 
     def duty(streams) -> float:
@@ -44,7 +45,7 @@ def heat_pump_machine(
     capacity = duty(solved.hpr_hot_streams)
     work = float(solved.w_net)
     capital = (
-        sum(float(c) for c in solved.hpr_machine_compressor_capital_costs)
+        sum(float(c) for c in solved.hpr_machine_internal_capital_costs)
         if cycle == "vapour_compression"
         else float(cost_per_kw) * capacity
     )
