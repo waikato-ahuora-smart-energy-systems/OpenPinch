@@ -30,7 +30,11 @@ def heat_pump_machine(
     Its duties are those of its condenser and evaporator streams (kW).
     The electricity is its work at ``COSTING_HPR_ELE_PRICE`` over the
     year's operating hours; the compressor costs ``cost_per_kw`` ($) per
-    kW of condenser capacity, annualised as exchanger capital is.
+    kW of condenser capacity, annualised as exchanger capital is. A
+    "vapour_compression" machine's compressors and motors cost what the
+    HPR service installs them at instead
+    (``hpr_machine_compressor_capital_costs``): its condensers and
+    evaporators are the network's exchangers, priced there.
     """
 
     def duty(streams) -> float:
@@ -39,7 +43,11 @@ def heat_pump_machine(
     price_scale, capital_scale = annual_cost_scales(costing)
     capacity = duty(solved.hpr_hot_streams)
     work = float(solved.w_net)
-    capital = float(cost_per_kw) * capacity
+    capital = (
+        sum(float(c) for c in solved.hpr_machine_compressor_capital_costs)
+        if cycle == "vapour_compression"
+        else float(cost_per_kw) * capacity
+    )
     return NetworkHeatPump(
         machine=name,
         cycle=cycle,
@@ -107,6 +115,7 @@ def heat_pump_step(
         base.network,
         args=dict(limits) if limits else None,
         load_fraction=load_fraction,
+        cycle=settings.heat_pump_cycle,
     )
     if solved is None:
         # The heaters carry no load: no heat pump to add.
@@ -189,12 +198,12 @@ def retrofit_with_heat_pump(
     as the first runs on ``problem``, from ``heat_pump_step``.
     """
 
-    if settings.heat_pump_cycle != "carnot":
+    if settings.heat_pump_cycle not in ("carnot", "vapour_compression"):
         # Checked here: the plain search below runs with no cycle, so its
         # own check of the cycle would not see this one.
         raise ValueError(
-            "the heat pump stream step takes heat_pump_cycle='carnot' only; "
-            f"got {settings.heat_pump_cycle!r}."
+            "the heat pump stream step takes heat_pump_cycle='carnot' or "
+            f"'vapour_compression' only; got {settings.heat_pump_cycle!r}."
         )
     # The stream step replaces the linked heat pump move: the plain search
     # offers none of its own.
@@ -216,20 +225,21 @@ def retrofit_with_heat_pump(
         return base
     sized = []
     for size in sizes:
-        step, solved = heat_pump_step(
-            problem,
-            base.frontier[0],
-            settings,
-            limits=limits,
-            machine=machine,
-            load_fraction=size,
-        )
-        if step is None:
-            continue
-        # A case that refuses the streams (process components, several
-        # process zones) or a network that cannot serve them is a heat pump
-        # this retrofit cannot use, not a failed retrofit.
+        # A target with no machine (none the cycle can model pays), a case
+        # that refuses the streams (process components, several process
+        # zones) or a network that cannot serve them is a heat pump this
+        # retrofit cannot use, not a failed retrofit.
         try:
+            step, solved = heat_pump_step(
+                problem,
+                base.frontier[0],
+                settings,
+                limits=limits,
+                machine=machine,
+                load_fraction=size,
+            )
+            if step is None:
+                continue
             case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
             with temporary_zone_configuration(
                 case._build_execution_master_zone(), configuration

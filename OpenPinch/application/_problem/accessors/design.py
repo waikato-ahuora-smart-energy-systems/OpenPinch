@@ -1773,9 +1773,14 @@ class _DesignAccessor:
         utility.
 
         With the "carnot" cycle the retrofit by default (``heat_pump_streams``
-        None or True; False keeps the linked move above, and True with any
-        other cycle is refused) tries the existing network's as-piped heat
-        pump target instead, as one machine of that size: its condensers
+        None or True; False keeps the linked move above), and with
+        "vapour_compression" when ``heat_pump_streams`` is True (True with
+        any other cycle is refused), tries the existing network's as-piped
+        heat pump target instead, as one machine of that size (with
+        "vapour_compression" a cascade of vapour compression cycles on
+        ``HPR_REFRIGERANTS``, with ``HPR_N_COND`` and ``HPR_N_EVAP``
+        levels, its condensers each one stream with their desuperheating,
+        condensing and subcooling segments): its condensers
         and evaporators, placed along
         the heaters' and coolers' own temperatures, join the case as
         streams, and a second search starts from the existing network with
@@ -1785,7 +1790,9 @@ class _DesignAccessor:
         to the evaporators). One machine can so serve several exchangers
         at several levels. That step is one modification of kind
         ``"heat_pump"``, which holds the compressor at ``heat_pump_cost``
-        per kW of condenser capacity, followed by its exchangers as new
+        per kW of condenser capacity (a "vapour_compression" machine at its
+        compressors' and motors' installed capital from the HPR service,
+        ``heat_pump_cost`` unused), followed by its exchangers as new
         matches; the machine's electricity is in the design's utility
         cost and its network records the machine in ``heat_pumps``. The
         machine is tried at each of ``heat_pump_sizes`` (shares of the
@@ -1800,7 +1807,8 @@ class _DesignAccessor:
         size. The plain search the step is joined with offers no linked
         heat pump. The step is left out, with a ``UserWarning`` giving the
         reason, on a problem with several periods, on one with process
-        components or a site of several process zones, and when the
+        components or a site of several process zones, when the target
+        finds no machine the cycle can model that pays, and when the
         network cannot serve the machine's duties; it is not built when
         ``max_modifications`` is 0.
 
@@ -1838,13 +1846,20 @@ class _DesignAccessor:
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit")
-        if heat_pump_streams and heat_pump_cycle != "carnot":
+        if heat_pump_streams and heat_pump_cycle not in (
+            "carnot",
+            "vapour_compression",
+        ):
             raise ValueError(
-                "heat_pump_streams is built for heat_pump_cycle='carnot' only; "
-                f"got {heat_pump_cycle!r}, which takes the linked heat pump move."
+                "heat_pump_streams is built for heat_pump_cycle='carnot' or "
+                f"'vapour_compression' only; got {heat_pump_cycle!r}."
             )
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
-        streams = heat_pump_cycle == "carnot" and heat_pump_streams is not False
+        # Carnot runs the stream step unless told not to; vapour compression
+        # only when asked, until it is compared with the linked move.
+        streams = (heat_pump_cycle == "carnot" and heat_pump_streams is not False) or (
+            heat_pump_cycle == "vapour_compression" and bool(heat_pump_streams)
+        )
         if streams and outside:
             raise ValueError(
                 "heat_pump_sizes are shares of the existing heaters' load, "

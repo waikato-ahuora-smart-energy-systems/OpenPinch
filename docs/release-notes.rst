@@ -151,6 +151,22 @@ Heat exchanger network synthesis
   failed when its areas were taken; it now designs. Network evolution,
   which solves without integers, still holds the approach at match ends
   only.
+- ``design.retrofit(heat_pump_cycle="vapour_compression",
+  heat_pump_streams=True)`` retrofits a vapour compression heat pump as
+  streams. The as-piped target is a cascade of vapour compression cycles
+  on ``HPR_REFRIGERANTS`` (``HPR_N_COND`` and ``HPR_N_EVAP`` levels), its
+  condensers kept as one stream each with their desuperheating,
+  condensing and subcooling segments. The machine costs its compressors
+  and motors as the heat pump service installs them, not
+  ``heat_pump_cost``: its exchangers are the network's new matches,
+  priced by their area. A target that finds no machine paying (a heater
+  above what the refrigerants reach) leaves the step out with a warning.
+  Heat pump targets now also report each machine's compressor capital
+  alone (``hpr_machine_compressor_capital_costs``). Without
+  ``heat_pump_streams=True`` vapour compression keeps the linked move
+  until the two are compared. On a low-temperature case (a cooler from 95
+  to 45 degC, a heater from 100 to 130 degC) a 296 kW water machine cuts
+  steam by a fifth and nets 67,500 $/y.
 - The retrofit search can start from a heat pump added to the case as
   streams. ``run_retrofit_search(problem, existing, settings,
   heat_pump=HeatPumpStep(...))`` takes a machine of a fixed size whose
@@ -170,7 +186,7 @@ Heat exchanger network synthesis
   network's as-piped heat pump target as one
   machine added as streams, in place of the linked heat pump move
   (``heat_pump_streams=False`` keeps the linked move; vapour compression
-  keeps it, and refuses ``heat_pump_streams=True``): several condensers along the heaters'
+  keeps it unless ``heat_pump_streams=True``): several condensers along the heaters'
   temperatures and several evaporators along the coolers', where the
   linked heat pump is one evaporator and one condenser at the ends of two
   streams. The step is one ``heat_pump`` modification with the compressor
