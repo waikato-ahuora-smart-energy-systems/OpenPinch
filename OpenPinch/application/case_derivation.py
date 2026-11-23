@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 
+from ..analysis.heat_pumps.common._shared.air import UTILITY_BAND_MAX_SPAN_K
 from ..domain.enums import StreamType, ZoneType
 from ..domain.targets import DirectHeatPumpTarget, IndirectHeatPumpTarget
 from ._problem.input.utilities import _set_utilities_for_zone_and_subzones
@@ -294,6 +295,53 @@ def _tree_node(tree: dict, path: list[str]) -> dict:
     return node
 
 
+def _band_move(stream, role: str, approach: float, levels) -> float:
+    """The kelvin to move a utility heat pump stream by so that the
+    utility level whose band it lies in serves all of it.
+
+    A utility level is written as a narrow band of temperature (a steam
+    main as 0.1 K), and a heat pump target places its streams against the
+    heat in the band, so a stream can end inside it. A level serves a
+    stream whole or not at all, and in the plant it is at one temperature.
+    A condenser whose hot end, less the approaches, lies inside the band
+    of a level that takes heat is moved up to the band's top; an
+    evaporator whose cold end, plus the approaches, lies inside the band
+    of a level that gives heat is moved down to its bottom. A segmented
+    stream moves by the most any of its segments needs.
+    """
+    moves = [0.0]
+    for level in levels:
+        ends = sorted(
+            float(end.value)
+            for end in (level.supply_temperature, level.target_temperature)
+        )
+        if not 0.0 < ends[1] - ends[0] <= UTILITY_BAND_MAX_SPAN_K:
+            continue
+        gap = approach + float(level.delta_t_contribution.value)
+        for part in stream.segments or (stream,):
+            end = float(part.supply_temperature.value)
+            if role == "condenser" and ends[0] + gap <= end < ends[1] + gap:
+                moves.append(ends[1] + gap - end)
+            if role == "evaporator" and ends[0] - gap < end <= ends[1] - gap:
+                moves.append(ends[0] - gap - end)
+    return max(moves, key=abs)
+
+
+def _moved_record(record: dict, move: float) -> dict:
+    """A stream record with its temperatures, and its segments', moved by
+    ``move`` K."""
+
+    def moved(part: dict) -> dict:
+        return part | {
+            key: part[key] | {"value": part[key]["value"] + move}
+            for key in ("t_supply", "t_target")
+        }
+
+    if "segments" in record:
+        return record | {"segments": [moved(part) for part in record["segments"]]}
+    return moved(record)
+
+
 def _case_with_utility_heat_pump_zones(
     problem, target, *, dt_cont: float, machine="HP", project_name=None
 ):
@@ -312,10 +360,11 @@ def _case_with_utility_heat_pump_zones(
     )
     source = problem.to_problem_json()
     node = _tree_node(source["zone_tree"], _ancestry(scope))
-    dt_cont = {"value": float(dt_cont), "unit": "delta_degC"}
-    for role, streams in (
-        ("condenser", target.hpr_hot_streams),
-        ("evaporator", target.hpr_cold_streams),
+    approach = float(dt_cont)
+    dt_cont = {"value": approach, "unit": "delta_degC"}
+    for role, streams, levels in (
+        ("condenser", target.hpr_hot_streams, scope.cold_utilities),
+        ("evaporator", target.hpr_cold_streams, scope.hot_utilities),
     ):
         name = f"{machine} {role}"
         node["children"] = [
@@ -323,13 +372,14 @@ def _case_with_utility_heat_pump_zones(
             {"name": name, "type": ZoneType.P.value, "children": None},
         ]
         for _key, stream in streams.items():
+            record = _heat_pump_stream_record(
+                stream,
+                zone=f"{scope.address}/{name}",
+                dt_cont=dt_cont,
+                mark={"machine": machine, "role": role, "placement": "utility"},
+            )
             source["streams"].append(
-                _heat_pump_stream_record(
-                    stream,
-                    zone=f"{scope.address}/{name}",
-                    dt_cont=dt_cont,
-                    mark={"machine": machine, "role": role, "placement": "utility"},
-                )
+                _moved_record(record, _band_move(stream, role, approach, levels))
             )
     return type(problem)(
         source,
