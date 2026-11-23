@@ -484,6 +484,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_UTILITY_PLACEMENT": _spec(str, "auto", "hens", "utility_placement", validator=partial(_string_choice, choices=HENS_UTILITY_PLACEMENT_VALUES)),
     "HENS_UTILITY_SLICES": _spec(bool, True, "hens", "utility_slices"),
     "HENS_FORBIDDEN_MATCHES": _spec(List[List[str]], [], "hens", "forbidden_matches", validator=_name_pairs),
+    "HENS_HEAT_PUMP_STREAM_EXCHANGERS": _spec(int, 2, "hens", "heat_pump_stream_exchangers", numeric_min=1.0),
     "HENS_SITE_LEVELS": _spec(str, "given", "hens", "site_levels", validator=partial(_string_choice, choices=HENS_SITE_LEVELS_VALUES)),
     "HENS_SITE_LEVEL_COUNTS": _spec(List[int], [2, 3, 4, 5], "hens", "site_level_counts", validator=_site_level_counts),
     "HENS_SITE_LEVEL_EARLY_STOP": _spec(bool, False, "hens", "site_level_early_stop"),

@@ -12,6 +12,7 @@ from ..analysis.heat_exchanger_networks.heat_pump_cost import (
     heat_pump_record,
     network_with_heat_pumps,
 )
+from ..analysis.heat_exchanger_networks.solver.arrays import heat_pump_stream_roles
 from ..contracts.hpr import HprLevels, HPRTargetingError
 from .case_derivation import (
     _case_with_heat_pump_streams,
@@ -155,6 +156,7 @@ def design_with_heat_pump(
     multipliers,
     arguments: Mapping,
     costing=None,
+    max_exchangers: int | None = None,
 ):
     """Design ``problem`` without a heat pump and, at each of
     ``multipliers``, with one, and rank every network together.
@@ -216,10 +218,40 @@ def design_with_heat_pump(
                 )
                 continue
             runs.append((run, view))
-    return heat_pump_design_view(problem, plain, runs)
+    return heat_pump_design_view(problem, plain, runs, max_exchangers=max_exchangers)
 
 
-def heat_pump_design_view(problem, plain, runs):
+def capped_heat_pump_streams(case) -> set[str]:
+    """The keys of the streams ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` caps:
+    the condensers and evaporators of ``case``, as its networks name them.
+
+    An ambient source is not capped: one air stream can feed several
+    evaporators.
+    """
+    return {
+        key
+        for key, role in heat_pump_stream_roles(case).items()
+        if role in ("condenser", "evaporator")
+    }
+
+
+def _most_exchangers(network, keys: set[str]) -> int:
+    """The most exchangers with duty that one stream of ``keys`` has.
+
+    ``keys`` are stream keys as the network names them: a stream of the
+    same name in another zone is another stream.
+    """
+    counts = dict.fromkeys(keys, 0)
+    for exchanger in network.exchangers:
+        if max(state.duty for state in exchanger.period_states) <= 0.0:
+            continue
+        for key in (exchanger.source_stream, exchanger.sink_stream):
+            if key in counts:
+                counts[key] += 1
+    return max(counts.values(), default=0)
+
+
+def heat_pump_design_view(problem, plain, runs, *, max_exchangers: int | None = None):
     """One view ranking the designs without the heat pump and with it.
 
     ``plain`` is the problem's design without a heat pump and ``runs`` pairs
@@ -228,6 +260,10 @@ def heat_pump_design_view(problem, plain, runs):
     (``network_with_heat_pumps``) and is ranked on that total among the
     rest. The view is ``plain``, its result holding them all and the
     cheapest selected.
+
+    A network that serves a heat pump stream through more than
+    ``max_exchangers`` exchangers (``HENS_HEAT_PUMP_STREAM_EXCHANGERS``) is
+    left out, and a warning says how many were.
     """
     from ..analysis.heat_exchanger_networks.results.selection import (
         ranked_networks,
@@ -236,8 +272,17 @@ def heat_pump_design_view(problem, plain, runs):
 
     result = plain.result
     ranked = list(ranked_networks(result))
+    kept = dropped = 0
     for run, view in runs:
+        capped = capped_heat_pump_streams(run.case)
         for outcome in ranked_networks(view.result):
+            if (
+                max_exchangers is not None
+                and _most_exchangers(outcome.network, capped) > max_exchangers
+            ):
+                dropped += 1
+                continue
+            kept += 1
             network = network_with_heat_pumps(outcome.network, (run.record,))
             ranked.append(
                 outcome.model_copy(
@@ -247,9 +292,25 @@ def heat_pump_design_view(problem, plain, runs):
                     }
                 )
             )
+    if dropped:
+        warnings.warn(
+            f"{dropped} heat pump network(s) put more than {max_exchangers} "
+            "exchanger(s) on a heat pump stream "
+            f"(HENS_HEAT_PUMP_STREAM_EXCHANGERS) and were left out; {kept} "
+            "are ranked.",
+            UserWarning,
+            stacklevel=2,
+        )
     result.ranked_networks = tuple(ranked)
     select_network(result)
     return plain
 
 
-__all__ = ["HeatPumpDesignCase", "heat_pump_design_case", "heat_pump_design_view"]
+__all__ = [
+    "HeatPumpDesignCase",
+    "capped_heat_pump_streams",
+    "design_with_heat_pump",
+    "heat_pump_design_case",
+    "heat_pump_design_view",
+    "heat_pump_request",
+]

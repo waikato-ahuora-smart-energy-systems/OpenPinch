@@ -566,7 +566,9 @@ class _DesignAccessor:
         designed at each multiplier, and ``NetworkHeatPump.load_fraction``
         names each network's; with one, that size alone. A multiplier and
         size with no heat pump target, or no network around its streams,
-        is left out with a warning. The problem's stored design is the one
+        is left out with a warning, as is a network that puts more than
+        ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` exchangers (2 by default) on
+        one heat pump stream. The problem's stored design is the one
         without a heat pump. ``record`` is not available with it, nor a
         problem with several periods.
         """
@@ -615,7 +617,8 @@ class _DesignAccessor:
                 depth=depth,
                 dt_cont_multipliers=dt_cont_multipliers,
             )
-            search = resolve_search(self._effective_hens(configuration))
+            hens = self._effective_hens(configuration)
+            search = resolve_search(hens)
             root = problem._require_prepared_root_zone()
             with temporary_zone_configuration(root, configuration):
                 # The prices and annualisation this call costs its networks
@@ -626,6 +629,7 @@ class _DesignAccessor:
                 heat_pump,
                 cost_per_kw=heat_pump_cost,
                 costing=costing,
+                max_exchangers=hens.heat_pump_stream_exchangers,
                 multipliers=search.dt_cont_multipliers,
                 arguments=arguments,
             )
