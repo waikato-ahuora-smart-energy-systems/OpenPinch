@@ -27,7 +27,7 @@ def network_with_heat_pumps(
 
 
 def heat_pump_record(
-    target, *, machine: str, costing, cost_per_kw: float
+    target, *, machine: str, costing, cost_per_kw: float, period_weights=None
 ) -> NetworkHeatPump:
     """A heat pump target as the machine a network records.
 
@@ -38,19 +38,44 @@ def heat_pump_record(
     ``COSTING_SERVICE_LIFE``. The condenser and evaporator are exchangers
     of the network, priced there.
     """
-    capital = float(cost_per_kw) * _duty(target.hpr_hot_streams)
+    work = float(target.hpr_work)
+    condenser = _duty(target.hpr_hot_streams)
+    evaporator = _duty(target.hpr_cold_streams)
+    cop = float(target.hpr_cop)
+    outputs = getattr(getattr(target, "hpr_details", None), "period_outputs", None)
+    if period_weights and outputs:
+        # A shared design over several periods: the target's own fields
+        # hold one period, its period outputs every one.
+        total = float(sum(period_weights.values()))
+        share = {period: weight / total for period, weight in period_weights.items()}
+        # A period the machine is off in (an off season, a load too small
+        # to run for) has no output, or one without streams: it draws no
+        # work and gives no heat, and keeps its share of the year.
+        running = {
+            p: outputs[p]
+            for p in share
+            if p in outputs and _duty(outputs[p]["hpr_hot_streams"]) > 0.0
+        }
+        delivered = {
+            p: _duty(output["hpr_hot_streams"]) for p, output in running.items()
+        }
+        work = sum(share[p] * float(output["w_net"]) for p, output in running.items())
+        cop = sum(share[p] * delivered[p] for p in running) / work if work else cop
+        condenser = max(delivered.values(), default=0.0)
+        evaporator = max(
+            (_duty(output["hpr_cold_streams"]) for output in running.values()),
+            default=0.0,
+        )
+    capital = float(cost_per_kw) * condenser
     return NetworkHeatPump(
         machine=machine,
         cycle=str(target.hpr_cycle),
-        condenser_duty=_duty(target.hpr_hot_streams),
-        evaporator_duty=_duty(target.hpr_cold_streams),
-        work=float(target.hpr_work),
-        cop=float(target.hpr_cop),
+        condenser_duty=condenser,
+        evaporator_duty=evaporator,
+        work=work,
+        cop=cop,
         electricity_cost=(
-            float(target.hpr_work)
-            * float(costing.hpr_ele_price)
-            * float(costing.annual_op_time)
-            / 1e3
+            work * float(costing.hpr_ele_price) * float(costing.annual_op_time) / 1e3
         ),
         capital_cost=capital,
         annual_capital_cost=capital

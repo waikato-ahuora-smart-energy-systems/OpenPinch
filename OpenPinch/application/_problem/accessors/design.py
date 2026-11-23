@@ -569,8 +569,12 @@ class _DesignAccessor:
         is left out with a warning, as is a network that puts more than
         ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` exchangers (2 by default) on
         one heat pump stream. The problem's stored design is the one
-        without a heat pump. ``record`` is not available with it, nor a
-        problem with several periods.
+        without a heat pump. ``record`` is not available with it. On a
+        problem with several periods the heat pump is solved as one
+        machine over all of them (a shared design), its streams vary by
+        period, its electricity is weighted by the period weights and its
+        compressor sized on its largest condenser duty; the sizes tried
+        are the load kinks of every period.
         """
         if heat_pump is not None:
             if record is not None:
