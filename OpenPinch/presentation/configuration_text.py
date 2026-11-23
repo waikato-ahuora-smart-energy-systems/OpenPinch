@@ -521,6 +521,15 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "of a level when the site utility balance makes that cheaper."
         ),
     ),
+    "HENS_EVOLUTION_LEVEL_HOLDS": FieldText(
+        "Level holds in evolution", None,
+        (
+            "Whether the thermal derivative and network evolution steps of a "
+            "single process keep the utility levels its pinch design held "
+            "(utility placement by temperature): none lets them trade utility "
+            "for area by price; fixed holds each level at its targeted duty."
+        ),
+    ),
     "HENS_RETROFIT_LOOPS": FieldText(
         "Retrofit heat recovery loops", None,
         (

@@ -111,6 +111,17 @@ class InternalHeatExchangerNetworkProblem:
     # How a site design holds each process's levels: "fixed" at its targets,
     # "at_least" at or above them (``HENS_SITE_LEVEL_HOLDS``).
     site_level_holds: str = "fixed"
+    # Whether a single process's stage-wise model keeps the levels its pinch
+    # design held (``utility_level_targets``): "none", or "fixed" at the
+    # targets (``HENS_EVOLUTION_LEVEL_HOLDS``). A site task holds by process
+    # instead.
+    level_holds: str = "none"
+    # The levels to hold when ``level_holds`` is "fixed": those the network
+    # this task starts from holds (``reporting.ranking.held_utility_levels``).
+    # A design that dropped the levels on one side of the pinch still
+    # records every target; holding it to those it missed could fail or
+    # move the split it chose. ``None`` holds ``utility_level_targets``.
+    held_level_targets: dict[str, list[float]] | None = None
     # A site task's utility levels (``../site/levels.py``): its stage-wise
     # model carries the site utility balance, so the site pays only for
     # its net utility use (``_stagewise/site_utilities.py``).
@@ -156,6 +167,20 @@ class InternalHeatExchangerNetworkProblem:
             )
             self.args["level_targets"] = targets
             self.args["stream_groups"] = groups
+        elif (
+            self.level_holds != "none"
+            and self.framework != "PDM"
+            and self.utility_level_targets
+        ):
+            # One process: its design's levels, held over all its streams
+            # (the group "" takes every stream; no match is ruled out).
+            held = (
+                self.utility_level_targets
+                if self.held_level_targets is None
+                else self.held_level_targets
+            )
+            targets, _groups = site_level_targets(self.solver_arrays, {"": held})
+            self.args["level_targets"] = targets
         if self.site_utility_system is not None and self.framework != "PDM":
             self.args["site_utilities"] = SiteUtilities(
                 self.site_utility_system.levels,
