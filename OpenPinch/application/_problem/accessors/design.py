@@ -1771,6 +1771,29 @@ class _DesignAccessor:
         ``COSTING_HPR_ELE_PRICE``; the heat pump's duties are not counted as
         utility.
 
+        With ``heat_pump_streams`` (and the "carnot" cycle) the retrofit
+        also tries the existing network's as-piped heat pump target as one
+        machine of that size: its condensers and evaporators, placed along
+        the heaters' and coolers' own temperatures, join the case as
+        streams, and a second search starts from the existing network with
+        the matches that serve them (each evaporator on every hot stream
+        whose cooler starts hot enough, each condenser on every cold stream
+        whose heater starts cold enough, and the air an evaporator draws on
+        to the evaporators). One machine can so serve several exchangers
+        at several levels. That step is one modification of kind
+        ``"heat_pump"``, which holds the compressor at ``heat_pump_cost``
+        per kW of condenser capacity, followed by its exchangers as new
+        matches; the machine's electricity is in the design's utility
+        cost and its network records the machine in ``heat_pumps``. Each
+        step of the result holds the better design of the two searches.
+        The machine's size is fixed, so it is not traded against exchanger
+        area as the linked heat pump's duty is. ``heat_pump_search`` bounds
+        the target's search (``maximum_iterations``,
+        ``maximum_evaluations``); the full search can take a minute. The
+        step is left out, with a ``UserWarning``, on a problem with
+        several periods and when the network cannot serve the machine's
+        duties.
+
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked
         by the utility cost their structure reaches with unlimited area (its
