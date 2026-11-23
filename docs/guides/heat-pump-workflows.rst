@@ -271,7 +271,9 @@ plus:
   target, with their segments when the cycle has them (a vapour compression
   condenser desuperheats, condenses and subcools);
 - ``dt_cont`` equal to ``HPR_DT_CONT`` on each, the approach the target
-  assumed between the heat pump and the process, so direct heat integration
+  assumed between the heat pump and the process (the value that solve used:
+  a ``minimum_approach_temperature`` given to the target is kept), so
+  direct heat integration
   targeting of ``with_pump`` gives the heat pump target's hot utility and
   the process cooling less the evaporator duty;
 - the air an evaporator draws on, when the process has too little heat
