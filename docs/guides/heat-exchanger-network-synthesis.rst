@@ -167,6 +167,11 @@ finished by the cheapest utility that reaches its target. In
   target. With ``HENS_UTILITY_PLACEMENT: "price"`` a side with a choice of
   utilities prefers the cheaper ones; with ``"temperature"`` each utility
   level carries the duty targeting gives it. Heuristic networks and the extra MILP networks keep those targets.
+  A side on which no design can hold the levels at their targets is
+  designed without them, choosing levels by price, and a ``UserWarning``
+  names the task and the side: its networks may then hold some levels and
+  not others (a heat pump's evaporator kept and its condenser replaced by
+  steam, for example).
   The main MILP network then drops stages that carry a small share of its
   recovery, which can move that recovery to utility (about 10% more utility
   on the ten-stream Ahmad case).

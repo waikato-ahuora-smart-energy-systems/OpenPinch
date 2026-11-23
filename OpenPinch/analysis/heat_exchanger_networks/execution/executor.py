@@ -757,6 +757,11 @@ def _solved_outcome(
         if getattr(solver_run, "converged", True)
         else {"unconverged_termination": str(solver_run.termination_condition)}
     )
+    # A pinch side designed without its utility levels: results assembly
+    # warns, as a log line in a worker process does not reach the caller.
+    dropped = sorted(getattr(internal_problem, "_sides_without_levels", ()))
+    if dropped:
+        diagnostics["levels_dropped"] = " and ".join(dropped)
     return HeatExchangerNetworkSynthesisTaskOutcome(
         task=task,
         status="success",
