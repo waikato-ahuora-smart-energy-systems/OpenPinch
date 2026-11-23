@@ -148,9 +148,15 @@ def joined(base, pumped) -> HeatExchangerNetworkRetrofitResult:
             if index < len(series)
         ]
         frontier.append(max(designs, key=lambda design: design.net_annual_benefit))
-    failed = [0] * (steps - 1)
-    for series, offset in ((base.failed_solves, 0), (pumped.failed_solves, 1)):
-        for index, count in enumerate(series):
+    # A search that ran out of candidates also counts the failures of the
+    # last depth it tried, which gave no design: its failed solves can run
+    # one step past its frontier.
+    series = ((base.failed_solves, 0), (pumped.failed_solves, 1))
+    failed = [0] * max(
+        [steps - 1, *(len(counts) + offset for counts, offset in series)]
+    )
+    for counts, offset in series:
+        for index, count in enumerate(counts):
             failed[index + offset] += int(count)
     return HeatExchangerNetworkRetrofitResult(
         frontier=mark_dominated(frontier),
