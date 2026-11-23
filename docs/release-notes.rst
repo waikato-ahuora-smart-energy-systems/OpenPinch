@@ -142,15 +142,17 @@ Heat exchanger network synthesis
   ``as_piped_heat_pump(problem, network)`` gives the as-piped heat pump
   target with its streams. The air an evaporator draws on is matched to
   the evaporators.
-- ``design.retrofit(heat_pump_cycle="carnot", heat_pump_streams=True)``
-  also tries the existing network's as-piped heat pump target as one
-  machine added as streams: several condensers along the heaters'
+- ``design.retrofit(heat_pump_cycle="carnot")`` now tries the existing
+  network's as-piped heat pump target as one
+  machine added as streams, in place of the linked heat pump move
+  (``heat_pump_streams=False`` keeps the linked move; vapour compression
+  keeps it, and refuses ``heat_pump_streams=True``): several condensers along the heaters'
   temperatures and several evaporators along the coolers', where the
   linked heat pump is one evaporator and one condenser at the ends of two
   streams. The step is one ``heat_pump`` modification with the compressor
   at ``heat_pump_cost`` per kW of condenser capacity and one new match per
   exchanger; each step of the result holds the better design of the search
-  with it and the search without. On a process where a heat pump pays
+  with it and the search without a heat pump. On a process where a heat pump pays
   above a COP of 2.5 the linked heat pump reaches 2.33 and was never
   selected; the as-piped machine reaches 3.1 to 3.3. The machine is tried
   at each of ``heat_pump_sizes``, shares of the heaters' load (by default
@@ -158,8 +160,10 @@ Heat exchanger network synthesis
   ``NetworkHeatPump.load_fraction``. On Ciric and Floudas at the guide's
   settings (electricity $30/MWh, compressor $300/kW, lift limit 200 K)
   the linked heat pump nets $1.23M/y and the as-piped machine at the full
-  load (17.5 MW, COP 2.37) $2.81M/y. The option is off by default.
-  ``heat_pump_search`` bounds the target's search. The step is left out
+  load (17.5 MW, COP 2.37) $2.81M/y, in about 20 s against under a second
+  for the linked move. ``heat_pump_search`` bounds each size's target
+  search, by default at 2000 evaluations (``{}`` for the full search, ten
+  times as long there for the same machine). The step is left out
   with a warning on a problem with several periods, on one with process
   components or a site of several process zones, and when the network
   cannot serve the machine's duties.

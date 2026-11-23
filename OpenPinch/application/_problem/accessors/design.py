@@ -1772,9 +1772,11 @@ class _DesignAccessor:
         ``COSTING_HPR_ELE_PRICE``; the heat pump's duties are not counted as
         utility.
 
-        With ``heat_pump_streams`` (and the "carnot" cycle) the retrofit
-        also tries the existing network's as-piped heat pump target as one
-        machine of that size: its condensers and evaporators, placed along
+        With the "carnot" cycle the retrofit by default (``heat_pump_streams``
+        None or True; False keeps the linked move above, and True with any
+        other cycle is refused) tries the existing network's as-piped heat
+        pump target instead, as one machine of that size: its condensers
+        and evaporators, placed along
         the heaters' and coolers' own temperatures, join the case as
         streams, and a second search starts from the existing network with
         the matches that serve them (each evaporator on every hot stream
@@ -1792,9 +1794,11 @@ class _DesignAccessor:
         result holds the best design of the plain search and every size's.
         Within one search the machine's size is fixed, not traded against
         exchanger area as the linked heat pump's duty is. ``heat_pump_search`` bounds
-        the target's search (``maximum_iterations``,
-        ``maximum_evaluations``); the full search can take more than a
-        minute. The step is left out, with a ``UserWarning`` giving the
+        each size's target search (``maximum_iterations``,
+        ``maximum_evaluations``), by default at 2000 evaluations; ``{}``
+        asks for the full search, which can take more than a minute per
+        size. The plain search the step is joined with offers no linked
+        heat pump. The step is left out, with a ``UserWarning`` giving the
         reason, on a problem with several periods, on one with process
         components or a site of several process zones, and when the
         network cannot serve the machine's duties; it is not built when

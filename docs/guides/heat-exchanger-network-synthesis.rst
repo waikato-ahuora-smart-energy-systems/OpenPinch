@@ -874,7 +874,11 @@ Repiping
    exchanger keeps its id, so it can also take added area, which makes a
    move to a match that needs a bigger unit a resized reassignment.
 Heat pumps
-   ``heat_pump_cycle`` lets a step add a heat pump between two streams, as
+   ``heat_pump_cycle`` lets a step add a heat pump. With ``"carnot"`` that
+   is by default the as-piped machine added as streams (next paragraph);
+   with ``heat_pump_streams=False``, and always with
+   ``"vapour_compression"``, it is the linked heat pump described here: a
+   heat pump between two streams, as
    Bütün et al. (2018) retrofit heat pumping with the network: an
    evaporator at the end of a hot stream, evaporating
    ``min_approach_temperature`` below its target, and a condenser at the
@@ -899,14 +903,14 @@ Heat pumps
    pump there lifts 208 K from H1 or 197 K from H2: within the default
    limit none is offered and new matches make the frontier. With the limit
    raised to 200 K, electricity at $30/MWh and the compressor at $300/kW, a
-   Carnot heat pump from H2 to C2 (COP 1.89, 7.7 MW, $2.39M fixed cost) is
-   the best first step at $1.22M/y net, level with the best new match
-   ($1.21M/y). At the case's $100/MWh new matches win.
+   linked Carnot heat pump from H2 to C2 (COP 1.89, 7.7 MW, $2.39M fixed
+   cost) is the best first step at $1.22M/y net, level with the best new
+   match ($1.21M/y). At the case's $100/MWh new matches win.
 The as-piped heat pump as streams
-   The heat pump above is one evaporator linked to one condenser, each at
+   The linked heat pump is one evaporator linked to one condenser, each at
    the end of its stream, so it lifts through the whole range the cooler
-   and the heater cover. With ``heat_pump_streams=True`` (and
-   ``heat_pump_cycle="carnot"``) the retrofit also tries the machine the
+   and the heater cover. With ``heat_pump_cycle="carnot"`` the retrofit
+   instead tries, by default, the machine the
    as-piped target of ``design.retrofit_heat_pumps`` describes, which
    places several condensers along the heaters' temperatures and several
    evaporators along the coolers'. Its condensers and evaporators join
@@ -919,8 +923,9 @@ The as-piped heat pump as streams
    shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
    default 1.0, 0.75 and 0.5), one search per size, and the machine
    records its share in ``load_fraction``. Each step of the result holds
-   the best design of the plain search and every size's, so the result is
-   never worse than without the option.
+   the best design of the plain search (which then offers no linked heat
+   pump) and every size's, so the result is never worse than the search
+   without a heat pump.
 
    On a process cooled from 54 degC and heated from 80 degC, with steam at
    $40/MWh and electricity at $100/MWh, a heat pump pays above a COP of
@@ -939,10 +944,12 @@ The as-piped heat pump as streams
    the as-piped machine at the full load (17.5 MW, three condensers and
    two evaporators, COP 2.37) takes all of the steam and nets $2.81M/y,
    ahead of its own smaller sizes (0.7 of the load: $2.11M/y; 0.4:
-   $1.25M/y). ``heat_pump_search`` bounds the target's search
-   (``{"maximum_evaluations": 2000}``): the full search can take more
-   than a minute per size. A level the target leaves without duty is not
-   added.
+   $1.25M/y). The whole retrofit takes about 20 s there; with
+   ``heat_pump_streams=False`` it takes the linked heat pump, $1.23M/y, in
+   under a second. ``heat_pump_search`` bounds each size's target search,
+   by default at ``{"maximum_evaluations": 2000}``; ``{}`` asks for the
+   full search, which found the same machine on this case in ten times as
+   long. A level the target leaves without duty is not added.
    The step is left out, with a ``UserWarning`` giving the reason, on a
    problem with several periods, on one with process components or a
    site of several process zones (the machine's streams cannot be added
