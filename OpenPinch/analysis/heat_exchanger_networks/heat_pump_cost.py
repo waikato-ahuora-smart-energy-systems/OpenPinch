@@ -1,0 +1,66 @@
+"""The cost a heat pump adds to a network designed around its streams."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from ...domain.heat_exchanger_network import HeatExchangerNetwork, NetworkHeatPump
+from ..economics import compute_capital_recovery_factor
+
+
+def network_with_heat_pumps(
+    network: HeatExchangerNetwork, heat_pumps: Sequence[NetworkHeatPump]
+) -> HeatExchangerNetwork:
+    """``network`` with ``heat_pumps`` recorded on it and their annual cost
+    (electricity and annualised capital) in its total.
+
+    The utility cost and the capital cost stay the network's own: its
+    utilities and its exchangers.
+    """
+    machines = tuple(heat_pumps)
+    total = network.total_annual_cost
+    if total is not None:
+        total += sum(machine.annual_cost for machine in machines)
+    return network.model_copy(
+        update={"heat_pumps": machines, "total_annual_cost": total}
+    )
+
+
+def heat_pump_record(
+    target, *, machine: str, costing, cost_per_kw: float
+) -> NetworkHeatPump:
+    """A heat pump target as the machine a network records.
+
+    Electricity is the target's work at ``COSTING_HPR_ELE_PRICE`` over
+    ``COSTING_ANNUAL_OP_TIME``. Capital is ``cost_per_kw`` ($ per kW of
+    condenser capacity) for the compressor and its motor, annualised at
+    the capital recovery factor of ``COSTING_DISCOUNT_RATE`` and
+    ``COSTING_SERVICE_LIFE``. The condenser and evaporator are exchangers
+    of the network, priced there.
+    """
+    capital = float(cost_per_kw) * _duty(target.hpr_hot_streams)
+    return NetworkHeatPump(
+        machine=machine,
+        cycle=str(target.hpr_cycle),
+        condenser_duty=_duty(target.hpr_hot_streams),
+        evaporator_duty=_duty(target.hpr_cold_streams),
+        work=float(target.hpr_work),
+        cop=float(target.hpr_cop),
+        electricity_cost=(
+            float(target.hpr_work)
+            * float(costing.hpr_ele_price)
+            * float(costing.annual_op_time)
+            / 1e3
+        ),
+        capital_cost=capital,
+        annual_capital_cost=capital
+        * compute_capital_recovery_factor(costing.discount_rate, costing.service_life),
+    )
+
+
+def _duty(streams) -> float:
+    """The summed duty (kW) of a target's condenser or evaporator streams."""
+    return float(sum(float(stream.heat_flow.value) for _key, stream in streams.items()))
+
+
+__all__ = ["heat_pump_record", "network_with_heat_pumps"]

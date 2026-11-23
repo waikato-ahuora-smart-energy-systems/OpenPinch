@@ -89,6 +89,35 @@ class NetworkOverdesign(BaseModel):
     failed_margins: tuple[float, ...] = ()
 
 
+class NetworkHeatPump(BaseModel):
+    """A heat pump designed into a network as streams of fixed duty.
+
+    The network's exchangers serve the machine's condenser and evaporator
+    streams; this is the machine itself. Duties and ``work`` are kW,
+    ``electricity_cost`` and ``annual_capital_cost`` $/y, and
+    ``capital_cost`` the installed cost ($) of the compressor and its
+    motor: the condenser and evaporator are exchangers of the network and
+    are priced there.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    machine: str
+    cycle: str
+    condenser_duty: float
+    evaporator_duty: float
+    work: float
+    cop: float
+    electricity_cost: float
+    capital_cost: float
+    annual_capital_cost: float
+
+    @property
+    def annual_cost(self) -> float:
+        """What the machine adds to the network's total annual cost, $/y."""
+        return self.electricity_cost + self.annual_capital_cost
+
+
 class HeatExchangerNetwork(BaseModel):
     """Ordered heat exchanger network result collection."""
 
@@ -110,6 +139,9 @@ class HeatExchangerNetwork(BaseModel):
     # The overdesign margin a rated network carries (``heat_exchanger_network
     # (overdesign_percentage=...)``); None without one.
     overdesign: NetworkOverdesign | None = None
+    # The heat pumps whose streams the network serves (``heat_exchanger_
+    # network(heat_pump=...)``); none in a design without one.
+    heat_pumps: tuple[NetworkHeatPump, ...] = ()
     solver_axis_metadata: dict[str, Any] = Field(
         default_factory=dict,
         exclude=True,
@@ -512,4 +544,9 @@ def _require_recovery_label(
         raise ValueError(f"{label.value} is only valid for recovery exchangers")
 
 
-__all__ = ["HeatExchangerNetwork", "NetworkOverdesign", "OverdesignPeriod"]
+__all__ = [
+    "HeatExchangerNetwork",
+    "NetworkHeatPump",
+    "NetworkOverdesign",
+    "OverdesignPeriod",
+]

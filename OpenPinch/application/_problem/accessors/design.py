@@ -6,7 +6,7 @@ import json
 import threading
 import time
 import warnings
-from copy import deepcopy
+from copy import copy, deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from ..arguments import (
@@ -489,6 +489,8 @@ class _DesignAccessor:
         best_solutions=None,
         solve_tolerance=None,
         record=None,
+        heat_pump=None,
+        heat_pump_cost: float = 0.0,
     ) -> HeatExchangerNetworkDesignView:
         """Run HEN synthesis at a search width and depth.
 
@@ -544,7 +546,85 @@ class _DesignAccessor:
         It is designed on a case derived from the zone, so the problem's
         stored results are not changed. The root zone (the default) designs
         on every stream.
+
+        ``heat_pump`` designs with a heat pump as well as without. It is a
+        cycle name (``"carnot"``) or a mapping with ``cycle`` and any of
+        ``load``, ``levels``, ``cycle_options``, ``search`` and ``options``
+        as ``target.heat_pump_and_refrigeration`` takes them. At each
+        dt_cont multiplier the heat pump is targeted with every
+        contribution at that multiplier, its condenser and evaporator join
+        the case as streams (``problem.with_heat_pump_streams``) and a
+        network is designed around them. Each such network records the
+        machine (``network.heat_pumps``) and counts its electricity
+        (``COSTING_HPR_ELE_PRICE`` over ``COSTING_ANNUAL_OP_TIME``) and
+        its compressor, at ``heat_pump_cost`` $ per kW of condenser
+        capacity, annualised, in its total annual cost. The result ranks
+        them with the networks designed without a heat pump, so the
+        selected network says whether the heat pump pays. A multiplier
+        with no heat pump target, or no network around its streams, is
+        left out with a warning. The problem's stored design is the one
+        without a heat pump. ``record`` is not available with it, nor a
+        problem with several periods.
         """
+        if heat_pump is not None:
+            if record is not None:
+                raise ValueError(
+                    "record= is not available with heat_pump=: a record collects "
+                    "one synthesis run, and a design with a heat pump is several."
+                )
+            from ....analysis.heat_exchanger_networks.execution.search import (
+                resolve_search,
+            )
+            from ...heat_pump_design import design_with_heat_pump
+
+            arguments = dict(
+                width=width,
+                depth=depth,
+                options=options,
+                period_id=period_id,
+                design_basis=design_basis,
+                basis_clusters=basis_clusters,
+                overdesign_percentage=overdesign_percentage,
+                dt_cont_multipliers=dt_cont_multipliers,
+                derivative_thresholds=derivative_thresholds,
+                stages=stages,
+                pack_stages=pack_stages,
+                solver=solver,
+                max_parallel=max_parallel,
+                best_solutions=best_solutions,
+                solve_tolerance=solve_tolerance,
+            )
+            problem = self._problem
+            if zone is not None:
+                target = problem._resolve_target_zone(zone)
+                if target.address != problem._require_prepared_root_zone().address:
+                    from ...case_derivation import _zone_case
+
+                    # The zone's own case: its heat pump is targeted there.
+                    return _zone_case(problem, target).design.heat_exchanger_network(
+                        heat_pump=heat_pump, heat_pump_cost=heat_pump_cost, **arguments
+                    )
+            _runtime, configuration = self._arguments(
+                options=options,
+                period_id=period_id,
+                width=width,
+                depth=depth,
+                dt_cont_multipliers=dt_cont_multipliers,
+            )
+            search = resolve_search(self._effective_hens(configuration))
+            root = problem._require_prepared_root_zone()
+            with temporary_zone_configuration(root, configuration):
+                # The prices and annualisation this call costs its networks
+                # with, for the heat pump's electricity and compressor.
+                costing = copy(root.config.costing)
+            return design_with_heat_pump(
+                problem,
+                heat_pump,
+                cost_per_kw=heat_pump_cost,
+                costing=costing,
+                multipliers=search.dt_cont_multipliers,
+                arguments=arguments,
+            )
         if zone is not None:
             target = self._problem._resolve_target_zone(zone)
             if target.address != self._problem._require_prepared_root_zone().address:

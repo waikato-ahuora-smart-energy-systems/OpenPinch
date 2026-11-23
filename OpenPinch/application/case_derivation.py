@@ -258,17 +258,33 @@ def with_heat_pump_streams(
     """
     from .hpr_selection import validate_hpr_target
 
-    if problem._process_components:
-        raise ValueError(
-            "heat pump streams cannot be added to a problem with process "
-            "components: the new case is built from the input records, which "
-            "do not hold them."
-        )
+    _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
     if not isinstance(target, DirectHeatPumpTarget):
         raise ValueError(
             "with_heat_pump_streams takes the target of a heat pump placed on "
             f"the process; this is a {target.type} target."
+        )
+    # The value the target was solved with: a per-call
+    # ``minimum_approach_temperature`` or a zone's own setting can differ
+    # from the problem's.
+    return _case_with_heat_pump_streams(
+        problem,
+        target,
+        dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]),
+        zone=zone,
+        machine=machine,
+        project_name=project_name,
+    )
+
+
+def _require_heat_pump_stream_support(problem) -> None:
+    """Raise for a problem heat pump streams cannot be added to yet."""
+    if problem._process_components:
+        raise ValueError(
+            "heat pump streams cannot be added to a problem with process "
+            "components: the new case is built from the input records, which "
+            "do not hold them."
         )
     if len(problem.period_ids) > 1:
         raise ValueError(
@@ -276,12 +292,15 @@ def with_heat_pump_streams(
             "streams that vary by period are not built yet; derive a "
             "single-period case and target the heat pump on it."
         )
+
+
+def _case_with_heat_pump_streams(
+    problem, target, *, dt_cont: float, zone=None, machine="HP", project_name=None
+):
+    """``problem`` with the streams of ``target`` at ``dt_cont`` (K), with no
+    check that the target is this problem's own."""
     address = _heat_pump_zone_address(problem, target, zone)
-    # The value the target was solved with: a per-call
-    # ``minimum_approach_temperature`` or a zone's own setting can differ
-    # from the problem's.
-    approach = target.provenance.effective_settings["HPR_DT_CONT"]
-    dt_cont = {"value": float(approach), "unit": "delta_degC"}
+    dt_cont = {"value": float(dt_cont), "unit": "delta_degC"}
     source = problem.to_problem_json()
     taken = {
         record["name"] for record in source["streams"] if record["zone"] == address

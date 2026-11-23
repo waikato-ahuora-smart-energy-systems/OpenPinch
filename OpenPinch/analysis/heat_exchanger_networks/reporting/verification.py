@@ -144,7 +144,8 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
         or network.capital_cost is None
     ):
         return []
-    component_total = network.utility_cost + network.capital_cost
+    heat_pumps = sum(machine.annual_cost for machine in network.heat_pumps)
+    component_total = network.utility_cost + network.capital_cost + heat_pumps
     if _close(
         network.total_annual_cost,
         component_total,
@@ -152,9 +153,10 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
         abs_tol=_COST_ABS_TOL,
     ):
         return []
+    parts = "utility + capital" + (" + heat pump" if network.heat_pumps else "")
     return [
         "total annual cost "
-        f"{network.total_annual_cost:.6g} does not match utility + capital "
+        f"{network.total_annual_cost:.6g} does not match {parts} "
         f"{component_total:.6g}"
     ]
 
