@@ -189,7 +189,18 @@ def retrofit_with_heat_pump(
     as the first runs on ``problem``, from ``heat_pump_step``.
     """
 
-    base = run_retrofit_search(problem, existing, settings)
+    if settings.heat_pump_cycle != "carnot":
+        # Checked here: the plain search below runs with no cycle, so its
+        # own check of the cycle would not see this one.
+        raise ValueError(
+            "the heat pump stream step takes heat_pump_cycle='carnot' only; "
+            f"got {settings.heat_pump_cycle!r}."
+        )
+    # The stream step replaces the linked heat pump move: the plain search
+    # offers none of its own.
+    base = run_retrofit_search(
+        problem, existing, replace(settings, heat_pump_cycle=None)
+    )
     if int(settings.max_modifications) < 1:
         # The heat pump step is a modification.
         return base

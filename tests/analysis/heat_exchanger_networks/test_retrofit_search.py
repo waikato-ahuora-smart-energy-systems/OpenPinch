@@ -1317,6 +1317,8 @@ def test_design_retrofit_rates_carnot_heat_pumps_with_the_hpr_efficiency(fake_so
             _existing_network(),
             max_modifications=1,
             heat_pump_cycle="carnot",
+            # The linked heat pump move (the stream step is the Carnot default).
+            heat_pump_streams=False,
             heat_pump_max_lift=None,
             heat_pump_cost=300.0,
             new_unit_cost=0.0,
@@ -1430,7 +1432,11 @@ def test_a_utility_named_like_a_heat_pump_keeps_its_own_properties(fake_solver):
     )
 
     PinchProblem(data).design.retrofit(
-        existing, max_modifications=1, heat_pump_cycle="carnot"
+        existing,
+        max_modifications=1,
+        heat_pump_cycle="carnot",
+        # The linked heat pump move (the stream step is the Carnot default).
+        heat_pump_streams=False,
     )
 
     baseline, _pumps = fake_solver.heat_pumps[0]
@@ -1445,6 +1451,8 @@ def test_a_period_named_like_a_heat_pump_leaves_the_heat_pump_offered(fake_solve
             _existing_network(),
             max_modifications=1,
             heat_pump_cycle="carnot",
+            # The linked heat pump move (the stream step is the Carnot default).
+            heat_pump_streams=False,
             heat_pump_max_lift=None,
         )
         (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]

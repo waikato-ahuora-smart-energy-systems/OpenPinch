@@ -1,5 +1,6 @@
 """Settings shared by every environment the suite runs in."""
 
+import importlib
 import os
 
 import pytest
@@ -15,6 +16,19 @@ settings.register_profile(
     "openpinch", derandomize=False, deadline=None, database=None, print_blob=True
 )
 settings.load_profile("openpinch")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _heat_pump_retrofit_binds_the_real_search():
+    """Import heat_pump_retrofit before any test patches the retrofit search.
+
+    design.retrofit imports the module lazily, and the module binds
+    run_retrofit_search by name on import. A test that patches the search on
+    its own module before that first import would leave its patch bound
+    there for every later test in the process; the Pyodide lanes run one
+    process.
+    """
+    importlib.import_module("OpenPinch.application.heat_pump_retrofit")
 
 
 # Each pool re-imports OpenPinch in every worker, which costs seconds per solve
