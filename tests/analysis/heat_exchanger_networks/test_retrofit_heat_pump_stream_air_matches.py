@@ -3,14 +3,17 @@
 Where the coolers reject too little heat, the as-piped target lets the
 evaporators take the rest from ambient air. As streams, the air is a hot
 stream of fixed duty beside the machine's own, and something has to cool
-it: each evaporator that stands at least the approach below the air gets
-a match with it, in a new stage after the network's last, the
-evaporators sharing the air between them.
+it: each evaporator that stands at least the approach below the air, at
+both ends of a counter-current match (the air's inlet against the
+evaporator's outlet, the air's outlet against its inlet), gets a match
+with it, in a new stage after the network's last, the evaporators
+sharing the air between them.
 
-The air here runs from 15 to 14.99 degC. At a 10 K approach an
-evaporator at 5 degC stands 9.99 K off its cold end, which the solve
-would refuse, so only the evaporator at -5 degC takes air. (Until the
-review of #483 any evaporator colder than the air took a share.)
+The air runs from 15 to 14.99 degC. At a 10 K approach an evaporator
+from 4.99 to 5 degC stands exactly 10 K off at both ends, where the
+target places it, and takes air; one at 6 degC, 9 K off, does not.
+(Until the review of #483 the filter set the air's outlet against the
+evaporator's outlet and refused the one at the limit.)
 """
 
 from __future__ import annotations
@@ -37,9 +40,9 @@ def test_ambient_air_is_matched_to_every_evaporator_an_approach_below_it():
         evaporators=[
             # Hotter than the air: it draws on the coolers alone.
             _stream("HP_C1", 99.99, 100.0),
-            _stream("HP_C2", 4.99, 5.0),
-            _stream("HP_C3", -5.01, -5.0),
-            _stream("HP_C4", -10.01, -10.0),
+            _stream("HP_C2", 5.99, 6.0),
+            _stream("HP_C3", 4.99, 5.0),
+            _stream("HP_C4", -5.01, -5.0),
         ],
         ambient_sources=[_stream("AIR_H1", 15.0, 14.99)],
         approach=10.0,

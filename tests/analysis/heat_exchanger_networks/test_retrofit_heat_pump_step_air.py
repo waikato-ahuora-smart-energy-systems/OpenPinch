@@ -34,9 +34,8 @@ def test_the_first_state_matches_the_air_to_the_evaporator():
     step = HeatPumpStep(
         record=SimpleNamespace(machine="HP"),
         condensers=(),
-        # At -5 degC, more than the 10 K approach below the air's cold end
-        # (one at 5 degC stood 9.99 K off and is refused since the review
-        # of #483).
+        # At -5 degC, well over the 10 K approach below the air at both
+        # ends of the match.
         evaporators=(_stream("HP_C1", -5.01, -5.0),),
         ambient_sources=(_stream("AIR_H1", 15.0, 14.99),),
         base=SimpleNamespace(network=network),

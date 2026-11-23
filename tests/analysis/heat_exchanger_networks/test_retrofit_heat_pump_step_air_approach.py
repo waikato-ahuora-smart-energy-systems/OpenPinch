@@ -8,8 +8,8 @@ takes air only 11 K below it, not at the process streams' approach
 (``THERMAL_DT_CONT`` plus ``HPR_DT_CONT``).
 
 Here the process approach is 2 K: an evaporator at 5 degC would pass it
-against air at 15 degC, but stands 9.99 K off and gets no air; one at
-3 degC, 11.99 K off, does.
+against air at 15 degC, but stands 10 K off and gets no air; one at
+3 degC, 12 K off, does.
 """
 
 from __future__ import annotations
