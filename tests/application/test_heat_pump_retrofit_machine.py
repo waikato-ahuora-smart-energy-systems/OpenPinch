@@ -54,3 +54,28 @@ def test_the_machine_holds_its_duties_electricity_and_compressor_cost():
         30_000.0
         * compute_capital_recovery_factor(costing.discount_rate, costing.service_life)
     )
+
+
+def test_a_vapour_compression_machine_costs_all_but_its_process_exchangers():
+    # The HPR service prices its compressors, motors and internal (cascade,
+    # IHX) exchangers; the condensers and evaporators are the network's
+    # exchangers, priced by area there.
+    costing = Configuration().costing
+    solved = SimpleNamespace(
+        hpr_hot_streams={"a": _stream("HP_H1", 100.0)},
+        hpr_cold_streams={"c": _stream("HP_C1", 70.0)},
+        w_net=30.0,
+        cop_h=100.0 / 30.0,
+        hpr_machine_internal_capital_costs=(40_000.0, 15_000.0),
+    )
+
+    machine = heat_pump_machine(
+        solved,
+        name="HP",
+        cycle="vapour_compression",
+        cost_per_kw=300.0,
+        costing=costing,
+    )
+
+    assert machine.cycle == "vapour_compression"
+    assert machine.capital_cost == pytest.approx(55_000.0)

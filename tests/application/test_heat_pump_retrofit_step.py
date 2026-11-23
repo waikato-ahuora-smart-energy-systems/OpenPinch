@@ -50,3 +50,19 @@ def test_the_step_holds_the_as_piped_machine_priced_by_the_search():
     assert step.record.capital_cost == pytest.approx(300.0 * delivered)
     assert (step.record.machine, step.record.cycle) == ("HP", "carnot")
     assert step.base is base
+
+
+def test_the_step_targets_the_searchs_cycle(monkeypatch):
+    from OpenPinch.application import heat_pump_retrofit
+
+    asked = []
+
+    def target(problem, network, **arguments):
+        asked.append(arguments.get("cycle"))
+
+    monkeypatch.setattr(heat_pump_retrofit, "as_piped_heat_pump", target)
+    settings = RetrofitSettings(heat_pump_cycle="vapour_compression")
+
+    heat_pump_step(None, SimpleNamespace(network=None), settings)
+
+    assert asked == ["vapour_compression"]

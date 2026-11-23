@@ -603,6 +603,14 @@ def evaluate_vapour_hpr_result(
         hpr_machine_annualized_capital_costs=(
             cost_accounting.hpr_machine_annualized_capital_costs
         ),
+        # Without the process and air exchangers: compressors, motors and
+        # the internal exchangers (cascade exchangers, IHXs).
+        hpr_machine_internal_capital_costs=tuple(
+            installed_capital(machine)
+            for machine in machine_components(
+                machines, process_areas=(0.0, 0.0, 0.0, 0.0), args=args
+            )
+        ),
         hpr_hot_utility_annualized_capital_cost=(
             cost_accounting.hpr_hot_utility_annualized_capital_cost
         ),

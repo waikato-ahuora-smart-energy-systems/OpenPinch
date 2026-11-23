@@ -15,7 +15,12 @@ from ....contracts.synthesis.retrofit import (
     RetrofitHeatPumpTarget,
     RetrofitHeatPumpTargets,
 )
-from ....domain.enums import HeatExchangerKind, ProblemTableLabel, TargetType
+from ....domain.enums import (
+    HeatExchangerKind,
+    HeatPumpAndRefrigerationCycle,
+    ProblemTableLabel,
+    TargetType,
+)
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
@@ -73,7 +78,12 @@ def retrofit_heat_pumps(
 
 
 def as_piped_heat_pump(
-    problem, network: HeatExchangerNetwork, *, args=None, load_fraction=None
+    problem,
+    network: HeatExchangerNetwork,
+    *,
+    args=None,
+    load_fraction=None,
+    cycle: str | None = None,
 ):
     """The as-piped heat pump target of ``network`` as the heat pump
     service solved it (``HeatPumpTargetOutputs``), with its condenser
@@ -81,7 +91,9 @@ def as_piped_heat_pump(
     (``hpr_cold_streams``) and work; ``None`` when the network's heaters
     carry no load. It is the solve ``retrofit_heat_pumps`` summarises as
     its as-piped target, at the same prices. ``network`` is a solved one:
-    its heaters and coolers carry their temperatures."""
+    its heaters and coolers carry their temperatures. ``cycle``
+    ("carnot" or "vapour_compression") solves a cascade of that cycle
+    whatever the zone's ``HPR_TYPE``; ``None`` takes ``HPR_TYPE``."""
 
     return _profile_target(
         problem,
@@ -89,7 +101,15 @@ def as_piped_heat_pump(
         _network_prices(problem, network),
         args,
         load_fraction=load_fraction,
+        cycle=cycle,
     )
+
+
+# The cycle model a retrofit heat pump's cycle name solves.
+_CYCLE_TYPES = {
+    "carnot": HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
+    "vapour_compression": HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+}
 
 
 def _network_prices(problem, network: HeatExchangerNetwork) -> dict:
@@ -107,11 +127,14 @@ def _network_prices(problem, network: HeatExchangerNetwork) -> dict:
     }
 
 
-def _profile_target(problem, profile, prices: dict, args, load_fraction=None):
+def _profile_target(
+    problem, profile, prices: dict, args, load_fraction=None, cycle=None
+):
     """The heat pump service's result on ``profile`` (shifted temperatures,
     source and sink) at ``prices``, in the first period, whose states the
     as-piped profiles and prices take. ``load_fraction`` caps the load at
-    that share of the sink's, on a copy of the configuration."""
+    that share of the sink's, and ``cycle`` sets the cycle model, on a copy
+    of the configuration."""
 
     T_vals, H_hot, H_cold = profile
     config = _at_network_prices(problem.master_zone.config, prices)
@@ -126,6 +149,9 @@ def _profile_target(problem, profile, prices: dict, args, load_fraction=None):
         config.update_values(
             HPR_LOAD_MODE="fraction", HPR_LOAD_FRACTION=float(load_fraction)
         )
+    if cycle is not None:
+        config = deepcopy(config)
+        config.update_values(HPR_TYPE=_CYCLE_TYPES[cycle])
     return compute_profile_heat_pump_target(
         T_vals=T_vals,
         H_hot=H_hot,
