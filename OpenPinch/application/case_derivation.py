@@ -408,6 +408,12 @@ def _case_with_utility_heat_pump_zones(
         ("evaporator", target.hpr_cold_streams, scope.hot_utilities),
     ):
         name = f"{machine} {role}"
+        if any(child["name"] == name for child in node["children"] or ()):
+            raise ValueError(
+                f"Zone {scope.address!r} already has a zone named {name!r}, "
+                "the name of a heat pump zone; give the heat pump another "
+                "name with machine=."
+            )
         node["children"] = [
             *(node["children"] or ()),
             {"name": name, "type": ZoneType.P.value, "children": None},
