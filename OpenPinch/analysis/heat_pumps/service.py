@@ -176,10 +176,15 @@ def _compute_single_period_hpr_target(
     if is_direct:
         pt_target = pt
     else:
-        # Create problem table based on inverted utility streams
+        # Create problem table based on inverted utility streams. The duties
+        # are the indirect target's: on a site of several processes the
+        # zone's own utilities hold what its streams would need read as one
+        # process, which is not what the site's utility system carries.
         pt_target = get_process_heat_cascade(
-            hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
-            cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
+            hot_streams=base_target.cold_utilities.get_hot_streams(invert_utility=True),
+            cold_streams=base_target.hot_utilities.get_cold_streams(
+                invert_utility=True
+            ),
             is_shifted=True,
             is_full_analysis=True,
             period_idx=idx,

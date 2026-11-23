@@ -17,6 +17,16 @@ Heat pumps and refrigeration
   utility-placement case the parallel seed now costs 431.4 k$/y rather than
   446.6 k$/y (refrigeration 79.0 kW rather than 105.5 kW), and a search that
   kept the seed kept the dearer design.
+- A utility heat pump or refrigeration target (``placement="utility"``) on
+  a site of several processes is now sized on the site's utility duties.
+  It was sized on the duties the site's streams would need read as one
+  process, with heat recovered between processes that the site's utility
+  levels cannot carry, while its residual utilities were taken from the
+  site's. On a site that imports 800 kW of steam at 180 degC and raises
+  1000 kW at 140 degC that it cannot use, a full load heat pump delivered
+  400 kW and left 400 kW of import; it now delivers the 800 kW. The same
+  holds for a shared design over several periods. A target on a single
+  process is unchanged.
 - ``problem.with_heat_pump_streams(target)`` returns a new unsolved case
   that holds the problem's streams and the streams of a direct heat pump
   target: each condenser a hot stream and each evaporator a cold stream, at

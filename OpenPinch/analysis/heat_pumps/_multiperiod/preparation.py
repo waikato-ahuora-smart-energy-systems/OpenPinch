@@ -186,9 +186,11 @@ def _optimizer_problem_table_for_hpr(
 ) -> ProblemTable:
     if is_direct:
         return deepcopy(base_target.pt)
+    # The indirect target's duties, not the zone's own: see
+    # ``service._compute_single_period_hpr_target``.
     return get_process_heat_cascade(
-        hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
-        cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
+        hot_streams=base_target.cold_utilities.get_hot_streams(invert_utility=True),
+        cold_streams=base_target.hot_utilities.get_cold_streams(invert_utility=True),
         is_shifted=True,
         is_full_analysis=True,
         period_idx=period_idx,
