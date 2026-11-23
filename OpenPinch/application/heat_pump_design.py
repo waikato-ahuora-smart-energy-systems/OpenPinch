@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..analysis.heat_exchanger_networks.heat_pump_cost import heat_pump_record
+from ..analysis.heat_exchanger_networks.heat_pump_cost import (
+    heat_pump_record,
+    network_with_heat_pumps,
+)
 from ..contracts.hpr import HprLevels
 from .case_derivation import _case_with_heat_pump_streams
 
@@ -87,4 +90,37 @@ def heat_pump_design_case(
     )
 
 
-__all__ = ["HeatPumpDesignCase", "heat_pump_design_case"]
+def heat_pump_design_view(problem, plain, runs):
+    """One view ranking the designs without the heat pump and with it.
+
+    ``plain`` is the problem's design without a heat pump and ``runs`` pairs
+    each heat pump case with the view of its design. Every network of a
+    heat pump design takes the case's machine record and its annual cost
+    (``network_with_heat_pumps``) and is ranked on that total among the
+    rest. The view is ``plain``, its result holding them all and the
+    cheapest selected.
+    """
+    from ..analysis.heat_exchanger_networks.results.selection import (
+        ranked_networks,
+        select_network,
+    )
+
+    result = plain.result
+    ranked = list(ranked_networks(result))
+    for run, view in runs:
+        for outcome in ranked_networks(view.result):
+            network = network_with_heat_pumps(outcome.network, (run.record,))
+            ranked.append(
+                outcome.model_copy(
+                    update={
+                        "network": network,
+                        "objective_value": network.total_annual_cost,
+                    }
+                )
+            )
+    result.ranked_networks = tuple(ranked)
+    select_network(result)
+    return plain
+
+
+__all__ = ["HeatPumpDesignCase", "heat_pump_design_case", "heat_pump_design_view"]
