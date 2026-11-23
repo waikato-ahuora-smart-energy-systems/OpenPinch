@@ -258,6 +258,12 @@ def with_heat_pump_streams(
     """
     from .hpr_selection import validate_hpr_target
 
+    if problem._process_components:
+        raise ValueError(
+            "heat pump streams cannot be added to a problem with process "
+            "components: the new case is built from the input records, which "
+            "do not hold them."
+        )
     validate_hpr_target(problem, target)
     if not isinstance(target, DirectHeatPumpTarget):
         raise ValueError(
