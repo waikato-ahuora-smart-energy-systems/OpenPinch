@@ -418,6 +418,12 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         if evaluator.settings.approach is None
         else float(evaluator.settings.approach)
     )
+    # Air carries the ambient contribution, not a process stream's.
+    ambient_approach = (
+        float(config.hpr.dt_env_cont) + float(config.hpr.dt_cont)
+        if evaluator.settings.approach is None
+        else float(evaluator.settings.approach)
+    )
     network, added = with_heat_pump_matches(
         existing,
         condensers=step.condensers,
@@ -428,26 +434,25 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         # matches name them as the existing network does.
         solved=_with_names(step.base.network, evaluator.names),
         ambient_sources=step.ambient_sources,
-        # Air carries the ambient contribution, not a process stream's.
-        ambient_approach=(
-            float(config.hpr.dt_env_cont) + float(config.hpr.dt_cont)
-            if evaluator.settings.approach is None
-            else float(evaluator.settings.approach)
-        ),
+        ambient_approach=ambient_approach,
     )
     matched = {
         name for placed in added for name in (placed.match.hot, placed.match.cold)
     }
-    for streams, what in (
-        (step.condensers, "no heater starts cold enough for the condenser"),
-        (step.evaporators, "no cooler starts hot enough for the evaporator"),
-        (step.ambient_sources, "no evaporator is colder than the ambient source"),
+    for streams, what, gap in (
+        (step.condensers, "no heater starts cold enough for the condenser", approach),
+        (step.evaporators, "no cooler starts hot enough for the evaporator", approach),
+        (
+            step.ambient_sources,
+            "no evaporator is colder than the ambient source",
+            ambient_approach,
+        ),
     ):
         for stream in streams:
             if stream.name not in matched:
                 raise ValueError(
                     f"{what} {stream.name!r} of heat pump "
-                    f"{step.record.machine!r} at an approach of {approach:g} K, "
+                    f"{step.record.machine!r} at an approach of {gap:g} K, "
                     "so nothing in the existing network can serve it."
                 )
     # The heat pump's streams are new: only the process stream of each
