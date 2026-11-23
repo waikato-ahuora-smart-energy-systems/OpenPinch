@@ -930,14 +930,24 @@ The as-piped heat pump as streams
    duty, and the target stands its levels close to the streams
    (``HPR_DT_CONT`` beyond their own contributions). On the case above
    the exchangers at the default area price cost as much as the machine
-   saves, and on Ciric and Floudas at the settings of the paragraph above
-   the full-size machine (17.5 MW, COP 2.37) nets $2.81M/y where the
+   saves. On Ciric and Floudas at the settings of the paragraph above the
    linked heat pump, sized by the search at 14.7 MW, nets $2.95M/y with
-   no new unit cost. ``heat_pump_search`` bounds the target's search
-   (``{"maximum_evaluations": 2000}``): the full search can take a minute
-   and a short one can return a machine that delivers less than its load.
-   The step is left out, with a ``UserWarning``, on a problem with several
-   periods and when the network cannot serve the machine's duties.
+   no new unit cost, while the as-piped target at the network's prices
+   settles on a 5 to 7 MW machine at a COP near 3.2 that nets slightly
+   below zero, whatever ``HPR_LOAD_FRACTION`` asks: the target caps its
+   load there, it does not set the machine's size. (One short target
+   search returned a 17.5 MW machine at a COP of 2.37, which netted
+   $2.81M/y.) ``heat_pump_search`` bounds the target's search
+   (``{"maximum_evaluations": 2000}``): the full search can take more
+   than a minute. A level the target leaves without duty is not added.
+   The step is left out, with a ``UserWarning`` giving the reason, on a
+   problem with several periods, on one with process components or a
+   site of several process zones (the machine's streams cannot be added
+   to the case), and when the network cannot serve the machine's duties.
+   With ``min_approach_temperature`` not given, the heat pump's matches
+   are placed at ``THERMAL_DT_CONT`` plus ``HPR_DT_CONT`` (air at
+   ``HPR_DT_ENV_CONT`` plus ``HPR_DT_CONT``); a stream with its own
+   ``dt_cont`` is not read for that.
 Sites and heat recovery loops
    When the existing network's streams span several process zones (a
    site's network given as a mapping), new matches and relocations join

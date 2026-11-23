@@ -1789,10 +1789,12 @@ class _DesignAccessor:
         The machine's size is fixed, so it is not traded against exchanger
         area as the linked heat pump's duty is. ``heat_pump_search`` bounds
         the target's search (``maximum_iterations``,
-        ``maximum_evaluations``); the full search can take a minute. The
-        step is left out, with a ``UserWarning``, on a problem with
-        several periods and when the network cannot serve the machine's
-        duties.
+        ``maximum_evaluations``); the full search can take more than a
+        minute. The step is left out, with a ``UserWarning`` giving the
+        reason, on a problem with several periods, on one with process
+        components or a site of several process zones, and when the
+        network cannot serve the machine's duties; it is not built when
+        ``max_modifications`` is 0.
 
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked

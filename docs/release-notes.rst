@@ -154,11 +154,13 @@ Heat exchanger network synthesis
   above a COP of 2.5 the linked heat pump reaches 2.33 and was never
   selected; the as-piped machine reaches 3.1 to 3.3. The machine's size is
   fixed at the target's and is not traded against exchanger area: on Ciric
-  and Floudas the full-size machine nets $2.81M/y where the linked heat
-  pump, sized by the search, nets $2.95M/y, so the option is off by
-  default. ``heat_pump_search`` bounds the target's search. The step is
-  left out with a warning on a problem with several periods and when the
-  network cannot serve the machine's duties.
+  and Floudas the target settles on a 5 to 7 MW machine that nets
+  slightly below zero where the linked heat pump, sized by the search,
+  nets $2.95M/y, so the option is off by default. ``heat_pump_search``
+  bounds the target's search. The step is left out with a warning on a
+  problem with several periods, on one with process components or a site
+  of several process zones, and when the network cannot serve the
+  machine's duties.
 - ``HENS_FORBIDDEN_MATCHES`` lists matches a design may not use, as pairs
   of names, the hot side then the cold side. Either may be a process
   stream or a utility: ``["H1", "C2"]`` forbids that recovery match,
