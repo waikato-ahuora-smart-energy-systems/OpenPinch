@@ -29,6 +29,22 @@ def test_a_candidate_evaporates_below_the_hot_target_and_condenses_above_the_col
     assert candidate.refrigerant is None
 
 
+def test_a_carnot_rating_refuses_a_lift_above_its_limit():
+    """A Carnot cycle has a COP at any lift, so without a limit the search
+    proposed a machine evaporating at 67 degC and condensing at 275 degC, a
+    208 K lift. The rating serves a pair only up to ``max_lift``."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pumps import (
+        carnot_rating,
+    )
+
+    rate = carnot_rating(0.5, max_lift=140.0)
+
+    assert rate(340.0, 480.0) == (pytest.approx(1.0 + 0.5 * 340.0 / 140.0), None)
+    assert rate(340.0, 480.5) is None
+    # No limit: any lift is served, as before.
+    assert carnot_rating(0.5)(340.0, 548.0) is not None
+
+
 def test_a_real_fluid_rating_takes_the_best_fluid_within_the_cycle_limits():
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pumps import (
         vapour_compression_rating,

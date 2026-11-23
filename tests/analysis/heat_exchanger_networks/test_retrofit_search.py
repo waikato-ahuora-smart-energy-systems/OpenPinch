@@ -1181,7 +1181,8 @@ def test_a_heat_pump_step_is_priced_by_its_capacity_and_exchanger_area(
 
     # The existing network heats only C2, so a heat pump delivers there,
     # from H1 or H2, which have coolers. Its evaporator and condenser carry
-    # the fake's 100 kW and 25 m2 each.
+    # the fake's 100 kW and 25 m2 each. Either lifts about 200 K, so the
+    # lift limit is taken off.
     result = run_retrofit_search(
         _problem(),
         _existing_network(),
@@ -1189,6 +1190,7 @@ def test_a_heat_pump_step_is_priced_by_its_capacity_and_exchanger_area(
             strategy=strategy,
             max_modifications=1,
             heat_pump_cycle="carnot",
+            heat_pump_max_lift=None,
             heat_pump_cost=300.0,
             repiping_cost=1_000.0,
             **COSTS,
@@ -1227,12 +1229,66 @@ def test_a_heat_pump_step_is_priced_by_its_capacity_and_exchanger_area(
     assert ("cold", "hot", pump.heat_pump_cop) in linked
 
 
+def test_a_carnot_heat_pump_is_offered_only_within_the_lift_limit(fake_solver):
+    """A Carnot cycle has a COP at any lift. On this case a heat pump to C2
+    (heated to 265 degC) lifts 208 K from H1 and 197 K from H2, which no
+    machine does, so by default (140 K, a two-stage cascade) none is
+    offered. ``heat_pump_max_lift`` moves the limit; ``None`` removes it."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    def pumps(**limit):
+        result = run_retrofit_search(
+            _problem(),
+            _existing_network(),
+            RetrofitSettings(
+                max_modifications=1,
+                heat_pump_cycle="carnot",
+                heat_pump_cost=300.0,
+                **COSTS,
+                **limit,
+            ),
+        )
+        return [
+            (m.hot_stream, m.cold_stream)
+            for design in result.frontier
+            for m in design.modifications
+            if m.kind == "heat_pump"
+        ]
+
+    assert pumps() == []
+    assert pumps(heat_pump_max_lift=200.0) == [("H2", "C2")]
+    assert len(pumps(heat_pump_max_lift=None)) == 1
+
+
+def test_a_carnot_heat_pump_with_a_free_compressor_is_warned_about(fake_solver):
+    """``heat_pump_cost`` is 0 by default, which prices a Carnot heat pump
+    as its two exchangers alone: on this case a 15 MW machine cost $69,200,
+    two exchanger unit costs, and the search installed it."""
+    import warnings
+
+    def retrofit(**heat_pump):
+        return _problem().design.retrofit(
+            _existing_network(), max_modifications=0, **COSTS, **heat_pump
+        )
+
+    with pytest.warns(UserWarning, match="heat_pump_cost"):
+        retrofit(heat_pump_cycle="carnot")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        retrofit(heat_pump_cycle="carnot", heat_pump_cost=300.0)
+        retrofit()
+
+
 def test_design_retrofit_rates_carnot_heat_pumps_with_the_hpr_efficiency(fake_solver):
     def pump(eta_ii: float):
         result = _problem().design.retrofit(
             _existing_network(),
             max_modifications=1,
             heat_pump_cycle="carnot",
+            heat_pump_max_lift=None,
             heat_pump_cost=300.0,
             new_unit_cost=0.0,
             options={"HPR_ETA_II_CARNOT": eta_ii},
@@ -1357,7 +1413,10 @@ def test_a_period_named_like_a_heat_pump_leaves_the_heat_pump_offered(fake_solve
     # a period, stage or segment of the same name does not.
     def pump(problem: PinchProblem):
         result = problem.design.retrofit(
-            _existing_network(), max_modifications=1, heat_pump_cycle="carnot"
+            _existing_network(),
+            max_modifications=1,
+            heat_pump_cycle="carnot",
+            heat_pump_max_lift=None,
         )
         (pump,) = [m for m in result.frontier[1].modifications if m.kind == "heat_pump"]
         return pump.hot_stream, pump.cold_stream

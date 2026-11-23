@@ -1576,6 +1576,7 @@ class _DesignAccessor:
         repiping_cost: float = 0.0,
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
+        heat_pump_max_lift: float | None = 140.0,
         heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
         solver=None,
@@ -1666,7 +1667,10 @@ class _DesignAccessor:
         the HPR service. "carnot" uses its Carnot cycle
         (``HPR_ETA_II_CARNOT``), pricing the compressor and package at
         ``heat_pump_cost`` ($ per kW of condenser capacity) and the two
-        exchangers' area by the area law. "vapour_compression" solves a
+        exchangers' area by the area law; it serves a pair only up to
+        ``heat_pump_max_lift`` (K from evaporating to condensing, 140 by
+        default, about a two-stage cascade; ``None`` for no limit), since a
+        Carnot cycle has a COP at any lift. "vapour_compression" solves a
         single stage on the best of ``HPR_REFRIGERANTS`` within the HPR cycle
         limits (the other ``HPR_*`` cycle options apply) and prices the
         machine with the HPR service's installed capital. The work costs
@@ -1729,6 +1733,15 @@ class _DesignAccessor:
                     UserWarning,
                     stacklevel=2,
                 )
+            if heat_pump_cycle == "carnot" and not heat_pump_cost:
+                warnings.warn(
+                    "retrofit prices a Carnot heat pump's compressor at "
+                    "heat_pump_cost, which is 0: the machine costs only its "
+                    "two exchangers, so the search favours it. Set "
+                    "heat_pump_cost ($ per kW of condenser capacity).",
+                    UserWarning,
+                    stacklevel=2,
+                )
             result = run_retrofit_search(
                 isolated,
                 existing,
@@ -1773,6 +1786,11 @@ class _DesignAccessor:
                     repiping_cost=float(repiping_cost),
                     heat_pump_cycle=heat_pump_cycle,
                     heat_pump_cost=float(heat_pump_cost),
+                    heat_pump_max_lift=(
+                        None
+                        if heat_pump_max_lift is None
+                        else float(heat_pump_max_lift)
+                    ),
                     heat_recovery_loops=bool(
                         isolated.master_zone.config.hens.retrofit_loops
                     ),
