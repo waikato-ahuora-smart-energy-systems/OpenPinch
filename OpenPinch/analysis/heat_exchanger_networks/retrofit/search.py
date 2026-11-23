@@ -352,7 +352,9 @@ def run_retrofit_search(
     seen = {_signature(base.state, evaluator.existing)}
     structural = settings.strategy == "structure"
     failed: list[int] = []
-    for _depth in range(max(0, int(settings.max_modifications))):
+    # A heat pump step is the first of the modifications allowed.
+    taken = 0 if heat_pump is None else 1
+    for _depth in range(max(0, int(settings.max_modifications) - taken)):
         children = []
         failed_before = evaluator.failures
         for parent in beam:
