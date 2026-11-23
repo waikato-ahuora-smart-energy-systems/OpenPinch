@@ -46,7 +46,10 @@ Heat exchanger network synthesis
   sliced utility's slices inherit it. Retrofit does not read it. A pinch
   side takes no heater below the pinch and no cooler above it, so a
   forbidden recovery match can leave pinch design with no network; the run
-  then starts network evolution directly, with a warning. On the
+  then starts network evolution directly, with a warning. A problem with
+  only hot or only cold streams has one network, set by its utility
+  targets, so a forbidden pair that network needs raises ``ValueError``
+  naming the pair. On the
   four-stream Yee and Grossmann case with a second utility level on each
   side, forbidding a match the best design uses gives seven ranked
   networks without it (best 187,837 against 137,745 unrestricted), and
