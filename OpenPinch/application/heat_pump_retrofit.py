@@ -88,6 +88,9 @@ def heat_pump_step(problem, base, settings, *, limits=None, machine: str = "HP")
     solved = as_piped_heat_pump(
         problem, base.network, args=dict(limits) if limits else None
     )
+    if solved is None:
+        # The heaters carry no load: no heat pump to add.
+        return None, None
     step = HeatPumpStep(
         record=heat_pump_machine(
             solved,
@@ -154,6 +157,8 @@ def retrofit_with_heat_pump(
     step, solved = heat_pump_step(
         problem, base.frontier[0], settings, limits=limits, machine=machine
     )
+    if step is None:
+        return base
     case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
     with temporary_zone_configuration(
         case._build_execution_master_zone(), configuration
