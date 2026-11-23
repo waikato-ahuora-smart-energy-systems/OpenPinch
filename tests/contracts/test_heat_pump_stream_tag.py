@@ -37,6 +37,7 @@ def test_a_stream_names_its_heat_pump_machine_and_one_of_three_roles():
     assert marked.model_dump(mode="python")["heat_pump"] == {
         "machine": "HP",
         "role": "condenser",
+        "placement": "process",
     }
     for role in ("evaporator", "ambient_source"):
         StreamSchema.model_validate(_stream({"machine": "HP", "role": role}))
