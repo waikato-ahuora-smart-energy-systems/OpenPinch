@@ -29,6 +29,12 @@ Heat pumps and refrigeration
   pump together. Electricity and the compressor are not in the new case's
   costs. A target from another problem, a stale one, a utility heat pump's
   and a problem with several periods are refused.
+- A ``HeatExchangerNetwork`` has a ``heat_pumps`` field: the heat pumps
+  whose streams it serves, each a ``NetworkHeatPump`` with its duties,
+  work, COP, electricity cost and compressor capital. It is empty for
+  every design today. A network that records a heat pump counts the
+  machine's electricity and annualised capital in its total annual cost,
+  and verification checks the total against all three parts.
 - Stream records take an optional ``heat_pump`` mark,
   ``{"machine": ..., "role": ...}`` with role ``condenser``, ``evaporator``
   or ``ambient_source``. ``with_heat_pump_streams`` sets it; the mark

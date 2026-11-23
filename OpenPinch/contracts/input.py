@@ -18,7 +18,7 @@ from ..domain._heat_exchanger import rules as _hx_rules
 from ..domain._validation import non_empty_str
 from ..domain.configuration_fields import validate_configuration_options
 from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
-from ..domain.heat_exchanger_network import NetworkOverdesign
+from ..domain.heat_exchanger_network import NetworkHeatPump, NetworkOverdesign
 from ..domain.hpr import HPRResidualSnapshot
 from .common import PeriodValueWithUnitAndIds, ScalarOrVU
 
@@ -532,6 +532,8 @@ class HeatExchangerNetworkSchema(BaseModel):
     )
     # A rated network's overdesign margin, as the network records it.
     overdesign: NetworkOverdesign | None = None
+    # The heat pumps whose streams the network serves, as it records them.
+    heat_pumps: tuple[NetworkHeatPump, ...] = ()
 
     @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod
