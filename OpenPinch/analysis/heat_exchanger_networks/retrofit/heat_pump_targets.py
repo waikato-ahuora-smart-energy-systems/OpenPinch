@@ -58,33 +58,67 @@ def retrofit_heat_pumps(
         ),
         "as_piped": as_piped_profiles(problem, network),
     }
-    # Prices in $/kW/y as the retrofit's: each side at the utilities the
-    # network's heaters (or coolers) use, duty-weighted, in the first period;
-    # and the HPR electricity price.
-    config = zone.config
+    prices = _network_prices(problem, network)
+    return RetrofitHeatPumpTargets(
+        **{
+            name: _summary(
+                _profile_target(problem, profile, prices, args),
+                profile[1],
+                profile[2],
+                prices,
+            )
+            for name, profile in profiles.items()
+        }
+    )
+
+
+def as_piped_heat_pump(problem, network: HeatExchangerNetwork, *, args=None):
+    """The as-piped heat pump target of ``network`` as the heat pump
+    service solved it (``HeatPumpTargetOutputs``), with its condenser
+    streams (``hpr_hot_streams``), evaporator streams
+    (``hpr_cold_streams``) and work; ``None`` when the network's heaters
+    carry no load. It is the solve ``retrofit_heat_pumps`` summarises as
+    its as-piped target, at the same prices. ``network`` is a solved one:
+    its heaters and coolers carry their temperatures."""
+
+    return _profile_target(
+        problem,
+        as_piped_profiles(problem, network),
+        _network_prices(problem, network),
+        args,
+    )
+
+
+def _network_prices(problem, network: HeatExchangerNetwork) -> dict:
+    """Prices in $/kW/y as the retrofit's: each side at the utilities the
+    network's heaters (or coolers) use, duty-weighted, in the first period;
+    and the HPR electricity price."""
+
+    config = problem.master_zone.config
     arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
     price_scale, _capital = annual_cost_scales(config.costing)
-    prices = {
+    return {
         "hot_utility_price": _utility_price(arrays, network, "hot"),
         "cold_utility_price": _utility_price(arrays, network, "cold"),
         "electricity_price": float(config.costing.hpr_ele_price) * price_scale,
     }
-    config = _at_network_prices(config, prices)
-    # The first period, whose states the as-piped profiles and prices take.
-    period_id = min(problem.period_ids.items(), key=lambda item: item[1])[0]
-    targets = {}
-    for name, (T_vals, H_hot, H_cold) in profiles.items():
-        result = compute_profile_heat_pump_target(
-            T_vals=T_vals,
-            H_hot=H_hot,
-            H_cold=H_cold,
-            config=config,
-            args=args,
-            period_id=period_id,
-            period_idx=0,
-        )
-        targets[name] = _summary(result, H_hot, H_cold, prices)
-    return RetrofitHeatPumpTargets(**targets)
+
+
+def _profile_target(problem, profile, prices: dict, args):
+    """The heat pump service's result on ``profile`` (shifted temperatures,
+    source and sink) at ``prices``, in the first period, whose states the
+    as-piped profiles and prices take."""
+
+    T_vals, H_hot, H_cold = profile
+    return compute_profile_heat_pump_target(
+        T_vals=T_vals,
+        H_hot=H_hot,
+        H_cold=H_cold,
+        config=_at_network_prices(problem.master_zone.config, prices),
+        args=args,
+        period_id=min(problem.period_ids.items(), key=lambda item: item[1])[0],
+        period_idx=0,
+    )
 
 
 def _at_network_prices(config, prices: dict):
