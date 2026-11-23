@@ -641,7 +641,10 @@ class PinchProblem:
 
         Each condenser becomes a hot stream and each evaporator a cold
         stream of ``zone``, marked with ``machine`` and its role and
-        carrying ``HPR_DT_CONT``.
+        carrying ``HPR_DT_CONT``. A utility heat pump's target, solved on
+        a site, adds them as two process zones of the site instead,
+        ``"<machine> condenser"`` and ``"<machine> evaporator"``; ``zone``
+        does not apply to it.
         """
         from .case_derivation import with_heat_pump_streams
 

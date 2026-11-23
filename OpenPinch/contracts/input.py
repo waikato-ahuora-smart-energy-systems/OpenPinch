@@ -116,11 +116,14 @@ class HeatPumpStreamSchema(BaseModel):
 
     ``machine`` names the heat pump; the streams of one machine share it.
     A condenser is a hot stream, an evaporator a cold stream, and an ambient
-    source the hot stream of the air an evaporator draws on.
+    source the hot stream of the air an evaporator draws on. ``placement``
+    says what the machine exchanges heat with: the process's streams
+    (``"process"``) or the site's utility levels (``"utility"``).
     """
 
     machine: Annotated[str, non_empty_str("heat pump machine name must be non-empty")]
     role: Literal["condenser", "evaporator", "ambient_source"]
+    placement: Literal["process", "utility"] = "process"
 
     model_config = ConfigDict(extra="forbid")
 

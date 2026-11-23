@@ -68,7 +68,7 @@ def test_the_air_an_evaporator_draws_on_is_added_as_its_ambient_source():
     air = [
         record
         for record in case.to_problem_json()["streams"]
-        if record["heat_pump"] == {"machine": "HP", "role": "ambient_source"}
+        if (record["heat_pump"] or {}).get("role") == "ambient_source"
     ]
     assert [record["name"] for record in air] == ["AIR_H1"]
     assert air[0]["heat_flow"]["value"] == pytest.approx(float(target.hpr_ambient_hot))

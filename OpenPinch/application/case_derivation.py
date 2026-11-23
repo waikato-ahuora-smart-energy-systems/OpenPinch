@@ -2,8 +2,9 @@
 
 from copy import deepcopy
 
+from ..analysis.heat_pumps.common._shared.air import UTILITY_BAND_MAX_SPAN_K
 from ..domain.enums import StreamType, ZoneType
-from ..domain.targets import DirectHeatPumpTarget
+from ..domain.targets import DirectHeatPumpTarget, IndirectHeatPumpTarget
 from ._problem.input.utilities import _set_utilities_for_zone_and_subzones
 from ._problem.targeting.state import snapshot_problem
 
@@ -260,10 +261,33 @@ def with_heat_pump_streams(
 
     _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
+    if isinstance(target, IndirectHeatPumpTarget):
+        if zone is not None:
+            raise ValueError(
+                "zone= names the process zone that takes the streams of a "
+                "heat pump on the process. A heat pump on the utility system "
+                "gets zones of its own under the zone it was targeted on; "
+                "drop zone=."
+            )
+        if len(problem.period_ids) > 1:
+            raise ValueError(
+                "The zones of a heat pump on the utility system are not built "
+                f"for a problem with {len(problem.period_ids)} periods yet; "
+                "derive a single-period case and target the heat pump on it."
+            )
+        case = _case_with_utility_heat_pump_zones(
+            problem,
+            target,
+            dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]),
+            machine=machine,
+            project_name=project_name,
+        )
+        _require_heat_pump_site_target(case, target)
+        return case
     if not isinstance(target, DirectHeatPumpTarget):
         raise ValueError(
-            "with_heat_pump_streams takes the target of a heat pump placed on "
-            f"the process; this is a {target.type} target."
+            "with_heat_pump_streams takes a heat pump target, placed on the "
+            f"process or on the utility system; this is a {target.type} target."
         )
     # The value the target was solved with: a per-call
     # ``minimum_approach_temperature`` or a zone's own setting can differ
@@ -275,6 +299,159 @@ def with_heat_pump_streams(
         zone=zone,
         machine=machine,
         project_name=project_name,
+    )
+
+
+def _tree_node(tree: dict, path: list[str]) -> dict:
+    """The node of the zone tree at ``path``, zone names from the root down."""
+    node = tree
+    for name in path[1:]:
+        node = next(child for child in node["children"] if child["name"] == name)
+    return node
+
+
+def _require_heat_pump_site_target(case, target) -> None:
+    """Raise unless ``case`` targets as the utility heat pump ``target`` did.
+
+    The case holds the heat pump as streams that the site's utility levels
+    serve. Its hot utility has to be what the target left, and its cold
+    utility what the target left plus the heat the target let ambient air
+    take, which the case does not hold. They differ when a level cannot
+    exchange with the heat pump as the target assumed; the case would then
+    look complete and target wrongly. The check runs on a copy, so the
+    case stays unsolved.
+    """
+    copy = type(case)(case.to_problem_json(), project_name=case.project_name)
+    site = copy.target.indirect_heat_integration(zone=target.provenance.zone_address)
+    wanted = (
+        float(target.hot_utility_target),
+        float(target.cold_utility_target) + float(target.hpr_ambient_cold),
+    )
+    found = (float(site.hot_utility_target), float(site.cold_utility_target))
+    tolerance = 1e-6 * max(1.0, *wanted)
+    if all(abs(have - want) <= tolerance for have, want in zip(found, wanted)):
+        return
+    raise ValueError(
+        "The site's utility levels cannot exchange with the heat pump as its "
+        f"target assumed: with the heat pump's zones the site needs "
+        f"{found[0]:.6g} kW of hot utility and {found[1]:.6g} kW of cold, "
+        f"where the target leaves {wanted[0]:.6g} and {wanted[1]:.6g} kW. A "
+        "level the heat pump delivers into must take heat as well as give "
+        "it, and one it draws on must give heat as well as take it (type "
+        "Both); a stream part way through a wide level's temperatures, and "
+        "ambient air the evaporator draws on, are not built."
+    )
+
+
+def _band_move(
+    stream, role: str, approach: float, levels, multiplier: float = 1.0
+) -> float:
+    """The kelvin to move a utility heat pump stream by so that the
+    utility level whose band it lies in serves all of it. ``approach`` is
+    the heat pump's own contribution as the target used it; each level's
+    contribution counts ``multiplier`` times, the zone's dt_cont multiplier.
+
+    A utility level is written as a narrow band of temperature (a steam
+    main as 0.1 K), and a heat pump target places its streams against the
+    heat in the band, so a stream can end inside it. A level serves a
+    stream whole or not at all, and in the plant it is at one temperature.
+    A condenser whose hot end, less the approaches, lies inside the band
+    of a level that takes heat is moved up to the band's top; an
+    evaporator whose cold end, plus the approaches, lies inside the band
+    of a level that gives heat is moved down to its bottom. A segmented
+    stream moves by the most any of its segments needs.
+    """
+    moves = [0.0]
+    for level in levels:
+        ends = sorted(
+            float(end.value)
+            for end in (level.supply_temperature, level.target_temperature)
+        )
+        if not 0.0 < ends[1] - ends[0] <= UTILITY_BAND_MAX_SPAN_K:
+            continue
+        gap = approach + multiplier * float(level.delta_t_contribution.value)
+        for part in stream.segments or (stream,):
+            end = float(part.supply_temperature.value)
+            if role == "condenser" and ends[0] + gap <= end < ends[1] + gap:
+                moves.append(ends[1] + gap - end)
+            if role == "evaporator" and ends[0] - gap < end <= ends[1] - gap:
+                moves.append(ends[0] - gap - end)
+    return max(moves, key=abs)
+
+
+def _moved_record(record: dict, move: float) -> dict:
+    """A stream record with its temperatures, and its segments', moved by
+    ``move`` K."""
+
+    def moved(part: dict) -> dict:
+        return part | {
+            key: part[key] | {"value": part[key]["value"] + move}
+            for key in ("t_supply", "t_target")
+        }
+
+    if "segments" in record:
+        return record | {"segments": [moved(part) for part in record["segments"]]}
+    return moved(record)
+
+
+def _case_with_utility_heat_pump_zones(
+    problem, target, *, dt_cont: float, machine="HP", project_name=None
+):
+    """``problem`` with a utility heat pump ``target``'s streams, each side
+    in a process zone of its own under the zone the target was solved on.
+
+    The condensers are the hot streams of ``"<machine> condenser"`` and
+    the evaporators the cold streams of ``"<machine> evaporator"``. In one
+    zone the two would recover heat from each other.
+    """
+    root = problem._require_prepared_root_zone()
+    scope = next(
+        zone
+        for zone in problem._walk_zone_tree(root)
+        if zone.address == target.provenance.zone_address
+    )
+    if scope.type == ZoneType.P.value:
+        raise ValueError(
+            f"The heat pump was targeted on the process zone {scope.address!r}. "
+            "A heat pump on the utility system is added as process zones of "
+            "a site; target it on the site that holds the process."
+        )
+    source = problem.to_problem_json()
+    node = _tree_node(source["zone_tree"], _ancestry(scope))
+    # The target stands its streams off a level by ``dt_cont`` as given plus
+    # the level's contribution times the zone's multiplier. The new zones
+    # inherit that multiplier, which scales every stream in them, so the
+    # heat pump's contribution is written over it.
+    approach = float(dt_cont)
+    multiplier = float(scope.dt_cont_multiplier)
+    dt_cont = {"value": approach / multiplier, "unit": "delta_degC"}
+    for role, streams, levels in (
+        ("condenser", target.hpr_hot_streams, scope.cold_utilities),
+        ("evaporator", target.hpr_cold_streams, scope.hot_utilities),
+    ):
+        name = f"{machine} {role}"
+        if any(child["name"] == name for child in node["children"] or ()):
+            raise ValueError(
+                f"Zone {scope.address!r} already has a zone named {name!r}, "
+                "the name of a heat pump zone; give the heat pump another "
+                "name with machine=."
+            )
+        node["children"] = [
+            *(node["children"] or ()),
+            {"name": name, "type": ZoneType.P.value, "children": None},
+        ]
+        for _key, stream in streams.items():
+            record = _heat_pump_stream_record(
+                stream,
+                zone=f"{scope.address}/{name}",
+                dt_cont=dt_cont,
+                mark={"machine": machine, "role": role, "placement": "utility"},
+            )
+            move = _band_move(stream, role, approach, levels, multiplier)
+            source["streams"].append(_moved_record(record, move))
+    return type(problem)(
+        source,
+        project_name=problem.project_name if project_name is None else project_name,
     )
 
 

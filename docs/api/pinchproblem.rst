@@ -406,8 +406,12 @@ project_name=None)`` creates an unsolved case that holds the problem's
 streams and the streams of a direct heat pump target: each condenser a hot
 stream, each evaporator a cold stream, at the ``HPR_DT_CONT`` the target
 was solved with, each marked
-``heat_pump: {"machine": ..., "role": ...}``. Direct heat integration
-targeting of the new case gives the heat pump target's utilities. See
+``heat_pump: {"machine": ..., "role": ..., "placement": ...}``. Direct heat
+integration targeting of the new case gives the heat pump target's
+utilities. Given a utility heat pump's target solved on a site, it adds
+the condensers and the evaporators as two process zones of the site,
+``"<machine> condenser"`` and ``"<machine> evaporator"``, and total site
+targeting of the new case gives the target's net utility. See
 :doc:`../guides/heat-pump-workflows`.
 
 The keyword-only ``base_target=None`` on direct/all integration and utility

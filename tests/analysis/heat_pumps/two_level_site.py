@@ -66,6 +66,23 @@ def two_level_site(options: dict | None = None) -> PinchProblem:
     )
 
 
+def recovering_two_level_site() -> PinchProblem:
+    """The site with heat to recover inside each process.
+
+    A site design joins networks that recover heat, and a process of one
+    stream has none. Each process gains 300 kW from 120 to 60 degC and
+    300 kW from 40 to 100 degC, which balance within it, so the site's
+    utilities are unchanged.
+    """
+    source = two_level_site_source()
+    for zone in ("A", "B"):
+        source["streams"] += [
+            _stream(zone, f"{zone} warm", 120.0, 60.0, 300.0),
+            _stream(zone, f"{zone} cool", 40.0, 100.0, 300.0),
+        ]
+    return PinchProblem(source=source, project_name="two level site")
+
+
 def utility_heat_pump_target(problem: PinchProblem, **arguments):
     """The site's utility heat pump at full load, with one evaluation.
 

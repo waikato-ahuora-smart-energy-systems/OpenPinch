@@ -50,8 +50,8 @@ def test_the_new_case_holds_the_condenser_and_evaporator_as_marked_streams(solve
 
     records = _heat_pump_records(case)
     assert {name: r["heat_pump"] for name, r in records.items()} == {
-        "HP_H1": {"machine": "HP", "role": "condenser"},
-        "HP_C1": {"machine": "HP", "role": "evaporator"},
+        "HP_H1": {"machine": "HP", "role": "condenser", "placement": "process"},
+        "HP_C1": {"machine": "HP", "role": "evaporator", "placement": "process"},
     }
     for record in records.values():
         assert record["zone"] == "basic/Plant"

@@ -770,6 +770,10 @@ def heat_pump_stream_roles(problem: PreparedProblem) -> dict[str, str]:
     address and the name, and followed to the master zone by the stream
     object the zones share. Matching by name alone would put the mark on a
     namesake in another branch of the zone tree.
+
+    Only a heat pump placed on the process has a role here. The streams of
+    one placed on the utility system exchange with utility levels, which
+    the rules written from these roles forbid.
     """
 
     records = getattr(getattr(problem, "_validated_data", None), "streams", None)
@@ -777,6 +781,7 @@ def heat_pump_stream_roles(problem: PreparedProblem) -> dict[str, str]:
         f"{record.zone}.{record.name}": record.heat_pump.role
         for record in records or ()
         if getattr(record, "heat_pump", None) is not None
+        and record.heat_pump.placement == "process"
     }
     if not marked:
         return {}
