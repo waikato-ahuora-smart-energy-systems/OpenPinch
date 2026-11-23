@@ -1834,6 +1834,12 @@ class _DesignAccessor:
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit")
+        outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
+        if heat_pump_streams and outside:
+            raise ValueError(
+                "heat_pump_sizes are shares of the existing heaters' load, "
+                f"between 0 and 1; got {', '.join(repr(s) for s in outside)}."
+            )
         _runtime, configuration = self._arguments(
             options=options, period_id=None, solve_tolerance=solve_tolerance
         )

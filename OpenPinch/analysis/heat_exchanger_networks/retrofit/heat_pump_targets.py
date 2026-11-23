@@ -115,6 +115,12 @@ def _profile_target(problem, profile, prices: dict, args, load_fraction=None):
 
     T_vals, H_hot, H_cold = profile
     config = _at_network_prices(problem.master_zone.config, prices)
+    if load_fraction is not None and not 0.0 <= float(load_fraction) <= 1.0:
+        # update_values does not check the field's bounds; NaN fails here.
+        raise ValueError(
+            "load_fraction is a share of the heaters' load, between 0 and 1; "
+            f"got {load_fraction!r}."
+        )
     if load_fraction is not None:
         config = deepcopy(config)
         config.update_values(
