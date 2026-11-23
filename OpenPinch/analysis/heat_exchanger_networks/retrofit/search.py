@@ -42,6 +42,7 @@ from ..duty_optimisation import (
     verify_solution,
 )
 from ..execution.settings import configured_stage_solver, stage_solver_options
+from ..heat_pump_cost import network_with_heat_pumps
 from ..solver.arrays import annual_cost_scales
 from .frontier import mark_dominated
 from .heat_pump_streams import with_heat_pump_matches
@@ -1120,6 +1121,7 @@ class _Evaluator:
                 # The machine itself, ahead of the matches that serve it:
                 # its compressor is a constant of the step.
                 record = self.heat_pump.record
+                solved = network_with_heat_pumps(solved, (record,))
                 modifications = (
                     HeatExchangerNetworkRetrofitModification(
                         kind="heat_pump",
