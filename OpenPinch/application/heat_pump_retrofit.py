@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -162,6 +163,16 @@ def retrofit_with_heat_pump(
     """
 
     base = run_retrofit_search(problem, existing, settings)
+    periods = len(getattr(problem, "period_ids", None) or ())
+    if periods > 1:
+        # The as-piped target reads the first period alone.
+        warnings.warn(
+            "the heat pump step was left out of the retrofit: it is not built "
+            f"for a problem with {periods} periods yet.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return base
     step, solved = heat_pump_step(
         problem, base.frontier[0], settings, limits=limits, machine=machine
     )
@@ -171,7 +182,16 @@ def retrofit_with_heat_pump(
     with temporary_zone_configuration(
         case._build_execution_master_zone(), configuration
     ):
-        pumped = run_retrofit_search(
-            case, existing, replace(settings, heat_pump_cycle=None), heat_pump=step
-        )
+        try:
+            pumped = run_retrofit_search(
+                case, existing, replace(settings, heat_pump_cycle=None), heat_pump=step
+            )
+        except ValueError as error:
+            # A heat pump the network cannot take, not a failed retrofit.
+            warnings.warn(
+                f"the heat pump step was left out of the retrofit: {error}",
+                UserWarning,
+                stacklevel=2,
+            )
+            return base
     return joined(base, pumped)

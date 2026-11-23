@@ -429,6 +429,21 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         solved=_with_names(step.base.network, evaluator.names),
         ambient_sources=step.ambient_sources,
     )
+    matched = {
+        name for placed in added for name in (placed.match.hot, placed.match.cold)
+    }
+    for streams, what in (
+        (step.condensers, "no heater starts cold enough for the condenser"),
+        (step.evaporators, "no cooler starts hot enough for the evaporator"),
+        (step.ambient_sources, "no evaporator is colder than the ambient source"),
+    ):
+        for stream in streams:
+            if stream.name not in matched:
+                raise ValueError(
+                    f"{what} {stream.name!r} of heat pump "
+                    f"{step.record.machine!r} at an approach of {approach:g} K, "
+                    "so nothing in the existing network can serve it."
+                )
     # The heat pump's streams are new: only the process stream of each
     # match has piping to change.
     pumped = {
