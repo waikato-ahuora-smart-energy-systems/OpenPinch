@@ -33,6 +33,15 @@ class HeatPumpDesignCase:
     record: Any = None
 
 
+def _scaled(problem, multiplier: float):
+    """A copy of ``problem`` as a design at ``multiplier`` sees it: its root
+    zone multiplier scaled, and so every stream's and utility's contribution."""
+    root = problem._require_prepared_root_zone()
+    scaled = type(problem)(problem.to_problem_json(), project_name=problem.project_name)
+    scaled.set_dt_cont_multiplier(float(root.dt_cont_multiplier) * float(multiplier))
+    return scaled
+
+
 def heat_pump_design_case(
     problem,
     multiplier: float,
@@ -68,8 +77,7 @@ def heat_pump_design_case(
     if approach is None:
         approach = float((options or {}).get("HPR_DT_CONT", root.config.hpr.dt_cont))
     zone_multiplier = float(root.dt_cont_multiplier)
-    scaled = type(problem)(problem.to_problem_json(), project_name=problem.project_name)
-    scaled.set_dt_cont_multiplier(zone_multiplier * multiplier)
+    scaled = _scaled(problem, multiplier)
     target = scaled.target.heat_pump_and_refrigeration(
         cycle,
         duty="heat_pump",
@@ -167,28 +175,47 @@ def design_with_heat_pump(
             stacklevel=2,
         )
     plain = problem.design.heat_exchanger_network(**arguments)
+    # A heat pump's size is chosen outside the design: each is its own
+    # target and its own networks. Without a load, every size worth trying.
+    asked = request.pop("load", None)
     runs = []
     for multiplier in multipliers:
-        try:
-            run = heat_pump_design_case(
-                problem,
-                multiplier,
-                cost_per_kw=cost_per_kw,
-                costing=costing,
-                **request,
-            )
-            view = run.case.design.heat_exchanger_network(
-                **dict(arguments) | {"dt_cont_multipliers": [multiplier]}
-            )
-        except (HPRTargetingError, WorkflowContractError) as error:
-            # No target at this multiplier, or no network around its streams.
-            warnings.warn(
-                f"No heat pump network at dt_cont multiplier {multiplier:g}: {error}",
-                UserWarning,
-                stacklevel=2,
-            )
-            continue
-        runs.append((run, view))
+        # The kinks of the profile as the design at this multiplier sees it:
+        # scaling the contributions moves the pinch and the profile's kinks.
+        loads = (
+            [asked]
+            if asked is not None
+            else [
+                {"fraction": fraction}
+                for fraction in _scaled(problem, multiplier)
+                .target.hpr_load_kinks()
+                .logical_load_fractions
+            ]
+        )
+        for load in loads:
+            try:
+                run = heat_pump_design_case(
+                    problem,
+                    multiplier,
+                    load=load,
+                    cost_per_kw=cost_per_kw,
+                    costing=costing,
+                    **request,
+                )
+                view = run.case.design.heat_exchanger_network(
+                    **dict(arguments) | {"dt_cont_multipliers": [multiplier]}
+                )
+            except (HPRTargetingError, WorkflowContractError) as error:
+                # No target at this multiplier and size, or no network
+                # around its streams.
+                warnings.warn(
+                    f"No heat pump network at dt_cont multiplier {multiplier:g}"
+                    f" and load {load}: {error}",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                continue
+            runs.append((run, view))
     return heat_pump_design_view(problem, plain, runs)
 
 

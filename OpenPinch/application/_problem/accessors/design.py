@@ -560,9 +560,13 @@ class _DesignAccessor:
         its compressor, at ``heat_pump_cost`` $ per kW of condenser
         capacity, annualised, in its total annual cost. The result ranks
         them with the networks designed without a heat pump, so the
-        selected network says whether the heat pump pays. A multiplier
-        with no heat pump target, or no network around its streams, is
-        left out with a warning. The problem's stored design is the one
+        selected network says whether the heat pump pays, and at what
+        size: without a ``load`` every load fraction at a kink of the net
+        load profile (``target.hpr_load_kinks``), and the full load, is
+        designed at each multiplier, and ``NetworkHeatPump.load_fraction``
+        names each network's; with one, that size alone. A multiplier and
+        size with no heat pump target, or no network around its streams,
+        is left out with a warning. The problem's stored design is the one
         without a heat pump. ``record`` is not available with it, nor a
         problem with several periods.
         """

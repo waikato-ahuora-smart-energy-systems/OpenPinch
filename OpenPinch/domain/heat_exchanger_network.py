@@ -111,6 +111,9 @@ class NetworkHeatPump(BaseModel):
     electricity_cost: float
     capital_cost: float
     annual_capital_cost: float
+    # The share of the heating the process could give a heat pump that this
+    # one takes (1.0: the full load); None when its target did not say.
+    load_fraction: float | None = None
 
     @property
     def annual_cost(self) -> float:
