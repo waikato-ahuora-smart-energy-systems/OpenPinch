@@ -231,8 +231,9 @@ def run_retrofit_search(
     """Search modifications of ``existing``, one at a time.
 
     Every exchanger of ``existing`` needs its installed ``area``; a
-    ``ValueError`` names those without one. ``max_added_area_fraction`` must
-    be None or finite and non-negative, and every exchanger id and stream in
+    ``ValueError`` names those without one. ``max_added_area_fraction`` and
+    ``heat_pump_max_lift`` must each be None or finite and non-negative, and
+    every exchanger id and stream in
     ``enhancement_factors``, ``enhancement_pressure_drops`` and
     ``pressure_drop_allowances`` must be in the existing network.
     """
@@ -251,6 +252,12 @@ def run_retrofit_search(
         raise ValueError(
             "max_added_area_fraction must be None or a finite fraction of at "
             f"least 0; got {fraction!r}."
+        )
+    lift = settings.heat_pump_max_lift
+    if lift is not None and not (math.isfinite(lift) and lift >= 0.0):
+        raise ValueError(
+            "heat_pump_max_lift must be None or a finite lift of at least 0 K; "
+            f"got {lift!r}."
         )
     missing = [
         str(e.exchanger_id)
