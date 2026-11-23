@@ -31,7 +31,7 @@ a docstring.
 
 ## Invariants
 - The service dispatches on `config.hpr.type` through the cycle registry: the model family's `placement` handler, imported when first used; an unregistered type raises `ValueError`, and the Brayton handler raises `NotImplementedError`. The accepted target's topology identifier also comes from the registry (cascade vapour compression with one condenser and one evaporator reports the single-stage identifier). [service.py:_placement_handler] [service.py:_get_hpr_targets] [optimisation_adapter.py:_hpr_topology_identifier]
-- Targeting runs against the zone's `DI` (direct) or `II` (indirect) target; the indirect case rebuilds the cascade from inverted utility streams. [service.py:_compute_single_period_hpr_target]
+- Targeting runs against the zone's `DI` (direct) or `II` (indirect) target; the indirect case rebuilds the cascade from the `II` target's utility streams, inverted, so on a site of several processes the heat pump works on the duties the site's utility system carries and not on what the site's streams would need read as one process. [service.py:_compute_single_period_hpr_target, _multiperiod/preparation.py:_optimizer_problem_table_for_hpr]
 - Hot enthalpy is passed to input construction as non-positive and cold as non-negative. [service.py:_get_hpr_targets]
 - The TESPy backend is preflighted before its handler runs; handlers for other backends are called without it. [service.py:_get_hpr_targets]
 - Multiperiod optimisation is chosen from `config.hpr.multiperiod_optimization_enabled`; the multiperiod path returns `None` when the selected period has no case. [service.py:_use_multiperiod_hpr_optimization] [service.py:_compute_multiperiod_heat_pump_or_refrigeration_target]

@@ -427,7 +427,9 @@ def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeyp
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
     zone.targets[TargetType.II.value] = SimpleNamespace(
-        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
     )
     calls = {}
 
@@ -518,7 +520,9 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
                 ProblemTableLabel.H_NET_HOT: [np.nan, np.nan],
                 ProblemTableLabel.H_NET_COLD: [np.nan, np.nan],
             }
-        )
+        ),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
     )
     utility_profile = ProblemTable(
         {
@@ -927,7 +931,9 @@ def test_compute_indirect_hpr_returns_none_when_utility_profile_has_no_load(
 ):
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     zone.targets[TargetType.II.value] = SimpleNamespace(
-        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
     )
     monkeypatch.setattr(
         hp,
