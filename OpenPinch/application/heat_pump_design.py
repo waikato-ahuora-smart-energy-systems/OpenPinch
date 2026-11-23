@@ -12,6 +12,7 @@ from ..analysis.heat_exchanger_networks.heat_pump_cost import (
     heat_pump_record,
     network_with_heat_pumps,
 )
+from ..analysis.heat_exchanger_networks.solver.arrays import heat_pump_stream_roles
 from ..contracts.hpr import HprLevels, HPRTargetingError
 from .case_derivation import (
     _case_with_heat_pump_streams,
@@ -220,16 +221,33 @@ def design_with_heat_pump(
     return heat_pump_design_view(problem, plain, runs, max_exchangers=max_exchangers)
 
 
-def _most_exchangers(network, names: set[str]) -> int:
-    """The most exchangers with duty that one stream of ``names`` has."""
-    counts = dict.fromkeys(names, 0)
+def capped_heat_pump_streams(case) -> set[str]:
+    """The keys of the streams ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` caps:
+    the condensers and evaporators of ``case``, as its networks name them.
+
+    An ambient source is not capped: one air stream can feed several
+    evaporators.
+    """
+    return {
+        key
+        for key, role in heat_pump_stream_roles(case).items()
+        if role in ("condenser", "evaporator")
+    }
+
+
+def _most_exchangers(network, keys: set[str]) -> int:
+    """The most exchangers with duty that one stream of ``keys`` has.
+
+    ``keys`` are stream keys as the network names them: a stream of the
+    same name in another zone is another stream.
+    """
+    counts = dict.fromkeys(keys, 0)
     for exchanger in network.exchangers:
         if max(state.duty for state in exchanger.period_states) <= 0.0:
             continue
         for key in (exchanger.source_stream, exchanger.sink_stream):
-            name = key.rsplit(".", 1)[-1]
-            if name in counts:
-                counts[name] += 1
+            if key in counts:
+                counts[key] += 1
     return max(counts.values(), default=0)
 
 
@@ -256,15 +274,11 @@ def heat_pump_design_view(problem, plain, runs, *, max_exchangers: int | None = 
     ranked = list(ranked_networks(result))
     kept = dropped = 0
     for run, view in runs:
-        names = {
-            record["name"]
-            for record in run.case.to_problem_json()["streams"]
-            if record["heat_pump"] is not None
-        }
+        capped = capped_heat_pump_streams(run.case)
         for outcome in ranked_networks(view.result):
             if (
                 max_exchangers is not None
-                and _most_exchangers(outcome.network, names) > max_exchangers
+                and _most_exchangers(outcome.network, capped) > max_exchangers
             ):
                 dropped += 1
                 continue
@@ -292,4 +306,11 @@ def heat_pump_design_view(problem, plain, runs, *, max_exchangers: int | None = 
     return plain
 
 
-__all__ = ["HeatPumpDesignCase", "heat_pump_design_case", "heat_pump_design_view"]
+__all__ = [
+    "HeatPumpDesignCase",
+    "capped_heat_pump_streams",
+    "design_with_heat_pump",
+    "heat_pump_design_case",
+    "heat_pump_design_view",
+    "heat_pump_request",
+]
