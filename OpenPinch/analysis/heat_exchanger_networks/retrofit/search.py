@@ -44,6 +44,7 @@ from ..duty_optimisation import (
 from ..execution.settings import configured_stage_solver, stage_solver_options
 from ..solver.arrays import annual_cost_scales
 from .frontier import mark_dominated
+from .heat_pump_streams import with_heat_pump_matches
 from .heat_pumps import (
     HeatPumpCandidate,
     carnot_rating,
@@ -206,6 +207,9 @@ class _Move:
     repiped: tuple[str, ...] = ()
     heat_pump: HeatPumpCandidate | None = None
     loop: HeatRecoveryLoop | None = None
+    # The heat pump whose stream this new match serves, when the search
+    # started from a heat pump step.
+    machine: str | None = None
 
 
 @dataclass(frozen=True)
@@ -226,7 +230,11 @@ class _Evaluated:
 
 
 def run_retrofit_search(
-    problem, existing: HeatExchangerNetwork, settings: RetrofitSettings
+    problem,
+    existing: HeatExchangerNetwork,
+    settings: RetrofitSettings,
+    *,
+    heat_pump=None,
 ) -> HeatExchangerNetworkRetrofitResult:
     """Search modifications of ``existing``, one at a time.
 
@@ -322,7 +330,17 @@ def run_retrofit_search(
             UserWarning,
             stacklevel=3,
         )
-    base = evaluator.evaluate(_State(existing, frozenset(), ()))
+    base = evaluator.evaluate(
+        _State(existing, frozenset(), ())
+        if heat_pump is None
+        else _heat_pump_root(existing, heat_pump, evaluator)
+    )
+    if base is None and heat_pump is not None:
+        raise ValueError(
+            f"the existing network with the heat pump {heat_pump.record.machine!r} "
+            "added as streams does not solve: its coolers and heaters cannot "
+            "serve the machine's duties at their approaches."
+        )
     if base is None:
         raise ValueError(
             "the existing network does not meet its targets at its installed "
@@ -380,6 +398,47 @@ def run_retrofit_search(
         evaluated_designs=evaluator.evaluations,
         failed_solves=tuple(failed),
     )
+
+
+def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
+    """The state a search with a heat pump step starts from: ``existing``
+    with the matches that serve the machine's streams, each a new match.
+
+    The matches are placed from the base design's solved coolers and
+    heaters. A match stands off by the search's approach, or with none by
+    the case's process contribution and the heat pump's own.
+    """
+
+    config = evaluator.config
+    approach = (
+        float(config.thermal.dt_cont) + float(config.hpr.dt_cont)
+        if evaluator.settings.approach is None
+        else float(evaluator.settings.approach)
+    )
+    network, added = with_heat_pump_matches(
+        existing,
+        condensers=step.condensers,
+        evaporators=step.evaporators,
+        approach=approach,
+        machine=step.record.machine,
+        solved=step.base.network,
+    )
+    by_id = {e.exchanger_id: e for e in network.exchangers}
+    moves = tuple(
+        _Move(
+            "new_match",
+            exchanger_id,
+            match=NewMatch(
+                by_id[exchanger_id].source_stream,
+                by_id[exchanger_id].sink_stream,
+                int(by_id[exchanger_id].stage),
+                True,
+            ),
+            machine=step.record.machine,
+        )
+        for exchanger_id in added
+    )
+    return _State(network, frozenset(), moves)
 
 
 def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
@@ -779,6 +838,7 @@ class _Evaluator:
         from ..solver.arrays import problem_to_solver_arrays
 
         config = problem.master_zone.config
+        self.config = config
         self.settings = settings
         self.existing = frozenset(
             e.exchanger_id for e in _structural_exchangers(existing)

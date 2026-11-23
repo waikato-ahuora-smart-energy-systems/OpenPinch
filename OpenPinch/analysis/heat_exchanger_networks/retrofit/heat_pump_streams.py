@@ -2,12 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitDesign
 from ....domain.enums import HeatExchangerKind
-from ....domain.heat_exchanger_network import HeatExchangerNetwork
+from ....domain.heat_exchanger_network import HeatExchangerNetwork, NetworkHeatPump
 from .moves import NewMatch, apply_new_match, stage_count
 
 # Solved network states carry temperatures in K; streams in degC.
 _KELVIN = 273.15
+
+
+@dataclass(frozen=True)
+class HeatPumpStep:
+    """A heat pump of a fixed size that a retrofit search starts from.
+
+    The problem the search runs on holds the machine's ``condensers`` (hot
+    streams) and ``evaporators`` (cold streams). ``record`` is the machine
+    with its electricity and compressor costs, and ``base`` the existing
+    network's design in the search without the heat pump: its solved
+    network places the matches and its utility cost is what savings are
+    measured against.
+    """
+
+    record: NetworkHeatPump
+    condensers: tuple
+    evaporators: tuple
+    base: HeatExchangerNetworkRetrofitDesign
 
 
 def with_heat_pump_matches(
@@ -17,11 +38,13 @@ def with_heat_pump_matches(
     evaporators,
     approach: float,
     machine: str = "HP",
+    solved: HeatExchangerNetwork | None = None,
 ) -> tuple[HeatExchangerNetwork, tuple[str, ...]]:
     """``network`` with the matches that serve a heat pump's streams, and
     the ids of the exchangers added.
 
-    ``network`` is solved: its coolers and heaters carry their process
+    ``network`` is solved, or ``solved`` is the same network solved: its
+    coolers and heaters carry their process
     side temperatures (first period). Each of ``evaporators`` (cold
     streams, degC) is matched to every hot stream whose cooler starts at
     least ``approach`` K above the evaporator's hot end, in a new stage
@@ -32,8 +55,8 @@ def with_heat_pump_matches(
     ends at stage 1. A stream no cooler or heater can serve gets no match.
     """
 
-    coolers = _starts(network, HeatExchangerKind.COLD_UTILITY)
-    heaters = _starts(network, HeatExchangerKind.HOT_UTILITY)
+    coolers = _starts(solved or network, HeatExchangerKind.COLD_UTILITY)
+    heaters = _starts(solved or network, HeatExchangerKind.HOT_UTILITY)
     added: list[str] = []
 
     def add(hot: str, cold: str, stage: int, new_stage: bool) -> None:
