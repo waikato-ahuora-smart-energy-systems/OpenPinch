@@ -1,15 +1,17 @@
-"""Split a level-holding pinch side at its utility pinches.
+"""Split a pinch side at every pinch inside it.
 
-With each utility level held at its target, the side's streams and levels
-balance, and the heat cascade can close at temperatures between the process
-pinch and the side's far end: utility pinches. No heat may cross one, so
-each region between them is designed on its own, from its end nearer the
-process pinch, and the regions' designs are stacked, nearest the pinch
-first.
+A side's heat cascade can close at temperatures between the pinch the
+problem was split at and the side's far end: a utility pinch, where a
+level held at its target leaves no heat to spare; the level of a heat
+pump's condenser or evaporator, sized to its pocket; a second process
+pinch. No heat may cross one, so each region between them is designed on
+its own, from its end nearer the pinch, and the regions' designs are
+stacked, nearest the pinch first.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 
 import numpy as np
@@ -17,23 +19,29 @@ import numpy as np
 from .side_streams import PINCH_TOLERANCE, PinchSide, SideStream
 
 # The cascade closes where the heat crossing is within this fraction of the
-# side's load: targeting rounds each level to about this.
-CASCADE_TOLERANCE = 1e-6
+# side's load. Targeting rounds a utility level to about 1e-6 of it, and a
+# heat pump target sizes a condenser to its pocket within 2e-6 (basic pinch
+# case). Looser cuts short of a pinch: 0.1 K below the pulp mill's utility
+# pinch the above side carries 7e-5 of its load.
+CASCADE_TOLERANCE = 1e-5
+# A stream spanning no more than this (K) is a level: a phase change is
+# written with a 0.01 K glide.
+ISOTHERMAL_SPAN = 2.0 * PINCH_TOLERANCE
 
 
-def utility_pinch_regions(side: PinchSide) -> list[PinchSide]:
-    """A single-period side split at its utility pinches, nearest first.
+def pinch_regions(side: PinchSide) -> list[PinchSide]:
+    """A single-period side split at the pinches inside it, nearest first.
 
-    A side without utility levels among its streams, or whose cascade does
-    not close between its ends, is one region: itself.
+    A side whose cascade does not close between its ends is one region:
+    itself.
     """
 
-    if side.periods != 1 or not _has_levels(side):
+    if side.periods != 1:
         return [side]
     streams = [s for s in side.hot + side.cold if s.active(0)]
     if not streams or any(not s.contributions for s in streams):
         return [side]
-    cuts = _utility_pinches(side, streams)
+    cuts = _interior_pinches(side, streams)
     if not cuts:
         return [side]
     bounds = [None, *cuts, None]
@@ -43,12 +51,6 @@ def utility_pinch_regions(side: PinchSide) -> list[PinchSide]:
         if region.hot or region.cold:
             regions.append(region)
     return regions
-
-
-def _has_levels(side: PinchSide) -> bool:
-    return any(s.index >= side.hot_count for s in side.hot) or any(
-        s.index >= side.cold_count for s in side.cold
-    )
 
 
 def _away(side: PinchSide, stream: SideStream, temperature: float) -> float:
@@ -68,15 +70,47 @@ def _crossing(side: PinchSide, streams, temperature: float) -> float:
     """The heat the cascade carries across ``temperature`` toward the pinch.
 
     Above the pinch, hot heat beyond it flows down; below the pinch, the
-    cold beyond it draws heat down across it.
+    cold beyond it draws heat down across it. The side's own utility, the
+    duty its streams are out of balance by when its levels are not among
+    them, enters beyond every stream and so crosses every temperature.
     """
 
     hot = sum(_away(side, s, temperature) for s in streams if s.kind == "hot")
     cold = sum(_away(side, s, temperature) for s in streams if s.kind == "cold")
-    return hot - cold if side.location == "above" else cold - hot
+    supply = sum(s.loads[0] for s in streams if s.kind == "hot")
+    demand = sum(s.loads[0] for s in streams if s.kind == "cold")
+    if side.location == "above":
+        return hot - cold + max(demand - supply, 0.0)
+    return cold - hot + max(supply - demand, 0.0)
 
 
-def _utility_pinches(side: PinchSide, streams) -> list[float]:
+def _level_crossings(side: PinchSide, streams) -> dict[float, float]:
+    """The cascade just beyond each near-isothermal stream taken as a point.
+
+    A condensing or evaporating stream is written with a small glide, and a
+    target that sizes one to close the cascade treats it as a point at its
+    end nearer the pinch. With the glide, the cascade at its far end is off
+    by the glide times the net CP of the streams around it. Keyed by the
+    stream's far end, where the side is cut: the crossing at the near end
+    less the stream's own heat (plus it, for a stream that takes heat from
+    the cascade's source side).
+    """
+
+    found: dict[float, float] = {}
+    for stream in streams:
+        shifted = stream.shifted(0)
+        near, far = shifted[0], shifted[-1]
+        if abs(far - near) > ISOTHERMAL_SPAN:
+            continue
+        feeds = (stream.kind == "hot") == (side.location == "above")
+        own = stream.loads[0] if feeds else -stream.loads[0]
+        value = _crossing(side, streams, near) - own
+        if abs(value) < abs(found.get(far, math.inf)):
+            found[far] = value
+    return found
+
+
+def _interior_pinches(side: PinchSide, streams) -> list[float]:
     """Interior shifted temperatures where the cascade closes, nearest first."""
 
     above = side.location == "above"
@@ -85,6 +119,7 @@ def _utility_pinches(side: PinchSide, streams) -> list[float]:
     )
     total = sum(s.loads[0] for s in streams)
     tolerance = CASCADE_TOLERANCE * max(total, 1.0)
+    levels = _level_crossings(side, streams)
     cuts: list[float] = []
     closed = False
     for temperature in points[1:-1]:
@@ -93,7 +128,10 @@ def _utility_pinches(side: PinchSide, streams) -> list[float]:
         if near <= tolerance or away <= tolerance:
             closed = False
             continue
-        if _crossing(side, streams, temperature) <= tolerance:
+        if (
+            _crossing(side, streams, temperature) <= tolerance
+            or abs(levels.get(temperature, math.inf)) <= tolerance
+        ):
             # One cut per closed stretch: no stream runs within it.
             if not closed:
                 cuts.append(temperature)
@@ -146,4 +184,4 @@ def _slice(side: PinchSide, stream: SideStream, near, far) -> SideStream | None:
     )
 
 
-__all__ = ["CASCADE_TOLERANCE", "utility_pinch_regions"]
+__all__ = ["CASCADE_TOLERANCE", "ISOTHERMAL_SPAN", "pinch_regions"]
