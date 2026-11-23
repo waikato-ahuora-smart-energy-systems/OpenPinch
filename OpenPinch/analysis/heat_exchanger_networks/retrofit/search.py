@@ -424,7 +424,9 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         evaporators=step.evaporators,
         approach=approach,
         machine=step.record.machine,
-        solved=step.base.network,
+        # The base design's network names streams as the solver does; the
+        # matches name them as the existing network does.
+        solved=_with_names(step.base.network, evaluator.names),
     )
     by_id = {e.exchanger_id: e for e in network.exchangers}
     moves = tuple(
