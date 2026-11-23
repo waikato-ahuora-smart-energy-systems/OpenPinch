@@ -276,12 +276,26 @@ def with_heat_pump_streams(
             "streams that vary by period are not built yet; derive a "
             "single-period case and target the heat pump on it."
         )
-    address = _heat_pump_zone_address(problem, target, zone)
     # The value the target was solved with: a per-call
     # ``minimum_approach_temperature`` or a zone's own setting can differ
     # from the problem's.
-    approach = target.provenance.effective_settings["HPR_DT_CONT"]
-    dt_cont = {"value": float(approach), "unit": "delta_degC"}
+    return _case_with_heat_pump_streams(
+        problem,
+        target,
+        dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]),
+        zone=zone,
+        machine=machine,
+        project_name=project_name,
+    )
+
+
+def _case_with_heat_pump_streams(
+    problem, target, *, dt_cont: float, zone=None, machine="HP", project_name=None
+):
+    """``problem`` with the streams of ``target`` at ``dt_cont`` (K), with no
+    check that the target is this problem's own."""
+    address = _heat_pump_zone_address(problem, target, zone)
+    dt_cont = {"value": float(dt_cont), "unit": "delta_degC"}
     source = problem.to_problem_json()
     taken = {
         record["name"] for record in source["streams"] if record["zone"] == address
