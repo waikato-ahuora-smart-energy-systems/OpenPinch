@@ -3,7 +3,7 @@
 from copy import deepcopy
 
 from ..domain.enums import StreamType, ZoneType
-from ..domain.targets import DirectHeatPumpTarget
+from ..domain.targets import DirectHeatPumpTarget, IndirectHeatPumpTarget
 from ._problem.input.utilities import _set_utilities_for_zone_and_subzones
 from ._problem.targeting.state import snapshot_problem
 
@@ -260,10 +260,18 @@ def with_heat_pump_streams(
 
     _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
+    if isinstance(target, IndirectHeatPumpTarget):
+        return _case_with_utility_heat_pump_zones(
+            problem,
+            target,
+            dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]),
+            machine=machine,
+            project_name=project_name,
+        )
     if not isinstance(target, DirectHeatPumpTarget):
         raise ValueError(
-            "with_heat_pump_streams takes the target of a heat pump placed on "
-            f"the process; this is a {target.type} target."
+            "with_heat_pump_streams takes a heat pump target, placed on the "
+            f"process or on the utility system; this is a {target.type} target."
         )
     # The value the target was solved with: a per-call
     # ``minimum_approach_temperature`` or a zone's own setting can differ
@@ -275,6 +283,57 @@ def with_heat_pump_streams(
         zone=zone,
         machine=machine,
         project_name=project_name,
+    )
+
+
+def _tree_node(tree: dict, path: list[str]) -> dict:
+    """The node of the zone tree at ``path``, zone names from the root down."""
+    node = tree
+    for name in path[1:]:
+        node = next(child for child in node["children"] if child["name"] == name)
+    return node
+
+
+def _case_with_utility_heat_pump_zones(
+    problem, target, *, dt_cont: float, machine="HP", project_name=None
+):
+    """``problem`` with a utility heat pump ``target``'s streams, each side
+    in a process zone of its own under the zone the target was solved on.
+
+    The condensers are the hot streams of ``"<machine> condenser"`` and
+    the evaporators the cold streams of ``"<machine> evaporator"``. In one
+    zone the two would recover heat from each other.
+    """
+    root = problem._require_prepared_root_zone()
+    scope = next(
+        zone
+        for zone in problem._walk_zone_tree(root)
+        if zone.address == target.provenance.zone_address
+    )
+    source = problem.to_problem_json()
+    node = _tree_node(source["zone_tree"], _ancestry(scope))
+    dt_cont = {"value": float(dt_cont), "unit": "delta_degC"}
+    for role, streams in (
+        ("condenser", target.hpr_hot_streams),
+        ("evaporator", target.hpr_cold_streams),
+    ):
+        name = f"{machine} {role}"
+        node["children"] = [
+            *(node["children"] or ()),
+            {"name": name, "type": ZoneType.P.value, "children": None},
+        ]
+        for _key, stream in streams.items():
+            source["streams"].append(
+                _heat_pump_stream_record(
+                    stream,
+                    zone=f"{scope.address}/{name}",
+                    dt_cont=dt_cont,
+                    mark={"machine": machine, "role": role, "placement": "utility"},
+                )
+            )
+    return type(problem)(
+        source,
+        project_name=problem.project_name if project_name is None else project_name,
     )
 
 
