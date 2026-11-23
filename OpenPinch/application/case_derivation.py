@@ -262,13 +262,15 @@ def with_heat_pump_streams(
     _require_heat_pump_stream_support(problem)
     validate_hpr_target(problem, target)
     if isinstance(target, IndirectHeatPumpTarget):
-        return _case_with_utility_heat_pump_zones(
+        case = _case_with_utility_heat_pump_zones(
             problem,
             target,
             dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]),
             machine=machine,
             project_name=project_name,
         )
+        _require_heat_pump_site_target(case, target)
+        return case
     if not isinstance(target, DirectHeatPumpTarget):
         raise ValueError(
             "with_heat_pump_streams takes a heat pump target, placed on the "
@@ -293,6 +295,39 @@ def _tree_node(tree: dict, path: list[str]) -> dict:
     for name in path[1:]:
         node = next(child for child in node["children"] if child["name"] == name)
     return node
+
+
+def _require_heat_pump_site_target(case, target) -> None:
+    """Raise unless ``case`` targets as the utility heat pump ``target`` did.
+
+    The case holds the heat pump as streams that the site's utility levels
+    serve. Its hot utility has to be what the target left, and its cold
+    utility what the target left plus the heat the target let ambient air
+    take, which the case does not hold. They differ when a level cannot
+    exchange with the heat pump as the target assumed; the case would then
+    look complete and target wrongly. The check runs on a copy, so the
+    case stays unsolved.
+    """
+    copy = type(case)(case.to_problem_json(), project_name=case.project_name)
+    site = copy.target.indirect_heat_integration(zone=target.provenance.zone_address)
+    wanted = (
+        float(target.hot_utility_target),
+        float(target.cold_utility_target) + float(target.hpr_ambient_cold),
+    )
+    found = (float(site.hot_utility_target), float(site.cold_utility_target))
+    tolerance = 1e-6 * max(1.0, *wanted)
+    if all(abs(have - want) <= tolerance for have, want in zip(found, wanted)):
+        return
+    raise ValueError(
+        "The site's utility levels cannot exchange with the heat pump as its "
+        f"target assumed: with the heat pump's zones the site needs "
+        f"{found[0]:.6g} kW of hot utility and {found[1]:.6g} kW of cold, "
+        f"where the target leaves {wanted[0]:.6g} and {wanted[1]:.6g} kW. A "
+        "level the heat pump delivers into must take heat as well as give "
+        "it, and one it draws on must give heat as well as take it (type "
+        "Both); a stream part way through a wide level's temperatures, and "
+        "ambient air the evaporator draws on, are not built."
+    )
 
 
 def _band_move(stream, role: str, approach: float, levels) -> float:
