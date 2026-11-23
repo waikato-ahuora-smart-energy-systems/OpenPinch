@@ -19,12 +19,10 @@ def test_design_retrofit_passes_the_sizes(monkeypatch):
     calls = []
 
     def retrofit(problem, existing, settings, **arguments):
+        # No solve: the Pyodide lane has no solver, and only the sizes
+        # that reach the sweep matter here.
         calls.append(arguments.get("sizes"))
-        from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
-            run_retrofit_search,
-        )
-
-        return run_retrofit_search(problem, existing, settings)
+        return object()
 
     monkeypatch.setattr(heat_pump_retrofit, "retrofit_with_heat_pump", retrofit)
     problem = levels_problem()
