@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from OpenPinch.analysis.heat_exchanger_networks.models._pinch_design import (
-    equations,
+from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+    interior_approach as equations,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver import piecewise
 from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (

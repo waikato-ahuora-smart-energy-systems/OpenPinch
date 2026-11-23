@@ -29,8 +29,8 @@ from ..solver.utility_slices import (
     with_utility_slices,
 )
 from ._base.execution import _assign_value, _set_value, _value
+from ._base.interior_approach import replay_interior_cuts
 from ._pinch_design.equations import _unit_index_sets as _equations_unit_indices
-from ._pinch_design.equations import replay_interior_cuts
 from ._stagewise import staged_utilities as _staged
 from ._stagewise.level_targets import site_level_targets
 from ._stagewise.site_utilities import SiteUtilities, site_balance, with_site_cost
