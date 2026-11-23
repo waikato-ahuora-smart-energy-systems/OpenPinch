@@ -428,20 +428,23 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         # matches name them as the existing network does.
         solved=_with_names(step.base.network, evaluator.names),
     )
-    by_id = {e.exchanger_id: e for e in network.exchangers}
+    # The heat pump's streams are new: only the process stream of each
+    # match has piping to change.
+    pumped = {stream.name for stream in step.condensers + step.evaporators}
     moves = tuple(
         _Move(
             "new_match",
-            exchanger_id,
-            match=NewMatch(
-                by_id[exchanger_id].source_stream,
-                by_id[exchanger_id].sink_stream,
-                int(by_id[exchanger_id].stage),
-                True,
+            placed.exchanger_id,
+            match=placed.match,
+            splits=placed.splits,
+            repiped=tuple(
+                stream
+                for stream in (placed.match.hot, placed.match.cold)
+                if stream not in pumped
             ),
             machine=step.record.machine,
         )
-        for exchanger_id in added
+        for placed in added
     )
     return _State(network, frozenset(), moves)
 
