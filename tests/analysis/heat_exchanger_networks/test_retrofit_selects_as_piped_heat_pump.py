@@ -46,5 +46,9 @@ def test_the_search_selects_the_as_piped_heat_pump():
     machines = [m for m in selected.modifications if m.kind == "heat_pump"]
     assert len(machines) == 1
     assert machines[0].heat_pump_cop > 3.0
-    assert selected.hot_utility < 100.0
+    # Less steam than the existing 240 kW. With one size the full machine
+    # left under 100 kW; tried at three sizes (the default since the duty
+    # sweep) a smaller one nets more, 11,393 $/y against 11,042, and
+    # leaves 123 kW.
+    assert selected.hot_utility < 240.0
     assert selected.net_annual_benefit > 0.0

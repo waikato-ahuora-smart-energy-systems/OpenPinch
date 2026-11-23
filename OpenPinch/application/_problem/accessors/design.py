@@ -1670,6 +1670,7 @@ class _DesignAccessor:
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
         heat_pump_streams: bool = False,
+        heat_pump_sizes: Sequence[float] = (1.0, 0.75, 0.5),
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
@@ -1871,6 +1872,7 @@ class _DesignAccessor:
                     retrofit_with_heat_pump,
                     configuration=configuration,
                     limits=heat_pump_search,
+                    sizes=tuple(float(size) for size in heat_pump_sizes),
                 )
             result = search(
                 isolated,
