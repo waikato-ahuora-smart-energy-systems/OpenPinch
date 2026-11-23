@@ -143,7 +143,10 @@ class RetrofitSettings:
     ``COSTING_HPR_ELE_PRICE``. "carnot" rates them with
     ``HPR_ETA_II_CARNOT``, pricing the evaporator and condenser like any new
     exchanger (``new_unit_cost`` and their area) and the compressor and its
-    package at ``heat_pump_cost`` ($ per kW of condenser capacity).
+    package at ``heat_pump_cost`` ($ per kW of condenser capacity). A Carnot
+    cycle has a COP at any lift, so it serves a pair only up to
+    ``heat_pump_max_lift`` (K from evaporating to condensing; 140 by
+    default, about a two-stage cascade; ``None`` for no limit).
     "vapour_compression" rates them with a single stage on the best of
     ``HPR_REFRIGERANTS`` within the HPR cycle limits, and prices the whole
     machine with the HPR service's installed capital.
@@ -188,6 +191,7 @@ class RetrofitSettings:
     repiping_cost: float = 0.0
     heat_pump_cycle: str | None = None
     heat_pump_cost: float = 0.0
+    heat_pump_max_lift: float | None = 140.0
     heat_recovery_loops: bool = True
     heat_recovery_loop_cost: float = 0.0
 
@@ -813,7 +817,10 @@ class _Evaluator:
         self.cycle_settings = _cycle_settings(config.hpr)
         if settings.heat_pump_cycle is not None:
             rating = (
-                carnot_rating(float(config.hpr.eta_ii_carnot))
+                carnot_rating(
+                    float(config.hpr.eta_ii_carnot),
+                    max_lift=settings.heat_pump_max_lift,
+                )
                 if settings.heat_pump_cycle == "carnot"
                 else vapour_compression_rating(
                     list(config.hpr.normalised_refrigerants), **self.cycle_settings

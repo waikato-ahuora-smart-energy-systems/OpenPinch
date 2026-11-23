@@ -128,6 +128,19 @@ Heat exchanger network synthesis
   room keep the loop midway between them. More loops are offered (26 to
   428 on the chocolate factory's streams) but no more are solved at each
   step, and a one-step retrofit there takes 3.0 s against 2.9 s.
+- **Breaking:** a Carnot retrofit heat pump (``heat_pump_cycle="carnot"``)
+  now serves a pair of streams only when its lift from evaporating to
+  condensing is at most ``heat_pump_max_lift``, 140 K by default (about a
+  two-stage cascade); ``None`` restores the old behaviour. A Carnot cycle
+  has a COP at any lift, so the search proposed machines no compressor
+  builds: on the Ciric and Floudas case with electricity at 30 $/MWh, a
+  15.2 MW heat pump lifting 208 K (67 to 275 degC) at a COP of 1.82. That
+  case now gets no heat pump by default and its frontier is new matches.
+- ``design.retrofit`` warns when ``heat_pump_cycle="carnot"`` is used with
+  ``heat_pump_cost`` left at 0. The compressor is then free and the heat
+  pump costs only its two exchangers: the 15.2 MW machine above had a
+  fixed cost of 69,200 $ and a net benefit of 3.94 M$/y, against
+  4.63 M$ and 3.03 M$/y with the compressor at 300 $/kW.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

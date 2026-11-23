@@ -849,7 +849,12 @@ Heat pumps
    service's cycle models rate it. ``"carnot"`` takes the heating COP
    ``1 + HPR_ETA_II_CARNOT * T_evap / (T_cond - T_evap)``, prices the
    compressor and package at ``heat_pump_cost`` per kW of condenser
-   capacity and the two exchangers by the area law. ``"vapour_compression"``
+   capacity and the two exchangers by the area law. A Carnot cycle has a
+   COP at any lift, so it serves a pair only up to ``heat_pump_max_lift``
+   (K from evaporating to condensing; 140 by default, about a two-stage
+   cascade; ``None`` for no limit), and ``heat_pump_cost`` is 0 unless
+   set, which a ``UserWarning`` points out: the machine then costs only
+   its two exchangers. ``"vapour_compression"``
    solves a single stage on each of ``HPR_REFRIGERANTS`` within the HPR
    cycle limits, keeps the fluid with the best COP and prices the whole
    machine (compressor, motor, evaporator and condenser) with the HPR
@@ -857,10 +862,13 @@ Heat pumps
    The model links the two duties by the COP; the search screens stream
    pairs by the utility the heat pump could relieve, and its condenser and
    evaporator duties do not count as hot and cold utility. On the Ciric
-   and Floudas case at $30/MWh electricity a Carnot heat pump from H1 to C2
-   (COP 1.92, 14.7 MW) is the best first step, at $2.06M/y net; at the
-   case's $100/MWh, and with a single water stage (COP 1.62, $13.7M
-   installed), new matches win.
+   and Floudas case the only heater is on C2, heated to 265 degC, so a heat
+   pump there lifts 208 K from H1 or 197 K from H2: within the default
+   limit none is offered and new matches make the frontier. With the limit
+   raised to 200 K, electricity at $30/MWh and the compressor at $300/kW, a
+   Carnot heat pump from H2 to C2 (COP 1.89, 7.7 MW, $2.39M fixed cost) is
+   the best first step at $1.22M/y net, level with the best new match
+   ($1.21M/y). At the case's $100/MWh new matches win.
 Sites and heat recovery loops
    When the existing network's streams span several process zones (a
    site's network given as a mapping), new matches and relocations join

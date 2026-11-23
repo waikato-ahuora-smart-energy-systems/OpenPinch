@@ -47,11 +47,18 @@ class HeatPumpCandidate:
 Rating = Callable[[float, float], "tuple[float, str | None] | None"]
 
 
-def carnot_rating(eta_ii: float) -> Rating:
+def carnot_rating(eta_ii: float, *, max_lift: float | None = None) -> Rating:
     """The HPR service's Carnot heat pump: heating COP
-    ``1 + eta_ii * T_evap / (T_cond - T_evap)``, no refrigerant."""
+    ``1 + eta_ii * T_evap / (T_cond - T_evap)``, no refrigerant.
+
+    A Carnot cycle has a COP at any lift, which no machine has: a pair whose
+    lift from evaporating to condensing is above ``max_lift`` (K) is not
+    served. ``None`` serves any lift.
+    """
 
     def rate(evaporating: float, condensing: float):
+        if max_lift is not None and condensing - evaporating > max_lift:
+            return None
         return float(calc_carnot_heat_pump_cop(condensing, evaporating, eta_ii)), None
 
     return rate
