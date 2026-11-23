@@ -300,6 +300,53 @@ stream-end utilities of a fit to every period):
 
 These are the masks ``HENS_FORBIDDEN_MATCHES`` fills, so the two combine.
 
+A heat pump on the utility system as zones of a site
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A utility heat pump (``placement="utility"``) lifts heat from one utility
+level of a site to a hotter one. ``with_heat_pump_streams`` takes its
+target too, and adds it as two process zones beside the site's
+processes::
+
+   target = site.target.heat_pump_and_refrigeration("carnot", placement="utility")
+   with_pump = site.with_heat_pump_streams(target)
+   with_pump.target.total_site_heat_integration()
+   with_pump.design.total_site_heat_exchanger_network()
+
+The condensers are the hot streams of a zone ``"HP condenser"`` and the
+evaporators the cold streams of ``"HP evaporator"`` (``machine`` gives the
+first word), marked ``placement: "utility"``. They are two zones because
+the streams of one zone recover heat from each other, and a condenser must
+not heat its own evaporator. The condenser's zone raises the level the
+site buys heat at and the evaporator's is heated from the level the site
+has heat to spare at, so the site's utility balance counts them as
+generation and use with no change to the design.
+
+Total site targeting of the new case gives the hot utility the heat pump
+target left, and its cold utility plus the heat the target let ambient
+air take (the air is not written into the case). On a site that imports
+800 kW of steam at 180 degC and has 1000 kW to spare at 140 degC, a full
+load heat pump leaves 0.08 kW of import, and so does the case.
+
+A level is written as a narrow band of temperature, a steam main as 0.1 K,
+and a target ends its streams inside those bands. A level serves a stream
+whole or not at all, so a condenser inside the band of a level that takes
+heat is moved up to the band's top and an evaporator inside the band of a
+level that gives heat down to its bottom. The move is at most the band's
+width.
+
+The new case is checked before it is returned. It is refused when it would
+not target as the heat pump did: when a level the heat pump delivers into
+is a hot utility alone or one it draws on a cold utility alone (the level
+has to be of type ``Both``), when a stream sits part way through a wide
+level's temperatures, and when the evaporator draws on ambient air. A site
+with several periods, a target solved on one process zone and a ``zone=``
+are refused by name. The direct match rules do not apply to these streams:
+exchanging with utility levels is what they are for. Electricity and the
+compressor are not in the case's costs, and
+``design.total_site_heat_exchanger_network`` has no ``heat_pump=`` of its
+own yet.
+
 Designing a network with and without the heat pump
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -433,10 +480,11 @@ its share of the year. An air-source heat pump and segmented (vapour
 compression) streams are not built over several periods yet and are
 refused.
 
-It takes the target of a heat pump placed on the process, solved on this
-problem as it stands: a target from another problem, one solved before the
-inputs changed, and a utility heat pump's target are refused. On a problem
-with several periods it takes a target solved as a shared design
+``with_heat_pump_streams`` takes a heat pump target solved on this problem
+as it stands: a target from another problem, one solved before the inputs
+changed, and a refrigeration target are refused. On a problem with several
+periods it takes the target of a heat pump on the process solved as a
+shared design
 (``options={"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True}``), whose streams
 it writes with a value per period; any other target there holds one
 period's streams and is refused. Electricity and the compressor are not

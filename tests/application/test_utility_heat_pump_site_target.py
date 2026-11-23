@@ -26,9 +26,7 @@ def test_the_site_target_of_the_case_is_the_heat_pump_targets_net_utility():
     case = problem.with_heat_pump_streams(target)
     site = case.target.total_site_heat_integration()
 
-    assert site.hot_utility_target == pytest.approx(
-        target.hot_utility_target, abs=1e-6
-    )
+    assert site.hot_utility_target == pytest.approx(target.hot_utility_target, abs=1e-6)
     assert site.cold_utility_target == pytest.approx(
         target.cold_utility_target + float(target.hpr_ambient_cold), abs=1e-6
     )

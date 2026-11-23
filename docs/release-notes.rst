@@ -37,10 +37,29 @@ Heat pumps and refrigeration
   513.4 kW of cooling, against 750 and 1000 kW without the heat pump), so
   heat exchanger network synthesis can design the process and the heat
   pump together. Electricity and the compressor are not in the new case's
-  costs. A target from another problem, a stale one and a utility heat
-  pump's are refused. On a problem with several periods the target must be
+  costs. A target from another problem, a stale one and a refrigeration
+  target are refused. On a problem with several periods the target must be
   a shared design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``), and its
   streams are written with a value per period.
+- ``problem.with_heat_pump_streams(target)`` also takes a utility heat
+  pump's target (``placement="utility"``) solved on a site. The condensers
+  become the hot streams of a process zone ``"HP condenser"`` and the
+  evaporators the cold streams of ``"HP evaporator"``, beside the site's
+  processes, so total site targeting and
+  ``design.total_site_heat_exchanger_network`` treat the heat pump as two
+  more processes: the condenser raises the level the site buys heat at and
+  the evaporator is heated from the level it has heat to spare at. Total
+  site targeting of the new case gives the hot utility the heat pump
+  target left and its cold utility plus the heat the target let ambient
+  air take. A stream that ends inside the 0.1 K band a utility level is
+  written as is moved to the band's end, so the level serves all of it.
+  The case is refused when it would not target as the heat pump did (a
+  level the heat pump delivers into or draws on has to be of type
+  ``Both``), on a site with several periods, and for a target solved on
+  one process zone. A heat pump stream's mark gains ``placement``,
+  ``"process"`` by default; streams marked ``"utility"`` take none of the
+  match rules of a heat pump on the process. Electricity and the
+  compressor are not in the case's costs.
 - ``design.heat_exchanger_network(heat_pump=..., heat_pump_cost=...)``
   designs with a heat pump as well as without and ranks both. ``heat_pump``
   is a cycle name or a mapping of ``target.heat_pump_and_refrigeration``
