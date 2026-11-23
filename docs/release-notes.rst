@@ -27,8 +27,10 @@ Heat pumps and refrigeration
   513.4 kW of cooling, against 750 and 1000 kW without the heat pump), so
   heat exchanger network synthesis can design the process and the heat
   pump together. Electricity and the compressor are not in the new case's
-  costs. A target from another problem, a stale one, a utility heat pump's
-  and a problem with several periods are refused.
+  costs. A target from another problem, a stale one and a utility heat
+  pump's are refused. On a problem with several periods the target must be
+  a shared design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``), and its
+  streams are written with a value per period.
 - ``design.heat_exchanger_network(heat_pump=..., heat_pump_cost=...)``
   designs with a heat pump as well as without and ranks both. ``heat_pump``
   is a cycle name or a mapping of ``target.heat_pump_and_refrigeration``
@@ -42,8 +44,14 @@ Heat pumps and refrigeration
   0.75, 1.0 and 1.5; at 1.0 it draws 263.4 kW (218,636 $/y). With the
   compressor at 200 $/kW its best network (at 0.75) costs 380,786 $/y
   against 229,354 $/y without a heat pump, which is selected; with steam at
-  200 $/MWh in place of 10 the heat pump design is selected. ``record=`` is not available with it, and a problem with
-  several periods is refused.
+  200 $/MWh in place of 10 the heat pump design is selected. ``record=``
+  is not available with it. On a problem with several periods the heat
+  pump is solved as one machine over all of them: its streams vary by
+  period, its electricity is weighted by the period weights, its
+  compressor is sized on its largest condenser duty, and the sizes tried
+  are the load kinks of every period. On the three-period crude preheat
+  train sample a full-load Carnot heat pump gives networks fitted to every
+  period with no heater or cooler on a heat pump stream.
 - Without a ``load``, ``heat_exchanger_network(heat_pump=...)`` designs
   every heat pump size worth trying at each multiplier, the load fractions
   at the kinks of the net load profile (``target.hpr_load_kinks``) and the

@@ -13,7 +13,7 @@ from ..analysis.heat_exchanger_networks.heat_pump_cost import (
     network_with_heat_pumps,
 )
 from ..analysis.heat_exchanger_networks.solver.arrays import heat_pump_stream_roles
-from ..contracts.hpr import HprLevels, HPRTargetingError
+from ..contracts.hpr import HprLevels, HprLoad, HPRTargetingError
 from .case_derivation import (
     _case_with_heat_pump_streams,
     _require_heat_pump_stream_support,
@@ -79,6 +79,10 @@ def heat_pump_design_case(
         approach = float((options or {}).get("HPR_DT_CONT", root.config.hpr.dt_cont))
     zone_multiplier = float(root.dt_cont_multiplier)
     scaled = _scaled(problem, multiplier)
+    if len(problem.period_ids) > 1:
+        # One machine over every period, as the network is one network:
+        # the only target that holds the heat pump's streams in each period.
+        options = dict(options or {}) | {"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True}
     target = scaled.target.heat_pump_and_refrigeration(
         cycle,
         duty="heat_pump",
@@ -93,6 +97,22 @@ def heat_pump_design_case(
         search=search,
         options=options,
     )
+    record = heat_pump_record(
+        target,
+        machine=machine,
+        # The costing group of the design this case is for, when that
+        # design's options differ from the problem's stored ones.
+        costing=root.config.costing if costing is None else costing,
+        cost_per_kw=cost_per_kw,
+        # Each period's share of the year, for a machine over several.
+        period_weights=dict(
+            zip(problem.period_ids, root.config.problem.period_weights)
+        ),
+    )
+    asked = None if load is None else HprLoad.model_validate(load).fraction
+    if record.load_fraction is None and asked is not None:
+        # A shared design over several periods reports no load summary.
+        record = record.model_copy(update={"load_fraction": float(asked)})
     return HeatPumpDesignCase(
         multiplier=multiplier,
         target=target,
@@ -100,14 +120,7 @@ def heat_pump_design_case(
         case=_case_with_heat_pump_streams(
             problem, target, dt_cont=approach, machine=machine
         ),
-        record=heat_pump_record(
-            target,
-            machine=machine,
-            # The costing group of the design this case is for, when that
-            # design's options differ from the problem's stored ones.
-            costing=root.config.costing if costing is None else costing,
-            cost_per_kw=cost_per_kw,
-        ),
+        record=record,
     )
 
 
@@ -146,6 +159,21 @@ def heat_pump_request(heat_pump) -> dict[str, Any]:
             + "."
         )
     return {"cycle": "carnot"} | dict(heat_pump)
+
+
+def _load_fractions(problem) -> list[float]:
+    """The heat pump sizes worth trying on ``problem``: the logical load
+    fractions of its net load profile, over every period.
+
+    The profile, and so its kinks, differs from period to period; a size
+    is tried over all of them, so the kinks of every period are taken.
+    """
+    fractions = {
+        round(float(fraction), 6)
+        for result in problem.target.all_periods.hpr_load_kinks().values()
+        for fraction in result.logical_load_fractions
+    }
+    return sorted(fractions)
 
 
 def design_with_heat_pump(
@@ -189,9 +217,7 @@ def design_with_heat_pump(
             if asked is not None
             else [
                 {"fraction": fraction}
-                for fraction in _scaled(problem, multiplier)
-                .target.hpr_load_kinks()
-                .logical_load_fractions
+                for fraction in _load_fractions(_scaled(problem, multiplier))
             ]
         )
         for load in loads:

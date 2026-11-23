@@ -97,7 +97,9 @@ class NetworkHeatPump(BaseModel):
     ``electricity_cost`` and ``annual_capital_cost`` $/y, and
     ``capital_cost`` the installed cost ($) of the compressor and its
     motor: the condenser and evaporator are exchangers of the network and
-    are priced there.
+    are priced there. For a machine over several periods the duties are
+    the largest of any period (its capacity) and ``work`` the mean over
+    the periods by their weights, which the electricity is priced on.
     """
 
     model_config = ConfigDict(extra="forbid")

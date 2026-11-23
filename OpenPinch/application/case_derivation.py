@@ -278,19 +278,66 @@ def with_heat_pump_streams(
     )
 
 
-def _require_heat_pump_stream_support(problem) -> None:
-    """Raise for a problem heat pump streams cannot be added to yet."""
+def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
+    """A shared-design target's streams in each of ``periods``, by role and
+    stream name.
+
+    The target's own stream collections hold one period; its period
+    outputs hold every period's.
+    """
+    outputs = target.hpr_details.period_outputs
+    found = {}
+    for role, group in (
+        ("condenser", "hpr_hot_streams"),
+        ("evaporator", "hpr_cold_streams"),
+    ):
+        each = [dict(outputs[period][group].items()) for period in periods]
+        found[role] = {name: [streams[name] for streams in each] for name in each[0]}
+    return found
+
+
+def _period_thermal_record(streams) -> dict:
+    """The temperatures and duty of one stream in each period, in order."""
+
+    def values(attribute: str) -> dict:
+        per_period = [_value_record(getattr(s, attribute)) for s in streams]
+        return {
+            "values": [record["value"] for record in per_period],
+            "unit": per_period[0]["unit"],
+        }
+
+    return {
+        "t_supply": values("supply_temperature"),
+        "t_target": values("target_temperature"),
+        "heat_flow": values("heat_flow"),
+    }
+
+
+def _require_heat_pump_stream_support(problem, target=None) -> None:
+    """Raise for a problem, or a problem and target, heat pump streams
+    cannot be built for.
+
+    A problem with several periods needs a target solved as a shared
+    design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``), which holds the
+    heat pump's streams in every period; any other target holds one
+    period's. Without ``target`` only the problem is checked.
+    """
     if problem._process_components:
         raise ValueError(
             "heat pump streams cannot be added to a problem with process "
             "components: the new case is built from the input records, which "
             "do not hold them."
         )
-    if len(problem.period_ids) > 1:
+    if (
+        target is not None
+        and len(problem.period_ids) > 1
+        and not getattr(target, "hpr_shared_design", False)
+    ):
         raise ValueError(
-            f"The problem has {len(problem.period_ids)} periods. Heat pump "
-            "streams that vary by period are not built yet; derive a "
-            "single-period case and target the heat pump on it."
+            f"The problem has {len(problem.period_ids)} periods and the heat "
+            "pump target holds one period's streams. Solve it as a shared "
+            "design, with the option HPR_MULTIPERIOD_OPTIMIZATION_ENABLED, or "
+            "derive a single-period case and target the heat pump on it."
         )
 
 
@@ -299,6 +346,7 @@ def _case_with_heat_pump_streams(
 ):
     """``problem`` with the streams of ``target`` at ``dt_cont`` (K), with no
     check that the target is this problem's own."""
+    _require_heat_pump_stream_support(problem, target)
     address = _heat_pump_zone_address(problem, target, zone)
     dt_cont = {"value": float(dt_cont), "unit": "delta_degC"}
     source = problem.to_problem_json()
@@ -313,6 +361,8 @@ def _case_with_heat_pump_streams(
         for _key, stream in target.hpr_details.amb_streams.items()
         if stream.stream_type == StreamType.Hot.value
     ]
+    periods = list(problem.period_ids)
+    by_period = _period_heat_pump_streams(target, periods) if len(periods) > 1 else {}
     for role, streams in (
         ("condenser", [s for _key, s in target.hpr_hot_streams.items()]),
         ("evaporator", [s for _key, s in target.hpr_cold_streams.items()]),
@@ -325,18 +375,20 @@ def _case_with_heat_pump_streams(
                     f"{stream.name!r}, the name of a heat pump stream; rename "
                     "the process stream."
                 )
-            source["streams"].append(
-                _heat_pump_stream_record(
-                    stream,
-                    zone=address,
-                    dt_cont=(
-                        _value_record(stream.delta_t_contribution)
-                        if role == "ambient_source"
-                        else dt_cont
-                    ),
-                    mark={"machine": machine, "role": role},
-                )
+            record = _heat_pump_stream_record(
+                stream,
+                zone=address,
+                dt_cont=(
+                    _value_record(stream.delta_t_contribution)
+                    if role == "ambient_source"
+                    else dt_cont
+                ),
+                mark={"machine": machine, "role": role},
             )
+            if by_period:
+                # A shared design: the stream's value in every period.
+                record |= _period_thermal_record(by_period[role][stream.name])
+            source["streams"].append(record)
     return type(problem)(
         source,
         project_name=problem.project_name if project_name is None else project_name,
