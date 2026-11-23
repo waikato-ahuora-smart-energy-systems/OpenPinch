@@ -46,6 +46,7 @@ def _owner():
         return [[[value, value]]]
 
     return SimpleNamespace(
+        integers=True,
         N_periods=1,
         S=1,
         I=1,

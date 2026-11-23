@@ -35,6 +35,7 @@ def install_interior_cuts(owner, M_ij_period) -> None:
     ):
         # Ordered, so a model of the same superstructure can replay them.
         owner._interior_cuts = {}
+        owner._interior_constraints = {}
         owner._interior_big_m = M_ij_period
         owner._add_lazy_cuts = lambda: _add_interior_approach_cuts(owner, M_ij_period)
 
@@ -70,7 +71,9 @@ def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
             owner.solver_arrays, side=side, parent_index=index, period_index=n
         ).clipped(*ends)
 
-    added = False
+    # Without integers a cut holds whatever the branch does next: one whose
+    # boundary has left the branch and still binds is released first.
+    added = False if owner.integers else _release_cuts_off_their_boundary(owner)
     for n in range(owner.N_periods):
         for k in range(owner.S):
             for i in range(owner.I):
@@ -155,6 +158,42 @@ def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
     return added
 
 
+def _release_cuts_off_their_boundary(owner) -> bool:
+    """Release each active cut of a model without integers whose boundary
+    the solved branch no longer spans and that still binds (its gap within
+    1e-6 K of the approach). Returns whether one was released."""
+
+    from .execution import _solver_value
+
+    def value(variable) -> float:
+        return _solver_value(owner, variable)
+
+    released = False
+    kept = getattr(owner, "_interior_kept", set())
+    for key, constraint in getattr(owner, "_interior_constraints", {}).items():
+        if not constraint.active or key in kept:
+            continue
+        n, i, j, k, side, _rounded = key
+        boundary, approach = owner._interior_cuts[key]
+        if side == "hot":
+            ends = (
+                value(owner.T_h_mid_by_period[n][i][k + 1]),
+                value(owner.T_h_by_period[n][i][k]),
+            )
+            gap = boundary - value(owner.T_c_mid_by_period[n][j][k])
+        else:
+            ends = (
+                value(owner.T_c_by_period[n][j][k + 1]),
+                value(owner.T_c_mid_by_period[n][j][k]),
+            )
+            gap = value(owner.T_h_mid_by_period[n][i][k + 1]) - boundary
+        inside = ends[0] < boundary < ends[1]
+        if not inside and gap <= approach + _CUT_TOLERANCE:
+            constraint.deactivate()
+            released = True
+    return released
+
+
 def _cut_pair(
     owner, M_ij_period, n, i, j, k, side: str, boundary: float, approach: float
 ) -> bool:
@@ -188,7 +227,15 @@ def _cut(
 
     key = (n, i, j, k, side, round(boundary, 9))
     if key in owner._interior_cuts:
-        return False
+        constraint = getattr(owner, "_interior_constraints", {}).get(key)
+        if constraint is None or constraint.active:
+            return False
+        # Released, then crossed again: put back and kept for good.
+        constraint.activate()
+        if not hasattr(owner, "_interior_kept"):
+            owner._interior_kept = set()
+        owner._interior_kept.add(key)
+        return True
     owner._interior_cuts[key] = (boundary, approach)
     m = owner.m
     big = M_ij_period[n][i][j]
@@ -199,8 +246,11 @@ def _cut(
     )
     if not owner.integers:
         # The stage crossed with the boundary inside the branch; the cut
-        # holds there whatever the branch does next.
-        m.Equation(gap >= approach - big * (1 - owner.z[i][j][k]))
+        # holds there until the branch leaves the boundary, so it is kept
+        # to be released (``_release_cuts_off_their_boundary``).
+        owner._interior_constraints[key] = m.Equation(
+            gap >= approach - big * (1 - owner.z[i][j][k])
+        )
         return True
     if side == "hot":
         ends = (owner.T_h_by_period[n][i][k], owner.T_h_mid_by_period[n][i][k + 1])
