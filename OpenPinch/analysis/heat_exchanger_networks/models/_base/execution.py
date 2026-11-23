@@ -40,6 +40,8 @@ def _solve_and_post_process(model, print_output: bool) -> None:
     total_solve_time = 0.0
     piecewise_mappings = getattr(model, "_piecewise_active_mappings", [])
     active_mapping_stable = not piecewise_mappings or getattr(model, "integers", False)
+    # Cuts added after the last solve were never solved: that solution breaks them.
+    cuts_pending = False
     for _attempt in range(8):
         model.solver_run = backend.solve_pyomo_model(model.m, solver_name=model.solver)
         total_solve_time += float(model.solver_run.solve_time or 0.0)
@@ -54,7 +56,8 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             continue
         # A model may check each solution and add constraints it breaks.
         add_cuts = getattr(model, "_add_lazy_cuts", None)
-        if add_cuts is None or not add_cuts():
+        cuts_pending = add_cuts is not None and bool(add_cuts())
+        if not cuts_pending:
             break
     model.solve_time = total_solve_time
 
@@ -72,6 +75,19 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             failure_reason=(
                 f"{model.solver_run.failure_reason}; segmented-stream active "
                 "interval solve was unresolved, so use Couenne or HiGHS"
+            ),
+        )
+
+    if model.solver_run.failure_reason is None and cuts_pending:
+        model.solver_run = backend.SolverRun(
+            name=model.solver_run.name,
+            extension=model.solver_run.extension,
+            status=model.solver_run.status,
+            objective_value=model.solver_run.objective_value,
+            solve_time=total_solve_time,
+            failure_reason=(
+                "the last solution still broke a cut the model added after it "
+                "(the solve ran out of attempts)"
             ),
         )
 
