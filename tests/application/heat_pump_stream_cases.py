@@ -35,13 +35,15 @@ def two_zone_problem() -> PinchProblem:
 
 
 def full_load_target(problem: PinchProblem, **options):
-    """The problem's Carnot heat pump target at full load, on a small search.
+    """The problem's Carnot heat pump target at full load, with no search.
 
-    One start and 100 evaluations: 0.15 s against 17 s for the default
-    search, and a few seconds against minutes in Pyodide. The target stops
-    short of the best (715 kW of condenser on the basic pinch case, where
-    the full search finds 750 kW), which the builder does not mind: its
-    case reproduces whatever target it is given.
+    The first start alone, at one evaluation: 0.02 s against 17 s for the
+    default search. In Pyodide the search runs about a hundred times
+    slower, and 100 evaluations in each of these tests added 3.5 minutes
+    to a lane with a 20 minute limit. The first start is the target's own
+    initial design, which meets the full load on the cases here (750 kW of
+    condenser on the basic pinch case); the builder's case reproduces
+    whatever target it is given.
     """
 
     return problem.target.carnot_heat_pump(
@@ -49,8 +51,8 @@ def full_load_target(problem: PinchProblem, **options):
             "load_fraction": 1.0,
             "condensers": 1,
             "evaporators": 1,
-            "maximum_restarts": 1,
-            "maximum_evaluations": 100,
+            "maximum_restarts": 0,
+            "maximum_evaluations": 1,
         }
         | options
     )

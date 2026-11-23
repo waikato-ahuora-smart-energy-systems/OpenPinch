@@ -83,6 +83,16 @@ Heat exchanger network synthesis
   counts as closed within 1e-5 of the side's load (was 1e-6: a heat pump
   target sizes its condenser within 2e-6), and a condenser or evaporator
   written with a 0.01 K glide closes it where it would as a point.
+- Pinch design splits a case that holds heat pump streams (streams marked
+  ``heat_pump``) at the process pinch, the pinch of the case without them.
+  A condenser sized to its pocket is an exact pinch hotter than the process
+  pinch; split there, the side below it had no solution, because the stretch
+  between the two pinches is short of heat by the target's rounding and a
+  side below a pinch takes no heater. On the basic pinch sample with the
+  Carnot heat pump at half load and multiplier 0.75, where neither method
+  returned a network, the MILP now returns one at the target (325.0 kW of
+  hot utility, total annual cost 224,536) and the heuristic 28 (best
+  221,279). A case without marked streams is split as before.
 - ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"`` (default ``"none"``, today's
   behaviour) makes the thermal derivative and network evolution steps of a
   single process keep each utility level at the duty its pinch design held

@@ -716,6 +716,49 @@ def _active_items(streams) -> list[tuple[str, Stream]]:
     return [(key, stream) for key, stream in streams.items() if stream.is_active]
 
 
+def heat_pump_stream_keys(problem: PreparedProblem) -> frozenset[str]:
+    """Keys of the process streams whose input record is marked as one side
+    of a heat pump (``heat_pump``): its condensers, evaporators and ambient
+    sources."""
+    return frozenset(heat_pump_stream_roles(problem))
+
+
+def heat_pump_stream_roles(problem: PreparedProblem) -> dict[str, str]:
+    """The heat pump role of each marked process stream, by its key in the
+    problem's master zone.
+
+    A record is found by its own zone and name, where its key is the zone's
+    address and the name, and followed to the master zone by the stream
+    object the zones share. Matching by name alone would put the mark on a
+    namesake in another branch of the zone tree.
+    """
+
+    records = getattr(getattr(problem, "_validated_data", None), "streams", None)
+    marked = {
+        f"{record.zone}.{record.name}": record.heat_pump.role
+        for record in records or ()
+        if getattr(record, "heat_pump", None) is not None
+    }
+    if not marked:
+        return {}
+    master = problem.master_zone
+    role_of: dict[int, str] = {}
+    pending = [master]
+    while pending:
+        zone = pending.pop()
+        pending.extend(zone.subzones.values())
+        for streams in (zone.hot_streams, zone.cold_streams):
+            for key, stream in streams.items():
+                if key in marked:
+                    role_of[id(stream)] = marked[key]
+    return {
+        key: role_of[id(stream)]
+        for streams in (master.hot_streams, master.cold_streams)
+        for key, stream in streams.items()
+        if id(stream) in role_of
+    }
+
+
 def _ordered_stream_items(problem: PreparedProblem, items) -> list[_PreparedItem]:
     item_list = list(items)
     input_streams = getattr(getattr(problem, "_validated_data", None), "streams", ())
@@ -828,6 +871,8 @@ __all__ = [
     "SEGMENT_PROFILE_VERSION",
     "MINIMUM_PAIR_APPROACH",
     "PreparedSolverArrays",
+    "heat_pump_stream_keys",
+    "heat_pump_stream_roles",
     "nominal_approach_temperature",
     "pair_minimum_approach",
     "problem_to_solver_arrays",
