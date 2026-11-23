@@ -141,6 +141,14 @@ Heat exchanger network synthesis
   pump costs only its two exchangers: the 15.2 MW machine above had a
   fixed cost of 69,200 $ and a net benefit of 3.94 M$/y, against
   4.63 M$ and 3.03 M$/y with the compressor at 300 $/kW.
+- A retrofit design's network now gives each existing exchanger the area
+  it has after the retrofit, installed plus any added. It gave the area
+  the exchanger's duty needs, which for a unit on a segmented stream is
+  the sum of its slices: on the Hallberg and Scribner crude case 12 of
+  the 18 existing units read differently from their installed area (E1
+  3,262 m2 against 4,303 m2), and the rating allowance recorded on a
+  design, each unit's rated area over its reported one, read up to 2.33
+  where it is 1.26. The frontier on that case is unchanged.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

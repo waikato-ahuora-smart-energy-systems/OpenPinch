@@ -297,6 +297,35 @@ def test_the_result_counts_the_candidate_solves_that_failed_at_each_step(fake_so
     assert result.failed_solves[0] > 0
 
 
+def test_an_existing_unit_reports_its_installed_area_and_what_was_added(fake_solver):
+    """The design's network gave an existing unit the area its duty needs
+    (for a unit on a segmented stream, the sum of its slices), not the area
+    it has. On the Hallberg and Scribner crude case 12 of 18 units differed:
+    E1 read 3,262 m2 against 4,303 m2 installed, and a unit reading 5 % of
+    its area made the design's rating allowance 2.33."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    result = run_retrofit_search(
+        _problem(), _existing_network(), RetrofitSettings(max_modifications=1, **COSTS)
+    )
+
+    design = result.frontier[1]
+    added = {
+        m.exchanger_id: m.added_area
+        for m in design.modifications
+        if m.kind == "area_addition"
+    }
+    assert added
+    reported = {e.exchanger_id: e.area for e in design.network.exchangers}
+    for unit in _existing_network().exchangers:
+        assert reported[unit.exchanger_id] == pytest.approx(
+            unit.area + added.get(unit.exchanger_id, 0.0)
+        )
+
+
 def test_an_existing_network_that_does_not_solve_is_an_error(fake_solver):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
         RetrofitSettings,
