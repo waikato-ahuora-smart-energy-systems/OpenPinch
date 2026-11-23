@@ -69,11 +69,22 @@ def heat_pump_case(problem, solved, *, machine: str):
         SimpleNamespace(
             provenance=SimpleNamespace(zone_address=root.address),
             hpr_details=SimpleNamespace(amb_streams=solved.amb_streams),
-            hpr_hot_streams=solved.hpr_hot_streams,
-            hpr_cold_streams=solved.hpr_cold_streams,
+            # Only the levels that carry duty, as in the step.
+            hpr_hot_streams={s.name: s for s in _carrying(solved.hpr_hot_streams)},
+            hpr_cold_streams={s.name: s for s in _carrying(solved.hpr_cold_streams)},
         ),
         dt_cont=float(root.config.hpr.dt_cont),
         machine=machine,
+    )
+
+
+def _carrying(streams) -> tuple:
+    """The streams of ``streams`` that carry duty."""
+
+    return tuple(
+        stream
+        for _key, stream in streams.items()
+        if float(stream.heat_flow.value) > 0.0
     )
 
 
@@ -101,8 +112,10 @@ def heat_pump_step(problem, base, settings, *, limits=None, machine: str = "HP")
             cost_per_kw=settings.heat_pump_cost,
             costing=problem.master_zone.config.costing,
         ),
-        condensers=tuple(stream for _key, stream in solved.hpr_hot_streams.items()),
-        evaporators=tuple(stream for _key, stream in solved.hpr_cold_streams.items()),
+        # A level the target left without duty is not a stream: it would
+        # need a match it may not be able to have.
+        condensers=_carrying(solved.hpr_hot_streams),
+        evaporators=_carrying(solved.hpr_cold_streams),
         base=base,
         # The air the evaporators draw on; air that takes heat the heat
         # pump leaves is not a stream of the case.
