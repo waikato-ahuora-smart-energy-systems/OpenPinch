@@ -116,6 +116,18 @@ Heat exchanger network synthesis
   refrigeration machine's COP, is priced at the network's cold utility as
   well. Those two options and ``COSTING_HPR_REFRIGERATION_ETA_II`` no
   longer affect ``retrofit_heat_pumps``.
+- A site retrofit now offers a heat recovery loop between a hot and a cold
+  stream whose targets leave no room for one. A loop was offered only
+  midway between the two targets, which needs them twice the approach and
+  1 K apart, so a stream cooled from 200 to 40 degC and one heated from 30
+  to 150 degC in another process got none. Such a pair now gets a loop that
+  serves part of each stream, at the temperature where the heat it can
+  collect above it and deliver below it is largest, with the streams' own
+  cooler and heater finishing them: on that pair a loop at 115 degC
+  recovers 75.5 of the 120 kW of heating. Pairs whose targets do leave
+  room keep the loop midway between them. More loops are offered (26 to
+  428 on the chocolate factory's streams) but no more are solved at each
+  step, and a one-step retrofit there takes 3.0 s against 2.9 s.
 - The minimum approach of a match is now the sum of its two sides'
   temperature contributions (each scaled by the dt_cont multiplier), with a
   floor of 0.1 K on the pair, for recovery matches, heaters and coolers.

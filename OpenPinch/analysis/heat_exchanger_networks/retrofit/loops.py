@@ -41,35 +41,75 @@ def heat_recovery_loop_candidates(
     approach: float,
 ) -> list[HeatRecoveryLoop]:
     """A loop for each hot and cold stream pair of different processes
-    whose targets leave room for it.
+    that a loop can carry heat between.
 
     ``ends`` maps each process stream to its supply and target temperature
     (K) and heat capacity flowrate; a hot stream's supply is above its
     target. ``processes`` maps streams to their process zone; a stream it
-    leaves out joins no loop. The loop runs midway between the hot stream's
-    target and the cold stream's, so the hot stream reaches its target at
-    least ``approach`` above the loop's warm end and the cold stream its
-    target at least ``approach`` below the loop's cool end: the targets must
-    be ``2 * approach + LOOP_SPAN`` apart. Then the loop can take all of the
-    hot stream's end cooling and give all of the cold stream's end heating.
+    leaves out joins no loop. The loop's temperature is ``loop_temperature``.
     """
 
     candidates = []
-    for hot, (hot_supply, hot_target, _flow) in ends.items():
-        if hot_supply <= hot_target or hot not in processes:
+    for hot, hot_ends in ends.items():
+        if hot_ends[0] <= hot_ends[1] or hot not in processes:
             continue
-        for cold, (cold_supply, cold_target, _cold_flow) in ends.items():
+        for cold, cold_ends in ends.items():
             if (
-                cold_supply > cold_target
+                cold_ends[0] > cold_ends[1]
                 or cold not in processes
                 or processes[cold] == processes[hot]
-                or hot_target - cold_target < 2.0 * approach + LOOP_SPAN - 1e-9
             ):
                 continue
-            candidates.append(
-                HeatRecoveryLoop(hot, cold, 0.5 * (hot_target + cold_target))
-            )
+            temperature = loop_temperature(hot_ends, cold_ends, approach=approach)
+            if temperature is not None:
+                candidates.append(HeatRecoveryLoop(hot, cold, temperature))
     return candidates
+
+
+def loop_temperature(
+    hot: tuple[float, float, float],
+    cold: tuple[float, float, float],
+    *,
+    approach: float,
+) -> float | None:
+    """The temperature (K) of a loop from a hot stream to a cold one, each
+    given as supply, target and heat capacity flowrate; ``None`` when no
+    loop can carry heat between them.
+
+    The hot stream must leave the loop cooler at least ``approach`` above
+    the loop's warm end and the cold stream leave the loop heater at least
+    ``approach`` below its cool end. Where the targets are
+    ``2 * approach + LOOP_SPAN`` apart the loop runs midway between them
+    and can take all of the hot stream's end cooling and give all of the
+    cold stream's end heating. Otherwise it serves part of each, the hot
+    stream above the loop and the cold stream below it, with their own
+    cooler and heater finishing them, and it runs where the heat it can
+    collect and the heat it can deliver, both read from the stream ends,
+    are largest together.
+    """
+
+    hot_supply, hot_target, hot_flow = hot
+    cold_supply, cold_target, cold_flow = cold
+    margin = approach + 0.5 * LOOP_SPAN
+    if hot_target - cold_target >= 2.0 * margin - 1e-9:
+        return 0.5 * (hot_target + cold_target)
+
+    def carried(temperature: float) -> float:
+        collected = hot_flow * (hot_supply - max(hot_target, temperature + margin))
+        delivered = cold_flow * (min(cold_target, temperature - margin) - cold_supply)
+        return min(collected, delivered)
+
+    # The collected heat falls and the delivered heat rises with the loop's
+    # temperature, each flat once it covers its whole stream, so the most
+    # they carry together is where they cross or at an end of a flat.
+    points = [hot_target - margin, cold_target + margin]
+    if hot_flow + cold_flow > 0.0:
+        points.append(
+            (hot_flow * (hot_supply - margin) + cold_flow * (cold_supply + margin))
+            / (hot_flow + cold_flow)
+        )
+    best = max(points, key=carried)
+    return best if carried(best) > 0.0 else None
 
 
 def screen_heat_recovery_loops(
@@ -152,6 +192,7 @@ __all__ = [
     "heat_recovery_loop_candidates",
     "loop_cooler_name",
     "loop_heater_name",
+    "loop_temperature",
     "screen_heat_recovery_loops",
     "with_loop_utilities",
 ]
