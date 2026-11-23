@@ -46,6 +46,7 @@ def _owner():
         return [[[value, value]]]
 
     return SimpleNamespace(
+        integers=True,
         N_periods=1,
         S=1,
         I=1,
@@ -84,7 +85,7 @@ def test_a_boundary_short_of_its_segment_approach_is_cut_at_that_approach(
     monkeypatch.setattr(
         equations,
         "_cut_pair",
-        lambda _owner, _big_m, n, i, j, side, boundary, approach: (
+        lambda _owner, _big_m, n, i, j, k, side, boundary, approach: (
             cuts.append((side, boundary, approach)) or True
         ),
     )

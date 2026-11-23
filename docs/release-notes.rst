@@ -148,9 +148,18 @@ Heat exchanger network synthesis
   a segmented stream too, by the same check and cuts as pinch design. On
   a stream that kinks inside a match (a condenser's desuperheat, then its
   plateau) it matched the stream whole across the kink and the task
-  failed when its areas were taken; it now designs. Network evolution,
-  which solves without integers, still holds the approach at match ends
-  only.
+  failed when its areas were taken; it now designs.
+- Network evolution keeps the minimum approach inside a match on a
+  segmented stream as well. It solves without integers, so a solution
+  that crosses at a segment boundary inside a match gets a linear cut in
+  that stage (the boundary less the cold branch outlet at least the
+  approach) and is solved again; a cut whose boundary the branch later
+  leaves is released while it still binds, and kept for good if the
+  branch crosses there again. A candidate that crossed was dropped
+  when its areas were taken, though the match could run at a smaller
+  duty; on a condensing stream matched in one stage it took all of the
+  cold stream's 150 kW past the plateau, and now takes 63.8 kW, the cold
+  stream leaving 2 K under the kink.
 - ``design.retrofit(heat_pump_cycle="vapour_compression",
   heat_pump_streams=True)`` retrofits a vapour compression heat pump as
   streams. The as-piped target is a cascade of vapour compression cycles
