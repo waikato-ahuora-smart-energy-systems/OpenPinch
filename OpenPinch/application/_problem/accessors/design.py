@@ -6,7 +6,7 @@ import json
 import threading
 import time
 import warnings
-from copy import deepcopy
+from copy import copy, deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from ..arguments import (
@@ -616,10 +616,16 @@ class _DesignAccessor:
                 dt_cont_multipliers=dt_cont_multipliers,
             )
             search = resolve_search(self._effective_hens(configuration))
+            root = problem._require_prepared_root_zone()
+            with temporary_zone_configuration(root, configuration):
+                # The prices and annualisation this call costs its networks
+                # with, for the heat pump's electricity and compressor.
+                costing = copy(root.config.costing)
             return design_with_heat_pump(
                 problem,
                 heat_pump,
                 cost_per_kw=heat_pump_cost,
+                costing=costing,
                 multipliers=search.dt_cont_multipliers,
                 arguments=arguments,
             )

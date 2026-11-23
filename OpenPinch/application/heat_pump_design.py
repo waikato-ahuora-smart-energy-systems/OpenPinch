@@ -45,6 +45,7 @@ def heat_pump_design_case(
     options=None,
     machine: str = "HP",
     cost_per_kw: float = 0.0,
+    costing=None,
 ) -> HeatPumpDesignCase:
     """The case for a heat pump design at ``multiplier``.
 
@@ -61,9 +62,11 @@ def heat_pump_design_case(
     multiplier = float(multiplier)
     root = problem._require_prepared_root_zone()
     levels = HprLevels.model_validate(levels or {})
+    # The target's own precedence: the levels' argument, then its options,
+    # then the problem's setting.
     approach = levels.minimum_approach_temperature
     if approach is None:
-        approach = float(root.config.hpr.dt_cont)
+        approach = float((options or {}).get("HPR_DT_CONT", root.config.hpr.dt_cont))
     zone_multiplier = float(root.dt_cont_multiplier)
     scaled = type(problem)(problem.to_problem_json(), project_name=problem.project_name)
     scaled.set_dt_cont_multiplier(zone_multiplier * multiplier)
@@ -91,7 +94,9 @@ def heat_pump_design_case(
         record=heat_pump_record(
             target,
             machine=machine,
-            costing=root.config.costing,
+            # The costing group of the design this case is for, when that
+            # design's options differ from the problem's stored ones.
+            costing=root.config.costing if costing is None else costing,
             cost_per_kw=cost_per_kw,
         ),
     )
@@ -135,7 +140,13 @@ def heat_pump_request(heat_pump) -> dict[str, Any]:
 
 
 def design_with_heat_pump(
-    problem, heat_pump, *, cost_per_kw: float, multipliers, arguments: Mapping
+    problem,
+    heat_pump,
+    *,
+    cost_per_kw: float,
+    multipliers,
+    arguments: Mapping,
+    costing=None,
 ):
     """Design ``problem`` without a heat pump and, at each of
     ``multipliers``, with one, and rank every network together.
@@ -145,6 +156,8 @@ def design_with_heat_pump(
     ``design.heat_exchanger_network``.
     """
     request = heat_pump_request(heat_pump)
+    # Before any design runs its solvers or replaces the stored design.
+    _require_heat_pump_stream_support(problem)
     if not cost_per_kw:
         warnings.warn(
             "heat_pump_cost is 0, so the heat pump designs are ranked with a "
@@ -167,7 +180,12 @@ def design_with_heat_pump(
         for load in loads:
             try:
                 run = heat_pump_design_case(
-                    problem, multiplier, load=load, cost_per_kw=cost_per_kw, **request
+                    problem,
+                    multiplier,
+                    load=load,
+                    cost_per_kw=cost_per_kw,
+                    costing=costing,
+                    **request,
                 )
                 view = run.case.design.heat_exchanger_network(
                     **dict(arguments) | {"dt_cont_multipliers": [multiplier]}
