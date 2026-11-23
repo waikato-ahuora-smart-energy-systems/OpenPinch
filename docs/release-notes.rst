@@ -127,6 +127,23 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Pinch design keeps the minimum approach inside a match on a segmented
+  stream, at every segment boundary the match spans, not only at its two
+  ends. The stream stays one stream. A vapour compression condenser
+  (desuperheating, then condensing) was matched whole against a cold
+  stream that ran hotter than the condensing plateau past the
+  desuperheat; the crossing was found only when the network's areas were
+  taken, and no network was designed. Both pinch design methods take
+  their duties from one side model, which now checks each solution at the
+  boundaries and, where a match falls short, cuts that pair at that
+  boundary and solves again; a side with no crossing keeps its solution.
+  The approach at a boundary is the one of the segments meeting there
+  (the stricter of the two at the boundary), not the parent streams'.
+  A solve that runs out of attempts while still adding cuts is a failed
+  solve. The basic pinch sample with a water vapour compression heat pump at a
+  quarter load now designs, with the condenser's desuperheat matched.
+  The heuristic's fixed structures can still be left with no feasible
+  duties by a cut; the MILP then designs in its place.
 - The retrofit search can start from a heat pump added to the case as
   streams. ``run_retrofit_search(problem, existing, settings,
   heat_pump=HeatPumpStep(...))`` takes a machine of a fixed size whose
