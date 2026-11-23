@@ -1670,6 +1670,7 @@ class _DesignAccessor:
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
         heat_pump_streams: bool = False,
+        heat_pump_sizes: Sequence[float] = (1.0, 0.75, 0.5),
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
         options: Mapping[str, Any] | None = None,
@@ -1784,10 +1785,13 @@ class _DesignAccessor:
         ``"heat_pump"``, which holds the compressor at ``heat_pump_cost``
         per kW of condenser capacity, followed by its exchangers as new
         matches; the machine's electricity is in the design's utility
-        cost and its network records the machine in ``heat_pumps``. Each
-        step of the result holds the better design of the two searches.
-        The machine's size is fixed, so it is not traded against exchanger
-        area as the linked heat pump's duty is. ``heat_pump_search`` bounds
+        cost and its network records the machine in ``heat_pumps``. The
+        machine is tried at each of ``heat_pump_sizes`` (shares of the
+        heaters' load: ``HPR_LOAD_FRACTION`` of the target), one search per
+        size, and records its share in ``load_fraction``; each step of the
+        result holds the best design of the plain search and every size's.
+        Within one search the machine's size is fixed, not traded against
+        exchanger area as the linked heat pump's duty is. ``heat_pump_search`` bounds
         the target's search (``maximum_iterations``,
         ``maximum_evaluations``); the full search can take more than a
         minute. The step is left out, with a ``UserWarning`` giving the
@@ -1830,6 +1834,12 @@ class _DesignAccessor:
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit")
+        outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
+        if heat_pump_streams and outside:
+            raise ValueError(
+                "heat_pump_sizes are shares of the existing heaters' load, "
+                f"between 0 and 1; got {', '.join(repr(s) for s in outside)}."
+            )
         _runtime, configuration = self._arguments(
             options=options, period_id=None, solve_tolerance=solve_tolerance
         )
@@ -1871,6 +1881,7 @@ class _DesignAccessor:
                     retrofit_with_heat_pump,
                     configuration=configuration,
                     limits=heat_pump_search,
+                    sizes=tuple(float(size) for size in heat_pump_sizes),
                 )
             result = search(
                 isolated,

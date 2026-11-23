@@ -915,8 +915,12 @@ The as-piped heat pump as streams
    ``heat_pump`` modification (the compressor at ``heat_pump_cost`` per kW
    of condenser capacity) and one new match per exchanger; the electricity
    is in the design's utility cost and the network records the machine in
-   ``heat_pumps``. Each step of the result holds the better design of the
-   two searches, so the result is never worse than without the option.
+   ``heat_pumps``. The machine is tried at each of ``heat_pump_sizes``,
+   shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
+   default 1.0, 0.75 and 0.5), one search per size, and the machine
+   records its share in ``load_fraction``. Each step of the result holds
+   the best design of the plain search and every size's, so the result is
+   never worse than without the option.
 
    On a process cooled from 54 degC and heated from 80 degC, with steam at
    $40/MWh and electricity at $100/MWh, a heat pump pays above a COP of
@@ -925,21 +929,20 @@ The as-piped heat pump as streams
    three condensers and two evaporators and takes 156 to 187 kW of the
    240 kW of steam.
 
-   The machine's size is fixed at the target's, so the search cannot
-   trade it against exchanger area as it does the linked heat pump's
-   duty, and the target stands its levels close to the streams
-   (``HPR_DT_CONT`` beyond their own contributions). On the case above
-   the exchangers at the default area price cost as much as the machine
-   saves. On Ciric and Floudas at the settings of the paragraph above the
-   linked heat pump, sized by the search at 14.7 MW, nets $2.95M/y with
-   no new unit cost, while the as-piped target at the network's prices
-   settles on a 5 to 7 MW machine at a COP near 3.2 that nets slightly
-   below zero, whatever ``HPR_LOAD_FRACTION`` asks: the target caps its
-   load there, it does not set the machine's size. (One short target
-   search returned a 17.5 MW machine at a COP of 2.37, which netted
-   $2.81M/y.) ``heat_pump_search`` bounds the target's search
+   Within one search a machine's size is fixed, so it is not traded
+   against exchanger area as the linked heat pump's duty is; the sizes
+   are tried instead. The target stands its levels close to the streams
+   (``HPR_DT_CONT`` beyond their own contributions), so on the case above
+   the exchangers at the default area price cost about as much as the
+   machine saves. On Ciric and Floudas at the settings of the paragraph
+   above the linked heat pump (H2 to C2, COP 1.89) nets $1.23M/y, while
+   the as-piped machine at the full load (17.5 MW, three condensers and
+   two evaporators, COP 2.37) takes all of the steam and nets $2.81M/y,
+   ahead of its own smaller sizes (0.7 of the load: $2.11M/y; 0.4:
+   $1.25M/y). ``heat_pump_search`` bounds the target's search
    (``{"maximum_evaluations": 2000}``): the full search can take more
-   than a minute. A level the target leaves without duty is not added.
+   than a minute per size. A level the target leaves without duty is not
+   added.
    The step is left out, with a ``UserWarning`` giving the reason, on a
    problem with several periods, on one with process components or a
    site of several process zones (the machine's streams cannot be added
