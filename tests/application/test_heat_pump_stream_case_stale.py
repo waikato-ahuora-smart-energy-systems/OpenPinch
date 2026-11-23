@@ -15,6 +15,7 @@ import pytest
 
 import OpenPinch
 from OpenPinch import PinchProblem
+from tests.application.heat_pump_stream_cases import full_load_target
 
 BASIC_PINCH = (
     Path(OpenPinch.__file__).parent / "tutorials/sample_cases/basic_pinch.json"
@@ -29,9 +30,7 @@ def _problem() -> PinchProblem:
 
 
 def test_a_target_solved_on_another_problem_is_refused():
-    target = _problem().target.carnot_heat_pump(
-        load_fraction=1.0, condensers=1, evaporators=1, maximum_restarts=1
-    )
+    target = full_load_target(_problem())
 
     with pytest.raises(ValueError, match="foreign, stale or modified"):
         _problem().with_heat_pump_streams(target)

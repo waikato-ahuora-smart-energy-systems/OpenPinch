@@ -16,6 +16,7 @@ import pytest
 
 import OpenPinch
 from OpenPinch import PinchProblem
+from tests.application.heat_pump_stream_cases import full_load_target
 
 BASIC_PINCH = (
     Path(OpenPinch.__file__).parent / "tutorials/sample_cases/basic_pinch.json"
@@ -28,9 +29,9 @@ def test_direct_targets_of_the_new_case_are_the_heat_pump_targets_utilities():
         project_name="basic",
     )
     base = problem.target.direct_heat_integration()
-    target = problem.target.carnot_heat_pump(
-        load_fraction=1.0, condensers=1, evaporators=1, maximum_restarts=1
-    )
+    # A small search leaves 35 kW of hot utility where the full one leaves
+    # none; the case must reproduce the target it is given either way.
+    target = full_load_target(problem)
     evaporator = sum(
         float(stream.heat_flow.value)
         for _key, stream in target.hpr_cold_streams.items()
