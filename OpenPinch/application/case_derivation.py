@@ -184,6 +184,13 @@ def _value_record(value) -> dict:
     return {"value": float(record["value"]), "unit": record["unit"]}
 
 
+def _scaled_record(value, scale: float) -> dict:
+    """``_value_record`` of a single-period ``value`` times ``scale`` (air
+    over several periods is refused where the period outputs are read)."""
+    record = _value_record(value)
+    return {**record, "value": record["value"] * scale}
+
+
 def _heat_pump_stream_record(stream, *, zone: str, dt_cont: dict, mark: dict) -> dict:
     """One heat pump stream of a target as a process stream input record.
 
@@ -548,10 +555,18 @@ def _require_heat_pump_stream_support(problem, target=None) -> None:
 
 
 def _case_with_heat_pump_streams(
-    problem, target, *, dt_cont: float, zone=None, machine="HP", project_name=None
+    problem,
+    target,
+    *,
+    dt_cont: float,
+    zone=None,
+    machine="HP",
+    project_name=None,
+    ambient_scale: float = 1.0,
 ):
     """``problem`` with the streams of ``target`` at ``dt_cont`` (K), with no
-    check that the target is this problem's own."""
+    check that the target is this problem's own. The air is written at its
+    own contribution times ``ambient_scale``."""
     _require_heat_pump_stream_support(problem, target)
     address = _heat_pump_zone_address(problem, target, zone)
     dt_cont = {"value": float(dt_cont), "unit": "delta_degC"}
@@ -595,7 +610,7 @@ def _case_with_heat_pump_streams(
                 stream,
                 zone=address,
                 dt_cont=(
-                    _value_record(stream.delta_t_contribution)
+                    _scaled_record(stream.delta_t_contribution, ambient_scale)
                     if role == "ambient_source"
                     else dt_cont
                 ),
