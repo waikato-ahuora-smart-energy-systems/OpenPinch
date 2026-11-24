@@ -24,7 +24,10 @@ from ....domain.enums import (
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
-from ...heat_pumps.service import compute_profile_heat_pump_target
+from ...heat_pumps.service import (
+    compute_profile_heat_pump_target,
+    compute_shared_profile_heat_pump_target,
+)
 from ...targeting.cascade import get_process_heat_cascade
 from ..solver.arrays import annual_cost_scales, problem_to_solver_arrays
 from .search import RetrofitSettings, run_retrofit_search
@@ -93,8 +96,27 @@ def as_piped_heat_pump(
     its as-piped target, at the same prices. ``network`` is a solved one:
     its heaters and coolers carry their temperatures. ``cycle``
     ("carnot" or "vapour_compression") solves a cascade of that cycle
-    whatever the zone's ``HPR_TYPE``; ``None`` takes ``HPR_TYPE``."""
+    whatever the zone's ``HPR_TYPE``; ``None`` takes ``HPR_TYPE``.
 
+    With several periods the machine is designed once for the coolers and
+    heaters of every period (``as_piped_period_profiles``), each period's
+    load its own heaters', weighted by the period's share of the year; its
+    ``period_outputs`` hold each period's streams and work. The prices are
+    the first period's."""
+
+    if len(problem.period_ids) > 1:
+        return compute_shared_profile_heat_pump_target(
+            profiles=as_piped_period_profiles(problem, network),
+            period_ids=problem.period_ids,
+            weights={
+                period: float(problem.master_zone.weights[index])
+                for period, index in problem.period_ids.items()
+            },
+            config=_target_config(
+                problem, _network_prices(problem, network), load_fraction, cycle
+            ),
+            args=args,
+        )
     return _profile_target(
         problem,
         as_piped_profiles(problem, network),
@@ -137,6 +159,22 @@ def _profile_target(
     of the configuration."""
 
     T_vals, H_hot, H_cold = profile
+    return compute_profile_heat_pump_target(
+        T_vals=T_vals,
+        H_hot=H_hot,
+        H_cold=H_cold,
+        config=_target_config(problem, prices, load_fraction, cycle),
+        args=args,
+        period_id=min(problem.period_ids.items(), key=lambda item: item[1])[0],
+        period_idx=0,
+    )
+
+
+def _target_config(problem, prices: dict, load_fraction=None, cycle=None):
+    """The master zone's configuration at ``prices``, its load capped at
+    ``load_fraction`` of the sink's and its cycle model ``cycle``, as
+    copies."""
+
     config = _at_network_prices(problem.master_zone.config, prices)
     if load_fraction is not None and not 0.0 <= float(load_fraction) <= 1.0:
         # update_values does not check the field's bounds; NaN fails here.
@@ -152,15 +190,7 @@ def _profile_target(
     if cycle is not None:
         config = deepcopy(config)
         config.update_values(HPR_TYPE=_CYCLE_TYPES[cycle])
-    return compute_profile_heat_pump_target(
-        T_vals=T_vals,
-        H_hot=H_hot,
-        H_cold=H_cold,
-        config=config,
-        args=args,
-        period_id=min(problem.period_ids.items(), key=lambda item: item[1])[0],
-        period_idx=0,
-    )
+    return config
 
 
 def _at_network_prices(config, prices: dict):
