@@ -784,10 +784,9 @@ class _DesignAccessor:
         ``heat_exchanger_network``) adds a utility heat pump, one that heats
         and cools the site's utility levels, never process streams: the
         site is designed without it and, at each dt_cont multiplier and
-        load (1.0, 0.75 and 0.5 of its full load unless ``load`` is given)
-        and approach (``HPR_DT_CONT`` times 1, 5 and 10 unless ``levels``
-        gives ``minimum_approach_temperature``),
-        with its condenser and evaporator as zones of the site
+        load (1.0, 0.75 and 0.5 of its full load unless ``load`` is given),
+        at ``levels``' ``minimum_approach_temperature``, else
+        ``HPR_DT_CONT``, with its condenser and evaporator as zones of the site
         (``with_heat_pump_streams``), and every network is ranked by its
         site cost with the machine's electricity and compressor
         (``heat_pump_cost``, $ per kW of condenser capacity). On a site with
