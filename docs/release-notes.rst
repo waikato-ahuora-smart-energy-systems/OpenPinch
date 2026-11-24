@@ -127,6 +127,12 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The non-isothermal stage-wise model keeps the minimum approach inside a
+  match on a segmented stream, at each segment boundary the match spans,
+  as the isothermal one does: each solution is checked on the match's own
+  branch outlets and a match that crosses is cut and solved again. It held
+  the approach at match ends only, so a match on a condensing stream could
+  cross at the kink and fail its slice areas.
 - ``design.total_site_heat_exchanger_network(heat_pump=...,
   heat_pump_cost=...)`` designs a site with a utility heat pump, one that
   heats and cools the site's utility levels, never process streams. It

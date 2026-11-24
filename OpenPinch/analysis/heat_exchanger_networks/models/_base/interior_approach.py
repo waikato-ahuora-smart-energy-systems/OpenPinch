@@ -26,8 +26,16 @@ _CUT_TOLERANCE = 1e-6
 
 def _branch_ends(owner, n: int, i: int, j: int, k: int) -> tuple:
     """The match's hot inlet and outlet and cold inlet and outlet
-    temperatures in stage ``k``."""
+    temperatures in stage ``k``: the stage's own in the isothermal model,
+    each branch's outlet in the non-isothermal one."""
 
+    if getattr(owner, "non_isothermal_model", False):
+        return (
+            owner.T_h_by_period[n][i][k],
+            owner.T_h_out_x_by_period[n][i][j][k],
+            owner.T_c_by_period[n][j][k + 1],
+            owner.T_c_out_y_by_period[n][j][i][k],
+        )
     return (
         owner.T_h_by_period[n][i][k],
         owner.T_h_mid_by_period[n][i][k + 1],
