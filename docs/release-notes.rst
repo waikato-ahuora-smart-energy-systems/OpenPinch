@@ -140,7 +140,8 @@ Heat exchanger network synthesis
   contribution the target stood it off by, and the zone then scaled it
   again: at a multiplier of 2 an air source 4 K off the evaporators was
   held 8 K off. It is now written over the multiplier, as the condensers
-  and evaporators are.
+  and evaporators are. All three now take the multiplier of the process
+  zone they join, not the site's, where that zone sets its own.
 - Pinch design keeps the minimum approach inside a match on a segmented
   stream, at every segment boundary the match spans, not only at its two
   ends. The stream stays one stream. A vapour compression condenser
