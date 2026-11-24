@@ -34,6 +34,9 @@ class HeatPumpStep:
     base: HeatExchangerNetworkRetrofitDesign
     # The hot streams of the air the evaporators draw on, if any.
     ambient_sources: tuple = ()
+    # A shared design over several periods: each condenser and evaporator
+    # by name, the stream in each period (None where it is off).
+    in_periods: Mapping[str, tuple] | None = None
 
 
 @dataclass(frozen=True)

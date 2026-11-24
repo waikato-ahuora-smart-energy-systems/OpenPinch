@@ -430,6 +430,8 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         ambient_approach=ambient_approach,
         hot_approaches=hot_approaches,
         cold_approaches=cold_approaches,
+        # A shared design: each level against each period's network.
+        in_periods=step.in_periods,
     )
     matched = {
         name for placed in added for name in (placed.match.hot, placed.match.cold)
