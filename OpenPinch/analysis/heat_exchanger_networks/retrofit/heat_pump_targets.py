@@ -345,6 +345,14 @@ def as_piped_profiles(
     )
 
 
+def as_piped_period_profiles(
+    problem, network: HeatExchangerNetwork
+) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """``as_piped_profiles`` in each of the problem's periods, by period id."""
+
+    return {period: as_piped_profiles(problem, network) for period in problem.period_ids}
+
+
 def _process_stream(streams: StreamCollection, name: str) -> Stream:
     """The process stream ``name`` names, as is or without its zone prefix
     (``H1`` for ``Process A.H1``); a bare name several zones share raises
