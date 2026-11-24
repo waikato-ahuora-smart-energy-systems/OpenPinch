@@ -209,8 +209,7 @@ def heat_pump_step(
                 in_periods[name] = tuple(streams.get(name) for streams in each)
             levels.append(
                 tuple(
-                    next(s for s in in_periods[name] if s is not None)
-                    for name in names
+                    next(s for s in in_periods[name] if s is not None) for name in names
                 )
             )
         condensers, evaporators = levels

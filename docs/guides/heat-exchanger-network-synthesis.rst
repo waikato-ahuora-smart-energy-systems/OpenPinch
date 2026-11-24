@@ -936,10 +936,23 @@ Heat pumps
    ``{"maximum_evaluations": 2000}``; ``{}`` asks for the full search,
    which found the same machine on that case in ten times as long. A level
    the target leaves without duty is not added.
+   On a problem with several periods the target is one machine designed
+   for the coolers and heaters of every period, each as it runs there,
+   each period at its own load and weight. Its streams carry each
+   period's duty, a match is placed only where its approach holds in
+   every period its level runs, the compressor is sized on the largest
+   condenser duty of any period and the electricity is each period's work
+   at its weight. On the case above over two equal periods, its heater
+   needing 720 kW in the peak, with electricity at $50/MWh and the
+   compressor at $100/kW, the condensers deliver 240 kW in the base and
+   317 kW in the peak, the steam is all but gone in both, and the design
+   nets $31,900/y. An air-source machine and segmented (vapour
+   compression) streams are not built over several periods yet.
    The step is left out, with a ``UserWarning`` giving the reason, on a
-   problem with several periods, on one with process components or a
-   site of several process zones (the machine's streams cannot be added
-   to the case), and when the network cannot serve the machine's duties.
+   problem with process components or a site of several process zones
+   (the machine's streams cannot be added to the case), over several
+   periods where the machine draws on air or has segmented streams, and
+   when the network cannot serve the machine's duties.
    With ``min_approach_temperature`` not given, each of the heat pump's
    matches stands off by its process stream's own contribution (its
    ``dt_cont`` with the zone's multiplier) plus ``HPR_DT_CONT`` (air by
