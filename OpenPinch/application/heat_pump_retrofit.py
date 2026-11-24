@@ -307,16 +307,6 @@ def retrofit_with_heat_pump(
     if int(settings.max_modifications) < 1:
         # The heat pump step is a modification.
         return base
-    periods = len(getattr(problem, "period_ids", None) or ())
-    if periods > 1:
-        # The as-piped target reads the first period alone.
-        warnings.warn(
-            "the heat pump step was left out of the retrofit: it is not built "
-            f"for a problem with {periods} periods yet.",
-            UserWarning,
-            stacklevel=2,
-        )
-        return base
     sized = []
     for size in sizes:
         # A target with no machine (none the cycle can model pays), a case
