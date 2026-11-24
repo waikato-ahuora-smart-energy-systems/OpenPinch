@@ -48,6 +48,7 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
         "enhancement",
         "heat_pump",
         "heat_recovery_loop",
+        "utility_switch",
     ]
     exchanger_id: str
     added_area: float = 0.0

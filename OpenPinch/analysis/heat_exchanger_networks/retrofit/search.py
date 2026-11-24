@@ -71,11 +71,13 @@ from .moves import (
     apply_new_match,
     apply_new_utility,
     apply_relocation,
+    apply_utility_switch,
     match_potential,
     new_splits,
     new_utility_candidates,
     period_mean,
     screen_new_matches,
+    utility_switch_candidates,
 )
 from .processes import stream_process_zones
 
@@ -196,6 +198,7 @@ class RetrofitSettings:
     heat_pump_max_lift: float | None = 140.0
     heat_recovery_loops: bool = True
     heat_recovery_loop_cost: float = 0.0
+    utility_switch_cost: float | None = None
 
 
 @dataclass(frozen=True)
@@ -211,6 +214,8 @@ class _Move:
     # The heat pump whose stream this new match serves, when the search
     # started from a heat pump step.
     machine: str | None = None
+    # A switched heater's or cooler's hot and cold sides after the switch.
+    switch: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -613,6 +618,7 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
             repiped=(match.hot, match.cold),
         )
         yield apply_new_match(network, match, exchanger_id), move
+    yield from _switch_steps(parent, settings, evaluator)
     if settings.relocation_cost is None:
         return
     for unit, match in _relocations(
@@ -639,6 +645,30 @@ def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator)
             repiped=_relocation_repiping(network, unit, match),
         )
         yield apply_relocation(network, unit, match), move
+
+
+def _switch_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
+    """With a ``utility_switch_cost``, each existing heater or cooler not yet
+    switched, served by each other utility of its kind, as
+    ``(network, move)``."""
+
+    if settings.utility_switch_cost is None:
+        return
+    network = parent.state.network
+    switched = {m.exchanger_id for m in parent.state.moves if m.kind == "utility_switch"}
+    for unit, utility in utility_switch_candidates(
+        network,
+        units=evaluator.existing - switched,
+        hot_utilities=evaluator.utility_axes["hot_utilities"],
+        cold_utilities=evaluator.utility_axes["cold_utilities"],
+    ):
+        moved = apply_utility_switch(network, unit, utility)
+        (after,) = (e for e in moved.exchangers if e.exchanger_id == unit)
+        yield moved, _Move(
+            "utility_switch",
+            unit,
+            switch=(str(after.source_stream), str(after.sink_stream)),
+        )
 
 
 def _heat_pump_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
@@ -1512,6 +1542,9 @@ class _Evaluator:
         splits = settings.split_cost * len(move.splits)
         if move.kind == "relocation":
             added, fixed = 0.0, settings.relocation_cost + splits
+        elif move.kind == "utility_switch":
+            # Its added area, if any, is an area addition of its own.
+            added, fixed = 0.0, settings.utility_switch_cost
         elif move.kind == "heat_pump" and move.heat_pump.refrigerant is not None:
             # The HPR machine capital covers the exchangers too.
             added = 0.0
@@ -1593,14 +1626,15 @@ class _Evaluator:
                 heat_pump_capacity=utility.max_duty,
                 heat_pump_refrigerant=pump.refrigerant,
             )
+        hot, cold = (match.hot, match.cold) if match else move.switch or (None, None)
         return HeatExchangerNetworkRetrofitModification(
             kind=move.kind,
             exchanger_id=move.exchanger_id,
             added_area=added,
             fixed_cost=float(fixed),
             area_cost=self._area_cost(added) + self._area_cost(utility_area),
-            hot_stream=match.hot if match else None,
-            cold_stream=match.cold if match else None,
+            hot_stream=hot,
+            cold_stream=cold,
             stage=stage if match else None,
             new_stage=bool(match and match.new_stage),
             new_splits=move.splits,
