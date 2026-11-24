@@ -162,6 +162,7 @@ def with_heat_pump_matches(
     # counter-current match, takes a share. The target places an
     # evaporator at the limit, so the comparison allows rounding.
     gap = approach if ambient_approach is None else float(ambient_approach)
+
     def under(air, evaporator) -> bool:
         # In every period both run, with ``in_periods``.
         return all(

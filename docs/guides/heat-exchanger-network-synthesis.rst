@@ -950,13 +950,17 @@ Heat pumps
    segments in every period: on the second case above, its heater needing
    1200 kW in the base and 1500 kW in the peak, the machine at 0.75 of the
    load delivers 900 and 1125 kW at a COP of 4.17 and nets $349,700/y
-   (196 s for three sizes). An air-source machine is not built over
-   several periods yet.
+   (196 s for three sizes). Air the machine draws on is a stream in every
+   period at that period's duty, matched to an evaporator only where the
+   ambient approach holds in every period both run: on a process heated
+   with 800 kW in one period and 1000 kW in the other against 200 kW of
+   waste heat, with steam at $60/MWh and electricity at $30/MWh, the
+   machine takes 311 and 437 kW from air, the steam is gone in both
+   periods and the design nets $325,000/y.
    The step is left out, with a ``UserWarning`` giving the reason, on a
    problem with process components or a site of several process zones
-   (the machine's streams cannot be added to the case), over several
-   periods where the machine draws on air, and
-   when the network cannot serve the machine's duties.
+   (the machine's streams cannot be added to the case), and when the
+   network cannot serve the machine's duties.
    With ``min_approach_temperature`` not given, each of the heat pump's
    matches stands off by its process stream's own contribution (its
    ``dt_cont`` with the zone's multiplier) plus ``HPR_DT_CONT`` (air by
