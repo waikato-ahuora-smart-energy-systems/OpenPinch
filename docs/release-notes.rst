@@ -12,6 +12,16 @@ Heat pumps and refrigeration
   and weight. The retrofit's as-piped heat pump (``as_piped_heat_pump``)
   now uses it for a network of several periods, reading each period's
   coolers and heaters as they run there; it read the first period's alone.
+- ``design.retrofit`` with ``heat_pump_cycle`` now tries its heat pump step
+  on a problem with several periods; it was left out with a warning. The
+  machine is designed once for every period, its streams carry each
+  period's duty, its matches hold their approach in every period it runs,
+  its compressor is sized on the largest condenser duty and its
+  electricity is each period's work at its weight. On a two-period case
+  whose heater needs 720 kW in the peak and 600 kW in the base, the
+  machine delivers 317 and 240 kW and nets 31,900 $/y. A machine that
+  draws on air, or with segmented streams, is still left out over several
+  periods.
 - The vapour-compression warm starts (parallel, cascade and VC-MVR) now
   seed each evaporator ``dt_phase_change`` below the Carnot evaporating
   temperature. A Carnot evaporator at ``T`` spans

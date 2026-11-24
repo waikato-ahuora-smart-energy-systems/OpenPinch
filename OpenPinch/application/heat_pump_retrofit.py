@@ -22,7 +22,13 @@ from .case_derivation import _case_with_heat_pump_streams, _heat_pump_zone_addre
 
 
 def heat_pump_machine(
-    solved, *, name: str, cycle: str, cost_per_kw: float, costing
+    solved,
+    *,
+    name: str,
+    cycle: str,
+    cost_per_kw: float,
+    costing,
+    period_weights=None,
 ) -> NetworkHeatPump:
     """The as-piped heat pump target ``solved`` as the machine a retrofit
     search starts from.
@@ -36,6 +42,13 @@ def heat_pump_machine(
     (``hpr_machine_internal_capital_costs``: compressors, motors, cascade
     exchangers and IHXs): its condensers and evaporators are the
     network's exchangers, priced there.
+
+    With ``period_weights`` (by period id) and a shared design's
+    ``period_outputs``, the duties are the largest of any period, the work
+    each period's at its share of the weights (none where the machine is
+    off) and the COP the heat so delivered over that work; a
+    "vapour_compression" machine installs each of its machines at the
+    largest internal capital any period needs.
     """
 
     def duty(streams) -> float:
@@ -43,9 +56,40 @@ def heat_pump_machine(
 
     price_scale, capital_scale = annual_cost_scales(costing)
     capacity = duty(solved.hpr_hot_streams)
+    evaporator = duty(solved.hpr_cold_streams)
     work = float(solved.w_net)
+    cop = float(solved.cop_h)
+    internal = tuple(getattr(solved, "hpr_machine_internal_capital_costs", None) or ())
+    outputs = getattr(solved, "period_outputs", None)
+    if period_weights and outputs:
+        # A shared design: sized for the period it delivers most in, each
+        # period's work drawn for its share of the year. A period the
+        # machine is off in has no output and draws nothing.
+        total = float(sum(period_weights.values()))
+        running = {p: outputs[p] for p in period_weights if p in outputs}
+        delivered = {p: duty(o["hpr_hot_streams"]) for p, o in running.items()}
+        work = sum(
+            float(period_weights[p]) / total * float(o["w_net"])
+            for p, o in running.items()
+        )
+        heat = sum(float(period_weights[p]) / total * q for p, q in delivered.items())
+        cop = heat / work if work else cop
+        capacity = max(delivered.values(), default=0.0)
+        evaporator = max(
+            (duty(o["hpr_cold_streams"]) for o in running.values()), default=0.0
+        )
+        # Each machine installed for the period that needs it largest: the
+        # solve's own costs are the selected period's alone.
+        each = [internal] + [
+            tuple(o.get("hpr_machine_internal_capital_costs") or ())
+            for o in running.values()
+        ]
+        internal = tuple(
+            max(float(costs[n]) for costs in each if n < len(costs))
+            for n in range(max(map(len, each)))
+        )
     capital = (
-        sum(float(c) for c in solved.hpr_machine_internal_capital_costs)
+        sum(float(c) for c in internal)
         if cycle == "vapour_compression"
         else float(cost_per_kw) * capacity
     )
@@ -53,9 +97,9 @@ def heat_pump_machine(
         machine=name,
         cycle=cycle,
         condenser_duty=capacity,
-        evaporator_duty=duty(solved.hpr_cold_streams),
+        evaporator_duty=evaporator,
         work=work,
-        cop=float(solved.cop_h),
+        cop=cop,
         electricity_cost=work * float(costing.hpr_ele_price) * price_scale,
         capital_cost=capital,
         annual_capital_cost=capital * capital_scale,
@@ -69,13 +113,30 @@ def heat_pump_case(problem, solved, *, machine: str):
     Each condenser is a hot stream and each evaporator a cold stream of
     the problem's process zone, marked with ``machine`` and its role, at
     ``HPR_DT_CONT``: the as-piped target stands the heat pump that far
-    off the coolers and heaters.
+    off the coolers and heaters. A shared design over several periods
+    (``period_outputs``) writes each stream in every period, with no duty
+    where it is off; a level without duty in any period is no stream.
     """
 
     root = problem._require_prepared_root_zone()
+    outputs = getattr(solved, "period_outputs", None)
     target = SimpleNamespace(
         provenance=SimpleNamespace(zone_address=root.address),
-        hpr_details=SimpleNamespace(amb_streams=solved.amb_streams),
+        # A shared design over several periods: the case writes each
+        # stream in every period from its period outputs, a level without
+        # duty in a period off there.
+        hpr_shared_design=bool(outputs),
+        hpr_details=SimpleNamespace(
+            amb_streams=solved.amb_streams,
+            period_outputs={
+                period: output
+                | {
+                    group: {s.name: s for s in _carrying(output.get(group) or {})}
+                    for group in ("hpr_hot_streams", "hpr_cold_streams")
+                }
+                for period, output in (outputs or {}).items()
+            },
+        ),
         # Only the levels that carry duty, as in the step.
         hpr_hot_streams={s.name: s for s in _carrying(solved.hpr_hot_streams)},
         hpr_cold_streams={s.name: s for s in _carrying(solved.hpr_cold_streams)},
@@ -132,6 +193,39 @@ def heat_pump_step(
     if solved is None:
         # The heaters carry no load: no heat pump to add.
         return None, None
+    # A level the target left without duty is not a stream: it would need
+    # a match it may not be able to have.
+    condensers = _carrying(solved.hpr_hot_streams)
+    evaporators = _carrying(solved.hpr_cold_streams)
+    in_periods = weights = None
+    if getattr(solved, "period_outputs", None):
+        # A shared design: a level is a stream if it carries duty in any
+        # period, taken from the first it runs in.
+        periods = sorted(problem.period_ids, key=problem.period_ids.get)
+        weights = {
+            period: float(problem.master_zone.weights[problem.period_ids[period]])
+            for period in periods
+        }
+        in_periods, levels = {}, []
+        for group in ("hpr_hot_streams", "hpr_cold_streams"):
+            each = [
+                {
+                    stream.name: stream
+                    for stream in _carrying(
+                        (solved.period_outputs.get(period) or {}).get(group) or {}
+                    )
+                }
+                for period in periods
+            ]
+            names = list(dict.fromkeys(name for streams in each for name in streams))
+            for name in names:
+                in_periods[name] = tuple(streams.get(name) for streams in each)
+            levels.append(
+                tuple(
+                    next(s for s in in_periods[name] if s is not None) for name in names
+                )
+            )
+        condensers, evaporators = levels
     step = HeatPumpStep(
         record=heat_pump_machine(
             solved,
@@ -139,11 +233,11 @@ def heat_pump_step(
             cycle=str(settings.heat_pump_cycle),
             cost_per_kw=settings.heat_pump_cost,
             costing=problem.master_zone.config.costing,
+            period_weights=weights,
         ).model_copy(update={"load_fraction": load_fraction}),
-        # A level the target left without duty is not a stream: it would
-        # need a match it may not be able to have.
-        condensers=_carrying(solved.hpr_hot_streams),
-        evaporators=_carrying(solved.hpr_cold_streams),
+        condensers=condensers,
+        evaporators=evaporators,
+        in_periods=in_periods,
         base=base,
         # The air the evaporators draw on; air that takes heat the heat
         # pump leaves is not a stream of the case.
@@ -224,16 +318,6 @@ def retrofit_with_heat_pump(
     )
     if int(settings.max_modifications) < 1:
         # The heat pump step is a modification.
-        return base
-    periods = len(getattr(problem, "period_ids", None) or ())
-    if periods > 1:
-        # The as-piped target reads the first period alone.
-        warnings.warn(
-            "the heat pump step was left out of the retrofit: it is not built "
-            f"for a problem with {periods} periods yet.",
-            UserWarning,
-            stacklevel=2,
-        )
         return base
     sized = []
     for size in sizes:
