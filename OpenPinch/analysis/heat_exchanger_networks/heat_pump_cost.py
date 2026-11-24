@@ -18,11 +18,21 @@ def network_with_heat_pumps(
     utilities and its exchangers.
     """
     machines = tuple(heat_pumps)
+    added = sum(machine.annual_cost for machine in machines)
     total = network.total_annual_cost
     if total is not None:
-        total += sum(machine.annual_cost for machine in machines)
+        total += added
+    metrics = dict(network.summary_metrics)
+    site = metrics.get("site_total_annual_cost")
+    if site is not None:
+        # A site network ranks by its site cost: the machine is in it too.
+        metrics["site_total_annual_cost"] = float(site) + added
     return network.model_copy(
-        update={"heat_pumps": machines, "total_annual_cost": total}
+        update={
+            "heat_pumps": machines,
+            "total_annual_cost": total,
+            "summary_metrics": metrics,
+        }
     )
 
 
