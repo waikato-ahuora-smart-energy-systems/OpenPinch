@@ -257,7 +257,10 @@ def design_with_heat_pump(
         options = request.get("options") or {}
         root = problem._require_prepared_root_zone()
         base = float(options.get("HPR_DT_CONT", root.config.hpr.dt_cont))
-        approaches = [factor * base for factor in _UTILITY_APPROACH_FACTORS]
+        # In order, once each: at a base of 0 every multiple is the same.
+        approaches = list(
+            dict.fromkeys(factor * base for factor in _UTILITY_APPROACH_FACTORS)
+        )
     else:
         approaches = [levels.minimum_approach_temperature]
     runs = []

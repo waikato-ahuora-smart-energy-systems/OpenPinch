@@ -143,3 +143,35 @@ def test_a_site_of_several_periods_is_designed_with_its_heat_pump():
     )
 
     assert any(o.network.heat_pumps for o in ranked_networks(view.result))
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_zero_heat_pump_approach_is_tried_once(monkeypatch):
+    # With HPR_DT_CONT at 0 every multiple is 0 K: one case, not three alike.
+    from OpenPinch.application import heat_pump_design
+
+    built = heat_pump_design.heat_pump_design_case
+    approaches = []
+
+    def recording(problem, multiplier, **arguments):
+        approaches.append(arguments["levels"].minimum_approach_temperature)
+        return built(problem, multiplier, **arguments)
+
+    monkeypatch.setattr(heat_pump_design, "heat_pump_design_case", recording)
+
+    recovering_two_level_site().design.total_site_heat_exchanger_network(
+        width=0,
+        depth=1,
+        heat_pump={
+            "cycle": "carnot",
+            "load": {"fraction": 1.0},
+            "levels": {"condensers": 1, "evaporators": 1},
+            "search": {"restarts": 0, "evaluations": 50},
+            "options": {"HPR_DT_CONT": 0.0},
+        },
+        heat_pump_cost=300.0,
+    )
+
+    assert approaches == [0.0]
