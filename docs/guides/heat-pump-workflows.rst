@@ -507,8 +507,11 @@ A period the machine is off in (an off season, or a load too small to run
 for) gives its streams no heat flow there and adds no work, while keeping
 its share of the year. A segmented (vapour compression) stream keeps its
 segments in every period, each with that period's temperatures and duty,
-and a segment absent in a period has no duty there. An air-source heat
-pump is not built over several periods yet and is refused.
+and a segment absent in a period has no duty there. The air an
+evaporator draws on is written in every period at that period's air duty:
+it is one stream at the ambient temperature, which is a single setting,
+and where the target's own period draws no air it is built from the
+configuration as the heat pump service builds it.
 
 ``with_heat_pump_streams`` takes a heat pump target solved on this problem
 as it stands: a target from another problem, one solved before the inputs

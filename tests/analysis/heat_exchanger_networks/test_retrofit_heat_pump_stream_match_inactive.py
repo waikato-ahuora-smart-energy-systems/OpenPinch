@@ -41,3 +41,19 @@ def test_a_cooler_off_in_a_period_is_checked_where_it_runs():
         ("H1", "HP_C1"),
         ("H2", "HP_C1"),
     }
+
+
+def test_a_level_is_not_matched_to_a_cooler_it_never_runs_with():
+    # H1's cooler is off in the peak, and this evaporator runs in the peak
+    # alone: a match between them would never carry duty.
+    network = inactive._with_h1_cooler_off_in_the_peak(periods.two_period_network())
+
+    _network, added = with_heat_pump_matches(
+        network,
+        condensers=[],
+        evaporators=[_evaporator()],
+        approach=10.0,
+        in_periods={"HP_C1": (None, _evaporator())},
+    )
+
+    assert {(p.match.hot, p.match.cold) for p in added} == {("H2", "HP_C1")}

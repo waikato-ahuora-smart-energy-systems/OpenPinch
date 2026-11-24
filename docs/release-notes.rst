@@ -19,8 +19,7 @@ Heat pumps and refrigeration
   its compressor is sized on the largest condenser duty and its
   electricity is each period's work at its weight. On a two-period case
   whose heater needs 720 kW in the peak and 600 kW in the base, the
-  machine delivers 317 and 240 kW and nets 31,900 $/y. A machine that
-  draws on air is still left out over several periods.
+  machine delivers 317 and 240 kW and nets 31,900 $/y.
 - A heat pump with segmented streams (a vapour compression condenser's
   desuperheating, condensing and subcooling) is now written in every
   period of a problem with several periods, each segment with that
@@ -29,6 +28,14 @@ Heat pumps and refrigeration
   heat pump step. A two-period retrofit whose heater needs 1200 kW in the
   base and 1500 kW in the peak now finds a vapour compression machine
   that delivers 900 and 1125 kW and nets 349,700 $/y.
+- The air a heat pump's evaporators draw on is now written in every period
+  of a problem with several periods, at that period's air duty; it was
+  refused. The air is one stream at the ambient temperature; where the
+  target's own period draws none, it is built from the configuration. The
+  retrofit's heat pump step matches it to an evaporator only where the
+  ambient approach holds in every period both run. A two-period retrofit
+  heated with 800 and 1000 kW against 200 kW of waste heat now finds a
+  machine that takes 311 and 437 kW from air and nets 325,000 $/y.
 - The vapour-compression warm starts (parallel, cascade and VC-MVR) now
   seed each evaporator ``dt_phase_change`` below the Carnot evaporating
   temperature. A Carnot evaporator at ``T`` spans
