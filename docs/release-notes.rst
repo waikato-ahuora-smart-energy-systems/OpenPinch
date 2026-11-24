@@ -20,8 +20,15 @@ Heat pumps and refrigeration
   electricity is each period's work at its weight. On a two-period case
   whose heater needs 720 kW in the peak and 600 kW in the base, the
   machine delivers 317 and 240 kW and nets 31,900 $/y. A machine that
-  draws on air, or with segmented streams, is still left out over several
-  periods.
+  draws on air is still left out over several periods.
+- A heat pump with segmented streams (a vapour compression condenser's
+  desuperheating, condensing and subcooling) is now written in every
+  period of a problem with several periods, each segment with that
+  period's temperatures and duty; it was refused. This serves
+  ``with_heat_pump_streams``, heat pump network design and the retrofit's
+  heat pump step. A two-period retrofit whose heater needs 1200 kW in the
+  base and 1500 kW in the peak now finds a vapour compression machine
+  that delivers 900 and 1125 kW and nets 349,700 $/y.
 - The vapour-compression warm starts (parallel, cascade and VC-MVR) now
   seed each evaporator ``dt_phase_change`` below the Carnot evaporating
   temperature. A Carnot evaporator at ``T`` spans
