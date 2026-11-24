@@ -160,9 +160,9 @@ Heat exchanger network synthesis
   duty; on a condensing stream matched in one stage it took all of the
   cold stream's 150 kW past the plateau, and now takes 63.8 kW, the cold
   stream leaving 2 K under the kink.
-- ``design.retrofit(heat_pump_cycle="vapour_compression",
-  heat_pump_streams=True)`` retrofits a vapour compression heat pump as
-  streams. The as-piped target is a cascade of vapour compression cycles
+- ``design.retrofit(heat_pump_cycle="vapour_compression")`` retrofits a
+  vapour compression heat pump as streams by default, as Carnot does
+  (``heat_pump_streams=False`` keeps the linked move). The as-piped target is a cascade of vapour compression cycles
   on ``HPR_REFRIGERANTS`` (``HPR_N_COND`` and ``HPR_N_EVAP`` levels), its
   condensers kept as one stream each with their desuperheating,
   condensing and subcooling segments. The machine costs what the heat
@@ -173,11 +173,12 @@ Heat exchanger network synthesis
   heater above what the refrigerants reach) leaves the step out with a
   warning. Heat pump targets now also report each machine's capital
   without its process and air exchangers
-  (``hpr_machine_internal_capital_costs``). Without
-  ``heat_pump_streams=True`` vapour compression keeps the linked move
-  until the two are compared. On a low-temperature case (a cooler from 95
-  to 45 degC, a heater from 100 to 130 degC) a 296 kW water machine cuts
-  steam by a fifth and nets 67,100 $/y.
+  (``hpr_machine_internal_capital_costs``). On a low-temperature case (a
+  cooler from 95 to 45 degC, a heater from 100 to 130 degC) the linked
+  move finds no heat pump, and the stream step with two condenser levels
+  and one evaporator level an 858 kW machine (COP 3.6) netting
+  181,000 $/y in 79 s; with the zone's default three and two levels its
+  search finds none.
 - The retrofit search can start from a heat pump added to the case as
   streams. ``run_retrofit_search(problem, existing, settings,
   heat_pump=HeatPumpStep(...))`` takes a machine of a fixed size whose
@@ -196,8 +197,7 @@ Heat exchanger network synthesis
 - ``design.retrofit(heat_pump_cycle="carnot")`` now tries the existing
   network's as-piped heat pump target as one
   machine added as streams, in place of the linked heat pump move
-  (``heat_pump_streams=False`` keeps the linked move; vapour compression
-  keeps it unless ``heat_pump_streams=True``): several condensers along the heaters'
+  (``heat_pump_streams=False`` keeps the linked move): several condensers along the heaters'
   temperatures and several evaporators along the coolers', where the
   linked heat pump is one evaporator and one condenser at the ends of two
   streams. The step is one ``heat_pump`` modification with the compressor

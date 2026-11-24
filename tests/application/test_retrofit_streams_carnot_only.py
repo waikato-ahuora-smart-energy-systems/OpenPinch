@@ -1,9 +1,10 @@
 """The stream step takes the Carnot and vapour compression cycles.
 
-A vapour compression retrofit heat pump keeps the linked move unless the
-stream step is asked for (``heat_pump_streams=True``), until the two are
-compared; Carnot runs the stream step by default. Vapour compression with
-the stream step was refused until the stream step could model it.
+Both run the stream step by default; ``heat_pump_streams=False`` keeps
+the linked move. Vapour compression kept the linked move by default until
+the two were compared: on a low-temperature retrofit the linked move found
+no heat pump where the stream step netted 67,000 $/y. Vapour compression
+with the stream step was refused until the stream step could model it.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from tests.analysis.heat_exchanger_networks.heat_pump_levels_case import (
 )
 
 
-def test_vapour_compression_runs_the_stream_step_when_asked(monkeypatch):
+def test_vapour_compression_runs_the_stream_step_unless_told_not_to(monkeypatch):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
     from OpenPinch.application import heat_pump_retrofit
 
@@ -33,10 +34,10 @@ def test_vapour_compression_runs_the_stream_step_when_asked(monkeypatch):
     monkeypatch.setattr(heat_pump_retrofit, "retrofit_with_heat_pump", streams)
     monkeypatch.setattr(search, "run_retrofit_search", linked)
 
-    levels_problem().design.retrofit(
-        EXISTING, heat_pump_cycle="vapour_compression", heat_pump_streams=True
-    )
     levels_problem().design.retrofit(EXISTING, heat_pump_cycle="vapour_compression")
+    levels_problem().design.retrofit(
+        EXISTING, heat_pump_cycle="vapour_compression", heat_pump_streams=False
+    )
 
     assert calls == [
         ("streams", "vapour_compression"),

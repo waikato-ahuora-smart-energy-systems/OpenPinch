@@ -1772,15 +1772,15 @@ class _DesignAccessor:
         ``COSTING_HPR_ELE_PRICE``; the heat pump's duties are not counted as
         utility.
 
-        With the "carnot" cycle the retrofit by default (``heat_pump_streams``
-        None or True; False keeps the linked move above), and with
-        "vapour_compression" when ``heat_pump_streams`` is True (True with
-        any other cycle is refused), tries the existing network's as-piped
-        heat pump target instead, as one machine of that size (with
-        "vapour_compression" a cascade of vapour compression cycles on
-        ``HPR_REFRIGERANTS``, with ``HPR_N_COND`` and ``HPR_N_EVAP``
-        levels, its condensers each one stream with their desuperheating,
-        condensing and subcooling segments): its condensers
+        With either cycle the retrofit by default (``heat_pump_streams``
+        None or True; False keeps the linked move above; True with no cycle
+        is refused) tries the existing network's as-piped heat pump target
+        instead, as one machine of that size (with "vapour_compression" a
+        cascade of vapour compression cycles on ``HPR_REFRIGERANTS``, with
+        ``HPR_N_COND`` and ``HPR_N_EVAP`` levels, its condensers each one
+        stream with their desuperheating, condensing and subcooling
+        segments; fewer levels than the zone's default three and two can
+        find a machine where they find none): its condensers
         and evaporators, placed along
         the heaters' and coolers' own temperatures, join the case as
         streams, and a second search starts from the existing network with
@@ -1856,10 +1856,10 @@ class _DesignAccessor:
                 f"'vapour_compression' only; got {heat_pump_cycle!r}."
             )
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
-        # Carnot runs the stream step unless told not to; vapour compression
-        # only when asked, until it is compared with the linked move.
-        streams = (heat_pump_cycle == "carnot" and heat_pump_streams is not False) or (
-            heat_pump_cycle == "vapour_compression" and bool(heat_pump_streams)
+        # Both cycles run the stream step unless told not to.
+        streams = (
+            heat_pump_cycle in ("carnot", "vapour_compression")
+            and heat_pump_streams is not False
         )
         if streams and outside:
             raise ValueError(

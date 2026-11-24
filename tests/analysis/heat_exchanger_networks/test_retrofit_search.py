@@ -1367,6 +1367,9 @@ def test_a_real_fluid_heat_pump_is_priced_by_the_hpr_machine_capital(fake_solver
         _existing_network(),
         max_modifications=1,
         heat_pump_cycle="vapour_compression",
+        # The linked move: vapour compression now runs the stream step by
+        # default, which finds no machine on this case.
+        heat_pump_streams=False,
         heat_pump_cost=300.0,
         repiping_cost=1_000.0,
         # The cycle below is built at a 1 K approach; the retrofit default
@@ -1571,6 +1574,9 @@ def test_a_heat_pump_whose_machine_cannot_be_priced_is_dropped(
         _existing_network(),
         max_modifications=1,
         heat_pump_cycle="vapour_compression",
+        # The linked move, whose pricing fails here: vapour compression now
+        # runs the stream step by default, which never reaches it.
+        heat_pump_streams=False,
         heat_pump_cost=300.0,
         repiping_cost=1_000.0,
         min_approach_temperature=1.0,
