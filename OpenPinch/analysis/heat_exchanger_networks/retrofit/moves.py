@@ -95,6 +95,51 @@ def apply_new_utility(
     )
 
 
+def utility_switch_candidates(
+    network: HeatExchangerNetwork,
+    *,
+    units,
+    hot_utilities,
+    cold_utilities,
+) -> tuple[tuple[str, str], ...]:
+    """Each ``(exchanger_id, utility)`` switch ``network`` could take: each
+    heater or cooler among ``units`` to each other utility of its kind,
+    heaters first."""
+
+    heaters = [
+        (e.exchanger_id, utility)
+        for e in network.exchangers
+        if e.exchanger_id in units and e.kind is HEATER
+        for utility in hot_utilities
+        if utility != e.source_stream
+    ]
+    coolers = [
+        (e.exchanger_id, utility)
+        for e in network.exchangers
+        if e.exchanger_id in units and e.kind is COOLER
+        for utility in cold_utilities
+        if utility != e.sink_stream
+    ]
+    return tuple(heaters + coolers)
+
+
+def apply_utility_switch(
+    network: HeatExchangerNetwork, exchanger_id: str, utility: str
+) -> HeatExchangerNetwork:
+    """``network`` with heater or cooler ``exchanger_id`` served by
+    ``utility``, keeping its id, its process stream and its installed area."""
+
+    def switched(e: HeatExchanger) -> HeatExchanger:
+        if e.exchanger_id != exchanger_id:
+            return e
+        side = "source_stream" if e.kind is HEATER else "sink_stream"
+        return e.model_copy(update={side: utility})
+
+    return network.model_copy(
+        update={"exchangers": tuple(switched(e) for e in network.exchangers)}
+    )
+
+
 def stage_count(network: HeatExchangerNetwork) -> int:
     """The network's stage count, or its deepest recovery stage."""
 
