@@ -54,3 +54,24 @@ def test_with_heat_pump_streams_takes_a_shared_design_on_a_site_of_periods():
 
     zones = {child["name"] for child in case.to_problem_json()["zone_tree"]["children"]}
     assert {"HP condenser", "HP evaporator"} <= zones
+
+
+def test_a_level_with_a_temperature_per_period_takes_its_own_band_in_each():
+    # MPS given per period: each period's stream is moved within that
+    # period's band, the level's temperatures read for the period.
+    source = two_level_site_source(PERIODS)
+    mps = next(u for u in source["utilities"] if u["name"] == "MPS")
+    mps["t_supply"] = {"values": [180.0, 180.0], "unit": "degC"}
+    mps["t_target"] = {"values": [179.9, 179.9], "unit": "degC"}
+    problem = PinchProblem(source=source, project_name="periods")
+
+    case = _case_with_utility_heat_pump_zones(
+        problem, _shared_target(problem), dt_cont=1.0
+    )
+
+    records = {
+        record["name"]: record
+        for record in case.to_problem_json()["streams"]
+        if record["heat_pump"] is not None
+    }
+    assert len(records["HP_H1"]["t_supply"].get("values", ())) == 2

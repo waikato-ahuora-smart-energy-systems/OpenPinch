@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+import numpy as np
+
 from ..analysis.heat_pumps.common._shared.air import UTILITY_BAND_MAX_SPAN_K
 from ..domain.enums import StreamType, ZoneType
 from ..domain.targets import DirectHeatPumpTarget, IndirectHeatPumpTarget
@@ -346,13 +348,25 @@ def _require_heat_pump_site_target(case, target) -> None:
     )
 
 
+def _at_period(value, period: int | None) -> float:
+    """``value``'s magnitude in ``period`` (its only one when it has one)."""
+
+    return float(np.asarray(value[period].value, dtype=float).reshape(-1)[0])
+
+
 def _band_move(
-    stream, role: str, approach: float, levels, multiplier: float = 1.0
+    stream,
+    role: str,
+    approach: float,
+    levels,
+    multiplier: float = 1.0,
+    period: int | None = None,
 ) -> float:
     """The kelvin to move a utility heat pump stream by so that the
     utility level whose band it lies in serves all of it. ``approach`` is
     the heat pump's own contribution as the target used it; each level's
     contribution counts ``multiplier`` times, the zone's dt_cont multiplier.
+    A level's temperatures and contribution are read in ``period``.
 
     A utility level is written as a narrow band of temperature (a steam
     main as 0.1 K), and a heat pump target places its streams against the
@@ -367,12 +381,12 @@ def _band_move(
     moves = [0.0]
     for level in levels:
         ends = sorted(
-            float(end.value)
+            _at_period(end, period)
             for end in (level.supply_temperature, level.target_temperature)
         )
         if not 0.0 < ends[1] - ends[0] <= UTILITY_BAND_MAX_SPAN_K:
             continue
-        gap = approach + multiplier * float(level.delta_t_contribution.value)
+        gap = approach + multiplier * _at_period(level.delta_t_contribution, period)
         for part in stream.segments or (stream,):
             end = float(part.supply_temperature.value)
             if role == "condenser" and ends[0] + gap <= end < ends[1] + gap:
@@ -463,11 +477,18 @@ def _case_with_utility_heat_pump_zones(
             if by_period:
                 record |= _period_thermal_record(each)
             # Each period's stream to the end of the band it lies in.
+            # One period's stream against that period's levels; a single
+            # period reads each level as it is.
             moves = [
                 _band_move(
-                    running if s is None else s, role, approach, levels, multiplier
+                    running if s is None else s,
+                    role,
+                    approach,
+                    levels,
+                    multiplier,
+                    period=n if by_period else None,
                 )
-                for s in each
+                for n, s in enumerate(each)
             ]
             source["streams"].append(_moved_record(record, moves))
     return type(problem)(
