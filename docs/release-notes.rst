@@ -7,6 +7,11 @@ Unreleased
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``compute_shared_profile_heat_pump_target`` designs one heat pump for
+  several periods' source and sink profiles, each period at its own load
+  and weight. The retrofit's as-piped heat pump (``as_piped_heat_pump``)
+  now uses it for a network of several periods, reading each period's
+  coolers and heaters as they run there; it read the first period's alone.
 - The vapour-compression warm starts (parallel, cascade and VC-MVR) now
   seed each evaporator ``dt_phase_change`` below the Carnot evaporating
   temperature. A Carnot evaporator at ``T`` spans

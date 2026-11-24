@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_targets import (
     as_piped_period_profiles,
 )
