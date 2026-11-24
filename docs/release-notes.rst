@@ -127,6 +127,20 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.total_site_heat_exchanger_network(heat_pump=...,
+  heat_pump_cost=...)`` designs a site with a utility heat pump, one that
+  heats and cools the site's utility levels, never process streams. It
+  designs the site without the heat pump and, at each dt_cont multiplier
+  and load (1.0, 0.75 and 0.5 of the full load unless ``load`` is given),
+  with the heat pump's condenser and evaporator as zones of the site, and
+  ranks every network by its site cost with the machine's electricity and
+  compressor. A size whose case would not target as the heat pump did (a
+  level it delivers into that only gives heat, for one) is left out with
+  a warning; a site with several periods is refused. A site network's
+  heat pump now also joins its ``site_total_annual_cost``, the cost it
+  ranks by. On a two-level site a 50-evaluation target (COP 2.65) designs
+  to $76,000/y of site cost plus $273,000/y for the machine, against
+  $315,000/y without it, so the plain site is selected.
 - Breaking: the retrofit search's linked heat pump move is retired. A
   heat pump enters a retrofit only as streams: ``design.retrofit`` with
   ``heat_pump_cycle="carnot"`` or ``"vapour_compression"`` always runs the

@@ -16,6 +16,8 @@ from ..analysis.heat_exchanger_networks.solver.arrays import heat_pump_stream_ro
 from ..contracts.hpr import HprLevels, HprLoad, HPRTargetingError
 from .case_derivation import (
     _case_with_heat_pump_streams,
+    _case_with_utility_heat_pump_zones,
+    _require_heat_pump_site_target,
     _require_heat_pump_stream_support,
 )
 
@@ -56,6 +58,7 @@ def heat_pump_design_case(
     machine: str = "HP",
     cost_per_kw: float = 0.0,
     costing=None,
+    placement: str = "process",
 ) -> HeatPumpDesignCase:
     """The case for a heat pump design at ``multiplier``.
 
@@ -86,7 +89,7 @@ def heat_pump_design_case(
     target = scaled.target.heat_pump_and_refrigeration(
         cycle,
         duty="heat_pump",
-        placement="process",
+        placement=placement,
         load=load,
         levels=levels.model_copy(
             update={
@@ -113,14 +116,22 @@ def heat_pump_design_case(
     if record.load_fraction is None and asked is not None:
         # A shared design over several periods reports no load summary.
         record = record.model_copy(update={"load_fraction": float(asked)})
-    return HeatPumpDesignCase(
-        multiplier=multiplier,
-        target=target,
+    if placement == "utility":
+        # The heat pump's zones of the site; their writer takes the approach
+        # the root's multiplier scales to and writes it over that multiplier.
+        case = _case_with_utility_heat_pump_zones(
+            problem, target, dt_cont=approach * zone_multiplier, machine=machine
+        )
+        # As with_heat_pump_streams does: the case at the design's multiplier
+        # must target as the heat pump did.
+        _require_heat_pump_site_target(_scaled(case, multiplier), target)
+    else:
         # The zone multiplier scales the heat pump's streams too.
-        case=_case_with_heat_pump_streams(
+        case = _case_with_heat_pump_streams(
             problem, target, dt_cont=approach, machine=machine
-        ),
-        record=record,
+        )
+    return HeatPumpDesignCase(
+        multiplier=multiplier, target=target, case=case, record=record
     )
 
 
@@ -161,6 +172,11 @@ def heat_pump_request(heat_pump) -> dict[str, Any]:
     return {"cycle": "carnot"} | dict(heat_pump)
 
 
+# The shares of its full load a utility heat pump is tried at without a
+# load, as a retrofit tries its heat pump sizes.
+_UTILITY_LOADS = (1.0, 0.75, 0.5)
+
+
 def _load_fractions(problem) -> list[float]:
     """The heat pump sizes worth trying on ``problem``: the logical load
     fractions of its net load profile, over every period.
@@ -185,17 +201,41 @@ def design_with_heat_pump(
     arguments: Mapping,
     costing=None,
     max_exchangers: int | None = None,
+    placement: str = "process",
 ):
     """Design ``problem`` without a heat pump and, at each of
     ``multipliers``, with one, and rank every network together.
 
     ``heat_pump`` is a cycle name or a mapping of the keyword arguments of
     ``heat_pump_design_case``; ``arguments`` are those of
-    ``design.heat_exchanger_network``.
+    ``design.heat_exchanger_network``, or with ``placement`` "utility" of
+    ``design.total_site_heat_exchanger_network``: the heat pump then heats
+    and cools the site's utility levels, and without a load it is tried at
+    each of ``_UTILITY_LOADS`` of its full load.
     """
+    site = placement == "utility"
+
+    def design(case, multiplier=None):
+        if not site:
+            at = {} if multiplier is None else {"dt_cont_multipliers": [multiplier]}
+            return case.design.heat_exchanger_network(**dict(arguments) | at)
+        options = dict(arguments.get("options") or {})
+        if multiplier is not None:
+            # The site design takes its multipliers from its options.
+            options["HENS_DT_CONT_MULTIPLIERS"] = [multiplier]
+        return case.design.total_site_heat_exchanger_network(
+            **dict(arguments) | {"options": options}
+        )
+
     request = heat_pump_request(heat_pump)
     # Before any design runs its solvers or replaces the stored design.
     _require_heat_pump_stream_support(problem)
+    periods = len(problem.period_ids)
+    if site and periods > 1:
+        raise ValueError(
+            "The zones of a utility heat pump are not built for a problem "
+            f"with {periods} periods yet; design a single-period case."
+        )
     if not cost_per_kw:
         warnings.warn(
             "heat_pump_cost is 0, so the heat pump designs are ranked with a "
@@ -204,7 +244,10 @@ def design_with_heat_pump(
             UserWarning,
             stacklevel=2,
         )
-    plain = problem.design.heat_exchanger_network(**arguments)
+    plain = design(problem)
+    # A site's case is refused when its levels cannot hold the heat pump as
+    # its target assumed: that size is left out, not the site design.
+    refused = (ValueError,) if site else ()
     # A heat pump's size is chosen outside the design: each is its own
     # target and its own networks. Without a load, every size worth trying.
     asked = request.pop("load", None)
@@ -212,14 +255,16 @@ def design_with_heat_pump(
     for multiplier in multipliers:
         # The kinks of the profile as the design at this multiplier sees it:
         # scaling the contributions moves the pinch and the profile's kinks.
-        loads = (
-            [asked]
-            if asked is not None
-            else [
+        # The kinks are the process profile's, not the site utilities'.
+        if asked is not None:
+            loads = [asked]
+        elif site:
+            loads = [{"fraction": fraction} for fraction in _UTILITY_LOADS]
+        else:
+            loads = [
                 {"fraction": fraction}
                 for fraction in _load_fractions(_scaled(problem, multiplier))
             ]
-        )
         for load in loads:
             try:
                 run = heat_pump_design_case(
@@ -228,14 +273,14 @@ def design_with_heat_pump(
                     load=load,
                     cost_per_kw=cost_per_kw,
                     costing=costing,
+                    placement=placement,
                     **request,
                 )
-                view = run.case.design.heat_exchanger_network(
-                    **dict(arguments) | {"dt_cont_multipliers": [multiplier]}
-                )
-            except (HPRTargetingError, WorkflowContractError) as error:
-                # No target at this multiplier and size, or no network
-                # around its streams.
+                view = design(run.case, multiplier)
+            except (HPRTargetingError, WorkflowContractError, *refused) as error:
+                # No target at this multiplier and size, no network around
+                # its streams, or (on a site) a case that would not target
+                # as the heat pump did.
                 warnings.warn(
                     f"No heat pump network at dt_cont multiplier {multiplier:g}"
                     f" and load {load}: {error}",
@@ -252,11 +297,12 @@ def capped_heat_pump_streams(case) -> set[str]:
     the condensers and evaporators of ``case``, as its networks name them.
 
     An ambient source is not capped: one air stream can feed several
-    evaporators.
+    evaporators. A machine on the utility system is capped as one on the
+    process is.
     """
     return {
         key
-        for key, role in heat_pump_stream_roles(case).items()
+        for key, role in heat_pump_stream_roles(case, ("process", "utility")).items()
         if role in ("condenser", "evaporator")
     }
 

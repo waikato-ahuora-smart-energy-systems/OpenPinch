@@ -762,7 +762,9 @@ def heat_pump_stream_keys(problem: PreparedProblem) -> frozenset[str]:
     return frozenset(heat_pump_stream_roles(problem))
 
 
-def heat_pump_stream_roles(problem: PreparedProblem) -> dict[str, str]:
+def heat_pump_stream_roles(
+    problem: PreparedProblem, placements: tuple[str, ...] = ("process",)
+) -> dict[str, str]:
     """The heat pump role of each marked process stream, by its key in the
     problem's master zone.
 
@@ -771,9 +773,10 @@ def heat_pump_stream_roles(problem: PreparedProblem) -> dict[str, str]:
     object the zones share. Matching by name alone would put the mark on a
     namesake in another branch of the zone tree.
 
-    Only a heat pump placed on the process has a role here. The streams of
-    one placed on the utility system exchange with utility levels, which
-    the rules written from these roles forbid.
+    By default only a heat pump placed on the process has a role here. The
+    streams of one placed on the utility system exchange with utility
+    levels, which the rules written from these roles forbid; a caller that
+    wants them too names both ``placements``.
     """
 
     records = getattr(getattr(problem, "_validated_data", None), "streams", None)
@@ -781,7 +784,7 @@ def heat_pump_stream_roles(problem: PreparedProblem) -> dict[str, str]:
         f"{record.zone}.{record.name}": record.heat_pump.role
         for record in records or ()
         if getattr(record, "heat_pump", None) is not None
-        and record.heat_pump.placement == "process"
+        and record.heat_pump.placement in placements
     }
     if not marked:
         return {}
