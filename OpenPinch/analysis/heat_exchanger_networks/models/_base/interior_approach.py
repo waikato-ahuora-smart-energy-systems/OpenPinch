@@ -29,7 +29,10 @@ def _branch_ends(owner, n: int, i: int, j: int, k: int) -> tuple:
     temperatures in stage ``k``: the stage's own in the isothermal model,
     each branch's outlet in the non-isothermal one."""
 
-    if getattr(owner, "non_isothermal_model", False):
+    # The branch outlets of the model that has them: the pinch design side
+    # takes non_isothermal_model from the same settings but has stage
+    # temperatures only.
+    if hasattr(owner, "T_h_out_x_by_period"):
         return (
             owner.T_h_by_period[n][i][k],
             owner.T_h_out_x_by_period[n][i][j][k],

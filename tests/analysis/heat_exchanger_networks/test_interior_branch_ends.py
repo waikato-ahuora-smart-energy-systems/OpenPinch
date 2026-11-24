@@ -29,3 +29,19 @@ def test_a_non_isothermal_match_is_checked_on_its_own_branch():
     ends = interior_approach._branch_ends(owner, 0, 0, 0, 0)
 
     assert ends == (200.0, 165.0, 120.0, 155.0)
+
+
+def test_a_model_without_branch_outlets_is_checked_on_its_stages():
+    # The pinch design side model takes non_isothermal_model from the same
+    # settings but has stage temperatures only.
+    owner = SimpleNamespace(
+        non_isothermal_model=True,
+        T_h_by_period=[[[200.0, 170.0]]],
+        T_h_mid_by_period=[[[200.0, 170.0]]],
+        T_c_by_period=[[[150.0, 120.0]]],
+        T_c_mid_by_period=[[[150.0, 120.0]]],
+    )
+
+    ends = interior_approach._branch_ends(owner, 0, 0, 0, 0)
+
+    assert ends == (200.0, 170.0, 120.0, 150.0)
