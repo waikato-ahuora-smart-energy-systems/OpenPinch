@@ -359,6 +359,13 @@ $ per kW of condenser capacity) included, and the cheapest is selected.
 ``heat_pump`` takes a cycle name or a mapping as for one process; without
 a ``load`` the machine is tried at 1.0, 0.75 and 0.5 of its full load,
 since the load kinks are the processes' profile, not the site utilities'.
+Without a ``minimum_approach_temperature`` in ``levels`` each is also
+tried at ``HPR_DT_CONT`` times 1, 5 and 10 off the levels: standing the
+machine close to the steam raises its COP but needs large exchangers. On
+the two-level site a fully searched machine at 1 K (COP 5.90) needed
+2,804 m2 and cost $330,740/y with the site, more than the site without
+it ($315,299/y); at 5 K (COP 5.08, 572 m2) it cost $259,717/y, at 10 K
+$262,354/y and at 20 K $289,897/y.
 A site with several periods is refused before any design. On the
 two-level site above, a 50-evaluation target (COP 2.65) designs to a site
 cost of $76,000/y, but its machine costs $273,000/y, so the site without a

@@ -74,3 +74,70 @@ def test_a_heat_pump_case_the_site_cannot_hold_is_left_out_with_a_warning():
         )
 
     assert not any(o.network.heat_pumps for o in ranked_networks(view.result))
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_site_heat_pump_is_tried_at_several_approaches(monkeypatch):
+    # Standing the machine HPR_DT_CONT (1 K) off the steam made its
+    # exchangers 2,804 m2: with a full search it lost to the plain site
+    # (330,740 against 315,299 $/y), where at 5 K it won (259,717 $/y).
+    # Without a given approach the site design tries HPR_DT_CONT times 1, 5
+    # and 10, one machine each, and the ranking chooses.
+    from OpenPinch.application import heat_pump_design
+
+    built = heat_pump_design.heat_pump_design_case
+    approaches = []
+
+    def recording(problem, multiplier, **arguments):
+        approaches.append(arguments["levels"].minimum_approach_temperature)
+        return built(problem, multiplier, **arguments)
+
+    monkeypatch.setattr(heat_pump_design, "heat_pump_design_case", recording)
+
+    recovering_two_level_site().design.total_site_heat_exchanger_network(
+        width=0,
+        depth=1,
+        heat_pump={
+            "cycle": "carnot",
+            "load": {"fraction": 1.0},
+            "levels": {"condensers": 1, "evaporators": 1},
+            "search": {"restarts": 0, "evaluations": 50},
+        },
+        heat_pump_cost=300.0,
+    )
+
+    assert approaches == [1.0, 5.0, 10.0]
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_zero_heat_pump_approach_is_tried_once(monkeypatch):
+    # With HPR_DT_CONT at 0 every multiple is 0 K: one case, not three alike.
+    from OpenPinch.application import heat_pump_design
+
+    built = heat_pump_design.heat_pump_design_case
+    approaches = []
+
+    def recording(problem, multiplier, **arguments):
+        approaches.append(arguments["levels"].minimum_approach_temperature)
+        return built(problem, multiplier, **arguments)
+
+    monkeypatch.setattr(heat_pump_design, "heat_pump_design_case", recording)
+
+    recovering_two_level_site().design.total_site_heat_exchanger_network(
+        width=0,
+        depth=1,
+        heat_pump={
+            "cycle": "carnot",
+            "load": {"fraction": 1.0},
+            "levels": {"condensers": 1, "evaporators": 1},
+            "search": {"restarts": 0, "evaluations": 50},
+            "options": {"HPR_DT_CONT": 0.0},
+        },
+        heat_pump_cost=300.0,
+    )
+
+    assert approaches == [0.0]
