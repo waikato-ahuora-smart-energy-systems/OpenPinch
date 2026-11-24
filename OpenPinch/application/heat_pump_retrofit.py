@@ -180,6 +180,40 @@ def heat_pump_step(
     if solved is None:
         # The heaters carry no load: no heat pump to add.
         return None, None
+    # A level the target left without duty is not a stream: it would need
+    # a match it may not be able to have.
+    condensers = _carrying(solved.hpr_hot_streams)
+    evaporators = _carrying(solved.hpr_cold_streams)
+    in_periods = weights = None
+    if getattr(solved, "period_outputs", None):
+        # A shared design: a level is a stream if it carries duty in any
+        # period, taken from the first it runs in.
+        periods = sorted(problem.period_ids, key=problem.period_ids.get)
+        weights = {
+            period: float(problem.master_zone.weights[problem.period_ids[period]])
+            for period in periods
+        }
+        in_periods, levels = {}, []
+        for group in ("hpr_hot_streams", "hpr_cold_streams"):
+            each = [
+                {
+                    stream.name: stream
+                    for stream in _carrying(
+                        (solved.period_outputs.get(period) or {}).get(group) or {}
+                    )
+                }
+                for period in periods
+            ]
+            names = list(dict.fromkeys(name for streams in each for name in streams))
+            for name in names:
+                in_periods[name] = tuple(streams.get(name) for streams in each)
+            levels.append(
+                tuple(
+                    next(s for s in in_periods[name] if s is not None)
+                    for name in names
+                )
+            )
+        condensers, evaporators = levels
     step = HeatPumpStep(
         record=heat_pump_machine(
             solved,
@@ -187,11 +221,11 @@ def heat_pump_step(
             cycle=str(settings.heat_pump_cycle),
             cost_per_kw=settings.heat_pump_cost,
             costing=problem.master_zone.config.costing,
+            period_weights=weights,
         ).model_copy(update={"load_fraction": load_fraction}),
-        # A level the target left without duty is not a stream: it would
-        # need a match it may not be able to have.
-        condensers=_carrying(solved.hpr_hot_streams),
-        evaporators=_carrying(solved.hpr_cold_streams),
+        condensers=condensers,
+        evaporators=evaporators,
+        in_periods=in_periods,
         base=base,
         # The air the evaporators draw on; air that takes heat the heat
         # pump leaves is not a stream of the case.
