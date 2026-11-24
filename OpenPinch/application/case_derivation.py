@@ -522,13 +522,6 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
         names = list(dict.fromkeys(name for streams in each for name in streams))
         # ``None`` where the stream is off in a period.
         found[role] = {name: [streams.get(name) for streams in each] for name in names}
-        for name, streams in found[role].items():
-            if any(stream is not None and stream.has_segments for stream in streams):
-                raise ValueError(
-                    f"The heat pump stream {name!r} has segments, and a "
-                    "segmented stream is not built for a problem with several "
-                    "periods yet."
-                )
     return found
 
 
@@ -540,6 +533,41 @@ def _period_thermal_record(streams) -> dict:
     value in every period, and one with no heat flow takes no part.
     """
     running = next(stream for stream in streams if stream is not None)
+    if running.has_segments:
+        # Each segment by name in every period; one absent in a period (or
+        # the whole stream off there) has no duty there.
+        names = list(
+            dict.fromkeys(
+                segment.name
+                for stream in streams
+                if stream is not None
+                for segment in stream.segments
+            )
+        )
+        each = {
+            name: [
+                None
+                if stream is None
+                else next((s for s in stream.segments if s.name == name), None)
+                for stream in streams
+            ]
+            for name in names
+        }
+        return {
+            "segments": [
+                {"name": name}
+                | _period_thermal_record(parts)
+                # Its film coefficient, as a single period's segment keeps.
+                | {
+                    "htc": _value_record(
+                        next(
+                            p for p in parts if p is not None
+                        ).heat_transfer_coefficient
+                    )
+                }
+                for name, parts in each.items()
+            ]
+        }
 
     def values(attribute: str, off=None) -> dict:
         per_period = [
