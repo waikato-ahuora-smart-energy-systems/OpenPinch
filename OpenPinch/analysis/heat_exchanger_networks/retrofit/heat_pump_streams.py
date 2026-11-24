@@ -164,12 +164,18 @@ def with_heat_pump_matches(
     gap = approach if ambient_approach is None else float(ambient_approach)
 
     def under(air, evaporator) -> bool:
-        # In every period both run, with ``in_periods``.
-        return all(
-            min(_hot_end(a) - _hot_end(e), _cold_end(a) - _cold_end(e))
-            >= gap - _APPROACH_TOLERANCE
+        # In every period both run, with ``in_periods``, and there must be
+        # one: a match between streams that never run together carries no
+        # duty.
+        together = [
+            (a, e)
             for a, e in zip(each_period(air), each_period(evaporator))
             if a is not None and e is not None
+        ]
+        return bool(together) and all(
+            min(_hot_end(a) - _hot_end(e), _cold_end(a) - _cold_end(e))
+            >= gap - _APPROACH_TOLERANCE
+            for a, e in together
         )
 
     for air in ambient_sources:

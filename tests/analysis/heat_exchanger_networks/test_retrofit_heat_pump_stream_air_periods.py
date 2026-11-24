@@ -50,3 +50,11 @@ def test_air_is_not_matched_where_a_period_breaks_its_approach():
     evaporator = (_stream("HP_C1", 5.0), _stream("HP_C1", 8.0))
 
     assert _air_matches(evaporator, (_air(), _air())) == set()
+
+
+def test_air_is_not_matched_to_an_evaporator_it_never_runs_with():
+    # Air drawn in the peak alone and an evaporator running in the base
+    # alone share no period: a match between them would never carry duty.
+    evaporator = (_stream("HP_C1", 5.0), None)
+
+    assert _air_matches(evaporator, (None, _air())) == set()
