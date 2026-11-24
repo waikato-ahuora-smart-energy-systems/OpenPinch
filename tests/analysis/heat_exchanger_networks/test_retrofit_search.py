@@ -1804,7 +1804,10 @@ def test_a_heater_may_switch_to_another_hot_utility(fake_solver):
     )
 
     switches = [
-        m for d in result.frontier for m in d.modifications if m.kind == "utility_switch"
+        m
+        for d in result.frontier
+        for m in d.modifications
+        if m.kind == "utility_switch"
     ]
     assert [
         (m.exchanger_id, m.hot_stream, m.cold_stream, m.fixed_cost, m.added_area)

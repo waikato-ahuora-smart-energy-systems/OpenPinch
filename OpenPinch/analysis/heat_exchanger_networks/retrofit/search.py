@@ -655,7 +655,9 @@ def _switch_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
     if settings.utility_switch_cost is None:
         return
     network = parent.state.network
-    switched = {m.exchanger_id for m in parent.state.moves if m.kind == "utility_switch"}
+    switched = {
+        m.exchanger_id for m in parent.state.moves if m.kind == "utility_switch"
+    }
     for unit, utility in utility_switch_candidates(
         network,
         units=evaluator.existing - switched,
@@ -664,10 +666,13 @@ def _switch_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
     ):
         moved = apply_utility_switch(network, unit, utility)
         (after,) = (e for e in moved.exchangers if e.exchanger_id == unit)
-        yield moved, _Move(
-            "utility_switch",
-            unit,
-            switch=(str(after.source_stream), str(after.sink_stream)),
+        yield (
+            moved,
+            _Move(
+                "utility_switch",
+                unit,
+                switch=(str(after.source_stream), str(after.sink_stream)),
+            ),
         )
 
 
