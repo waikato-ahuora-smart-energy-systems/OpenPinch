@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitDesign
@@ -55,6 +56,8 @@ def with_heat_pump_matches(
     solved: HeatExchangerNetwork | None = None,
     ambient_sources=(),
     ambient_approach: float | None = None,
+    hot_approaches: Mapping[str, float] | None = None,
+    cold_approaches: Mapping[str, float] | None = None,
 ) -> tuple[HeatExchangerNetwork, tuple[PlacedMatch, ...]]:
     """``network`` with the matches that serve a heat pump's streams, and
     the ids of the exchangers added.
@@ -69,7 +72,13 @@ def with_heat_pump_matches(
     heater starts at least ``approach`` K below the condenser's cold end,
     in a new stage ahead of the network's first, so the hottest condenser
     ends at stage 1. A stream no cooler or heater can serve gets no match.
+    ``hot_approaches`` and ``cold_approaches`` map a hot or a cold process
+    stream to its own approach in place of ``approach``; a zone may name a
+    hot and a cold stream alike.
     """
+
+    def needed(process: str, side) -> float:
+        return float((side or {}).get(process, approach))
 
     coolers = _starts(solved or network, HeatExchangerKind.COLD_UTILITY)
     heaters = _starts(solved or network, HeatExchangerKind.HOT_UTILITY)
@@ -94,7 +103,7 @@ def with_heat_pump_matches(
         served = sorted(
             cold
             for cold, start in heaters.items()
-            if _cold_end(condenser) - start >= approach
+            if _cold_end(condenser) - start >= needed(cold, cold_approaches)
         )
         for position, cold in enumerate(served):
             add(condenser.name, cold, 1, position == 0)
@@ -103,7 +112,7 @@ def with_heat_pump_matches(
         served = sorted(
             hot
             for hot, start in coolers.items()
-            if start - _hot_end(evaporator) >= approach
+            if start - _hot_end(evaporator) >= needed(hot, hot_approaches)
         )
         stage = stage_count(network) + 1
         for position, hot in enumerate(served):

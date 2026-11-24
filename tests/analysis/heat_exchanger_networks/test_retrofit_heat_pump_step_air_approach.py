@@ -51,7 +51,12 @@ def test_air_stands_off_an_evaporator_by_the_two_contributions():
         base=SimpleNamespace(network=network),
     )
     evaluator = SimpleNamespace(
-        config=config, settings=RetrofitSettings(approach=None), names={}
+        config=config,
+        settings=RetrofitSettings(approach=None),
+        names={},
+        # Each process stream at THERMAL_DT_CONT.
+        hot_contributions={"H1": 1.0, "H2": 1.0},
+        cold_contributions={"C2": 1.0},
     )
 
     state = _heat_pump_root(network, step, evaluator)

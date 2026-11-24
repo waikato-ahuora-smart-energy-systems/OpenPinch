@@ -409,7 +409,7 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
 
     The matches are placed from the base design's solved coolers and
     heaters. A match stands off by the search's approach, or with none by
-    the case's process contribution and the heat pump's own.
+    its process stream's own contribution and the heat pump's.
     """
 
     config = evaluator.config
@@ -417,6 +417,20 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         float(config.thermal.dt_cont) + float(config.hpr.dt_cont)
         if evaluator.settings.approach is None
         else float(evaluator.settings.approach)
+    )
+    # Each process stream's own contribution and the heat pump's, each side
+    # apart: a zone may name a hot and a cold stream alike.
+    own = evaluator.settings.approach is None
+    hot_approaches, cold_approaches = (
+        (
+            {
+                name: float(contribution) + float(config.hpr.dt_cont)
+                for name, contribution in getattr(evaluator, side).items()
+            }
+            if own
+            else None
+        )
+        for side in ("hot_contributions", "cold_contributions")
     )
     # Air carries the ambient contribution, not a process stream's.
     ambient_approach = (
@@ -435,24 +449,31 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         solved=_with_names(step.base.network, evaluator.names),
         ambient_sources=step.ambient_sources,
         ambient_approach=ambient_approach,
+        hot_approaches=hot_approaches,
+        cold_approaches=cold_approaches,
     )
     matched = {
         name for placed in added for name in (placed.match.hot, placed.match.cold)
     }
+    held = (
+        f"each stream's contribution plus {float(config.hpr.dt_cont):g} K"
+        if own
+        else f"{approach:g} K"
+    )
     for streams, what, gap in (
-        (step.condensers, "no heater starts cold enough for the condenser", approach),
-        (step.evaporators, "no cooler starts hot enough for the evaporator", approach),
+        (step.condensers, "no heater starts cold enough for the condenser", held),
+        (step.evaporators, "no cooler starts hot enough for the evaporator", held),
         (
             step.ambient_sources,
             "no evaporator is colder than the ambient source",
-            ambient_approach,
+            f"{ambient_approach:g} K",
         ),
     ):
         for stream in streams:
             if stream.name not in matched:
                 raise ValueError(
                     f"{what} {stream.name!r} of heat pump "
-                    f"{step.record.machine!r} at an approach of {gap:g} K, "
+                    f"{step.record.machine!r} at an approach of {gap}, "
                     "so nothing in the existing network can serve it."
                 )
     # The heat pump's streams are new: only the process stream of each
@@ -900,6 +921,14 @@ class _Evaluator:
         self.tol = float(hens.solve_tolerance)
         self.max_parallel = supported_workers(max(1, int(hens.max_parallel)))
         self.names = _existing_names(self.arrays.axis_maps, existing)
+        # Each process stream's contribution, by its existing name, each
+        # side apart: a zone may name a hot and a cold stream alike.
+        self.hot_contributions = _side_contributions(
+            self.arrays, self.names, "hot_process_streams", "T_h_cont_period"
+        )
+        self.cold_contributions = _side_contributions(
+            self.arrays, self.names, "cold_process_streams", "T_c_cont_period"
+        )
         # The streams the screens offer new matches and utility units on. A
         # heat pump step's own streams are left out: its step gave them
         # their matches, and a condenser must not heat its evaporator.
@@ -1623,6 +1652,17 @@ def _spanned_processes(
         if name in processes
     }
     return processes if len(spanned) > 1 else None
+
+
+def _side_contributions(arrays, names, axis: str, values: str) -> dict[str, float]:
+    """Each process stream of one side's contribution (K, first period, with
+    the zone's dt_cont multiplier), by the name ``names`` maps it to."""
+
+    # Period-major: the first period's row.
+    return {
+        names.get(str(key), str(key)): float(arrays.arrays[values][0][index])
+        for key, index in arrays.axis_maps[axis].items()
+    }
 
 
 def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]:
