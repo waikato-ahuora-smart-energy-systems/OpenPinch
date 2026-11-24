@@ -812,6 +812,16 @@ Search size
    NLPs (stepwise: ``beam_width * (existing exchangers +
    new_match_candidates)``). ``min_approach_temperature`` (default
    1 K) applies to every exchanger.
+Utility switching
+   ``utility_switch_cost`` (default ``None``: no switches) is the fixed
+   cost of serving an existing heater or cooler by another utility of its
+   kind, for example a heater moved from high-pressure to cheaper
+   low-pressure steam. The unit keeps its installed area; any area it
+   then needs is an area addition of its own. Each unit is switched at
+   most once, and switches get their own ``new_match_candidates`` full
+   solves in the ranking. On a case whose heater on 250 degC steam at
+   $40/MWh can use 150 degC steam at $20/MWh, a $5,000 switch saves
+   $39,840/y where no other change pays.
 Relocation
    ``relocation_cost`` (default ``None``: no relocations) is the fixed cost
    of moving an existing recovery exchanger, plus ``split_cost`` per stream

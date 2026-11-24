@@ -161,7 +161,11 @@ class RetrofitSettings:
     the end of a cold stream of another, an intermediate fluid at one
     temperature whose duties balance in every period. Its two exchangers
     are priced like new exchangers, plus ``heat_recovery_loop_cost`` ($ per
-    loop, for its pump and piping run).
+    loop, for its pump and piping run). ``utility_switch_cost`` ($ per
+    switch) enables utility switches (None: none): each existing heater or
+    cooler, once, served by another utility of its kind, keeping its id,
+    stream and installed area; any area it then needs is an area addition
+    of its own.
 
     ``strategy`` "structure" (the default) makes one structural change per step
     (new match, relocation, paired utility): ``ceiling_candidates`` screened

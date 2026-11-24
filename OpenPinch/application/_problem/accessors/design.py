@@ -1677,6 +1677,7 @@ class _DesignAccessor:
         heat_pump_sizes: Sequence[float] = (1.0, 0.75, 0.5),
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
+        utility_switch_cost: float | None = None,
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
@@ -1740,7 +1741,12 @@ class _DesignAccessor:
         ``ceiling_relocations`` such moves per design (default 400, the best
         scored first) by their ceiling; the stepwise search tries the
         ``relocation_candidates`` with the most heat potential at the match
-        less the unit's present duty. With ``new_utility_units`` each new match and
+        less the unit's present duty. With ``utility_switch_cost`` ($ per
+        switch; None, the default: no switches) a step may serve an existing
+        heater or cooler by another utility of its kind, once, keeping the
+        unit and its installed area (a ``"utility_switch"`` modification;
+        any area it then needs is an area addition of its own).
+        With ``new_utility_units`` each new match and
         relocation is also tried together with a new end heater or cooler on
         a stream that has none, which can free the units a move needs; the
         pair is one modification, costing one more ``new_unit_cost`` and the
@@ -1979,6 +1985,11 @@ class _DesignAccessor:
                         isolated.master_zone.config.hens.retrofit_loops
                     ),
                     heat_recovery_loop_cost=float(heat_recovery_loop_cost),
+                    utility_switch_cost=(
+                        None
+                        if utility_switch_cost is None
+                        else float(utility_switch_cost)
+                    ),
                 ),
             )
         for zone in walk_zone_tree(isolated._master_zone):
