@@ -98,11 +98,17 @@ def with_heat_pump_matches(
     )
 
     def holds(level, process: str, starts, gap, side) -> bool:
+        # Each period both run in: a cooler or heater off in a period has
+        # no start there.
         return all(
             gap(stream, starts[period][process]) >= needed(process, side)
             for period, stream in enumerate(each_period(level))
-            if stream is not None
+            if stream is not None and process in starts[period]
         )
+
+    def candidates(starts) -> list[str]:
+        """Every process stream with a cooler or heater running in a period."""
+        return list(dict.fromkeys(name for each in starts for name in each))
 
     added: list[PlacedMatch] = []
 
@@ -124,7 +130,7 @@ def with_heat_pump_matches(
     for condenser in sorted(condensers, key=_cold_end):
         served = sorted(
             cold
-            for cold in heaters[0]
+            for cold in candidates(heaters)
             if holds(
                 condenser,
                 cold,
@@ -139,7 +145,7 @@ def with_heat_pump_matches(
     for evaporator in sorted(evaporators, key=_hot_end, reverse=True):
         served = sorted(
             hot
-            for hot in coolers[0]
+            for hot in candidates(coolers)
             if holds(
                 evaporator,
                 hot,
@@ -187,9 +193,14 @@ def _starts(
         state = exchanger.period_states[period]
         if cooler:
             name, inlet = exchanger.source_stream, state.source_inlet_temperature
-            starts[name] = max(starts.get(name, -_KELVIN), float(inlet) - _KELVIN)
         else:
             name, inlet = exchanger.sink_stream, state.sink_inlet_temperature
+        if not state.active or inlet is None:
+            # Off in this period: it has no start there.
+            continue
+        if cooler:
+            starts[name] = max(starts.get(name, -_KELVIN), float(inlet) - _KELVIN)
+        else:
             starts[name] = min(starts.get(name, float("inf")), float(inlet) - _KELVIN)
     return starts
 
