@@ -45,3 +45,32 @@ def test_a_site_design_ranks_its_utility_heat_pump_networks_with_the_plain_ones(
     selected = view.selected_network
     assert ranking_cost(selected, selected.total_annual_cost) == min(costs)
     assert not selected.heat_pumps
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_heat_pump_case_the_site_cannot_hold_is_left_out_with_a_warning():
+    # With MPS a hot utility alone the condenser cannot raise it, so the
+    # case is refused; the site is still designed without the heat pump.
+    from OpenPinch import PinchProblem
+
+    source = recovering_two_level_site().to_problem_json()
+    mps = next(u for u in source["utilities"] if u["name"] == "MPS")
+    mps["type"] = "Hot"
+    problem = PinchProblem(source=source, project_name="one sided")
+
+    with pytest.warns(UserWarning, match="No heat pump network.*type Both"):
+        view = problem.design.total_site_heat_exchanger_network(
+            width=0,
+            depth=1,
+            heat_pump={
+                "cycle": "carnot",
+                "load": {"fraction": 1.0},
+                "levels": {"condensers": 1, "evaporators": 1},
+                "search": {"restarts": 0, "evaluations": 50},
+            },
+            heat_pump_cost=300.0,
+        )
+
+    assert not any(o.network.heat_pumps for o in ranked_networks(view.result))

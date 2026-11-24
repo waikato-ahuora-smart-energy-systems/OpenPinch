@@ -134,7 +134,9 @@ Heat exchanger network synthesis
   and load (1.0, 0.75 and 0.5 of the full load unless ``load`` is given),
   with the heat pump's condenser and evaporator as zones of the site, and
   ranks every network by its site cost with the machine's electricity and
-  compressor. A site with several periods is refused. A site network's
+  compressor. A size whose case would not target as the heat pump did (a
+  level it delivers into that only gives heat, for one) is left out with
+  a warning; a site with several periods is refused. A site network's
   heat pump now also joins its ``site_total_annual_cost``, the cost it
   ranks by. On a two-level site a 50-evaluation target (COP 2.65) designs
   to $76,000/y of site cost plus $273,000/y for the machine, against

@@ -17,6 +17,7 @@ from ..contracts.hpr import HprLevels, HprLoad, HPRTargetingError
 from .case_derivation import (
     _case_with_heat_pump_streams,
     _case_with_utility_heat_pump_zones,
+    _require_heat_pump_site_target,
     _require_heat_pump_stream_support,
 )
 
@@ -121,6 +122,9 @@ def heat_pump_design_case(
         case = _case_with_utility_heat_pump_zones(
             problem, target, dt_cont=approach * zone_multiplier, machine=machine
         )
+        # As with_heat_pump_streams does: the case at the design's multiplier
+        # must target as the heat pump did.
+        _require_heat_pump_site_target(_scaled(case, multiplier), target)
     else:
         # The zone multiplier scales the heat pump's streams too.
         case = _case_with_heat_pump_streams(
@@ -241,6 +245,9 @@ def design_with_heat_pump(
             stacklevel=2,
         )
     plain = design(problem)
+    # A site's case is refused when its levels cannot hold the heat pump as
+    # its target assumed: that size is left out, not the site design.
+    refused = (ValueError,) if site else ()
     # A heat pump's size is chosen outside the design: each is its own
     # target and its own networks. Without a load, every size worth trying.
     asked = request.pop("load", None)
@@ -270,9 +277,10 @@ def design_with_heat_pump(
                     **request,
                 )
                 view = design(run.case, multiplier)
-            except (HPRTargetingError, WorkflowContractError) as error:
-                # No target at this multiplier and size, or no network
-                # around its streams.
+            except (HPRTargetingError, WorkflowContractError, *refused) as error:
+                # No target at this multiplier and size, no network around
+                # its streams, or (on a site) a case that would not target
+                # as the heat pump did.
                 warnings.warn(
                     f"No heat pump network at dt_cont multiplier {multiplier:g}"
                     f" and load {load}: {error}",

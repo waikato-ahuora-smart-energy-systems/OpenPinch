@@ -69,3 +69,26 @@ def test_the_exchanger_cap_counts_a_utility_heat_pumps_streams():
     capped = capped_heat_pump_streams(run.case)
 
     assert {key.rsplit(".", 1)[-1] for key in capped} == {"HP_H1", "HP_C1"}
+
+
+def test_a_utility_case_that_would_not_target_as_the_heat_pump_did_is_refused():
+    # MPS is a hot utility alone, so the condenser cannot raise it: the case
+    # would look complete and target wrongly, as with_heat_pump_streams
+    # refuses too.
+    from OpenPinch import PinchProblem
+    from tests.analysis.heat_pumps.two_level_site import two_level_site_source
+
+    source = two_level_site_source()
+    mps = next(u for u in source["utilities"] if u["name"] == "MPS")
+    mps["type"] = "Hot"
+    problem = PinchProblem(source=source, project_name="one sided")
+
+    with pytest.raises(ValueError, match="type Both"):
+        heat_pump_design_case(
+            problem,
+            1.0,
+            placement="utility",
+            load={"fraction": 1.0},
+            levels={"condensers": 1, "evaporators": 1},
+            search=ONE_EVALUATION,
+        )
