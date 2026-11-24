@@ -16,6 +16,7 @@ from ..analysis.heat_exchanger_networks.solver.arrays import heat_pump_stream_ro
 from ..contracts.hpr import HprLevels, HprLoad, HPRTargetingError
 from .case_derivation import (
     _case_with_heat_pump_streams,
+    _case_with_utility_heat_pump_zones,
     _require_heat_pump_stream_support,
 )
 
@@ -56,6 +57,7 @@ def heat_pump_design_case(
     machine: str = "HP",
     cost_per_kw: float = 0.0,
     costing=None,
+    placement: str = "process",
 ) -> HeatPumpDesignCase:
     """The case for a heat pump design at ``multiplier``.
 
@@ -86,7 +88,7 @@ def heat_pump_design_case(
     target = scaled.target.heat_pump_and_refrigeration(
         cycle,
         duty="heat_pump",
-        placement="process",
+        placement=placement,
         load=load,
         levels=levels.model_copy(
             update={
@@ -113,14 +115,19 @@ def heat_pump_design_case(
     if record.load_fraction is None and asked is not None:
         # A shared design over several periods reports no load summary.
         record = record.model_copy(update={"load_fraction": float(asked)})
-    return HeatPumpDesignCase(
-        multiplier=multiplier,
-        target=target,
+    if placement == "utility":
+        # The heat pump's zones of the site; their writer takes the approach
+        # the root's multiplier scales to and writes it over that multiplier.
+        case = _case_with_utility_heat_pump_zones(
+            problem, target, dt_cont=approach * zone_multiplier, machine=machine
+        )
+    else:
         # The zone multiplier scales the heat pump's streams too.
-        case=_case_with_heat_pump_streams(
+        case = _case_with_heat_pump_streams(
             problem, target, dt_cont=approach, machine=machine
-        ),
-        record=record,
+        )
+    return HeatPumpDesignCase(
+        multiplier=multiplier, target=target, case=case, record=record
     )
 
 
