@@ -45,7 +45,8 @@ def test_a_condenser_stands_off_a_heater_by_its_stream_contribution():
         config=config,
         settings=RetrofitSettings(approach=None),
         names={},
-        contributions={"H1": 1.0, "H2": 1.0, "C2": 5.0},
+        hot_contributions={"H1": 1.0, "H2": 1.0},
+        cold_contributions={"C2": 5.0},
     )
 
     with pytest.raises(ValueError, match="'HP_H1'.*contribution plus 1 K"):

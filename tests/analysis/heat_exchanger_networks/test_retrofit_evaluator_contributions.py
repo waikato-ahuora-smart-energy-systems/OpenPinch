@@ -30,7 +30,6 @@ def test_the_evaluator_maps_each_stream_to_its_contribution():
 
     evaluator = _Evaluator(problem, existing, RetrofitSettings(approach=None))
 
-    assert evaluator.contributions == {
-        "H1": pytest.approx(10.0),
-        "C1": pytest.approx(10.0),
-    }
+    # Hot and cold streams apart: a zone may name one of each alike.
+    assert evaluator.hot_contributions == {"H1": pytest.approx(10.0)}
+    assert evaluator.cold_contributions == {"C1": pytest.approx(10.0)}

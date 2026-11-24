@@ -49,7 +49,36 @@ def test_an_evaporator_stands_off_a_cooler_by_its_stream_contribution():
         config=config,
         settings=RetrofitSettings(approach=None),
         names={},
-        contributions={"H1": 10.0, "H2": 1.0, "C2": 1.0},
+        hot_contributions={"H1": 10.0, "H2": 1.0},
+        cold_contributions={"C2": 1.0},
+    )
+
+    state = _heat_pump_root(network, step, evaluator)
+
+    served = sorted(m.match.hot for m in state.moves if m.match.cold == "HP_C1")
+    assert served == ["H2"]
+
+
+def test_a_cold_stream_of_the_same_name_does_not_lend_its_contribution():
+    # A zone's hot and cold streams are named apart: a cold H1 at 1 K
+    # must not stand in for the hot H1's 10 K, as it did when the
+    # evaluator mapped both sides by name alone.
+    config = Configuration()
+    config.update_values(THERMAL_DT_CONT=1.0, HPR_DT_CONT=1.0)
+    network = _solved_network()
+    step = HeatPumpStep(
+        record=SimpleNamespace(machine="HP"),
+        condensers=(),
+        evaporators=(_stream("HP_C1", 129.99, 130.0),),
+        ambient_sources=(),
+        base=SimpleNamespace(network=network),
+    )
+    evaluator = SimpleNamespace(
+        config=config,
+        settings=RetrofitSettings(approach=None),
+        names={},
+        hot_contributions={"H1": 10.0, "H2": 1.0},
+        cold_contributions={"H1": 1.0, "C2": 1.0},
     )
 
     state = _heat_pump_root(network, step, evaluator)
