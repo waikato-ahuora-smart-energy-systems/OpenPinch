@@ -44,3 +44,27 @@ def test_each_period_is_a_case_at_its_own_sinks_load(monkeypatch):
     assert [case.solver_case.args.Q_hpr_target for case in cases] == pytest.approx(
         [120.0, 150.0]
     )
+
+
+def test_a_period_without_load_runs_no_machine_and_keeps_its_share(monkeypatch):
+    # As for a zone's shared design: a period with no sink is no case, and
+    # its weight still counts in the weighted operation.
+    captured = {}
+
+    def solve(**kwargs):
+        captured.update(kwargs)
+        return "target"
+
+    monkeypatch.setattr(service, "get_multiperiod_hpr_targets", solve)
+    idle = (T_VALS, np.array([0.0, 0.0, -60.0]), np.zeros(3))
+
+    service.compute_shared_profile_heat_pump_target(
+        profiles={"base": idle, "peak": PROFILES["peak"]},
+        period_ids={"base": 0, "peak": 1},
+        weights={"base": 0.25, "peak": 0.75},
+        config=Configuration(),
+    )
+
+    assert [case.period_id for case in captured["period_cases"]] == ["peak"]
+    assert captured["selected_period_id"] == "peak"
+    assert captured["idle_period_weight"] == pytest.approx(0.25)

@@ -165,6 +165,7 @@ def compute_shared_profile_heat_pump_target(
     """
 
     cases = []
+    idle = 0.0
     for period_id, (T_vals, H_hot, H_cold) in profiles.items():
         index = int(period_ids[period_id])
         load = resolve_hpr_target_load(
@@ -175,6 +176,11 @@ def compute_shared_profile_heat_pump_target(
             period_id=period_id,
             period_idx=index,
         )
+        if load < tol:
+            # No machine runs in the period, as a zone's shared design
+            # leaves it out; its weight still counts.
+            idle += float(weights[period_id])
+            continue
         case = HPRPeriodCase(
             period_id=period_id,
             period_idx=index,
@@ -204,6 +210,7 @@ def compute_shared_profile_heat_pump_target(
         period_cases=cases,
         selected_period_id=cases[0].period_id,
         selected_period_idx=cases[0].period_idx,
+        idle_period_weight=idle,
     )
 
 
