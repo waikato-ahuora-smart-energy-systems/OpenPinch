@@ -518,7 +518,11 @@ def _children(parent: _Evaluated, settings: RetrofitSettings, evaluator):
             )
     for network, move in _structural_steps(parent, settings, evaluator):
         yield replace(state, network=network, moves=state.moves + (move,))
-        if not settings.new_utility_units or move.kind in _UTILITY_PAIRS:
+        # A switch is one change of its own, as a utility pair is.
+        if not settings.new_utility_units or move.kind in (
+            *_UTILITY_PAIRS,
+            "utility_switch",
+        ):
             continue
         for utility in new_utility_candidates(network, **evaluator.utility_axes):
             utility_id = _new_utility_id(network, utility)

@@ -1537,3 +1537,33 @@ def test_a_heater_may_switch_to_another_hot_utility(fake_solver):
         # name, as a new end heater's does.
         ("E7", "Hot Utility.LP", "C2", 5_000.0, 0.0)
     ]
+
+
+def test_a_utility_switch_takes_no_new_end_utility_with_it(fake_solver):
+    """A switch is one change: ``new_utility_units`` pairs new end heaters
+    and coolers with new matches and relocations only. With no new match
+    or relocation screened, it adds no design to a search of switches."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    data = json.loads(read_sample_case(CASE))
+    hu = next(u for u in data["utilities"] if u["name"] == "HU")
+    data["utilities"].append(hu | {"name": "LP"})
+
+    def evaluated(new_utility_units: bool) -> int:
+        return run_retrofit_search(
+            PinchProblem(data),
+            _existing_network(),
+            RetrofitSettings(
+                max_modifications=1,
+                ceiling_candidates=0,
+                new_match_candidates=8,
+                utility_switch_cost=5_000.0,
+                new_utility_units=new_utility_units,
+                **COSTS,
+            ),
+        ).evaluated_designs
+
+    assert evaluated(True) == evaluated(False)
