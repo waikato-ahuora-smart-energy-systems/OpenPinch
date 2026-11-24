@@ -51,11 +51,12 @@ def with_heat_pump_matches(
     *,
     condensers,
     evaporators,
-    approach: float | Mapping[str, float],
+    approach: float,
     machine: str = "HP",
     solved: HeatExchangerNetwork | None = None,
     ambient_sources=(),
     ambient_approach: float | None = None,
+    process_approaches: Mapping[str, float] | None = None,
 ) -> tuple[HeatExchangerNetwork, tuple[PlacedMatch, ...]]:
     """``network`` with the matches that serve a heat pump's streams, and
     the ids of the exchangers added.
@@ -70,11 +71,13 @@ def with_heat_pump_matches(
     heater starts at least ``approach`` K below the condenser's cold end,
     in a new stage ahead of the network's first, so the hottest condenser
     ends at stage 1. A stream no cooler or heater can serve gets no match.
-    ``approach`` may instead map each process stream to its own approach.
+    ``process_approaches`` maps a cooled stream to its own approach in
+    place of ``approach``.
     """
 
     def needed(process: str) -> float:
-        return float(approach[process]) if isinstance(approach, Mapping) else approach
+        own = process_approaches or {}
+        return float(own.get(process, approach))
 
     coolers = _starts(solved or network, HeatExchangerKind.COLD_UTILITY)
     heaters = _starts(solved or network, HeatExchangerKind.HOT_UTILITY)
@@ -99,7 +102,7 @@ def with_heat_pump_matches(
         served = sorted(
             cold
             for cold, start in heaters.items()
-            if _cold_end(condenser) - start >= approach
+            if _cold_end(condenser) - start >= needed(cold)
         )
         for position, cold in enumerate(served):
             add(condenser.name, cold, 1, position == 0)

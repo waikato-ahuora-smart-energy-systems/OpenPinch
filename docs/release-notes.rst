@@ -127,6 +127,14 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A retrofit without ``min_approach_temperature`` places each match that
+  serves a heat pump at its process stream's own contribution (its
+  ``dt_cont`` with the zone's multiplier) plus ``HPR_DT_CONT``. Every
+  match was placed at ``THERMAL_DT_CONT`` plus ``HPR_DT_CONT``, so a
+  stream with a larger contribution got a match its solve then had to
+  refuse, and one with a smaller contribution missed matches it could
+  take. The refusal of a heat pump stream nothing can serve names that
+  rule.
 - A retrofit heat pump's air source keeps its own contribution under a
   zone dt_cont multiplier. The retrofit wrote the air into the case at the
   contribution the target stood it off by, and the zone then scaled it

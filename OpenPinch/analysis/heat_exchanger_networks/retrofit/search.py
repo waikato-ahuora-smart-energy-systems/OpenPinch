@@ -409,18 +409,23 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
 
     The matches are placed from the base design's solved coolers and
     heaters. A match stands off by the search's approach, or with none by
-    the case's process contribution and the heat pump's own.
+    its process stream's own contribution and the heat pump's.
     """
 
     config = evaluator.config
-    # Each process stream's own contribution and the heat pump's.
     approach = (
+        float(config.thermal.dt_cont) + float(config.hpr.dt_cont)
+        if evaluator.settings.approach is None
+        else float(evaluator.settings.approach)
+    )
+    # Each process stream's own contribution and the heat pump's.
+    process_approaches = (
         {
             name: float(contribution) + float(config.hpr.dt_cont)
             for name, contribution in evaluator.contributions.items()
         }
         if evaluator.settings.approach is None
-        else float(evaluator.settings.approach)
+        else None
     )
     # Air carries the ambient contribution, not a process stream's.
     ambient_approach = (
@@ -439,24 +444,30 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
         solved=_with_names(step.base.network, evaluator.names),
         ambient_sources=step.ambient_sources,
         ambient_approach=ambient_approach,
+        process_approaches=process_approaches,
     )
     matched = {
         name for placed in added for name in (placed.match.hot, placed.match.cold)
     }
+    held = (
+        f"{approach:g} K"
+        if process_approaches is None
+        else f"each stream's contribution plus {float(config.hpr.dt_cont):g} K"
+    )
     for streams, what, gap in (
-        (step.condensers, "no heater starts cold enough for the condenser", approach),
-        (step.evaporators, "no cooler starts hot enough for the evaporator", approach),
+        (step.condensers, "no heater starts cold enough for the condenser", held),
+        (step.evaporators, "no cooler starts hot enough for the evaporator", held),
         (
             step.ambient_sources,
             "no evaporator is colder than the ambient source",
-            ambient_approach,
+            f"{ambient_approach:g} K",
         ),
     ):
         for stream in streams:
             if stream.name not in matched:
                 raise ValueError(
                     f"{what} {stream.name!r} of heat pump "
-                    f"{step.record.machine!r} at an approach of {gap:g} K, "
+                    f"{step.record.machine!r} at an approach of {gap}, "
                     "so nothing in the existing network can serve it."
                 )
     # The heat pump's streams are new: only the process stream of each
