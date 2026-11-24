@@ -874,10 +874,10 @@ Repiping
    exchanger keeps its id, so it can also take added area, which makes a
    move to a match that needs a bigger unit a resized reassignment.
 Heat pumps
-   ``heat_pump_cycle`` lets a step add a heat pump. With ``"carnot"`` that
-   is by default the as-piped machine added as streams (next paragraph);
-   with ``heat_pump_streams=False``, and always with
-   ``"vapour_compression"``, it is the linked heat pump described here: a
+   ``heat_pump_cycle`` lets a step add a heat pump. With ``"carnot"`` or
+   ``"vapour_compression"`` that is by default the as-piped machine added
+   as streams (next paragraph); with ``heat_pump_streams=False`` it is the
+   linked heat pump described here: a
    heat pump between two streams, as
    Bütün et al. (2018) retrofit heat pumping with the network: an
    evaporator at the end of a hot stream, evaporating
@@ -909,15 +909,22 @@ Heat pumps
 The as-piped heat pump as streams
    The linked heat pump is one evaporator linked to one condenser, each at
    the end of its stream, so it lifts through the whole range the cooler
-   and the heater cover. With ``heat_pump_cycle="carnot"`` the retrofit
-   instead tries, by default, the machine the
+   and the heater cover. With ``heat_pump_cycle="carnot"`` or
+   ``"vapour_compression"`` the retrofit instead tries, by default, the
+   machine the
    as-piped target of ``design.retrofit_heat_pumps`` describes, which
    places several condensers along the heaters' temperatures and several
    evaporators along the coolers'. Its condensers and evaporators join
    the case as streams of fixed duty and a second search starts from the
    existing network with the matches that serve them. The step is one
    ``heat_pump`` modification (the compressor at ``heat_pump_cost`` per kW
-   of condenser capacity) and one new match per exchanger; the electricity
+   of condenser capacity; a vapour compression machine at the HPR
+   service's installed capital without its process and air exchangers)
+   and one new match per exchanger; a vapour compression condenser is one
+   stream with its desuperheating, condensing and subcooling segments,
+   and the zone's ``HPR_N_COND`` and ``HPR_N_EVAP`` levels set the
+   cascade (on a low-temperature case two and one found an 858 kW machine
+   netting $181,000/y where the default three and two found none); the electricity
    is in the design's utility cost and the network records the machine in
    ``heat_pumps``. The machine is tried at each of ``heat_pump_sizes``,
    shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
