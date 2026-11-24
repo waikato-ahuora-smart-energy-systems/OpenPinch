@@ -98,12 +98,17 @@ def with_heat_pump_matches(
     )
 
     def holds(level, process: str, starts, gap, side) -> bool:
-        # Each period both run in: a cooler or heater off in a period has
-        # no start there.
-        return all(
-            gap(stream, starts[period][process]) >= needed(process, side)
+        # Each period both run in (a cooler or heater off in a period has
+        # no start there), and there must be one: a match that never runs
+        # carries no duty.
+        together = [
+            (period, stream)
             for period, stream in enumerate(each_period(level))
             if stream is not None and process in starts[period]
+        ]
+        return bool(together) and all(
+            gap(stream, starts[period][process]) >= needed(process, side)
+            for period, stream in together
         )
 
     def candidates(starts) -> list[str]:
