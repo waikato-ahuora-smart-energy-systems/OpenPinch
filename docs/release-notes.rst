@@ -127,6 +127,18 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Breaking: the retrofit search's linked heat pump move is retired. A
+  heat pump enters a retrofit only as streams: ``design.retrofit`` with
+  ``heat_pump_cycle="carnot"`` or ``"vapour_compression"`` always runs the
+  as-piped stream step, and its ``heat_pump_streams`` and
+  ``heat_pump_max_lift`` keywords are gone (passing either raises
+  ``TypeError``). ``run_retrofit_search`` refuses a
+  ``RetrofitSettings.heat_pump_cycle``, and
+  ``RetrofitSettings.heat_pump_max_lift``, ``FixedStructureSpec.heat_pumps``
+  and ``retrofit/heat_pumps.py`` are removed. The stream step netted
+  $2.81M/y on the guide's case where the linked move netted $1.23M/y,
+  and found a machine on a low-temperature case where the linked move
+  found none.
 - ``design.retrofit(utility_switch_cost=...)`` lets the search serve an
   existing heater or cooler by another utility of its kind (a
   ``"utility_switch"`` modification), keeping the unit and its installed
