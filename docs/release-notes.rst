@@ -127,6 +127,12 @@ Zones and targeting
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.retrofit(utility_switch_cost=...)`` lets the search serve an
+  existing heater or cooler by another utility of its kind (a
+  ``"utility_switch"`` modification), keeping the unit and its installed
+  area; any area it then needs is an area addition. On a case whose heater
+  on 250 degC steam at $40/MWh can use 150 degC steam at $20/MWh, a
+  $5,000 switch nets $39,368/y where no other change pays. Off by default.
 - A retrofit without ``min_approach_temperature`` places each match that
   serves a heat pump at its process stream's own contribution (its
   ``dt_cont`` with the zone's multiplier) plus ``HPR_DT_CONT``. Every

@@ -1767,3 +1767,83 @@ def test_a_single_process_retrofit_proposes_no_heat_recovery_loop(fake_solver):
         for design in result.frontier
         for m in design.modifications
     )
+
+
+def test_a_heater_may_switch_to_another_hot_utility(fake_solver):
+    """With a ``utility_switch_cost`` the search offers each existing heater
+    the case's other hot utilities: E7 on HU may move to LP, priced at the
+    switch cost, with no area and no repiping of its process stream."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    data = json.loads(read_sample_case(CASE))
+    hu = next(u for u in data["utilities"] if u["name"] == "HU")
+    data["utilities"].append(
+        hu
+        | {
+            "name": "LP",
+            "t_supply": {"unit": "degC", "value": 300.0},
+            "t_target": {"unit": "degC", "value": 299.0},
+            "price": {"unit": "$/MWh", "value": 20.0},
+        }
+    )
+
+    result = run_retrofit_search(
+        PinchProblem(data),
+        _existing_network(),
+        RetrofitSettings(
+            max_modifications=1,
+            # No new matches screened; one change of each kind solved.
+            ceiling_candidates=0,
+            new_match_candidates=1,
+            utility_switch_cost=5_000.0,
+            **COSTS,
+        ),
+    )
+
+    switches = [
+        m
+        for d in result.frontier
+        for m in d.modifications
+        if m.kind == "utility_switch"
+    ]
+    assert [
+        (m.exchanger_id, m.hot_stream, m.cold_stream, m.fixed_cost, m.added_area)
+        for m in switches
+    ] == [
+        # A utility the existing network does not name keeps its solver
+        # name, as a new end heater's does.
+        ("E7", "Hot Utility.LP", "C2", 5_000.0, 0.0)
+    ]
+
+
+def test_a_utility_switch_takes_no_new_end_utility_with_it(fake_solver):
+    """A switch is one change: ``new_utility_units`` pairs new end heaters
+    and coolers with new matches and relocations only. With no new match
+    or relocation screened, it adds no design to a search of switches."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    data = json.loads(read_sample_case(CASE))
+    hu = next(u for u in data["utilities"] if u["name"] == "HU")
+    data["utilities"].append(hu | {"name": "LP"})
+
+    def evaluated(new_utility_units: bool) -> int:
+        return run_retrofit_search(
+            PinchProblem(data),
+            _existing_network(),
+            RetrofitSettings(
+                max_modifications=1,
+                ceiling_candidates=0,
+                new_match_candidates=8,
+                utility_switch_cost=5_000.0,
+                new_utility_units=new_utility_units,
+                **COSTS,
+            ),
+        ).evaluated_designs
+
+    assert evaluated(True) == evaluated(False)

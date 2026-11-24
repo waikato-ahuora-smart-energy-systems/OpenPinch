@@ -36,7 +36,11 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
     stream and loop heater ``utility_exchanger_id`` (``utility_area``) on
     the cold one, at ``loop_temperature`` (degC), carrying ``loop_duty``
     (its largest duty, kW); ``fixed_cost`` holds its two new units, the
-    loop's pump and piping and the repiping.
+    loop's pump and piping and the repiping. ``"utility_switch"`` is
+    existing heater or cooler ``exchanger_id`` served by another utility,
+    ``hot_stream`` and ``cold_stream`` naming the utility and the stream it
+    then joins; ``fixed_cost`` holds the switch, and any area it gains is
+    an ``"area_addition"`` of its own.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -48,6 +52,7 @@ class HeatExchangerNetworkRetrofitModification(BaseModel):
         "enhancement",
         "heat_pump",
         "heat_recovery_loop",
+        "utility_switch",
     ]
     exchanger_id: str
     added_area: float = 0.0
