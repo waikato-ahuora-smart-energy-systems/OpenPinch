@@ -140,7 +140,11 @@ Heat exchanger network synthesis
   and load (1.0, 0.75 and 0.5 of the full load unless ``load`` is given),
   with the heat pump's condenser and evaporator as zones of the site, and
   ranks every network by its site cost with the machine's electricity and
-  compressor. A size whose case would not target as the heat pump did (a
+  compressor. Unless ``levels`` gives ``minimum_approach_temperature`` the
+  machine is also tried at ``HPR_DT_CONT`` times 1, 5 and 10 off the
+  levels: on the two-level site a fully searched machine 1 K off the steam
+  needed 2,804 m2 of exchangers and lost to the plain site ($330,740/y
+  against $315,299/y), while 5 K (572 m2) won at $259,717/y. A size whose case would not target as the heat pump did (a
   level it delivers into that only gives heat, for one) is left out with
   a warning; a site with several periods is refused. A site network's
   heat pump now also joins its ``site_total_annual_cost``, the cost it

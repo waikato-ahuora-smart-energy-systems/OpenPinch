@@ -175,6 +175,11 @@ def heat_pump_request(heat_pump) -> dict[str, Any]:
 # The shares of its full load a utility heat pump is tried at without a
 # load, as a retrofit tries its heat pump sizes.
 _UTILITY_LOADS = (1.0, 0.75, 0.5)
+# The approaches, in multiples of HPR_DT_CONT, a utility heat pump is tried
+# at without one given: on a two-level site the machine stood 1 K off the
+# steam needed 2,804 m2 of exchangers and lost to the plain site, where 5 K
+# (572 m2) won by $55,600/y.
+_UTILITY_APPROACH_FACTORS = (1.0, 5.0, 10.0)
 
 
 def _load_fractions(problem) -> list[float]:
@@ -251,6 +256,16 @@ def design_with_heat_pump(
     # A heat pump's size is chosen outside the design: each is its own
     # target and its own networks. Without a load, every size worth trying.
     asked = request.pop("load", None)
+    levels = HprLevels.model_validate(request.pop("levels", None) or {})
+    if site and levels.minimum_approach_temperature is None:
+        # A machine stood HPR_DT_CONT off the levels needs large
+        # exchangers; a wider approach costs COP. The ranking chooses.
+        options = request.get("options") or {}
+        root = problem._require_prepared_root_zone()
+        base = float(options.get("HPR_DT_CONT", root.config.hpr.dt_cont))
+        approaches = [factor * base for factor in _UTILITY_APPROACH_FACTORS]
+    else:
+        approaches = [levels.minimum_approach_temperature]
     runs = []
     for multiplier in multipliers:
         # The kinks of the profile as the design at this multiplier sees it:
@@ -266,29 +281,33 @@ def design_with_heat_pump(
                 for fraction in _load_fractions(_scaled(problem, multiplier))
             ]
         for load in loads:
-            try:
-                run = heat_pump_design_case(
-                    problem,
-                    multiplier,
-                    load=load,
-                    cost_per_kw=cost_per_kw,
-                    costing=costing,
-                    placement=placement,
-                    **request,
-                )
-                view = design(run.case, multiplier)
-            except (HPRTargetingError, WorkflowContractError, *refused) as error:
-                # No target at this multiplier and size, no network around
-                # its streams, or (on a site) a case that would not target
-                # as the heat pump did.
-                warnings.warn(
-                    f"No heat pump network at dt_cont multiplier {multiplier:g}"
-                    f" and load {load}: {error}",
-                    UserWarning,
-                    stacklevel=2,
-                )
-                continue
-            runs.append((run, view))
+            for approach in approaches:
+                try:
+                    run = heat_pump_design_case(
+                        problem,
+                        multiplier,
+                        load=load,
+                        levels=levels.model_copy(
+                            update={"minimum_approach_temperature": approach}
+                        ),
+                        cost_per_kw=cost_per_kw,
+                        costing=costing,
+                        placement=placement,
+                        **request,
+                    )
+                    view = design(run.case, multiplier)
+                except (HPRTargetingError, WorkflowContractError, *refused) as error:
+                    # No target at this multiplier and size, no network
+                    # around its streams, or (on a site) a case that would
+                    # not target as the heat pump did.
+                    warnings.warn(
+                        f"No heat pump network at dt_cont multiplier "
+                        f"{multiplier:g} and load {load}: {error}",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                    continue
+                runs.append((run, view))
     return heat_pump_design_view(problem, plain, runs, max_exchangers=max_exchangers)
 
 
