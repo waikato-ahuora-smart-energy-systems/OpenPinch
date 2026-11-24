@@ -413,8 +413,12 @@ def _heat_pump_root(existing: HeatExchangerNetwork, step, evaluator) -> _State:
     """
 
     config = evaluator.config
+    # Each process stream's own contribution and the heat pump's.
     approach = (
-        float(config.thermal.dt_cont) + float(config.hpr.dt_cont)
+        {
+            name: float(contribution) + float(config.hpr.dt_cont)
+            for name, contribution in evaluator.contributions.items()
+        }
         if evaluator.settings.approach is None
         else float(evaluator.settings.approach)
     )
@@ -900,6 +904,8 @@ class _Evaluator:
         self.tol = float(hens.solve_tolerance)
         self.max_parallel = supported_workers(max(1, int(hens.max_parallel)))
         self.names = _existing_names(self.arrays.axis_maps, existing)
+        # Each process stream's contribution, by its existing name.
+        self.contributions = _stream_contributions(self.arrays, self.names)
         # The streams the screens offer new matches and utility units on. A
         # heat pump step's own streams are left out: its step gave them
         # their matches, and a condenser must not heat its evaporator.
@@ -1623,6 +1629,22 @@ def _spanned_processes(
         if name in processes
     }
     return processes if len(spanned) > 1 else None
+
+
+def _stream_contributions(arrays, names) -> dict[str, float]:
+    """Each process stream's contribution (K, first period, with the zone's
+    dt_cont multiplier), by the name ``names`` maps its solver name to."""
+
+    contributions: dict[str, float] = {}
+    for axis, values in (
+        ("hot_process_streams", "T_h_cont_period"),
+        ("cold_process_streams", "T_c_cont_period"),
+    ):
+        for key, index in arrays.axis_maps[axis].items():
+            name = names.get(str(key), str(key))
+            # Period-major: the first period's row.
+            contributions[name] = float(arrays.arrays[values][0][index])
+    return contributions
 
 
 def _existing_names(axis_maps, existing: HeatExchangerNetwork) -> dict[str, str]:

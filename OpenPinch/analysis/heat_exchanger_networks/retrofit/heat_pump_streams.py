@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitDesign
@@ -50,7 +51,7 @@ def with_heat_pump_matches(
     *,
     condensers,
     evaporators,
-    approach: float,
+    approach: float | Mapping[str, float],
     machine: str = "HP",
     solved: HeatExchangerNetwork | None = None,
     ambient_sources=(),
@@ -69,7 +70,11 @@ def with_heat_pump_matches(
     heater starts at least ``approach`` K below the condenser's cold end,
     in a new stage ahead of the network's first, so the hottest condenser
     ends at stage 1. A stream no cooler or heater can serve gets no match.
+    ``approach`` may instead map each process stream to its own approach.
     """
+
+    def needed(process: str) -> float:
+        return float(approach[process]) if isinstance(approach, Mapping) else approach
 
     coolers = _starts(solved or network, HeatExchangerKind.COLD_UTILITY)
     heaters = _starts(solved or network, HeatExchangerKind.HOT_UTILITY)
@@ -103,7 +108,7 @@ def with_heat_pump_matches(
         served = sorted(
             hot
             for hot, start in coolers.items()
-            if start - _hot_end(evaporator) >= approach
+            if start - _hot_end(evaporator) >= needed(hot)
         )
         stage = stage_count(network) + 1
         for position, hot in enumerate(served):

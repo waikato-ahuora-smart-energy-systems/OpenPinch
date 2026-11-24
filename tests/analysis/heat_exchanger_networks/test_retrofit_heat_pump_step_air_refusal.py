@@ -44,7 +44,11 @@ def test_the_refusal_quotes_the_airs_approach():
         base=SimpleNamespace(network=network),
     )
     evaluator = SimpleNamespace(
-        config=config, settings=RetrofitSettings(approach=None), names={}
+        config=config,
+        settings=RetrofitSettings(approach=None),
+        names={},
+        # Each process stream at THERMAL_DT_CONT.
+        contributions={"H1": 5.0, "H2": 5.0, "C2": 5.0},
     )
 
     with pytest.raises(ValueError, match="'AIR_H1'.*approach of 11 K"):
