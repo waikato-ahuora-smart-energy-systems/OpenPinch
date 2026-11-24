@@ -41,3 +41,12 @@ def test_the_zones_write_each_heat_pump_stream_in_every_period():
     }
     assert len(records["HP_H1"]["heat_flow"].get("values", ())) == 2
     assert len(records["HP_C1"]["t_supply"].get("values", ())) == 2
+
+
+def test_with_heat_pump_streams_takes_a_shared_design_on_a_site_of_periods():
+    problem = PinchProblem(source=two_level_site_source(PERIODS), project_name="periods")
+
+    case = problem.with_heat_pump_streams(_shared_target(problem))
+
+    zones = {child["name"] for child in case.to_problem_json()["zone_tree"]["children"]}
+    assert {"HP condenser", "HP evaporator"} <= zones

@@ -276,12 +276,8 @@ def with_heat_pump_streams(
                 "gets zones of its own under the zone it was targeted on; "
                 "drop zone=."
             )
-        if len(problem.period_ids) > 1:
-            raise ValueError(
-                "The zones of a heat pump on the utility system are not built "
-                f"for a problem with {len(problem.period_ids)} periods yet; "
-                "derive a single-period case and target the heat pump on it."
-            )
+        # Several periods take a shared design, its streams in each period.
+        _require_heat_pump_stream_support(problem, target)
         case = _case_with_utility_heat_pump_zones(
             problem,
             target,
