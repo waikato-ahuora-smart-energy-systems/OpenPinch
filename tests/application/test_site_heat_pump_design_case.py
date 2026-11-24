@@ -50,3 +50,22 @@ def test_a_site_design_with_several_periods_and_a_heat_pump_is_refused():
 
     with pytest.raises(ValueError, match="utility heat pump.*2 periods"):
         problem.design.total_site_heat_exchanger_network(heat_pump="carnot")
+
+
+def test_the_exchanger_cap_counts_a_utility_heat_pumps_streams():
+    # HENS_HEAT_PUMP_STREAM_EXCHANGERS caps the exchangers on a heat pump's
+    # condensers and evaporators wherever the machine is placed.
+    from OpenPinch.application.heat_pump_design import capped_heat_pump_streams
+
+    run = heat_pump_design_case(
+        recovering_two_level_site(),
+        1.0,
+        placement="utility",
+        load={"fraction": 1.0},
+        levels={"condensers": 1, "evaporators": 1},
+        search=ONE_EVALUATION,
+    )
+
+    capped = capped_heat_pump_streams(run.case)
+
+    assert {key.rsplit(".", 1)[-1] for key in capped} == {"HP_H1", "HP_C1"}

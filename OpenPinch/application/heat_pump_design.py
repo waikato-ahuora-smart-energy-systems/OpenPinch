@@ -289,11 +289,12 @@ def capped_heat_pump_streams(case) -> set[str]:
     the condensers and evaporators of ``case``, as its networks name them.
 
     An ambient source is not capped: one air stream can feed several
-    evaporators.
+    evaporators. A machine on the utility system is capped as one on the
+    process is.
     """
     return {
         key
-        for key, role in heat_pump_stream_roles(case).items()
+        for key, role in heat_pump_stream_roles(case, ("process", "utility")).items()
         if role in ("condenser", "evaporator")
     }
 
