@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 
 import numpy as np
 
 from ...analysis.numerics import get_period_index
 from ...analysis.targeting.cascade import create_problem_table_with_t_int
-from ...contracts.hpr import HeatPumpTargetOutputs, HPRSearchBudget
+from ...contracts.hpr import HeatPumpTargetOutputs, HPRPeriodCase, HPRSearchBudget
 from ...domain.configuration import Configuration, tol
 from ...domain.enums import (
     GraphType,
@@ -35,6 +36,7 @@ from ._multiperiod.preparation import (
     period_case_by_id,
     period_id_for_index,
 )
+from ._multiperiod.state import _PreparedHPRPeriodCase
 from .common.load_selection import resolve_hpr_target_load
 from .common.postprocessing import _get_hpr_residual_utility_summary
 from .common.preprocessing import (
@@ -50,6 +52,8 @@ from .performance_maps.targeting import (
 __all__ = [
     "compute_direct_heat_pump_or_refrigeration_target",
     "compute_indirect_heat_pump_or_refrigeration_target",
+    "compute_profile_heat_pump_target",
+    "compute_shared_profile_heat_pump_target",
 ]
 
 
@@ -100,6 +104,120 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
 
 
+def compute_profile_heat_pump_target(
+    *,
+    T_vals: np.ndarray,
+    H_hot: np.ndarray,
+    H_cold: np.ndarray,
+    config: Configuration,
+    args: dict | None = None,
+    period_id: str | None = None,
+    period_idx: int | None = None,
+) -> HeatPumpTargetOutputs | None:
+    """Target a heat pump that takes heat only from the source profile
+    ``H_hot`` and delivers it only to the sink profile ``H_cold``, with no
+    heat recovery between them; ``None`` when the load is below ``tol``.
+
+    The profiles are cumulative duties on the shifted temperatures
+    ``T_vals`` (hottest first), as a problem table's ``H(net-hot)`` and
+    ``H(net-cold)`` columns. The load is the sink's duty capped by
+    ``config``'s HPR load (a period-valued load at ``period_id`` or
+    ``period_idx``); ``args`` takes the search budget keys
+    (``maximum_iterations``, ``maximum_evaluations``).
+    """
+
+    load = resolve_hpr_target_load(
+        H_net_cold=H_cold,
+        H_net_hot=H_hot,
+        is_heat_pumping=True,
+        config=config,
+        period_id=period_id,
+        period_idx=period_idx,
+    )
+    if load < tol:
+        return None
+    return _get_hpr_targets(
+        Q_hpr_target=load,
+        T_vals=T_vals,
+        H_hot=H_hot,
+        H_cold=H_cold,
+        config=config,
+        is_heat_pumping=True,
+        search_budget=_hpr_search_budget(args),
+        background_is_utility=False,
+    )
+
+
+def compute_shared_profile_heat_pump_target(
+    *,
+    profiles: Mapping[str, tuple[np.ndarray, np.ndarray, np.ndarray]],
+    period_ids: Mapping[str, int],
+    weights: Mapping[str, float],
+    config: Configuration,
+    args: dict | None = None,
+) -> HeatPumpTargetOutputs | None:
+    """``compute_profile_heat_pump_target`` designed once for several
+    periods, each with its own ``profiles`` (by period id).
+
+    The profiles lie on one temperature grid. Each period's load is its
+    sink's, capped by ``config``'s HPR load in that period, and counts by
+    its share of ``weights``; ``period_ids`` gives each period's index. A
+    period whose load is below ``tol`` runs no machine and keeps its share;
+    with no load in any period there is no target (``None``).
+    """
+
+    cases = []
+    idle = 0.0
+    for period_id, (T_vals, H_hot, H_cold) in profiles.items():
+        index = int(period_ids[period_id])
+        load = resolve_hpr_target_load(
+            H_net_cold=H_cold,
+            H_net_hot=H_hot,
+            is_heat_pumping=True,
+            config=config,
+            period_id=period_id,
+            period_idx=index,
+        )
+        if load < tol:
+            # No machine runs in the period, as a zone's shared design
+            # leaves it out; its weight still counts.
+            idle += float(weights[period_id])
+            continue
+        case = HPRPeriodCase(
+            period_id=period_id,
+            period_idx=index,
+            weight=float(weights[period_id]),
+            args=construct_HPRTargetInputs(
+                Q_hpr_target=load,
+                T_vals=T_vals,
+                H_hot=np.abs(H_hot) * -1,
+                H_cold=np.abs(H_cold),
+                is_heat_pumping=True,
+                config=config,
+                period_idx=index,
+                search_budget=_hpr_search_budget(args),
+            ),
+        )
+        cases.append(
+            _PreparedHPRPeriodCase(
+                period_id=period_id,
+                period_idx=index,
+                weight=case.weight,
+                solver_case=case,
+                base_target=None,
+                optimizer_pt=None,
+            )
+        )
+    if not cases:
+        return None
+    return get_multiperiod_hpr_targets(
+        period_cases=cases,
+        selected_period_id=cases[0].period_id,
+        selected_period_idx=cases[0].period_idx,
+        idle_period_weight=idle,
+    )
+
+
 ################################################################################
 # Helper functions API
 ################################################################################
@@ -131,10 +249,15 @@ def _compute_single_period_hpr_target(
     if is_direct:
         pt_target = pt
     else:
-        # Create problem table based on inverted utility streams
+        # Create problem table based on inverted utility streams. The duties
+        # are the indirect target's: on a site of several processes the
+        # zone's own utilities hold what its streams would need read as one
+        # process, which is not what the site's utility system carries.
         pt_target = get_process_heat_cascade(
-            hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
-            cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
+            hot_streams=base_target.cold_utilities.get_hot_streams(invert_utility=True),
+            cold_streams=base_target.hot_utilities.get_cold_streams(
+                invert_utility=True
+            ),
             is_shifted=True,
             is_full_analysis=True,
             period_idx=idx,

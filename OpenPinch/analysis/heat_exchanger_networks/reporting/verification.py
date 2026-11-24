@@ -64,9 +64,14 @@ def verify_network_feasibility(
     """Return feasibility failures for one extracted HEN candidate.
 
     The checks intentionally operate on the service-boundary network data,
-    not the private solver model. They therefore catch under-costed or
-    heat-balance-inconsistent EVM candidates after solution extraction and before
-    ranking/selection.
+    not the private solver model. They catch heat-balance, temperature,
+    approach and area inconsistencies after solution extraction and before
+    ranking/selection. Costs are checked for consistency only: the total
+    annual cost must equal utility plus capital, and, when every exchanger
+    records its own capital cost, the network's capital must be their sum.
+    The cost law and the utility prices are not on the network (and differ
+    between the process, site, retrofit and multiperiod cost models), so
+    capital is not recomputed from the areas nor utility cost from the duties.
     """
 
     if network is None:
@@ -77,6 +82,7 @@ def verify_network_feasibility(
     if len(period_ids) <= 1:
         failures.extend(_check_summary_totals(network))
     failures.extend(_check_cost_consistency(network))
+    failures.extend(_check_exchanger_capital(network))
     for period_id in period_ids:
         failures.extend(_check_temperature_order(network.exchangers, period_id))
         failures.extend(_check_minimum_approach(network, period_id))
@@ -138,7 +144,8 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
         or network.capital_cost is None
     ):
         return []
-    component_total = network.utility_cost + network.capital_cost
+    heat_pumps = sum(machine.annual_cost for machine in network.heat_pumps)
+    component_total = network.utility_cost + network.capital_cost + heat_pumps
     if _close(
         network.total_annual_cost,
         component_total,
@@ -146,10 +153,31 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
         abs_tol=_COST_ABS_TOL,
     ):
         return []
+    parts = "utility + capital" + (" + heat pump" if network.heat_pumps else "")
     return [
         "total annual cost "
-        f"{network.total_annual_cost:.6g} does not match utility + capital "
+        f"{network.total_annual_cost:.6g} does not match {parts} "
         f"{component_total:.6g}"
+    ]
+
+
+def _check_exchanger_capital(network: HeatExchangerNetwork) -> list[str]:
+    """The network's capital against its exchangers' own capital costs,
+    when every exchanger records one."""
+    costs = [exchanger.capital_cost for exchanger in network.exchangers]
+    if network.capital_cost is None or not costs or None in costs:
+        return []
+    exchanger_total = math.fsum(costs)
+    if _close(
+        network.capital_cost,
+        exchanger_total,
+        rel_tol=_COST_REL_TOL,
+        abs_tol=_COST_ABS_TOL,
+    ):
+        return []
+    return [
+        f"capital cost {network.capital_cost:.6g} does not match the "
+        f"exchangers' capital costs {exchanger_total:.6g}"
     ]
 
 
@@ -482,29 +510,35 @@ def _check_area_consistency(
     period_id: str,
 ) -> list[str]:
     metadata = network.source_metadata
-    failures = _check_segment_contribution_areas(network.exchangers, period_id)
+    failures = _check_segment_contribution_areas(
+        network.exchangers,
+        period_id,
+        allowances=metadata.get("rating_area_allowances"),
+    )
     if _uses_isothermal_stage_boundaries(metadata):
         return failures
-    hot_htc = _stream_value_map(
-        network,
-        "hot_process_streams",
-        metadata.get("hot_stream_heat_transfer_coefficients"),
+    period_idx = (
+        network.period_ids.index(period_id) if period_id in network.period_ids else None
     )
-    cold_htc = _stream_value_map(
-        network,
-        "cold_process_streams",
-        metadata.get("cold_stream_heat_transfer_coefficients"),
-    )
-    hot_utility_htc = _stream_value_map(
-        network,
-        "hot_utilities",
-        metadata.get("hot_utility_heat_transfer_coefficients"),
-    )
-    cold_utility_htc = _stream_value_map(
-        network,
-        "cold_utilities",
-        metadata.get("cold_utility_heat_transfer_coefficients"),
-    )
+
+    def htc(axis_name: str, key: str) -> dict[str, float]:
+        # Each period's coefficients when recorded, else the scalar ones.
+        by_period = metadata.get(f"{key}_by_period")
+        if (
+            period_idx is not None
+            and isinstance(by_period, list | tuple)
+            and period_idx < len(by_period)
+        ):
+            return _stream_value_map(network, axis_name, by_period[period_idx])
+        return _stream_value_map(network, axis_name, metadata.get(key))
+
+    # A rated network's installed areas are judged as its rating capped them
+    # (``rating_area_allowances``: exact over calibrated Chen sizing).
+    allowances = metadata.get("rating_area_allowances") or {}
+    hot_htc = htc("hot_process_streams", "hot_stream_heat_transfer_coefficients")
+    cold_htc = htc("cold_process_streams", "cold_stream_heat_transfer_coefficients")
+    hot_utility_htc = htc("hot_utilities", "hot_utility_heat_transfer_coefficients")
+    cold_utility_htc = htc("cold_utilities", "cold_utility_heat_transfer_coefficients")
     if not any((hot_htc, cold_htc, hot_utility_htc, cold_utility_htc)):
         return failures
 
@@ -525,9 +559,10 @@ def _check_area_consistency(
         if overall_htc is None or terminal_lmtd is None:
             continue
         required_area = state.duty / overall_htc / terminal_lmtd
-        if exchanger.area + _AREA_ABS_TOL < required_area and not _close(
+        area = exchanger.area * float(allowances.get(exchanger.exchanger_id, 1.0))
+        if area + _AREA_ABS_TOL < required_area and not _close(
             required_area,
-            exchanger.area,
+            area,
             rel_tol=_AREA_REL_TOL,
             abs_tol=_AREA_ABS_TOL,
         ):
@@ -569,6 +604,7 @@ def _check_segment_contribution_balances(
 def _check_segment_contribution_areas(
     exchangers: Iterable[HeatExchanger],
     period_id: str,
+    allowances=None,
 ) -> list[str]:
     failures = []
     for exchanger in exchangers:
@@ -595,10 +631,14 @@ def _check_segment_contribution_areas(
         if design_area is None:
             continue
         # As for single-segment exchangers, spare area (an installed unit
-        # running below its area) is fine; only too little fails.
-        if exchanger.area + _AREA_ABS_TOL < design_area and not _close(
+        # running below its area) is fine; only too little fails. A rated
+        # unit's area is widened by its rating allowance.
+        area = exchanger.area * float(
+            (allowances or {}).get(exchanger.exchanger_id, 1.0)
+        )
+        if area + _AREA_ABS_TOL < design_area and not _close(
             design_area,
-            exchanger.area,
+            area,
             rel_tol=_AREA_REL_TOL,
             abs_tol=_AREA_ABS_TOL,
         ):
@@ -697,7 +737,10 @@ def _stream_order(
     axis_map = network.solver_axis_metadata.get("axis_maps", {}).get(axis_name, {})
     if not axis_map:
         return ()
-    return ordered_mapping_keys(axis_map)
+    # A utility slice's exchangers carry its parent's name; slices share
+    # their parent's approach and film coefficient.
+    parents = network.solver_axis_metadata.get("utility_parents") or {}
+    return tuple(parents.get(name, name) for name in ordered_mapping_keys(axis_map))
 
 
 def _uses_isothermal_stage_boundaries(metadata: dict) -> bool:

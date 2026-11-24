@@ -66,6 +66,7 @@ def calculate_pinch(owner) -> None:
         raise ValueError(
             "PDM construction requires a shifted pinch temperature in every period."
         )
+    # Stream loads, read in preprocessing, can require the side too.
     owner.side_required = any(
         target > owner.tol
         for target in (
@@ -109,6 +110,10 @@ def _set_multiperiod_preprocessing(owner) -> None:
     owner.z_j_active = list(decomposition.z_j_active)
     if decomposition.manual_stage_selection is None:
         owner.S = max(sum(owner.z_i_active), sum(owner.z_j_active))
+        if getattr(owner, "staged_utilities", False):
+            # Room for a staged heater (or cooler) at the pinch end, before
+            # the first recovery stage, where the lowest level often serves.
+            owner.S += 1
     else:
         owner.S = decomposition.S
     owner.K = owner.S + 1
@@ -157,6 +162,13 @@ def _set_multiperiod_preprocessing(owner) -> None:
     )
     owner.Qtot_sh = np.max(owner.Qtot_sh_period, axis=0)
     owner.Qtot_sc = np.max(owner.Qtot_sc_period, axis=0)
+    # A side with a load above tol has recovery to do even at zero utility
+    # target; a smaller load gets no recovery match, so it cannot require one.
+    owner.side_required = bool(
+        getattr(owner, "side_required", False)
+        or np.any(owner.Qtot_sh_period > owner.tol)
+        or np.any(owner.Qtot_sc_period > owner.tol)
+    )
     owner.U_r_period = np.array(
         build_index_grid(
             lambda n, i, j: _overall_heat_transfer_coefficient(
@@ -216,6 +228,14 @@ def _set_multiperiod_preprocessing(owner) -> None:
         ),
         (owner.I, owner.J, owner.S),
     )
+    # ``HENS_FORBIDDEN_MATCHES``: hot by cold, present only when the option
+    # names a recovery match (``solver/arrays.py``).
+    forbidden = getattr(owner, "forbidden_recovery", None)
+    if forbidden is not None:
+        for i in range(owner.I):
+            for j in range(owner.J):
+                if forbidden[i][j]:
+                    owner.z_feasible[i][j] = [0] * owner.S
     # Heaters only above the pinch and coolers only below, each on a stream
     # this side has and a utility that can meet its approach at the target.
     hot_reachable, cold_reachable = _approach.utility_match_feasibility(owner)

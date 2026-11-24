@@ -399,7 +399,7 @@ def test_absent_utility_price_uses_default_price_without_warning():
         # dTmin 20 against THERMAL_DT_CONT 5 is a dt_cont multiplier of 2.
         (5.0, 10.0),
         (2.0, 4.0),
-        (0.0, 0.2),  # a zero contribution becomes 0.1 K times the multiplier
+        (0.0, 0.0),  # a zero contribution stays zero; the floor is on the pair
     ],
 )
 def test_hen_multiplier_scales_every_stream_contribution(dt_cont, expected):

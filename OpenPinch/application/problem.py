@@ -629,6 +629,29 @@ class PinchProblem:
 
         return with_utilities_from(self, other_problem, project_name=project_name)
 
+    def with_heat_pump_streams(
+        self,
+        target: BaseTargetModel,
+        *,
+        zone: str | None = None,
+        machine: str = "HP",
+        project_name: str | None = None,
+    ) -> "PinchProblem":
+        """Add a heat pump target's streams to a fresh unsolved study.
+
+        Each condenser becomes a hot stream and each evaporator a cold
+        stream of ``zone``, marked with ``machine`` and its role and
+        carrying ``HPR_DT_CONT``. A utility heat pump's target, solved on
+        a site, adds them as two process zones of the site instead,
+        ``"<machine> condenser"`` and ``"<machine> evaporator"``; ``zone``
+        does not apply to it.
+        """
+        from .case_derivation import with_heat_pump_streams
+
+        return with_heat_pump_streams(
+            self, target, zone=zone, machine=machine, project_name=project_name
+        )
+
     def set_dt_cont_multiplier(
         self,
         value: float,

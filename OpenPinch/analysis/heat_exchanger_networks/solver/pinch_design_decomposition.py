@@ -9,6 +9,7 @@ on copied :class:`Zone` and :class:`Stream` objects.
 
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from typing import Literal
 
@@ -20,14 +21,16 @@ from ....analysis.targeting.direct import (
 )
 from ....domain.configuration import tol
 from ....domain.stream import Stream
+from ....domain.stream_collection import StreamCollection
 from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
 from .arrays import (
-    ZERO_CONTRIBUTION_REPLACEMENT,
+    MINIMUM_PAIR_APPROACH,
     PreparedSolverArrays,
-    _array_dt_cont_multiplier,
     _temperature_contribution,
+    _value,
+    heat_pump_stream_keys,
     problem_to_solver_arrays,
 )
 
@@ -50,6 +53,9 @@ class PinchDesignTarget(BaseModel):
     hot_pinch: float | None
     cold_pinch: float | None
     shifted_pinch_temperature: float | None
+    # Each utility's targeted duty (kW), in the decomposition's utility order.
+    hot_utility_level_targets: tuple[float, ...] = ()
+    cold_utility_level_targets: tuple[float, ...] = ()
     target_access_contract: tuple[str, ...] = Field(
         default=(
             "OpenPinch direct_heat_integration on copied Zone",
@@ -117,6 +123,8 @@ class PinchDesignDecomposition(BaseModel):
     manual_stage_selection: tuple[int, int] | None
     hot_stream_identities: tuple[str, ...]
     cold_stream_identities: tuple[str, ...]
+    hot_utility_identities: tuple[str, ...] = ()
+    cold_utility_identities: tuple[str, ...] = ()
     unit_conventions: dict[str, str]
     dt_cont_convention: str
 
@@ -220,13 +228,19 @@ def build_pinch_design_decomposition(
         raise ValueError("pinch_location must be 'above' or 'below'.")
 
     arrays = problem_to_solver_arrays(problem, dTmin)
-    period_targets = _calculate_openpinch_targets(problem, dTmin=float(dTmin))
+    period_targets = _calculate_openpinch_targets(
+        problem,
+        dTmin=float(dTmin),
+        hot_utilities=tuple(arrays.utility_identities["hot_utilities"]),
+        cold_utilities=tuple(arrays.utility_identities["cold_utilities"]),
+    )
     return _build_decomposition(
         arrays=arrays,
         period_targets=period_targets,
         dTmin=float(dTmin),
         pinch_location=pinch_location,
         stage_selection=stage_selection,
+        partner_leasts=_partner_leasts(problem.master_zone, dTmin=float(dTmin)),
     )
 
 
@@ -234,8 +248,14 @@ def _calculate_openpinch_targets(
     problem: PreparedProblem,
     *,
     dTmin: float,
+    hot_utilities: tuple[str, ...] = (),
+    cold_utilities: tuple[str, ...] = (),
 ) -> tuple[PinchDesignTarget, ...]:
     zone = _zone_with_hen_dt_contribution(problem, dTmin=dTmin)
+    # A heat pump's condenser and evaporator, each sized to its pocket, make
+    # pinches of their own. The case is split at the process pinch: the
+    # pinch of the same zone without the heat pump's streams.
+    process = _without_streams(zone, heat_pump_stream_keys(problem))
     period_ids = ordered_mapping_keys(zone.period_ids or {"0": 0})
     targets = []
     for period_idx, period_id in enumerate(period_ids):
@@ -243,11 +263,18 @@ def _calculate_openpinch_targets(
             zone,
             args={"period_id": period_id},
         )
+        split = (
+            target
+            if process is None
+            else compute_direct_integration_targets(
+                process, args={"period_id": period_id}
+            )
+        )
         shifted_pinch_temperature = _shifted_pinch_temperature(
-            hot_utility_target=target.hot_utility_target,
-            cold_utility_target=target.cold_utility_target,
-            hot_pinch=target.hot_pinch,
-            cold_pinch=target.cold_pinch,
+            hot_utility_target=split.hot_utility_target,
+            cold_utility_target=split.cold_utility_target,
+            hot_pinch=split.hot_pinch,
+            cold_pinch=split.cold_pinch,
         )
         targets.append(
             PinchDesignTarget(
@@ -259,9 +286,39 @@ def _calculate_openpinch_targets(
                 hot_pinch=target.hot_pinch,
                 cold_pinch=target.cold_pinch,
                 shifted_pinch_temperature=shifted_pinch_temperature,
+                hot_utility_level_targets=_level_targets(
+                    target.hot_utilities, hot_utilities, period_idx
+                ),
+                cold_utility_level_targets=_level_targets(
+                    target.cold_utilities, cold_utilities, period_idx
+                ),
             )
         )
     return tuple(targets)
+
+
+def _without_streams(zone: Zone, keys: frozenset[str]) -> Zone | None:
+    """A copy of ``zone`` with the streams of ``keys`` switched off, which
+    targeting then skips; ``None`` when there are none to switch off."""
+    if not keys:
+        return None
+    copy = deepcopy(zone)
+    for streams in (copy.hot_streams, copy.cold_streams):
+        for key, stream in streams.items():
+            if key in keys:
+                stream.is_active = False
+    return copy
+
+
+def _level_targets(
+    targeted: StreamCollection, identities: tuple[str, ...], period_idx: int
+) -> tuple[float, ...]:
+    """Each utility's targeted duty (kW) in ``identities`` order."""
+    duties = {
+        key: _value(utility.heat_flow, "kW", period_idx=period_idx)
+        for key, utility in targeted.items()
+    }
+    return tuple(duties.get(key, 0.0) for key in identities)
 
 
 def _zone_with_hen_dt_contribution(problem: PreparedProblem, *, dTmin: float) -> Zone:
@@ -277,15 +334,23 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
     """Materialize effective contributions in a detached targeting zone."""
 
     # Capture every value before the zone setter changes inherited multipliers.
+    leasts = _partner_leasts(zone, dTmin=dTmin)
+    group_of = {
+        id(stream): group for group in _PARTNERS for stream in getattr(zone, group)
+    }
     prepared = []
     for stream in zone.all_streams:
         parts = stream.segments if stream.has_segments else (stream,)
+        partner_least = leasts[group_of[id(stream)]]
         contributions = [
-            _stream_dt_cont_with_fallback(
-                part,
-                dTmin=dTmin,
-                reference_dt_cont=zone.config.thermal.dt_cont,
-                locked=stream.delta_t_contribution_multiplier_locked,
+            _lifted_contribution(
+                _stream_dt_cont_with_fallback(
+                    part,
+                    dTmin=dTmin,
+                    reference_dt_cont=zone.config.thermal.dt_cont,
+                    locked=stream.delta_t_contribution_multiplier_locked,
+                ),
+                partner_least,
             )
             for part in parts
         ]
@@ -316,6 +381,77 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
     zone.config.update_values(THERMAL_DT_CONT=float(dTmin) / 2.0)
 
 
+# The groups whose streams each group's streams can exchange heat with.
+_PARTNERS = {
+    "hot_streams": ("cold_streams", "cold_utilities"),
+    "cold_streams": ("hot_streams", "hot_utilities"),
+    "hot_utilities": ("cold_streams",),
+    "cold_utilities": ("hot_streams",),
+}
+
+
+def _partner_leasts(zone: Zone, *, dTmin: float) -> dict[str, float]:
+    """For each stream group of ``zone``, the least contribution (at the
+    task's scale, over segments and periods) among the streams it can
+    exchange heat with; infinite for a group with no partner."""
+
+    def least(group: str) -> float:
+        return min(
+            (
+                value
+                for stream in getattr(zone, group)
+                for part in (stream.segments if stream.has_segments else (stream,))
+                for value in _contribution_values(
+                    _stream_dt_cont_with_fallback(
+                        part,
+                        dTmin=dTmin,
+                        reference_dt_cont=zone.config.thermal.dt_cont,
+                        locked=stream.delta_t_contribution_multiplier_locked,
+                    )
+                )
+            ),
+            default=math.inf,
+        )
+
+    group_least = {group: least(group) for group in _PARTNERS}
+    return {
+        group: min(group_least[partner] for partner in partners)
+        for group, partners in _PARTNERS.items()
+    }
+
+
+def _lift_for_pair_floor(values, partner_least: float):
+    """Contributions that keep every pair at the pair floor in targeting.
+
+    The models floor a pair's summed contributions at 0.1 K
+    (``pair_minimum_approach``), but targeting shifts each stream by its own
+    contribution, so a pair summing to less would be targeted closer than
+    the models allow. Where a contribution and the least of its possible
+    partners sum below the floor it is raised to half the floor, so the pair
+    targets at the floor or wider; every other contribution is unchanged.
+    """
+    values = np.asarray(values, dtype=float)
+    return np.where(
+        values + partner_least < MINIMUM_PAIR_APPROACH,
+        np.maximum(values, 0.5 * MINIMUM_PAIR_APPROACH),
+        values,
+    )
+
+
+def _contribution_values(contribution: dict) -> list[float]:
+    if "values" in contribution:
+        return [float(value) for value in contribution["values"]]
+    return [float(contribution["value"])]
+
+
+def _lifted_contribution(contribution: dict, partner_least: float) -> dict:
+    """``contribution`` (a value or period values) lifted for the pair floor."""
+    lifted = _lift_for_pair_floor(_contribution_values(contribution), partner_least)
+    if "values" in contribution:
+        return {**contribution, "values": [float(value) for value in lifted]}
+    return {**contribution, "value": float(lifted[0])}
+
+
 def _stream_dt_cont_with_fallback(
     stream: Stream,
     *,
@@ -326,13 +462,7 @@ def _stream_dt_cont_with_fallback(
     """Use the solver-array contribution policy for each effective period."""
     current = getattr(stream, "effective_delta_t_contribution", None)
     if current is None:
-        multiplier = (
-            1.0 if locked else _array_dt_cont_multiplier(dTmin, reference_dt_cont)
-        )
-        return {
-            "value": ZERO_CONTRIBUTION_REPLACEMENT * multiplier,
-            "unit": "delta_degC",
-        }
+        return {"value": 0.0, "unit": "delta_degC"}
 
     values = [
         _temperature_contribution(
@@ -374,6 +504,7 @@ def _build_decomposition(
     dTmin: float,
     pinch_location: PinchLocation,
     stage_selection: StageSelection,
+    partner_leasts: dict[str, float] | None = None,
 ) -> PinchDesignDecomposition:
     values = arrays.arrays
     period_count = len(period_targets)
@@ -395,9 +526,18 @@ def _build_decomposition(
     if any(rows.shape[0] != period_count for rows in state_rows.values()):
         raise ValueError("PDM period targets must match solver-array periods.")
     # Each stream meets the shifted pinch at its own contribution, so its real
-    # pinch temperature is T* + dt_cont (hot) or T* - dt_cont (cold).
+    # pinch temperature is T* + dt_cont (hot) or T* - dt_cont (cold). The
+    # targets were computed with contributions lifted for the pair floor
+    # (``partner_leasts`` given), so the split uses the same ones.
     hot_contributions = np.asarray(values["T_h_cont_period"], dtype=float)
     cold_contributions = np.asarray(values["T_c_cont_period"], dtype=float)
+    if partner_leasts is not None:
+        hot_contributions = _lift_for_pair_floor(
+            hot_contributions, partner_leasts["hot_streams"]
+        )
+        cold_contributions = _lift_for_pair_floor(
+            cold_contributions, partner_leasts["cold_streams"]
+        )
     z_i_active_period = []
     z_j_active_period = []
     for period_idx, target in enumerate(period_targets):
@@ -458,6 +598,8 @@ def _build_decomposition(
         manual_stage_selection=manual_stage_selection,
         hot_stream_identities=tuple(arrays.stream_identities["hot_process_streams"]),
         cold_stream_identities=tuple(arrays.stream_identities["cold_process_streams"]),
+        hot_utility_identities=tuple(arrays.utility_identities["hot_utilities"]),
+        cold_utility_identities=tuple(arrays.utility_identities["cold_utilities"]),
         unit_conventions={
             "process_temperatures": "K in solver arrays; degC in ProblemTable rows",
             "pinch_temperatures": (
@@ -468,8 +610,7 @@ def _build_decomposition(
         dt_cont_convention=(
             "Copied stream and explicit segment dt_cont values are the prepared "
             "effective contributions times the task's dt_cont multiplier "
-            "(unscaled for a locked stream), with 0.1 K times that multiplier "
-            "replacing a zero. "
+            "(unscaled for a locked stream); a zero stays zero. "
             "The copied zone dt_cont_multiplier is then set to 1.0."
         ),
     )

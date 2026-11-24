@@ -222,6 +222,107 @@ def test_get_hot_and_cold_streams_from_subzones(dummy_zone, sample_streams):
     assert "Sub1.Cold1" in dummy_zone.cold_streams
 
 
+def _plain_stream(name, supply, target, heat_flow):
+    return Stream(
+        name=name,
+        supply_temperature=supply,
+        target_temperature=target,
+        heat_flow=heat_flow,
+    )
+
+
+def test_a_zone_with_subzones_keeps_its_own_streams():
+    """A process zone that also holds a unit operation keeps the streams
+    placed on it, and its parent sees both; importing again changes nothing."""
+    site = Zone(name="Site")
+    process = Zone(name="A")
+    unit = Zone(name="U")
+    process.hot_streams.add(_plain_stream("H1", 200.0, 60.0, 140.0), key="Site/A.H1")
+    process.cold_streams.add(_plain_stream("C1", 50.0, 150.0, 100.0), key="Site/A.C1")
+    unit.hot_streams.add(_plain_stream("H2", 180.0, 90.0, 90.0), key="Site/A/U.H2")
+    process.add_zone(unit)
+    site.add_zone(process)
+
+    site.import_hot_and_cold_streams_from_sub_zones()
+    site.import_hot_and_cold_streams_from_sub_zones()
+
+    assert sorted(key for key, _ in process.hot_streams.items()) == [
+        "Site/A.H1",
+        "U.H2",
+    ]
+    assert [key for key, _ in process.cold_streams.items()] == ["Site/A.C1"]
+    assert sorted(key for key, _ in site.hot_streams.items()) == ["A.H1", "A.H2"]
+    assert [key for key, _ in site.cold_streams.items()] == ["A.C1"]
+
+
+def test_an_own_cold_stream_survives_a_hot_import_under_the_same_key():
+    """Hot and cold keys are separate namespaces: importing a child's hot
+    stream ``C.x`` does not mark the parent's own cold stream ``C.x`` as
+    imported, so a second import keeps it."""
+    parent = Zone(name="P")
+    child = Zone(name="C")
+    parent.cold_streams.add(_plain_stream("x", 50.0, 150.0, 100.0), key="C.x")
+    child.hot_streams.add(_plain_stream("x", 200.0, 60.0, 140.0), key="P/C.x")
+    parent.add_zone(child)
+
+    parent.import_hot_and_cold_streams_from_sub_zones()
+    parent.import_hot_and_cold_streams_from_sub_zones()
+
+    assert [key for key, _ in parent.cold_streams.items()] == ["C.x"]
+    assert [key for key, _ in parent.hot_streams.items()] == ["C.x"]
+
+
+def test_repeated_imports_keep_the_keys_of_a_renamed_nested_stream():
+    """A zone's own stream and a deeper subzone's stream sharing a name
+    collide at the site, which renames the nested stream; importing again
+    keeps every key the first import gave."""
+    site = Zone(name="Site")
+    process = Zone(name="A")
+    unit = Zone(name="U")
+    process.hot_streams.add(_plain_stream("H1", 250.0, 60.0, 190.0), key="Site/A.H1")
+    unit.hot_streams.add(_plain_stream("H1", 180.0, 90.0, 90.0), key="Site/A/U.H1")
+    process.add_zone(unit)
+    site.add_zone(process)
+
+    site.import_hot_and_cold_streams_from_sub_zones()
+    first_process_keys = sorted(key for key, _ in process.hot_streams.items())
+    first_site_keys = sorted(key for key, _ in site.hot_streams.items())
+    first_names = sorted(s.name for s in site.hot_streams)
+    site.import_hot_and_cold_streams_from_sub_zones()
+
+    assert first_process_keys == ["Site/A.H1", "U.H1"]
+    assert sorted(key for key, _ in process.hot_streams.items()) == first_process_keys
+    assert sorted(key for key, _ in site.hot_streams.items()) == first_site_keys
+    assert sorted(s.name for s in site.hot_streams) == first_names
+
+
+def test_a_copied_zone_keeps_the_keys_of_a_renamed_nested_stream():
+    """``PinchProblem.master_zone`` hands out deep copies: importing again
+    on a copy keeps the keys the first import gave."""
+    from copy import deepcopy
+
+    site = Zone(name="Site")
+    process = Zone(name="A")
+    unit = Zone(name="U")
+    process.hot_streams.add(_plain_stream("H1", 250.0, 60.0, 190.0), key="Site/A.H1")
+    unit.hot_streams.add(_plain_stream("H1", 180.0, 90.0, 90.0), key="Site/A/U.H1")
+    process.add_zone(unit)
+    site.add_zone(process)
+    site.import_hot_and_cold_streams_from_sub_zones()
+
+    copy = deepcopy(site)
+    copy.import_hot_and_cold_streams_from_sub_zones()
+
+    copied_process = copy.subzones["A"]
+    assert sorted(key for key, _ in copied_process.hot_streams.items()) == [
+        "Site/A.H1",
+        "U.H1",
+    ]
+    assert sorted(key for key, _ in copy.hot_streams.items()) == sorted(
+        key for key, _ in site.hot_streams.items()
+    )
+
+
 # === New Tests for Zone ===
 
 

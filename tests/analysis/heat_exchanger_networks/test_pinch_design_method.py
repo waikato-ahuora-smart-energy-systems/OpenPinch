@@ -585,7 +585,8 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._utilisation_threshold(5) == 5.0
     assert problem._utilisation_threshold(8) == 8.0
     assert problem._utilisation_threshold(10) == 10.0
-    assert problem._utilisation_threshold(11) == 0.0
+    # Above 10 stages the 10-stage threshold holds; it used to drop to 0.
+    assert problem._utilisation_threshold(11) == 10.0
     assert problem._get_active_stages(case) == [0, 2]
 
 
@@ -1703,8 +1704,6 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     assert _optional_int(None) is None
     assert _optional_int("7") == 7
     assert _pdm_stage_selection(problem) == "automated"
-    two_stage_problem = _four_stream_problem(options={"HENS_STAGE_SELECTION": [2, 3]})
-    assert _pdm_stage_selection(two_stage_problem) == [2, 3]
     assert _pdm_stage_selection(
         problem,
         task.model_copy(update={"settings": {"stage_selection": [2, 4]}}),
@@ -1712,6 +1711,41 @@ def test_executor_option_helpers_cover_validation_and_fallback_paths() -> None:
     assert _solver_status(SimpleNamespace(case=SimpleNamespace(solver_run=None))) == (
         "success"
     )
+
+
+def test_pdm_stages_set_the_pinch_design_stage_counts() -> None:
+    """``HENS_PDM_STAGES`` holds the MILP pinch design stage counts above and
+    below the pinch, which may be equal. ``HENS_STAGE_SELECTION`` lists stage
+    counts for direct network evolution and sets neither, whatever its
+    length. A task's own pair, as the stage pair candidates carry, comes
+    first."""
+    listed = _four_stream_problem(options={"HENS_STAGE_SELECTION": [2, 3]})
+    assert _pdm_stage_selection(listed) == "automated"
+
+    staged = _four_stream_problem(
+        options={"HENS_PDM_STAGES": [3, 3], "HENS_SEARCH_DEPTH": 3}
+    )
+    assert _pdm_stage_selection(staged) == [3, 3]
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(staged))[0]
+    assert _pdm_stage_selection(staged, task) == [3, 3]
+    assert _pdm_stage_selection(
+        staged, task.model_copy(update={"settings": {"stage_selection": [2, 4]}})
+    ) == [2, 4]
+
+
+def test_pdm_stages_leave_the_heuristic_pinch_design_its_own_stages() -> None:
+    """The heuristic pinch design sets each side's stages from its own
+    matches, so its decompositions are not built to the MILP's pair."""
+    from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
+
+    staged = _four_stream_problem(options={"HENS_PDM_STAGES": [1, 2]})
+    task = build_pinch_design_method_tasks(workflow_settings_from_problem(staged))[0]
+    heuristic = task.model_copy(
+        update={"method": HeatExchangerNetworkDesignMethod.HeuristicPinchDesign}
+    )
+
+    assert _pdm_stage_selection(staged, task) == [1, 2]
+    assert _pdm_stage_selection(staged, heuristic) == "automated"
     assert (
         _solver_status(
             SimpleNamespace(
@@ -3136,25 +3170,25 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
         )
 
     # dTmin 14 against THERMAL_DT_CONT 5 is a multiplier of 1.4; a missing or
-    # zero contribution becomes 0.1 K times it.
+    # zero contribution stays zero (the 0.1 K floor is on the pair).
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
         dTmin=14.0,
         reference_dt_cont=5.0,
-    ) == {"value": pytest.approx(0.14), "unit": "delta_degC"}
+    ) == {"value": pytest.approx(0.0, abs=1e-12), "unit": "delta_degC"}
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(
             effective_delta_t_contribution=Value([0.0, 1.0, 9.0], "delta_degC")
         ),
         dTmin=14.0,
         reference_dt_cont=5.0,
-    ) == {"values": pytest.approx([0.14, 1.4, 12.6]), "unit": "delta_degC"}
+    ) == {"values": pytest.approx([0.0, 1.4, 12.6], abs=1e-12), "unit": "delta_degC"}
     assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
         dTmin=14.0,
         reference_dt_cont=5.0,
         locked=True,
-    ) == {"value": pytest.approx(0.1), "unit": "delta_degC"}
+    ) == {"value": pytest.approx(0.0, abs=1e-12), "unit": "delta_degC"}
 
     assert (
         pdm_decomposition._shifted_pinch_temperature(
@@ -3784,3 +3818,75 @@ def test_stagewise_post_process_reads_the_utility_price_once_and_no_approaches(
     # Never per cell: the unused dTAC/dA grid that read it is gone.
     assert len(price_calls) <= 1
     assert approach_calls == []
+
+
+@pytest.mark.skipif(sys.platform == "emscripten", reason="Pyodide cannot start threads")
+def test_a_pooled_stage_that_raises_cancels_its_waiting_solves():
+    """An error from one solve ends the stage without running the solves
+    still waiting for a worker."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution import executor
+
+    release = threading.Event()
+    ran = []
+
+    def solve(index):
+        ran.append(index)
+        if index == 0:
+            raise RuntimeError("solve failed")
+        release.wait(5)
+        return index
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    with pytest.raises(RuntimeError, match="solve failed"):
+        list(executor._as_completed(pool, solve, range(4)))
+    release.set()
+    pool.shutdown(wait=True)
+
+    assert 3 not in ran
+
+
+def test_removal_ranking_weighs_every_periods_recovery() -> None:
+    """A match that recovers heat only in the second period is not pure
+    capital: the removal ranking prices each period's recovery at that
+    period's weight and utility price."""
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 1
+    model.J = 2
+    model.S = 1
+    model.N_periods = 2
+    model.period_weights = [0.5, 0.5]
+    model.z = [[[1], [1]]]
+    model.Q_r_by_period = [[[[0.0], [10.0]]], [[[100.0], [10.0]]]]
+    model.Q_r = model.Q_r_by_period[0]
+    model.alpha = [[[[1.0]], [[1.0]]]]
+    model.hu_cost_period = [[5.0], [5.0]]
+    model.cu_cost_period = [[5.0], [5.0]]
+    model.Q_hu_by_utility_by_period = [[0.0], [0.0]]
+    model.Q_cu_by_utility_by_period = [[0.0], [0.0]]
+    model.unit_cost = [50.0]
+    model.A_coeff = [2.0]
+    model.A_exp = [1.0]
+    model.area_r = [[[5.0], [5.0]]]
+    model.tol = 1e-3
+
+    assert model.get_lowest_benefit_HX_candidates(2) == [[0, 1, 0], [0, 0, 0]]
+
+
+def test_a_standalone_pinch_design_of_a_one_sided_case_has_its_utility_network():
+    """A case of only hot streams has one network, of coolers alone, as the
+    full design returns; the standalone pinch design used to raise."""
+    from OpenPinch.application.problem import PinchProblem
+    from tests.analysis.heat_exchanger_networks.test_duty_optimisation import (
+        _small_payload,
+    )
+
+    payload = _small_payload()
+    payload["streams"] = payload["streams"][:1]
+
+    view = PinchProblem(payload).design.pinch_design(width=0, depth=0)
+
+    kinds = {e.kind.value for e in view.selected_network.exchangers}
+    assert kinds == {"cold_utility"}

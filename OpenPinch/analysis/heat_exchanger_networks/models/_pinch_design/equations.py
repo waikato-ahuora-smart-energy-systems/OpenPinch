@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from ...indexing import build_index_grid
 from .._base import approach as _approach
+from .._base import interior_approach as _interior
 from .._base import piecewise as _piecewise
+from .._base import utility_slices as _slices
 from .._base.superstructure import create_match_binaries, create_utility_duty_grids
+from .._stagewise import staged_utilities as _staged
 
 
 def set_stage_wise_superstructure(owner) -> None:
@@ -58,6 +61,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ),
         (owner.N_periods, owner.J, owner.K),
     )
+    _staged.create_staged_utility_grids(owner)
     owner.Q_r = owner.Q_r_by_period[0]
     owner.Q_c = owner.Q_c_by_period[0]
     owner.Q_h = owner.Q_h_by_period[0]
@@ -77,6 +81,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         for j in range(owner.J)
                     )
                     - sum(owner.Q_c_by_period[n][i])
+                    - _staged.staged_cooler_duty(owner, n, i)
                     == 0.0
                 )
                 if owner.z_i_active_period[n][i] > 0
@@ -94,6 +99,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         for i in range(owner.I)
                     )
                     - sum(owner.Q_h_by_period[n][j])
+                    - _staged.staged_heater_duty(owner, n, j)
                     == 0.0
                 )
                 if owner.z_j_active_period[n][j] > 0
@@ -104,7 +110,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         _ = [
             (
                 owner.m.Equation(
-                    (owner.T_h_by_period[n][i][k + 1] - owner.T_h_by_period[n][i][k])
+                    (
+                        owner.T_h_mid_by_period[n][i][k + 1]
+                        - owner.T_h_by_period[n][i][k]
+                    )
                     * owner.f_h_period[n][i]
                     + sum(owner.Q_r_by_period[n][i][j][k] for j in range(owner.J))
                     == 0
@@ -119,7 +128,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         _ = [
             (
                 owner.m.Equation(
-                    (owner.T_c_by_period[n][j][k + 1] - owner.T_c_by_period[n][j][k])
+                    (
+                        owner.T_c_by_period[n][j][k + 1]
+                        - owner.T_c_mid_by_period[n][j][k]
+                    )
                     * owner.f_c_period[n][j]
                     + sum(owner.Q_r_by_period[n][i][j][k] for i in range(owner.I))
                     == 0
@@ -176,6 +188,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             ]
 
     _approach._set_multiperiod_utility_approach_equations(owner)
+    _staged.set_staged_utility_equations(owner)
+    _slices.set_utility_slice_coupling(owner)
 
     M_ij_period = [
         [
@@ -199,7 +213,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         _ = [
             (
                 owner.m.Equation(
-                    (owner.T_h_by_period[n][i][k] - owner.T_c_by_period[n][j][k])
+                    (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     >= _approach._recovery_approach_temperature(owner, i, j, n)
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
@@ -216,7 +230,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             (
                 owner.m.Equation(
                     (
-                        owner.T_h_by_period[n][i][k + 1]
+                        owner.T_h_mid_by_period[n][i][k + 1]
                         - owner.T_c_by_period[n][j][k + 1]
                     )
                     >= _approach._recovery_approach_temperature(owner, i, j, n)
@@ -231,6 +245,9 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             for j in range(owner.J)
             for i in range(owner.I)
         ]
+    # The approach inside a match on a segmented stream, checked on each
+    # solution; the solve loop re-solves while it cuts.
+    _interior.install_interior_cuts(owner, M_ij_period)
 
     owner.dqda = []
     owner.alpha = []
@@ -263,7 +280,8 @@ def _utility_cost(owner):
                     owner,
                     side,
                     n,
-                    sum(row[u] for row in grid),
+                    sum(row[u] for row in grid)
+                    + sum(_staged.staged_utility_loads(owner, side, n, u)),
                     utility=u,
                 )
                 for side, grid, count in (
@@ -316,6 +334,12 @@ def _link_units_to_duty(owner) -> None:
         "z": lambda i, j, k: [owner.Q_r_by_period[n][i][j][k] for n in _periods(owner)],
         "z_hu": lambda j, u: [owner.Q_h_by_period[n][j][u] for n in _periods(owner)],
         "z_cu": lambda i, u: [owner.Q_c_by_period[n][i][u] for n in _periods(owner)],
+        "z_hs": lambda j, u, k: [
+            owner.Q_hs_by_period[n][j][u][k] for n in _periods(owner)
+        ],
+        "z_cs": lambda i, u, k: [
+            owner.Q_cs_by_period[n][i][u][k] for n in _periods(owner)
+        ],
     }
     for name, indices in _unit_index_sets(owner).items():
         for index in indices:
@@ -329,9 +353,61 @@ def _periods(owner) -> range:
     return range(owner.N_periods)
 
 
-def _set_utility_target(owner, duty_grids, targets) -> None:
+def _set_utility_target(owner, side: str, targets) -> None:
+    duty_grids = owner.Q_h_by_period if side == "hot" else owner.Q_c_by_period
+    count = owner.NHU if side == "hot" else owner.NCU
     for n in range(owner.N_periods):
-        owner.m.Equation(_total_duty(duty_grids[n]) - targets[n] >= 0.0)
+        owner.m.Equation(
+            _total_duty(duty_grids[n])
+            + sum(
+                sum(_staged.staged_utility_loads(owner, side, n, u))
+                for u in range(count)
+            )
+            - targets[n]
+            >= 0.0
+        )
+    if getattr(owner, "staged_utilities", False):
+        _set_level_targets(owner, side)
+
+
+# Relative slack on each level target, for rounding between targeting and
+# the side's own duties.
+_LEVEL_BAND = 1e-7
+
+
+def _set_level_targets(owner, side: str) -> None:
+    """Hold each utility's duty at its targeted level.
+
+    Targeting assigns each level its duty by temperature; with staged units
+    the side can place each level where it serves, so prices no longer pick
+    the levels.
+    """
+    targets = owner.pinch_decomposition.period_targets
+    duty_grids = owner.Q_h_by_period if side == "hot" else owner.Q_c_by_period
+    count = owner.NHU if side == "hot" else owner.NCU
+    for n in range(owner.N_periods):
+        levels = (
+            targets[n].hot_utility_level_targets
+            if side == "hot"
+            else targets[n].cold_utility_level_targets
+        )
+        if len(levels) != count:
+            raise ValueError(
+                f"PDM {side} utility level targets must match the solver's "
+                f"{count} {side} utilities."
+            )
+        for u, level in enumerate(levels):
+            duty = sum(row[u] for row in duty_grids[n]) + sum(
+                _staged.staged_utility_loads(owner, side, n, u)
+            )
+            # A relative band, not the model tolerance: within the tolerance
+            # prices would still shift up to 1e-3 kW between levels.
+            relative = getattr(owner, "level_band", None)
+            band = (_LEVEL_BAND if relative is None else relative) * max(
+                1.0, abs(level)
+            )
+            owner.m.Equation(duty <= level + band)
+            owner.m.Equation(duty >= level - band)
 
 
 def _goal_duty(owner, n: int):
@@ -363,9 +439,9 @@ def set_obj(owner) -> None:
     choice = _has_utility_choice(owner)
 
     if goal == "hot utility":
-        _set_utility_target(owner, owner.Q_h_by_period, owner.HU_target_by_period)
+        _set_utility_target(owner, "hot", owner.HU_target_by_period)
     elif goal == "cold utility":
-        _set_utility_target(owner, owner.Q_c_by_period, owner.CU_target_by_period)
+        _set_utility_target(owner, "cold", owner.CU_target_by_period)
 
     if goal in UTILITY_GOALS:
         owner.m.Minimize(
@@ -394,6 +470,9 @@ def set_obj(owner) -> None:
         )
     else:
         _link_units_to_duty(owner)
+        if getattr(owner, "staged_utilities", False):
+            # Fewer units must not move duty between levels.
+            _set_level_targets(owner, "hot" if owner.pinch_loc == "above" else "cold")
         if choice and owner.utility_cost_cap is not None:
             # Relative slack for the cap's own rounding in the solver.
             owner.m.Equation(
@@ -416,7 +495,20 @@ def _unit_index_sets(owner) -> dict[str, list[tuple[int, ...]]]:
         ],
         "z_hu": [(j, u) for j in range(owner.J) for u in range(owner.NHU)],
         "z_cu": [(i, u) for i in range(owner.I) for u in range(owner.NCU)],
+        # Staged heaters and coolers offered (none without staging).
+        "z_hs": _staged_indices(getattr(owner, "z_hs_allowed", [])),
+        "z_cs": _staged_indices(getattr(owner, "z_cs_allowed", [])),
     }
+
+
+def _staged_indices(allowed) -> list[tuple[int, int, int]]:
+    return [
+        (s, u, k)
+        for s, row in enumerate(allowed)
+        for u, by_k in enumerate(row)
+        for k, offered in enumerate(by_k)
+        if offered
+    ]
 
 
 def _at(grid, index: tuple[int, ...]):

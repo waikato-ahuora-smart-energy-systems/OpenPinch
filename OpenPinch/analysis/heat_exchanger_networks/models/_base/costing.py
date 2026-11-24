@@ -81,12 +81,21 @@ def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
 
 
 def _utility_area_cost(owner, side: str) -> float:
-    """Return the area cost of every heater or cooler, one per (stream, utility)."""
+    """Return the area cost of every heater or cooler.
+
+    A stream-end unit is one per (stream, utility); a stage-wise model's
+    staged units (``area_hs``, ``area_cs``) add one per boundary.
+    """
     if side == "hot":
         coefficient, exponent, areas = owner.hu_coeff[0], owner.hu_exp[0], owner.area_hu
+        staged = getattr(owner, "area_hs", [])
     else:
         coefficient, exponent, areas = owner.cu_coeff[0], owner.cu_exp[0], owner.area_cu
-    return coefficient * sum(area**exponent for row in areas for area in row)
+        staged = getattr(owner, "area_cs", [])
+    return coefficient * (
+        sum(area**exponent for row in areas for area in row)
+        + sum(area**exponent for row in staged for by_k in row for area in by_k)
+    )
 
 
 def _weighted_numeric_average(owner, values: Sequence[float]) -> float:

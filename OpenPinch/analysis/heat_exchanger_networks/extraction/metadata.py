@@ -221,8 +221,13 @@ _NO_VALUE = object()
 def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
-    if value.__class__ is float:
-        return value
+    # Numbers (NumPy floats included) and [value] lists are most of what
+    # extraction reads: convert or unwrap them directly, before anything
+    # slower. float() of a list would raise and catch a TypeError.
+    if isinstance(value, float | int):
+        return float(value)
+    if isinstance(value, list):
+        return _optional_float(value[0]) if value else None
     # A solved Pyomo variable or parameter holds its number in ``value``;
     # reading it before asking what the object is saves two lookups and two
     # calls on every read. Indexed components and expressions have no

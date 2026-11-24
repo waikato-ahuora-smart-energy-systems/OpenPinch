@@ -512,6 +512,208 @@ def test_stage_reduction_keeps_the_original_when_the_reduced_network_fails(
     assert reduced is case
 
 
+def _reduction_case():
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+    case.T_h = [[[400.0]] * 4] * 2
+    case.T_c = [[[300.0]] * 4]
+    case.theta_1 = case.theta_2 = [[[[10.0]] * 3]] * 2
+    case.TAC_model = case.TAC = case.solve_time = 1.0
+    case.Q_hu_by_utility_by_period = [[100.0], [100.0]]
+    case.Q_cu_by_utility_by_period = [[50.0], [50.0]]
+    case.solver_run = SimpleNamespace(converged=True)
+    return case
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        {"TAC": 2.0},
+        {"Q_hu_by_utility_by_period": [[100.0], [120.0]]},
+    ],
+    ids=["dearer", "more utility"],
+)
+def test_stage_reduction_keeps_the_original_when_the_reduced_network_is_worse(
+    monkeypatch, outcome
+):
+    """Reduction only simplifies: a reduced network that costs more or uses
+    more utility in some period does not replace the solved one."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Worse(_ReducedModel):
+        valid = True
+
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.Q_hu_by_utility_by_period = [[100.0], [100.0]]
+            self.Q_cu_by_utility_by_period = [[50.0], [50.0]]
+            for name, value in outcome.items():
+                setattr(self, name, value)
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Worse)
+    case = _reduction_case()
+
+    reduced = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    ).remove_unused_stages(case)
+
+    assert reduced is case
+
+
+def test_stage_reduction_keeps_a_reduced_network_no_worse(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Same(_ReducedModel):
+        valid = True
+
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.Q_hu_by_utility_by_period = [[100.0], [100.0]]
+            self.Q_cu_by_utility_by_period = [[50.0], [50.0]]
+            self.solver_run = SimpleNamespace(converged=True)
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Same)
+    case = _reduction_case()
+
+    reduced = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    ).remove_unused_stages(case)
+
+    assert reduced is not case
+
+
+def test_stage_reduction_solves_with_the_tasks_solver_options(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+    case.solver_options = {"time_limit": 30}
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=3
+        ).remove_unused_stages(case)
+
+    assert built["solver_options"] == {"time_limit": 30}
+
+
+def test_a_reduced_solve_moved_to_ipopt_keeps_its_time_limit(monkeypatch):
+    """A reduced model that is not linear moves from HiGHS to Ipopt; the
+    task's time limit goes with it, under Ipopt's own option, as HiGHS's
+    other options do not apply there."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    configured = {}
+
+    class _Nonlinear(_ReducedModel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.m = SimpleNamespace(is_linear=lambda: False)
+
+        def optimise(self, print_output=False):
+            raise RuntimeError("stop after configuring")
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Nonlinear)
+    monkeypatch.setattr(unit.backend, "require_solver_backend", lambda name: None)
+    monkeypatch.setattr(
+        unit.backend,
+        "configure_pyomo_solver",
+        lambda model, name, *, solver_options=None: configured.update(
+            name=name, options=solver_options
+        ),
+    )
+    case = _reduction_case()
+    case.solver_options = {"time_limit": 30.0, "presolve": "on"}
+
+    with pytest.raises(RuntimeError, match="stop after configuring"):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=3
+        ).remove_unused_stages(case)
+
+    assert configured == {"name": "ipopt-pyomo", "options": {"max_wall_time": 30.0}}
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{"limits/time": 30.0}, {"max_wall_time": 30.0}, {"max_cpu_time": 30.0}],
+    ids=["scip", "ipopt wall", "ipopt cpu"],
+)
+def test_a_reduced_solve_on_ipopt_keeps_any_solvers_time_limit(monkeypatch, options):
+    """The task's limit may be under SCIP's or Ipopt's own key; it still
+    reaches Ipopt as ``max_wall_time``."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+
+    assert unit._ipopt_time_limit(options) == {"max_wall_time": 30.0}
+
+
+def test_empty_stages_go_when_no_stage_reaches_the_threshold(monkeypatch):
+    """Twelve stages hold their recovery evenly over eleven (9% each) and
+    leave one empty: none reaches the 10% threshold, so stage reduction used
+    to keep all twelve; it now drops the empty one."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    case = _two_period_stage_case()
+    case.I, case.J, case.S = 1, 1, 12
+    case.Q_r_by_period = [[[[[q] for q in [10.0] * 11 + [0.0]]]]]
+    case.Q_r = case.Q_r_by_period[0]
+    case.Q_h = [[[0.0]]]
+    case.Q_c = [[[0.0]]]
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=12
+        ).remove_unused_stages(case)
+
+    assert built["stages"] == 11
+
+
+def test_more_than_ten_stages_keep_the_ten_stage_threshold():
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    problem = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    )
+
+    assert problem._utilisation_threshold(11) == problem._utilisation_threshold(10)
+
+
 def test_stage_reduction_sets_shared_flags_from_every_period(monkeypatch):
     # The reduced model is relaxed: a match, heater or cooler flagged 0 has
     # no approach constraint or unit cost however much duty it carries, so a

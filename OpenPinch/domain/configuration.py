@@ -195,11 +195,26 @@ class HensConfig:
     derivative_thresholds: list[float]
     min_exchanger_approach_share: float
     pdm_stage_pair_limit: int | None
+    pdm_stages: list[int] | None
     pdm_min_unit_networks: int
     pdm_extra_unit_networks: int
     heuristic_pdm_networks: int | None
     heuristic_pdm_evolution_seeds: int | None
     pdm_milp: bool | None
+    utility_placement: str
+    utility_slices: bool
+    forbidden_matches: list[list[str]]
+    heat_pump_stream_exchangers: int
+    site_levels: str
+    site_level_counts: list[int]
+    site_level_early_stop: bool
+    site_level_step: float
+    site_level_step_min: float
+    site_time_limit: float | None
+    site_letdown_price: float
+    site_level_holds: str
+    evolution_level_holds: str
+    retrofit_loops: bool
     tdm_parent_limit: int | None
     stage_packing: str
     stage_selection: list[int]

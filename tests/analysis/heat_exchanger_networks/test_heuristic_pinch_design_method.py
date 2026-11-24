@@ -587,3 +587,96 @@ def test_default_synthesis_finds_escobars_cheapest_network():
 
     assert design.selected_network.total_annual_cost == pytest.approx(352_267, rel=1e-4)
     assert verify_network_feasibility(design.selected_network) == ()
+
+
+def test_a_heuristic_network_without_an_objective_value_sorts_last():
+    """A success with no objective value is dropped before a costed one, and
+    does not stop the run."""
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+        _cheapest_heuristic_seeds,
+    )
+    from OpenPinch.contracts.synthesis.task import (
+        HeatExchangerNetworkSynthesisTask,
+        HeatExchangerNetworkSynthesisTaskOutcome,
+    )
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    def outcome(name, objective):
+        return HeatExchangerNetworkSynthesisTaskOutcome(
+            task=HeatExchangerNetworkSynthesisTask(
+                run_id=name,
+                method="heuristic_pinch_design_method",
+                dt_cont_multiplier=1.0,
+            ),
+            status="success",
+            network=HeatExchangerNetwork(run_id=name),
+            objective_value=objective,
+        )
+
+    uncosted, costed = outcome("uncosted", None), outcome("costed", 10.0)
+
+    assert _cheapest_heuristic_seeds((uncosted, costed), 1) == (costed,)
+
+
+def test_the_workflow_runs_every_stage_in_one_executor_session():
+    """So a run with worker processes starts their pool once."""
+    from contextlib import contextmanager
+
+    class SessionExecutor(FakeSynthesisExecutor):
+        def __init__(self):
+            super().__init__()
+            self.sessions = 0
+            self.open = False
+            self.stages_in_session = []
+
+        @contextmanager
+        def session(self):
+            self.sessions += 1
+            self.open = True
+            try:
+                yield self
+            finally:
+                self.open = False
+
+        def execute(self, tasks, **kwargs):
+            self.stages_in_session.append(self.open)
+            return super().execute(tasks, **kwargs)
+
+    problem = _small_problem_with_options(
+        {"HENS_DT_CONT_MULTIPLIERS": [1.0], "HENS_PDM_MILP": True}
+    )
+    executor = SessionExecutor()
+
+    workflow_module.execute_open_hens_method(
+        problem, workflow_settings_from_problem(problem), executor=executor
+    )
+
+    assert executor.sessions == 1
+    assert len(executor.stages_in_session) > 1
+    assert all(executor.stages_in_session)
+    assert not executor.open
+
+
+def test_the_workflows_run_time_covers_closing_the_session(monkeypatch):
+    """Closing a session joins its worker processes while the caller still
+    waits, so the reported run time includes it."""
+    from contextlib import contextmanager
+
+    clock = [0.0]
+    monkeypatch.setattr(workflow_module, "perf_counter", lambda: clock[0])
+
+    class SlowToClose(FakeSynthesisExecutor):
+        @contextmanager
+        def session(self):
+            try:
+                yield self
+            finally:
+                clock[0] += 5.0
+
+    problem = _small_problem_with_options({"HENS_DT_CONT_MULTIPLIERS": [1.0]})
+
+    result = workflow_module.execute_open_hens_method(
+        problem, workflow_settings_from_problem(problem), executor=SlowToClose()
+    )
+
+    assert result.total_run_time == pytest.approx(5.0)

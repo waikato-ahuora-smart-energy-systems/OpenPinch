@@ -603,6 +603,14 @@ def evaluate_vapour_hpr_result(
         hpr_machine_annualized_capital_costs=(
             cost_accounting.hpr_machine_annualized_capital_costs
         ),
+        # Without the process and air exchangers: compressors, motors and
+        # the internal exchangers (cascade exchangers, IHXs).
+        hpr_machine_internal_capital_costs=tuple(
+            installed_capital(machine)
+            for machine in machine_components(
+                machines, process_areas=(0.0, 0.0, 0.0, 0.0), args=args
+            )
+        ),
         hpr_hot_utility_annualized_capital_cost=(
             cost_accounting.hpr_hot_utility_annualized_capital_cost
         ),
@@ -827,6 +835,21 @@ def subcritical_stage_condensing_temperatures(
     for index in range(1, capped.size):
         capped[index] = min(capped[index], capped[index - 1])
     return capped
+
+
+def vapour_seed_evaporating_temperatures(
+    T_evap_carnot: np.ndarray,
+    dt_phase_change: float,
+) -> np.ndarray:
+    """Map Carnot evaporating levels to vapour-cycle saturation temperatures.
+
+    A Carnot evaporator at ``T`` spans ``[T - dt_phase_change, T]``, while a
+    vapour evaporator widens its flat profile upwards from its saturation
+    temperature. Seeding at ``T - dt_phase_change`` starts the vapour stream at
+    the Carnot stream's lower edge, so a Carnot evaporator on a utility band
+    edge stays on it.
+    """
+    return np.asarray(T_evap_carnot, dtype=float) - float(dt_phase_change)
 
 
 # Keeps a floored temperature above Tmin through the degC to K round trip.

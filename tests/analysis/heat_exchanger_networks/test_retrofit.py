@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import json
+import warnings
 
 import pytest
 
@@ -780,3 +781,122 @@ def test_retrofit_search_drops_designs_that_fail_solution_verification(monkeypat
     assert all(
         m.kind == "area_addition" for d in result.frontier for m in d.modifications
     )
+
+
+def _captured_settings(monkeypatch, **kwargs):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    captured = {}
+
+    def capture(problem, existing, settings, *args, **kw):
+        captured["settings"] = settings
+        raise RuntimeError("captured")
+
+    monkeypatch.setattr(search, "run_retrofit_search", capture)
+    with pytest.raises(RuntimeError, match="captured"):
+        _case_problem().design.retrofit(_existing_network(), **kwargs)
+    return captured["settings"]
+
+
+def test_a_retrofit_approach_defaults_to_the_cases_minimum_approach(monkeypatch):
+    """No approach given leaves each match the sum of its streams'
+    temperature contributions (``None``), not a 1 K default that let new
+    matches recover heat the design basis rules out, nor twice the master
+    zone's dt_cont, which overrides per-stream values."""
+    assert _captured_settings(monkeypatch).approach is None
+    assert _captured_settings(
+        monkeypatch, min_approach_temperature=4.0
+    ).approach == pytest.approx(4.0)
+
+
+def test_a_retrofit_with_unpriced_modifications_warns(monkeypatch):
+    """New units cost COSTING_HX_UNIT_COST but area additions, splits and
+    repiping cost nothing by default, which favours them."""
+    with pytest.warns(UserWarning, match="area_addition_cost"):
+        _captured_settings(monkeypatch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        _captured_settings(
+            monkeypatch, area_addition_cost=1.0, split_cost=1.0, repiping_cost=1.0
+        )
+
+
+def _recovery_approaches(problem, approach):
+    """Each recovery exchanger's minimum approach (K) in the retrofit
+    model the search builds for the existing network."""
+    from OpenPinch.analysis.heat_exchanger_networks.models import fixed_structure
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        _Evaluator,
+        _State,
+    )
+
+    class Built(Exception):
+        pass
+
+    def built(model, *args, **kwargs):
+        raise Built(model.recovery_dt[0])
+
+    problem.target.direct_heat_integration()
+    network = _existing_network()
+    evaluator = _Evaluator(problem, network, RetrofitSettings(approach=approach))
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(fixed_structure.FixedStructureModel, "optimise", built)
+        with pytest.raises(Built) as caught:
+            evaluator.evaluate(_State(network, frozenset(), ()))
+    return caught.value.args[0]
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_a_retrofit_without_an_approach_keeps_each_streams_contribution():
+    """H1 contributes 2 K and every other stream 5 K: H1's match needs
+    7 K, the others 10 K; an explicit approach still sets them all."""
+    data = json.loads(CASE_JSON.read_text(encoding="utf-8"))
+    for stream in data["streams"]:
+        if stream["name"] == "H1":
+            stream["dt_cont"] = {"value": 2.0, "unit": "delta_degC"}
+
+    default = _recovery_approaches(PinchProblem(data), None)
+    explicit = _recovery_approaches(PinchProblem(data), 4.0)
+
+    assert sorted(default) == pytest.approx([7.0, 10.0, 10.0, 10.0])
+    assert explicit == pytest.approx([4.0] * 4)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_a_retrofit_match_of_two_zero_contributions_is_held_to_the_pair_floor():
+    """H1 and C1 contribute nothing: their match is held to the 0.1 K floor
+    of a pair, and C1's match with H3 (5 K) to H3's contribution alone."""
+    data = json.loads(CASE_JSON.read_text(encoding="utf-8"))
+    for stream in data["streams"]:
+        value = 0.0 if stream["name"] in {"H1", "C1"} else 5.0
+        stream["dt_cont"] = {"value": value, "unit": "delta_degC"}
+
+    default = _recovery_approaches(PinchProblem(data), None)
+
+    assert sorted(default) == pytest.approx([0.1, 5.0, 10.0, 10.0], abs=1e-12)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_every_frontier_network_of_the_guide_example_verifies():
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+        verify_network_feasibility,
+    )
+
+    result = _case_problem().design.retrofit(
+        EXISTING_STRUCTURE,
+        max_modifications=3,
+        area_addition_cost=8_650.0,
+        split_cost=10_000.0,
+    )
+
+    # The existing network (step 0) included: each installed unit is judged
+    # as the search rated it, its area widened by the tolerance and the
+    # rating allowance it records.
+    assert result.frontier[0].modifications == ()
+    for step, design in enumerate(result.frontier):
+        assert verify_network_feasibility(design.network) == (), step

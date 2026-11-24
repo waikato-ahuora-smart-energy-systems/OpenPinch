@@ -39,11 +39,14 @@ CASE_IDS = (
 )
 PACKAGE_SAMPLE_CASE_ID = "Four-stream-Yee-and-Grossmann-1990-1"
 # The package sample shows the synthesis defaults: it drops the OpenHENS
-# solver and the multiplier and threshold grids the fixtures pin.
+# solver, the multiplier and threshold grids the fixtures pin, and their
+# worker count (on a case this small, worker processes cost more than they
+# save).
 PACKAGE_SAMPLE_DEFAULTED_OPTIONS = (
     "HENS_SOLVER_PDM",
     "HENS_DT_CONT_MULTIPLIERS",
     "HENS_DERIVATIVE_THRESHOLDS",
+    "HENS_MAX_PARALLEL",
 )
 OPENHENS_DT_GRID = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]
 # The fixtures keep the default THERMAL_DT_CONT of 5 K; synthesis is keyed on

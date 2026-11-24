@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -55,6 +55,74 @@ _AREA_LABEL_KINDS = {
 }
 
 
+class OverdesignPeriod(BaseModel):
+    """One period's recovery and utility, kW, before and after a margin."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recovery_before: float
+    recovery_after: float
+    utility_before: float
+    utility_after: float
+
+
+class NetworkOverdesign(BaseModel):
+    """An overdesign margin on a network's recovery areas and its effect.
+
+    ``mode`` is ``"fixed"`` (the margin given) or ``"optimised"`` (the
+    least-cost margin found); ``percentage`` is the margin, ``cost`` and
+    ``cost_without_margin`` the total annual costs with and without it,
+    ``search`` every ``(percentage, cost)`` point rated, and
+    ``failed_margins`` every margin of an ``"optimised"`` search whose rating
+    failed. An optimised 0 % with no positive margin in ``search`` means no
+    positive margin could be rated, not that none pays.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["fixed", "optimised"]
+    percentage: float
+    periods: dict[str, OverdesignPeriod]
+    cost_without_margin: float
+    cost: float
+    search: tuple[tuple[float, float], ...] = ()
+    failed_margins: tuple[float, ...] = ()
+
+
+class NetworkHeatPump(BaseModel):
+    """A heat pump designed into a network as streams of fixed duty.
+
+    The network's exchangers serve the machine's condenser and evaporator
+    streams; this is the machine itself. Duties and ``work`` are kW,
+    ``electricity_cost`` and ``annual_capital_cost`` $/y, and
+    ``capital_cost`` the installed cost ($) of the compressor and its
+    motor: the condenser and evaporator are exchangers of the network and
+    are priced there. For a machine over several periods the duties are
+    the largest of any period (its capacity) and ``work`` the mean over
+    the periods by their weights, which the electricity is priced on.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    machine: str
+    cycle: str
+    condenser_duty: float
+    evaporator_duty: float
+    work: float
+    cop: float
+    electricity_cost: float
+    capital_cost: float
+    annual_capital_cost: float
+    # The share of the heating the process could give a heat pump that this
+    # one takes (1.0: the full load); None when its target did not say.
+    load_fraction: float | None = None
+
+    @property
+    def annual_cost(self) -> float:
+        """What the machine adds to the network's total annual cost, $/y."""
+        return self.electricity_cost + self.annual_capital_cost
+
+
 class HeatExchangerNetwork(BaseModel):
     """Ordered heat exchanger network result collection."""
 
@@ -73,6 +141,12 @@ class HeatExchangerNetwork(BaseModel):
     summary_metrics: dict[str, float | int | str | bool | None] = Field(
         default_factory=dict,
     )
+    # The overdesign margin a rated network carries (``heat_exchanger_network
+    # (overdesign_percentage=...)``); None without one.
+    overdesign: NetworkOverdesign | None = None
+    # The heat pumps whose streams the network serves (``heat_exchanger_
+    # network(heat_pump=...)``); none in a design without one.
+    heat_pumps: tuple[NetworkHeatPump, ...] = ()
     solver_axis_metadata: dict[str, Any] = Field(
         default_factory=dict,
         exclude=True,
@@ -96,12 +170,14 @@ class HeatExchangerNetwork(BaseModel):
             raise ValueError("stage_count must be a positive integer when supplied")
         return value
 
-    @field_validator(
-        "objective_value",
-        "total_annual_cost",
-        "utility_cost",
-        "capital_cost",
-    )
+    # A site network's net utility cost, and so its objective and total
+    # annual cost, is negative where steam credits exceed purchases.
+    @field_validator("objective_value", "total_annual_cost", "utility_cost")
+    @classmethod
+    def _validate_optional_signed_cost(cls, value: float | None) -> float | None:
+        return _rules.optional_finite(value, _rules.NETWORK_COST_MESSAGE)
+
+    @field_validator("capital_cost")
     @classmethod
     def _validate_optional_non_negative_finite(
         cls,
@@ -473,4 +549,9 @@ def _require_recovery_label(
         raise ValueError(f"{label.value} is only valid for recovery exchangers")
 
 
-__all__ = ["HeatExchangerNetwork"]
+__all__ = [
+    "HeatExchangerNetwork",
+    "NetworkHeatPump",
+    "NetworkOverdesign",
+    "OverdesignPeriod",
+]

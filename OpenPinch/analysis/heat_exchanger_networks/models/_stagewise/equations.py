@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from ...indexing import build_index_grid
 from .._base import approach as _approach
+from .._base import interior_approach as _interior
 from .._base import piecewise as _piecewise
+from .._base import utility_slices as _slices
 from .._base.superstructure import create_match_binaries, create_utility_duty_grids
+from . import level_targets as _levels
+from . import staged_utilities as _staged
 
 
 def set_stage_wise_superstructure(owner) -> None:
@@ -103,7 +107,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             ),
                             lb=approaches[n][i][j],
                         )
-                        if owner.z_allowed[i][j][k] > 0
+                        if _runs(owner, n, i, j, k)
                         else approaches[n][i][j]
                     )
                     for k in range(owner.S)
@@ -126,7 +130,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             ),
                             lb=approaches[n][i][j],
                         )
-                        if owner.z_allowed[i][j][k] > 0
+                        if _runs(owner, n, i, j, k)
                         else approaches[n][i][j]
                     )
                     for k in range(owner.S)
@@ -137,6 +141,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
+
+    _staged.create_staged_utility_grids(owner)
 
     owner.Q_r = owner.Q_r_by_period[0]
     owner.Q_c = owner.Q_c_by_period[0]
@@ -163,6 +169,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         ]
                     )
                     - sum(owner.Q_c_by_period[n][i])
+                    - _staged.staged_cooler_duty(owner, n, i)
                     == 0.0
                     for i in range(owner.I)
                 ]
@@ -178,13 +185,17 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         ]
                     )
                     - sum(owner.Q_h_by_period[n][j])
+                    - _staged.staged_heater_duty(owner, n, j)
                     == 0.0
                     for j in range(owner.J)
                 ]
             )
             owner.m.Equations(
                 [
-                    (owner.T_h_by_period[n][i][k + 1] - owner.T_h_by_period[n][i][k])
+                    (
+                        owner.T_h_mid_by_period[n][i][k + 1]
+                        - owner.T_h_by_period[n][i][k]
+                    )
                     * owner.f_h_period[n][i]
                     + sum(owner.Q_r_by_period[n][i][j][k] for j in range(owner.J))
                     == 0
@@ -195,7 +206,10 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             )
             owner.m.Equations(
                 [
-                    (owner.T_c_by_period[n][j][k + 1] - owner.T_c_by_period[n][j][k])
+                    (
+                        owner.T_c_by_period[n][j][k + 1]
+                        - owner.T_c_mid_by_period[n][j][k]
+                    )
                     * owner.f_c_period[n][j]
                     + sum(owner.Q_r_by_period[n][i][j][k] for i in range(owner.I))
                     == 0
@@ -250,11 +264,20 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     # them. The non-isothermal one also creates the branch variables.
     if not owner.values_only:
         _approach._set_multiperiod_utility_approach_equations(owner)
+        _staged.set_staged_utility_equations(owner)
+        _slices.set_utility_slice_coupling(owner)
+        _levels.set_level_target_equations(owner)
 
     if owner.non_isothermal_model:
         _set_multiperiod_non_isothermal_equations(owner)
+        if not owner.values_only:
+            # As the isothermal model does, on each match's own branches.
+            _interior.install_interior_cuts(owner, owner.M_ij_period)
     elif not owner.values_only:
         _set_multiperiod_isothermal_approach_equations(owner)
+        # The approach inside a match on a segmented stream, checked on each
+        # solution as the pinch design side model does.
+        _interior.install_interior_cuts(owner, owner.M_ij_period)
 
     owner.dqda = []
     owner.alpha = []
@@ -266,10 +289,10 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
             (
                 owner.m.Equation(
                     owner.theta_1_by_period[n][i][j][k]
-                    <= (owner.T_h_by_period[n][i][k] - owner.T_c_by_period[n][j][k])
+                    <= (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -280,10 +303,10 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
             (
                 owner.m.Equation(
                     owner.theta_1_by_period[n][i][j][k]
-                    >= (owner.T_h_by_period[n][i][k] - owner.T_c_by_period[n][j][k])
+                    >= (owner.T_h_by_period[n][i][k] - owner.T_c_mid_by_period[n][j][k])
                     - owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -295,12 +318,12 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                 owner.m.Equation(
                     owner.theta_2_by_period[n][i][j][k]
                     <= (
-                        owner.T_h_by_period[n][i][k + 1]
+                        owner.T_h_mid_by_period[n][i][k + 1]
                         - owner.T_c_by_period[n][j][k + 1]
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -312,12 +335,12 @@ def _set_multiperiod_isothermal_approach_equations(owner) -> None:
                 owner.m.Equation(
                     owner.theta_2_by_period[n][i][j][k]
                     >= (
-                        owner.T_h_by_period[n][i][k + 1]
+                        owner.T_h_mid_by_period[n][i][k + 1]
                         - owner.T_c_by_period[n][j][k + 1]
                     )
                     - owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -435,7 +458,7 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -452,7 +475,7 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                     )
                     + owner.M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for k in range(owner.S)
@@ -538,7 +561,7 @@ def set_dqda_equations(owner) -> None:
                     * owner.theta_2_by_period[n][i][j][k]
                     * owner.U_r_period[n][i][j],
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             ),
             (owner.N_periods, owner.I, owner.J, owner.S),
@@ -551,7 +574,7 @@ def set_dqda_equations(owner) -> None:
                     * owner.M_ij_period[n][i][j]
                     * (1 - owner.z[i][j][k])
                 )
-                if owner.z_allowed[i][j][k] > 0
+                if _runs(owner, n, i, j, k)
                 else None
             )
             for n in range(owner.N_periods)
@@ -585,3 +608,14 @@ def set_dqda_equations(owner) -> None:
         for j in range(owner.J)
         for i in range(owner.I)
     ]
+
+
+def _runs(owner, n: int, i: int, j: int, k: int) -> bool:
+    """Whether allowed match ``(i, j, k)`` can carry duty in period ``n``.
+
+    A match is allowed when it can run in some period; in a period where
+    its supply temperatures are too close for its approach its duty bound
+    is zero, and its approach temperatures stay constants with no
+    constraints, so their bounds cannot cross.
+    """
+    return owner.z_allowed[i][j][k] > 0 and owner.Q_max_period[n][i][j] > owner.tol

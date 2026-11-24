@@ -253,6 +253,279 @@ limits are retained. Period sets must match; ordered values are aligned by ID.
 Use ``project_name=`` to override the receiver's name. To keep the fixed HPR study,
 continue analysing ``optimized`` or derive from an existing residual receiver.
 
+A heat pump as streams of the case
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A heat pump of a fixed size is a set of streams with fixed duties: each
+condenser gives heat like a hot stream and each evaporator takes it like a
+cold stream. ``with_heat_pump_streams`` writes a solved target that way::
+
+   target = problem.target.carnot_heat_pump(load_fraction=1.0)
+   with_pump = problem.with_heat_pump_streams(target)
+   with_pump.target.direct_heat_integration()
+
+``with_pump`` starts unsolved with the problem's own streams and utilities,
+plus:
+
+- one hot stream per condenser and one cold stream per evaporator of the
+  target, with their segments when the cycle has them (a vapour compression
+  condenser desuperheats, condenses and subcools);
+- ``dt_cont`` equal to ``HPR_DT_CONT`` on each, the approach the target
+  assumed between the heat pump and the process (the value that solve used:
+  a ``minimum_approach_temperature`` given to the target is kept), so
+  direct heat integration
+  targeting of ``with_pump`` gives the heat pump target's hot utility and
+  the process cooling less the evaporator duty;
+- the air an evaporator draws on, when the process has too little heat
+  below the pinch, as a hot stream at ambient temperature with
+  ``HPR_DT_ENV_CONT``. The air a condenser rejects heat to is not added:
+  the case's cold utility takes that heat;
+- a mark on each added stream, ``heat_pump: {"machine": "HP", "role":
+  "condenser"}`` (or ``"evaporator"``, ``"ambient_source"``), which travels
+  with the stream record. ``machine=`` sets the name.
+
+The streams go in the process zone the target was solved on, or the only
+process zone under it; on a site with several, name one with ``zone=``.
+
+A network designed on ``with_pump`` keeps the heat pump's streams on the
+process. The marks rule out, in every design step (pinch design, the
+thermal derivative and network evolution steps with their moves, and the
+stream-end utilities of a fit to every period):
+
+- a match between a condenser stream and an evaporator stream, which would
+  hand the machine's output back to its input;
+- a cooler on a condenser stream and a heater on an evaporator stream,
+  which would call the stream served while the process went without;
+- any use of an ambient source stream other than heating an evaporator.
+
+These are the masks ``HENS_FORBIDDEN_MATCHES`` fills, so the two combine.
+
+A heat pump on the utility system as zones of a site
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A utility heat pump (``placement="utility"``) lifts heat from one utility
+level of a site to a hotter one. ``with_heat_pump_streams`` takes its
+target too, and adds it as two process zones beside the site's
+processes::
+
+   target = site.target.heat_pump_and_refrigeration("carnot", placement="utility")
+   with_pump = site.with_heat_pump_streams(target)
+   with_pump.target.total_site_heat_integration()
+   with_pump.design.total_site_heat_exchanger_network()
+
+The condensers are the hot streams of a zone ``"HP condenser"`` and the
+evaporators the cold streams of ``"HP evaporator"`` (``machine`` gives the
+first word), marked ``placement: "utility"``. They are two zones because
+the streams of one zone recover heat from each other, and a condenser must
+not heat its own evaporator. The condenser's zone raises the level the
+site buys heat at and the evaporator's is heated from the level the site
+has heat to spare at, so the site's utility balance counts them as
+generation and use with no change to the design.
+
+Total site targeting of the new case gives the hot utility the heat pump
+target left, and its cold utility plus the heat the target let ambient
+air take (the air is not written into the case). On a site that imports
+800 kW of steam at 180 degC and has 1000 kW to spare at 140 degC, a full
+load heat pump leaves 0.08 kW of import, and so does the case.
+
+A level is written as a narrow band of temperature, a steam main as 0.1 K,
+and a target ends its streams inside those bands. A level serves a stream
+whole or not at all, so a condenser inside the band of a level that takes
+heat is moved up to the band's top and an evaporator inside the band of a
+level that gives heat down to its bottom. The move is at most the band's
+width. Where the site has a dt_cont multiplier the new zones inherit it, and
+the streams are written with ``HPR_DT_CONT`` over the multiplier, so they
+stand off the levels as the target put them.
+
+The new case is checked before it is returned. It is refused when it would
+not target as the heat pump did: when a level the heat pump delivers into
+is a hot utility alone or one it draws on a cold utility alone (the level
+has to be of type ``Both``), when a stream sits part way through a wide
+level's temperatures, and when the evaporator draws on ambient air. On a site
+with several periods a target that is not a shared design is refused;
+the case is then checked in the period the target's own fields describe.
+A target solved on one process zone and a ``zone=``
+are refused by name. The direct match rules do not apply to these streams:
+exchanging with utility levels is what they are for. Electricity and the
+compressor are not in the case's costs.
+
+``design.total_site_heat_exchanger_network(heat_pump=...)`` does all of
+this in one call, as ``heat_exchanger_network(heat_pump=...)`` does for one
+process, except that its heat pump heats and cools the site's utility
+levels, never process streams. It designs the site without a heat pump
+and, at each dt_cont multiplier and load, targets the utility heat pump on
+the site scaled to that multiplier, adds its zones and designs the site
+again at that multiplier alone. Every network is ranked by its site cost,
+the machine's electricity and annualised compressor (``heat_pump_cost``,
+$ per kW of condenser capacity) included, and the cheapest is selected.
+``heat_pump`` takes a cycle name or a mapping as for one process; without
+a ``load`` the machine is tried at 1.0, 0.75 and 0.5 of its full load,
+since the load kinks are the processes' profile, not the site utilities'.
+The machine stands ``HPR_DT_CONT`` off the levels, or the
+``minimum_approach_temperature`` ``levels`` gives; like any stream's, its
+contribution scales with the dt_cont multiplier, and the approach varies
+only with it. Standing the machine close to the steam raises its COP but
+needs large exchangers: on the two-level site a fully searched machine at
+1 K (COP 5.90) needed 2,804 m2 and cost $330,740/y with the site, more
+than the site without it ($315,299/y), where at 5 K (COP 5.08, 572 m2) it
+cost $259,717/y, at 10 K $262,354/y and at 20 K $289,897/y. Give the
+approach in ``levels`` to stand the machine further off.
+On a site with several periods the target is a shared design
+(``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) and the zones write each stream
+with its temperatures and duty per period, each period's stream moved
+within its level band on its own. On the
+two-level site above, a 50-evaluation target (COP 2.65) designs to a site
+cost of $76,000/y, but its machine costs $273,000/y, so the site without a
+heat pump ($315,000/y) is selected.
+
+Designing a network with and without the heat pump
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``design.heat_exchanger_network(heat_pump=...)`` does the steps above for
+every dt_cont multiplier of the search and ranks the results with the
+designs that have no heat pump::
+
+   design = problem.design.heat_exchanger_network(
+       heat_pump="carnot",
+       heat_pump_cost=200.0,  # $ per kW of condenser capacity
+   )
+   design.selected_network.heat_pumps   # () when the heat pump does not pay
+   for outcome in design.top(10):
+       network = outcome.network
+       network.total_annual_cost, network.heat_pumps
+
+``heat_pump`` is a cycle name, or a mapping with ``cycle`` and any of
+``load``, ``levels``, ``cycle_options``, ``search`` and ``options`` as
+``target.heat_pump_and_refrigeration`` takes them, for a part load or a
+given number of levels::
+
+   heat_pump = {"cycle": "carnot", "load": {"fraction": 0.5},
+                "levels": {"condensers": 1, "evaporators": 1}}
+
+At each multiplier the heat pump is targeted afresh, with every
+contribution (``HPR_DT_CONT`` included) at that multiplier, because a
+design at 0.75 sees every stream at 0.75 of its contribution and a heat
+pump targeted at 1.0 would sit at the wrong levels there.
+
+Each network designed around the heat pump's streams carries a
+``NetworkHeatPump`` in ``network.heat_pumps`` (duties, work, COP,
+electricity cost, compressor capital) and its total annual cost is
+
+.. code-block:: text
+
+   utility cost + exchanger capital
+     + work x COSTING_HPR_ELE_PRICE x COSTING_ANNUAL_OP_TIME
+     + annualised (heat_pump_cost x condenser capacity)
+
+``utility_cost`` and ``capital_cost`` stay the network's own utilities
+and exchangers; the condenser and the evaporator are exchangers of the
+network and are priced there. ``heat_pump_cost`` prices the compressor
+and its motor for every cycle for now; left at 0 the design warns that the
+compressor is free.
+
+On the basic pinch sample (steam at 10 $/MWh, electricity at 100 $/MWh) a
+Carnot heat pump at full load draws 263.4 kW at multiplier 1.0, 218,636
+$/y. With the compressor at 200 $/kW the best heat pump network, at
+multiplier 0.75 where the machine draws 219.4 kW, costs 380,786 $/y against
+229,354 $/y for the best design without a heat pump, which is selected.
+With steam at 200 $/MWh the design without it costs 1,254,404 $/y and the
+heat pump design is selected. At half load (``"load": {"fraction": 0.5}``)
+the best heat pump network costs 297,124 $/y.
+
+The size of a heat pump is not a variable of the design: each size is its
+own target and its own networks. Without a ``load`` the design tries every
+size worth trying, the load fractions at the kinks of the net load profile
+where the lift a heat pump needs jumps or steepens
+(``target.hpr_load_kinks().logical_load_fractions``) and the full load, at
+every multiplier, and ranks them all. The kinks are those of the profile
+at each multiplier, which scaling the contributions moves: the basic pinch
+sample's profile steps at 0.4 of its load up to multiplier 1.5 and has no
+step at 2.0, where only the full load is designed; ``network.heat_pumps[0].load_fraction``
+says which size a network has. With a ``load`` it designs that size alone.
+The run count is multipliers times sizes, plus the design without a heat
+pump.
+
+On the basic pinch sample the sizes are 0.4 and 1.0. With the compressor
+at 200 $/kW the best network of each size costs, at multiplier 1.0:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Steam, $/MWh
+     - No heat pump
+     - 0.4 of the load
+     - Full load
+     - Selected
+   * - 10
+     - 238,776
+     - 306,868
+     - 409,423
+     - no heat pump
+   * - 30
+     - 363,276
+     - 381,568
+     - 409,423
+     - no heat pump
+   * - 40
+     - 425,526
+     - 418,918
+     - 409,423
+     - full load
+   * - 100
+     - 799,026
+     - 643,018
+     - 409,423
+     - full load
+
+The part-load size is the cheapest only between 37.35 and 37.46 $/MWh on
+this sample: a kW of heat pump costs almost the same at either size.
+
+A condenser or an evaporator is one piece of equipment, or a few on the
+working fluid. ``HENS_HEAT_PUMP_STREAM_EXCHANGERS`` (2 by default) is the
+most exchangers a network may put on one heat pump stream: a network over
+it is left out of the ranking, and a warning says how many were. The cap is
+applied to the designed networks, not inside the design models, so with a
+low cap a size can lose every network; on the basic pinch sample the
+heuristic's networks put one or two exchangers on each heat pump stream,
+and a cap of 1 keeps those with one.
+
+A multiplier and size at which no heat pump target is found, or no network
+is designed around its streams, is left out with a warning. ``record=`` is
+not available with ``heat_pump=``.
+
+On a problem with several periods the heat pump is solved as one machine
+over all of them (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``, which the
+design turns on itself), and its streams carry a value in every period:
+on the crude preheat train sample the condenser gives 184, 750 and 1337 kW
+at turndown, base and peak, at 227, 236 and 248 degC. The network is
+synthesised on the design basis and fitted to every period like any other,
+and the fit adds no heater or cooler to a heat pump stream. The machine's
+electricity is its work in each period weighted by the period weights, its
+compressor is sized on its largest condenser duty, and
+``NetworkHeatPump.condenser_duty`` and ``evaporator_duty`` are those
+largest duties. Without a ``load`` the sizes tried are the load kinks of
+every period, since the profile and its kinks differ between periods.
+A period the machine is off in (an off season, or a load too small to run
+for) gives its streams no heat flow there and adds no work, while keeping
+its share of the year. A segmented (vapour compression) stream keeps its
+segments in every period, each with that period's temperatures and duty,
+and a segment absent in a period has no duty there. The air an
+evaporator draws on is written in every period at that period's air duty:
+it is one stream at the ambient temperature, which is a single setting,
+and where the target's own period draws no air it is built from the
+configuration as the heat pump service builds it.
+
+``with_heat_pump_streams`` takes a heat pump target solved on this problem
+as it stands: a target from another problem, one solved before the inputs
+changed, and a refrigeration target are refused. On a problem with several
+periods it takes the target of a heat pump on the process solved as a
+shared design
+(``options={"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True}``), whose streams
+it writes with a value per period; any other target there holds one
+period's streams and is refused. Electricity and the compressor are not
+in the new case: its targets and any network designed on it price the
+exchangers and the utilities only.
+
 The three HPR shortcuts accept a current, local, unmodified scalar HPR result;
 strings, whole result collections and other target kinds are unsupported.
 Omitted zone and period selectors inherit the HPR result. Explicit conflicts,

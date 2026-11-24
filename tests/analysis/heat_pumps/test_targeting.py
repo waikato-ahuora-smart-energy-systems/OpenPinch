@@ -427,7 +427,9 @@ def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeyp
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
     zone.targets[TargetType.II.value] = SimpleNamespace(
-        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
     )
     calls = {}
 
@@ -518,7 +520,9 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
                 ProblemTableLabel.H_NET_HOT: [np.nan, np.nan],
                 ProblemTableLabel.H_NET_COLD: [np.nan, np.nan],
             }
-        )
+        ),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
     )
     utility_profile = ProblemTable(
         {
@@ -851,12 +855,85 @@ def test_compute_direct_hpr_returns_none_when_direct_profile_has_no_load():
     )
 
 
+def test_a_profile_heat_pump_target_serves_the_given_sink_from_the_given_source(
+    monkeypatch,
+):
+    # The source and sink profiles are used as given: the heat pump's load is
+    # the sink's whole duty, capped by the configured load.
+    captured = {}
+
+    def fake_get_hpr_targets(**kwargs):
+        captured.update(kwargs)
+        return "target"
+
+    monkeypatch.setattr(hp, "_get_hpr_targets", fake_get_hpr_targets)
+    T_vals = np.array([150.0, 100.0, 50.0])
+    H_hot = np.array([0.0, 0.0, -80.0])
+    H_cold = np.array([120.0, 0.0, 0.0])
+
+    result = hp.compute_profile_heat_pump_target(
+        T_vals=T_vals,
+        H_hot=H_hot,
+        H_cold=H_cold,
+        config=Configuration(),
+        args={"maximum_iterations": 7},
+    )
+
+    assert result == "target"
+    assert captured["Q_hpr_target"] == pytest.approx(120.0)
+    assert captured["is_heat_pumping"] is True
+    assert captured["background_is_utility"] is False
+    assert captured["search_budget"].maximum_iterations == 7
+    for name, values in (("T_vals", T_vals), ("H_hot", H_hot), ("H_cold", H_cold)):
+        np.testing.assert_array_equal(captured[name], values)
+
+
+def test_a_profile_heat_pump_target_with_no_sink_is_none(monkeypatch):
+    monkeypatch.setattr(hp, "_get_hpr_targets", lambda **_kwargs: "target")
+
+    assert (
+        hp.compute_profile_heat_pump_target(
+            T_vals=np.array([150.0, 50.0]),
+            H_hot=np.array([0.0, -80.0]),
+            H_cold=np.array([0.0, 0.0]),
+            config=Configuration(),
+        )
+        is None
+    )
+
+
+def test_a_profile_heat_pump_target_takes_the_named_periods_load(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        hp, "_get_hpr_targets", lambda **kwargs: captured.update(kwargs) or "target"
+    )
+    config = Configuration(
+        options={
+            "HPR_LOAD_MODE": "period_values",
+            "HPR_LOAD_PERIOD_VALUES": {"base": 10.0, "peak": 25.0},
+        }
+    )
+
+    hp.compute_profile_heat_pump_target(
+        T_vals=np.array([150.0, 50.0]),
+        H_hot=np.array([0.0, -80.0]),
+        H_cold=np.array([120.0, 0.0]),
+        config=config,
+        period_id="peak",
+        period_idx=1,
+    )
+
+    assert captured["Q_hpr_target"] == pytest.approx(25.0)
+
+
 def test_compute_indirect_hpr_returns_none_when_utility_profile_has_no_load(
     monkeypatch,
 ):
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     zone.targets[TargetType.II.value] = SimpleNamespace(
-        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
     )
     monkeypatch.setattr(
         hp,

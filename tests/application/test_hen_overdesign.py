@@ -128,9 +128,9 @@ def test_a_fixed_margin_scales_every_recovery_area_and_raises_no_utility(fitted)
     base_utility = _utility_by_period(network)
     for period, utility in _utility_by_period(margined).items():
         assert utility <= base_utility[period] + 1e-3 * max(base_utility[period], 1.0)
-    metrics = margined.summary_metrics["overdesign"]
-    assert metrics["mode"] == "fixed" and metrics["percentage"] == 20.0
-    assert set(metrics["periods"]) == {"base", "peak"}
+    metrics = margined.overdesign
+    assert metrics.mode == "fixed" and metrics.percentage == 20.0
+    assert set(metrics.periods) == {"base", "peak"}
 
 
 @pytest.mark.solver
@@ -143,11 +143,11 @@ def test_an_optimised_margin_costs_no_more_than_none_or_the_maximum(fitted):
 
     optimised = problem.design._apply_overdesign(network, "optimise").selected_network
 
-    metrics = optimised.summary_metrics["overdesign"]
-    costs = dict(metrics["search"])
-    assert 0.0 <= metrics["percentage"] <= 50.0
-    assert metrics["cost"] <= costs[0.0] * (1 + 1e-6)
-    assert metrics["cost"] <= costs[50.0] * (1 + 1e-6)
+    metrics = optimised.overdesign
+    costs = dict(metrics.search)
+    assert 0.0 <= metrics.percentage <= 50.0
+    assert metrics.cost <= costs[0.0] * (1 + 1e-6)
+    assert metrics.cost <= costs[50.0] * (1 + 1e-6)
 
 
 @pytest.mark.solver
@@ -164,6 +164,239 @@ def test_a_cost_optimal_single_period_network_needs_no_margin():
 
     margined = base.design._apply_overdesign(optimal, "optimise").selected_network
 
-    assert margined.summary_metrics["overdesign"]["percentage"] == pytest.approx(
-        0.0, abs=1.0
+    assert margined.overdesign.percentage == pytest.approx(0.0, abs=1.0)
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_overdesign_keeps_a_network_designed_below_1_k():
+    """Evolution can design an approach down to its 0.1 K floor; rating each
+    network for overdesign at 1 K made the cheapest one infeasible and
+    dropped it, even at a margin of 0. Rating at the case's own minimum
+    approach keeps it."""
+    from OpenPinch.application.problem import PinchProblem
+    from tests.analysis.heat_exchanger_networks.test_duty_optimisation import (
+        _small_payload,
     )
+
+    plain = PinchProblem(_small_payload()).design.heat_exchanger_network(
+        width=0, depth=1
+    )
+    margined = PinchProblem(_small_payload()).design.heat_exchanger_network(
+        width=0, depth=1, overdesign_percentage=0.0
+    )
+
+    assert margined.selected_network.total_annual_cost == pytest.approx(
+        plain.selected_network.total_annual_cost, rel=1e-4
+    )
+
+
+def test_an_overdesigned_network_keeps_the_levels_to_check(monkeypatch):
+    """Rating does not hold utility levels; the rated network keeps the
+    levels its design held, so ``holds_utility_levels`` checks them rather
+    than finding no targets to miss."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks import overdesign
+
+    rated = HeatExchangerNetwork(exchangers=(), run_id="rated")
+    monkeypatch.setattr(
+        overdesign,
+        "apply_overdesign",
+        lambda network, margin, **kwargs: (
+            SimpleNamespace(selected_network=rated),
+            {
+                "mode": "fixed",
+                "percentage": 0.0,
+                "periods": {},
+                "cost_without_margin": 0.0,
+                "cost": 0.0,
+            },
+        ),
+    )
+    targets = {"Hot Utility.LPS": [10.0, 12.0]}
+    network = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="designed",
+        source_metadata={"utility_level_targets": targets},
+    )
+    problem = _two_period_problem()
+    hens = problem.design._effective_hens(None)
+
+    view = problem.design._overdesigned(
+        network, 0.0, hens=hens, options=None, solver=None, solve_tolerance=None
+    )
+
+    assert view.selected_network.source_metadata["utility_level_targets"] == targets
+
+
+def test_a_fitted_network_is_rated_at_its_designs_approach(monkeypatch):
+    """The fit's result is labelled as a duty optimisation; rating it for
+    overdesign keeps the approach the synthesised network was designed to,
+    read before the fit, not the evolution floor its label suggests."""
+    from types import SimpleNamespace
+
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+
+    designed = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="designed",
+        method="PDM",
+        summary_metrics={"dt_cont_multiplier": 0.75},
+    )
+    fitted = HeatExchangerNetwork(
+        exchangers=(), run_id="fitted", method="network_evolution_method"
+    )
+    seen = {}
+    monkeypatch.setattr(
+        _DesignAccessor,
+        "_fit_to_all_periods",
+        lambda self, network, **kwargs: SimpleNamespace(selected_network=fitted),
+    )
+
+    def overdesigned(self, network, margin, **kwargs):
+        seen.update(network=network, approach=kwargs.get("approach"))
+        return "rated"
+
+    monkeypatch.setattr(_DesignAccessor, "_overdesigned", overdesigned)
+    problem = _two_period_problem()
+
+    problem.design._finalise_network(
+        designed,
+        fit=True,
+        margin=0.0,
+        hens=problem.design._effective_hens(None),
+        options=None,
+        solver=None,
+        solve_tolerance=None,
+    )
+
+    assert seen["network"] is fitted
+    assert seen["approach"] == {"problem_approach": True, "dt_cont_multiplier": 0.75}
+
+
+def test_a_network_fitted_at_the_fallback_is_rated_at_the_fallback(monkeypatch):
+    """A fit that could not keep the design approach fits at 1 K; its areas
+    are sized for 1 K, so the rating holds 1 K too, not the design approach
+    those areas cannot meet."""
+    from types import SimpleNamespace
+
+    from OpenPinch.application._problem.accessors.design import _DesignAccessor
+
+    designed = HeatExchangerNetwork(
+        exchangers=(), run_id="designed", method="PDM", summary_metrics={}
+    )
+    fitted = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="fitted",
+        method="network_evolution_method",
+        summary_metrics={"approach_temperature": 1.0},
+    )
+    seen = {}
+    monkeypatch.setattr(
+        _DesignAccessor,
+        "_fit_to_all_periods",
+        lambda self, network, **kwargs: SimpleNamespace(selected_network=fitted),
+    )
+
+    def overdesigned(self, network, margin, **kwargs):
+        seen.update(approach=kwargs.get("approach"))
+        return "rated"
+
+    monkeypatch.setattr(_DesignAccessor, "_overdesigned", overdesigned)
+    problem = _two_period_problem()
+
+    problem.design._finalise_network(
+        designed,
+        fit=True,
+        margin=10.0,
+        hens=problem.design._effective_hens(None),
+        options=None,
+        solver=None,
+        solve_tolerance=None,
+    )
+
+    assert seen["approach"] == {"min_approach_temperature": 1.0}
+
+
+def test_a_failed_margin_is_recorded_on_the_network():
+    from OpenPinch.domain.heat_exchanger_network import NetworkOverdesign
+
+    metrics = NetworkOverdesign(
+        mode="optimised",
+        percentage=0.0,
+        periods={},
+        cost_without_margin=1.0,
+        cost=1.0,
+        search=((0.0, 1.0),),
+        failed_margins=(50.0,),
+    )
+
+    assert metrics.failed_margins == (50.0,)
+
+
+def test_a_scaled_pinch_design_keeps_each_streams_contribution():
+    """At a multiplier other than 1 a pinch design network keeps each
+    stream's own contribution scaled by it, as synthesis does, not one
+    nominal approach for every exchanger."""
+    problem = _two_period_problem()
+    network = HeatExchangerNetwork(
+        exchangers=(),
+        run_id="designed",
+        method="PDM",
+        summary_metrics={"dt_cont_multiplier": 0.75},
+    )
+
+    approach = problem.design._design_approach(
+        network, problem.design._effective_hens(None)
+    )
+
+    assert approach == {"problem_approach": True, "dt_cont_multiplier": 0.75}
+
+
+def test_a_duty_optimisation_builds_its_arrays_at_the_requested_multiplier():
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
+        duty_optimisation_task,
+    )
+
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("Process A.Raw Milk", "Process A.CIP Water", 1)], stage_count=1
+    )
+    request = build_duty_optimisation_request(
+        network, objective="cost", problem_approach=True, dt_cont_multiplier=0.75
+    )
+
+    settings = SimpleNamespace(
+        run_id="run",
+        dt_cont_multipliers=(1.0,),
+        problem_id=None,
+        workspace_variant=None,
+        period_id=None,
+    )
+
+    task = duty_optimisation_task(request, settings)
+
+    assert task.dt_cont_multiplier == pytest.approx(0.75)
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_an_overdesigned_network_reloads_from_json(fitted):
+    """The overdesign metrics are a typed field of the network, so an
+    overdesigned network survives a JSON round trip; as a nested dict in the
+    scalar summary metrics it failed validation on reload."""
+    problem, network = fitted
+
+    margined = problem.design._apply_overdesign(network, 20.0).selected_network
+    reloaded = HeatExchangerNetwork.model_validate_json(margined.model_dump_json())
+
+    assert reloaded.overdesign == margined.overdesign
+    assert reloaded.overdesign.percentage == 20.0

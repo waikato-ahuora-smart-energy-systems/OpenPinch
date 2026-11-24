@@ -35,6 +35,7 @@ import from here.
 - Validated temperatures are in degC; below -273.15 is an error. Temperatures are compared in canonical units. [semantics.py:_validate_above_absolute_zero], [construction.py:_validate_stream_temperatures]
 - A non-segmented stream whose non-zero temperature span is below `THERMAL_DT_PHASE_CHANGE` has its target moved out to that span; its duty is unchanged, and an exactly isothermal stream is rejected. [construction.py:_widen_near_isothermal_target]
 - Per-period arrays must have one entry per `PROBLEM_PERIOD_IDS` id. [semantics.py:_validate_period_lengths]
+- A negative utility `dt_cont`, `heat_flow`, `maximum_heat_flow` or `price` is a warning, except a negative `price` on a `Cold` utility without `segments` or a `profile`: a credit for the heat it takes (steam raised), which a total site design supports. [semantics.py:_validate_utility_record_states]
 - Supplied `heat_flow` must agree with `heat_capacity_flowrate` x |dT| to a relative 1e-4. [semantics.py:_validate_heat_capacity_flowrate_agreement]
 - Segment temperatures chain end to start, keep one direction, and carry positive heat flow and HTC; profile cumulative heat increases strictly. [semantics.py:_validate_segmented_stream_states], [semantics.py:_validate_temperature_heat_profile_states]
 - Supplied parent `t_supply`, `t_target` and `heat_flow` must match the nested profile. [segments.py:_validate_supplied_parent_aggregates]

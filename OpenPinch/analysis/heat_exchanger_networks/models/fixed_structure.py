@@ -49,6 +49,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..solver.arrays import pair_minimum_approach
 from ..solver.piecewise import (
     duty_aligned_area_contributions,
     profile_from_solver_arrays,
@@ -129,10 +130,14 @@ class FixedStructureSpec:
     # transfer coefficient, so its capacity, by the factor.
     enhanced_recovery: Mapping[int, float] = field(default_factory=dict)
     enhanced_utilities: Mapping[int, float] = field(default_factory=dict)
-    # Heat pumps, each (evaporator, condenser, COP): two utility exchangers,
-    # by index in ``utilities``, whose duties the COP links in every period
-    # (the condenser delivers the evaporator's heat plus the work).
-    heat_pumps: tuple[tuple[int, int, float], ...] = ()
+    # Heat recovery loops, each (cooler, heater): two utility exchangers, by
+    # index in ``utilities``, with equal duties in every period (the loop
+    # delivers what it collects, with no loss).
+    loops: tuple[tuple[int, int], ...] = ()
+    # Utility levels held at their targets, each (utilities, per-period
+    # duties): the duties of those utility exchangers, by index in
+    # ``utilities``, sum to the level's target in every period.
+    level_holds: tuple[tuple[tuple[int, ...], tuple[float, ...]], ...] = ()
 
 
 @dataclass
@@ -321,8 +326,10 @@ def prepare_fixed_structure(owner) -> None:
             _approach_limit(
                 owner,
                 spec.recovery_approach.get(r),
-                owner.hot_profiles[n][m.hot].max_contribution
-                + owner.cold_profiles[n][m.cold].max_contribution,
+                pair_minimum_approach(
+                    owner.hot_profiles[n][m.hot].max_contribution,
+                    owner.cold_profiles[n][m.cold].max_contribution,
+                ),
             )
             for r, m in enumerate(spec.recovery)
         ]
@@ -333,8 +340,10 @@ def prepare_fixed_structure(owner) -> None:
             _approach_limit(
                 owner,
                 spec.utility_approach.get(e),
-                _utility_contribution(owner, n, m)
-                + stream_profile(owner, n, m).max_contribution,
+                pair_minimum_approach(
+                    _utility_contribution(owner, n, m),
+                    stream_profile(owner, n, m).max_contribution,
+                ),
             )
             for e, m in enumerate(spec.utilities)
         ]
@@ -770,6 +779,11 @@ def _q_max(owner, n: int, match: RecoveryMatch) -> float:
 # -- equations ----------------------------------------------------------------
 
 
+# A held level's duty stays within this share of its target (or of 1 kW),
+# half the tolerance a network is checked against when it holds its levels.
+LEVEL_BAND = 5e-4
+
+
 def build_fixed_structure_equations(owner) -> None:
     """Create variables and constraints for every period."""
 
@@ -799,11 +813,16 @@ def build_fixed_structure_equations(owner) -> None:
         _recovery_equations(owner, n, start)
         _utility_equations(owner, n, start)
         _utility_caps(owner, n)
-        for evaporator, condenser, cop in owner.spec.heat_pumps:
-            owner._equal(
-                owner.q_u[n][condenser] * (float(cop) - 1.0),
-                owner.q_u[n][evaporator] * float(cop),
-            )
+        for cooler, heater in owner.spec.loops:
+            owner._equal(owner.q_u[n][heater], owner.q_u[n][cooler])
+        for units, targets in owner.spec.level_holds:
+            # A band, not an equality: a level at zero would otherwise pin
+            # duties bounded at zero, which some Ipopt builds cannot solve.
+            target = float(targets[n])
+            band = LEVEL_BAND * max(1.0, abs(target))
+            duty = sum(owner.q_u[n][e] for e in units)
+            owner._at_least(duty, target - band)
+            owner._at_least(target + band, duty)
     if owner.minimisation_goal in {"total area", "total cost"}:
         _common_areas(owner)
     elif owner.minimisation_goal == "rating":
@@ -1299,14 +1318,32 @@ def _common_areas(owner) -> None:
     ]
 
 
+# The rating cap widens each installed area by this share: a unit rated at
+# exactly its design area runs at its cap with no slack, which Ipopt can find
+# infeasible. Verification accepts areas 1e-4 short, far wider.
+_RATING_SLACK = 1e-6
+
+
 def _installed_areas(owner) -> None:
     """Each exchanger's installed area caps its duty in every period."""
+
+    owner.rating_terms = {}
 
     def installed(side, areas, points, count):
         fixed = []
         for e in range(count):
             area = float(areas[e])
-            _cap_installed(owner, area, points.get(e, {}), *_unit_terms(owner, side, e))
+            caps = _cap_installed(
+                owner,
+                area * (1.0 + _RATING_SLACK),
+                points.get(e, {}),
+                *_unit_terms(owner, side, e),
+            )
+            # Per period, the cap's factor per m2 and end approaches, to
+            # compare with verification's exact sizing (``rating_allowances``).
+            owner.rating_terms[(side, e)] = [
+                (factor, thetas) for _constraint, factor, thetas in caps
+            ]
             fixed.append(area)
         return fixed
 
@@ -1749,6 +1786,8 @@ def post_process_fixed_structure(owner) -> None:
     owner.total_area = sum(
         result.area for result in owner.recovery_results + owner.utility_results
     )
+    if owner.minimisation_goal == "rating":
+        owner.rating_allowances = _rating_allowances(owner)
     if owner.minimisation_goal == "retrofit":
         owner.area_values = _area_values(owner)
         owner.rating_allowances = _rating_allowances(owner)

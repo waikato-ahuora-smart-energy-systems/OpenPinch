@@ -15,15 +15,18 @@ Converts a solved equation model (and the solver arrays it was built from) into 
 
 ## Invariants
 - Exchanger ids are `recovery:<hot>-><cold>:S<stage>`, `hot-utility:<utility>-><cold>` and `cold-utility:<hot>-><utility>`; recovery stages are one-based [recovery.py:_recovery_exchangers, utility.py:_hot_utility_exchangers].
+- A utility slice (`../solver/utility_slices.py`) is reported under its parent utility (`source_stream` of a heater, `sink_stream` of a cooler), its exchanger id keeping the slice name, so two slices on one stream stay distinct; `solver_axis_metadata["utility_parents"]` maps each slice to its parent [service.py:extract_heat_exchanger_network] [utility.py:_hot_utility_exchangers].
+- A model with staged utilities (`z_hs_allowed`, `z_cs_allowed`) also gives `hot-utility:<utility>-><cold>:S<stage>` and `cold-utility:<hot>-><utility>:S<stage>`, with `stage` the one-based stage the stream has just left, as duty optimisation reads a utility exchanger's stage: a heater at boundary `k` has stage `k + 1` and a cooler stage `k`. The stream runs from the mid temperature (`T_c_mid`, `T_h_mid`) to the boundary temperature, and the area is `area_hs` or `area_cs` [utility.py:_staged_hot_utility_exchangers, _staged_cold_utility_exchangers] [period_state.py:_staged_hot_utility_period_state, _staged_cold_utility_period_state].
+- Several stream-end heaters (or coolers) active on one stream in a period run in parallel: each keeps the stream's whole end span and takes `sink_split_fraction` (`source_split_fraction` for coolers) equal to its share of their total duty, since the stage-wise model holds their approaches and sizes their areas against that span [service.py:_end_utilities_in_parallel].
 - Exchangers inactive in every period are dropped unless `include_inactive` is true (only `extract_heat_exchanger_network` exposes it); an exchanger is active when its duty and (if present) its binary exceed the tolerance; a recovery match's binary is read once and shared by its periods, whose duties are checked in period order until one is active [metadata.py:_is_active] [recovery.py:_recovery_exchangers].
-- Solved values are read through `_optional_float`: a plain float as is, then any object's `value` (a Pyomo variable or parameter), then a scalar Pyomo component, `float()`, or the first element of a `[value]` list [metadata.py:_optional_float].
+- Solved values are read through `_optional_float`: a number (NumPy floats included) is converted and a `[value]` list unwrapped directly, then any object's `value` (a Pyomo variable or parameter) is read, then a scalar Pyomo component, `float()`, or the first element of an indexed value [metadata.py:_optional_float].
 - Duties below minus `max(tolerance, 1e-4)` raise `ValueError`; smaller negatives are clipped to zero [metadata.py:_normalized_solver_duty].
 - Period ids must be unique and match `N_periods` [metadata.py:_period_ids].
 - At least one hot and one cold utility must exist on the solver axes [metadata.py:_utilities].
 - With explicit branch outlets, `X`/`Y` fractions outside zero to one raise `ValueError` and are otherwise clamped; under isothermal mixing the fraction is the duty share of the stage duty, capped at 1, or `None` [period_state.py:_recovery_split_fraction].
 - When segment area contributions exist, the aggregate `area` is set to `None` [recovery.py:_recovery_exchangers, utility.py:_hot_utility_exchangers].
 - Recovery source inlet is read at stage boundary `k` of the hot stream and sink inlet at `k + 1` of the cold stream [period_state.py:_recovery_period_state].
-- Without explicit branch outlet temperatures, the isothermal-mixing convention applies: outlets equal the stage outlet boundary, falling back to inlet and duty over `cp` when no boundary exists [period_state.py:_hot_recovery_outlet, _cold_recovery_outlet].
+- Without explicit branch outlet temperatures, the isothermal-mixing convention applies: outlets equal the stage outlet (the mid temperature where the model has one, else the boundary), falling back to inlet and duty over `cp` when no boundary exists [period_state.py:_hot_recovery_outlet, _cold_recovery_outlet].
 - Capital cost is the explicit model value; otherwise `TAC` minus utility cost when `TAC` is at least the utility cost and the component sum is absent or disagrees; otherwise the component sum [metadata.py:_capital_cost].
 - Model codes `PDM`, `TDM`, `ESM` map to `HeatExchangerNetworkDesignMethod` values [metadata.py:_result_method].
 - Segment slicing of a segmented parent with positive duty needs stage boundary temperatures unless the model supplies segment area contributions, and raises otherwise [segment_area.py:_recovery_segment_contributions].
@@ -32,5 +35,5 @@ Converts a solved equation model (and the solver arrays it was built from) into 
 - None. The solved model and solver arrays are read, not mutated [service.py:extract_heat_exchanger_network].
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_pinch_design_method.py tests/analysis/heat_exchanger_networks/test_multi_utility.py`
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_pinch_design_method.py tests/analysis/heat_exchanger_networks/test_multi_utility.py tests/analysis/heat_exchanger_networks/test_staged_utilities.py`
 - There is no extraction-specific test file; these tests exercise extraction through the synthesis methods.

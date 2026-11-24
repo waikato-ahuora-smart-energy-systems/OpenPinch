@@ -21,6 +21,7 @@ from dataclasses import dataclass, replace
 from itertools import combinations, islice
 from typing import Iterator
 
+from .regions import pinch_regions
 from .rules import cp_feasible, cp_rule_met, pinch_streams, split_counts
 from .side_streams import PinchSide, SideStream
 
@@ -275,6 +276,16 @@ def propose_side_topologies(side: PinchSide, *, limit: int) -> list[SideProposal
     designs = [period for period in designs if period]
     if not designs:
         return []
+    return _best_first(designs, lambda chosen: _union(side, chosen), limit=limit)
+
+
+def _best_first(designs, combine, *, limit: int) -> list[SideProposal]:
+    """Combinations of one design from each list, lowest summed rank first.
+
+    ``combine`` joins the chosen designs into one proposal; repeats are
+    dropped and complete proposals come first.
+    """
+
     proposals: list[SideProposal] = []
     seen: set[tuple] = set()
     start = (0,) * len(designs)
@@ -284,10 +295,10 @@ def propose_side_topologies(side: PinchSide, *, limit: int) -> list[SideProposal
     while heap and len(proposals) < limit and pops < _NODES_PER_PROPOSAL * limit:
         pops += 1
         _total, ranks = heapq.heappop(heap)
-        union = _union(side, [designs[n][r] for n, r in enumerate(ranks)])
-        if union.signature not in seen:
-            seen.add(union.signature)
-            proposals.append(union)
+        joined = combine([designs[n][r] for n, r in enumerate(ranks)])
+        if joined.signature not in seen:
+            seen.add(joined.signature)
+            proposals.append(joined)
         for n in range(len(designs)):
             if ranks[n] + 1 < len(designs[n]):
                 following = ranks[:n] + (ranks[n] + 1,) + ranks[n + 1 :]
@@ -322,6 +333,49 @@ def _union(side: PinchSide, designs: list[SideProposal]) -> SideProposal:
 
 def _single_period_topologies(side: PinchSide, *, limit: int) -> list[SideProposal]:
     """Up to ``limit`` distinct topologies for one single-period side.
+
+    A side with pinches inside it has each region designed on its own;
+    a proposal stacks one design per region, nearest the pinch first.
+    """
+
+    regions = pinch_regions(side)
+    if len(regions) == 1:
+        return _region_topologies(side, limit=limit)
+    designs = [_region_topologies(region, limit=limit) for region in regions]
+    if not all(designs):
+        return []
+    return _best_first(designs, lambda chosen: _stack(side, chosen), limit=limit)
+
+
+def _stack(side: PinchSide, designs: list[SideProposal]) -> SideProposal:
+    """One topology from region designs, nearest the pinch first.
+
+    Above the pinch the pinch end is the last stage, so the nearest region
+    takes the highest stages; below it the first.
+    """
+
+    stages = sum(design.stages for design in designs)
+    above = side.location == "above"
+    matches = []
+    offset = 0
+    for design in designs:
+        start = stages - offset - design.stages if above else offset
+        matches += [
+            replace(match, stage=start + match.stage) for match in design.matches
+        ]
+        offset += design.stages
+    return SideProposal(
+        location=side.location,
+        stages=stages,
+        matches=tuple(matches),
+        heaters=tuple(sorted({h for design in designs for h in design.heaters})),
+        coolers=tuple(sorted({c for design in designs for c in design.coolers})),
+        complete=all(design.complete for design in designs),
+    )
+
+
+def _region_topologies(side: PinchSide, *, limit: int) -> list[SideProposal]:
+    """Up to ``limit`` distinct topologies for one single-period region.
 
     Every set of pinch matches gets its own depth-first search over the
     matches away from the pinch; the searches take turns, so the proposals
@@ -833,6 +887,9 @@ def _feasible_duty(side, state, must, partner) -> float:
 def _proposal(side, state, streams, must_kind, *, complete: bool) -> SideProposal:
     stages = 1 + max((match[2] for match in state.matches), default=0)
     above = side.location == "above"
+    # A utility level's match is a heater or cooler, which every partner is
+    # allowed below; its stage stays in the grid, so the side model can
+    # place the level between that match's neighbours.
     matches = tuple(
         ProposedMatch(
             hot=hot,
@@ -841,6 +898,7 @@ def _proposal(side, state, streams, must_kind, *, complete: bool) -> SideProposa
             duty=duty,
         )
         for hot, cold, layer, duty in state.matches
+        if hot < side.hot_count and cold < side.cold_count
     )
     # Every partner may use its utilities, not just those with load left: if
     # the side model cannot reach the proposed duties, the load it leaves

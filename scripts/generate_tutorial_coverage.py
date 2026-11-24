@@ -104,6 +104,8 @@ UNDER_DEVELOPMENT_METHODS = frozenset(
         "organic_rankine_cycle",
         "grand_composite_curve_with_orc",
         "net_load_profiles_with_orc",
+        # A step of heat pump network design, which no notebook owns yet.
+        "with_heat_pump_streams",
     }
 )
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"
@@ -125,6 +127,8 @@ DESIGN_TUTORIALS = {
     "network_evolution": 16,
     "optimise_duties": 16,
     "retrofit": 16,
+    "retrofit_heat_pumps": 16,
+    "total_site_heat_exchanger_network": 16,
 }
 PLOT_TUTORIALS = {
     "catalog": 1,

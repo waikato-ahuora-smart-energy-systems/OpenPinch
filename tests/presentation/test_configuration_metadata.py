@@ -30,6 +30,7 @@ def test_numeric_list_fields_are_reported_as_number_lists():
         "HENS_DT_CONT_MULTIPLIERS",
         "HENS_DERIVATIVE_THRESHOLDS",
         "HENS_STAGE_SELECTION",
+        "HENS_PDM_STAGES",
     ):
         field = _field(name)
         assert (field.field_type, field.multiple) == ("number_list", True), name

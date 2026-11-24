@@ -14,6 +14,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.pinch_design_decompositio
 )
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.domain.configuration import tol
+from OpenPinch.domain.stream_collection import StreamCollection
 from tests.support.paths import FIXTURES_ROOT, REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -93,9 +94,22 @@ def test_decomposition_targets_preserve_original_effective_contributions(
     for stream in original_streams:
         stream.delta_t_contribution_multiplier_locked = True
     # Locked streams keep their effective contributions at any task
-    # multiplier (dTmin 12 against THERMAL_DT_CONT 5 is 1.2); a contribution at
-    # or below tol becomes 0.1 K, unscaled because the stream is locked.
-    expected = [base * multiplier if base * multiplier > tol else 0.1 for base in bases]
+    # multiplier (dTmin 12 against THERMAL_DT_CONT 5 is 1.2). The 0.1 K floor
+    # is on each pair, so targeting raises a contribution only where it and
+    # a possible partner sum below the floor, and then to half of it
+    # (test_pinch_targets_hold_the_floor_for_a_pair_of_zero_contributions).
+    # The streams are a hot utility, two hot streams, two cold streams and a
+    # cold utility. Above a zero multiplier the second hot stream (0), the
+    # first cold stream (tol / 4) and the cold utility (0) are in such pairs;
+    # at zero every stream is.
+    scaled = [base * multiplier for base in bases]
+    in_a_pair_below_the_floor = (
+        [True] * 6 if multiplier == 0.0 else [False, False, True, True, False, True]
+    )
+    expected = [
+        max(value, 0.05) if lifted else value
+        for value, lifted in zip(scaled, in_a_pair_below_the_floor)
+    ]
     captured: dict[str, float | bool | list[float]] = {}
 
     def fake_compute_direct_integration_targets(zone, args=None):
@@ -116,6 +130,8 @@ def test_decomposition_targets_preserve_original_effective_contributions(
             heat_recovery_target=1.0,
             hot_pinch=100.0,
             cold_pinch=90.0,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
         )
 
     monkeypatch.setattr(
@@ -128,7 +144,7 @@ def test_decomposition_targets_preserve_original_effective_contributions(
 
     assert captured["same_zone"] is False
     assert captured["dt_cont_multiplier"] == pytest.approx(1.0)
-    assert captured["process_dt_cont"] == pytest.approx(expected)
+    assert captured["process_dt_cont"] == pytest.approx(expected, abs=1e-12)
     assert captured["process_dt_cont_act"] == pytest.approx(expected)
     assert target.shifted_pinch_temperature == pytest.approx(373.15)
 

@@ -37,7 +37,9 @@ def test_ci_triggers_and_single_required_check():
         "workflow_dispatch",
         "workflow_call",
     }
-    assert ci["on"]["pull_request"]["branches"] == ["develop", "main"]
+    # A stacked pull request (based on another claude/ branch) gets the
+    # standard profile too.
+    assert ci["on"]["pull_request"]["branches"] == ["develop", "main", "claude/**"]
     assert ci["on"]["push"]["branches"] == ["develop"]
     # Metadata edits must never re-run (and so never re-report) the gate.
     assert "types" not in ci["on"]["pull_request"]
@@ -53,21 +55,40 @@ def test_ci_triggers_and_single_required_check():
     assert gate["if"] == "${{ always() }}"
     assert set(gate["needs"]) == set(ci["jobs"]) - {"ci-ok"}
     assert '"solver"' in runs(gate) and '"version"' in runs(gate)
-    assert '"solver","compat"' in runs(gate).replace(", ", ",")
+    assert """'. + ["compat"]'""" in runs(gate)
     (required,) = re.findall(r"^required='(.*)'$", runs(gate), re.MULTILINE)
     # audit stays informational; every other always-on lane blocks a merge.
-    assert json.loads(required) == ["lint", "tests", "build", "smoke", "pyodide"]
+    assert json.loads(required) == [
+        "lint",
+        "tests",
+        "build",
+        "smoke",
+        "pyodide",
+        "solver",
+    ]
 
 
 def test_main_only_lanes():
     jobs = workflow("ci.yml")["jobs"]
-    assert "refs/heads/main" in jobs["solver"]["if"]
-    assert "github.base_ref == 'main'" in jobs["solver"]["if"]
-    assert jobs["compat"]["if"] == jobs["solver"]["if"]
+    assert "refs/heads/main" in jobs["compat"]["if"]
+    assert "github.base_ref == 'main'" in jobs["compat"]["if"]
     assert jobs["version"]["if"] == (
         "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
     )
     assert "check_release_version.py --base-pyproject" in runs(jobs["version"])
+
+
+def test_solver_tests_run_on_every_pull_request_and_notebooks_only_for_main():
+    """Solver-backed changes are tested before they merge into develop; the
+    packaged notebook runs, most of the lane's time, wait for main."""
+    solver = workflow("ci.yml")["jobs"]["solver"]
+    assert "if" not in solver
+    (step,) = [s for s in solver["steps"] if s.get("name") == "Solver tests"]
+    assert step["env"]["MARKERS"] == (
+        "${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') "
+        "&& 'solver' || 'solver and not tutorial_profile' }}"
+    )
+    assert '-m "$MARKERS"' in step["run"]
 
 
 def test_every_ci_lane_is_present():

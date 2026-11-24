@@ -16,16 +16,19 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from ....domain.enums import HeatExchangerNetworkDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod, ZoneType
 from ....domain.progress import emit as emit_progress
 from ....optimisation.execution import _main_module_blocks_workers
 from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models._stagewise.evolution import reporting_improvements
 from ..models.problem import InternalHeatExchangerNetworkProblem
+from ..reporting.ranking import held_utility_levels
 from ..results.record import admit, recording_active
+from ..site.levels import site_utility_system, utility_capacities
 from ..solver.arrays import (
     PreparedSolverArrays,
+    annual_cost_scales,
     nominal_approach_temperature,
     problem_to_solver_arrays,
 )
@@ -108,7 +111,7 @@ class LocalSynthesisExecutor:
         shared = _ZoneCopiedOnce(problem)
         max_parallel = supported_workers(int(max_parallel))
         worker_count = max(1, min(max_parallel, len(tasks)))
-        pool = self._start_pool(worker_count)
+        pool = self._start_pool(worker_count, max_parallel)
         if pool is not None and _can_build_tasks_in_workers(tasks, parent_outcomes):
             # Workers get the problem itself; each copies the zone once.
             solve_inputs = (
@@ -162,8 +165,9 @@ class LocalSynthesisExecutor:
 
         worker_count = max(1, min(max_parallel, len(built)))
         if pool is not None and worker_count == 1:
-            # At most one task built: close the unused pool and solve here.
-            with pool:
+            # At most one task built: solve here, closing the unused pool
+            # unless a session keeps it for later stages.
+            with self._using(pool):
                 pass
             pool = None
         branch_parallel = max(1, max_parallel) if worker_count == 1 else 1
@@ -190,15 +194,70 @@ class LocalSynthesisExecutor:
 
         return self._collect_outcomes(tasks, solved_results, failed)
 
-    def _start_pool(self, worker_count: int):
-        """A pool of ``worker_count`` workers, or ``None`` to run serially."""
+    # Whether a session is open, and the pool it keeps for its stages.
+    _session_open = False
+    _session_pool = None
+
+    @contextmanager
+    def session(self):
+        """Keep one worker pool for every stage executed inside.
+
+        Worker processes take seconds to start, so a run of several stages
+        starts its pool once, at the first stage that needs one, and closes
+        it when the session ends. Outside a session each ``execute`` call
+        starts and closes its own pool.
+        """
+        self._session_open = True
+        try:
+            yield self
+        finally:
+            self._session_open = False
+            pool, self._session_pool = self._session_pool, None
+            if pool is not None:
+                pool.__exit__(None, None, None)
+
+    def _start_pool(self, worker_count: int, session_workers: int | None = None):
+        """A pool of ``worker_count`` workers, or ``None`` to run serially.
+
+        In a session the pool is the session's, started on first use with
+        ``session_workers`` workers (``worker_count`` when not given) so it
+        can serve the later stages too.
+        """
         if worker_count <= 1:
             return None
+        if self._session_pool is not None:
+            return self._session_pool
+        workers = (
+            (session_workers or worker_count) if self._session_open else worker_count
+        )
         try:
-            return self.worker_pool_factory(worker_count)
+            pool = self.worker_pool_factory(workers)
         except NotImplementedError as exc:
             logger.debug("Solving HEN tasks serially: %s", exc)
             return None
+        if self._session_open:
+            pool.__enter__()
+            self._session_pool = pool
+        return pool
+
+    @contextmanager
+    def _using(self, pool):
+        """Use ``pool`` for one stage.
+
+        A stage's own pool is closed after it. A session's pool stays open
+        for the stages to come, unless the stage fails in it: then it is
+        closed and dropped, so the next stage starts a new one.
+        """
+        if pool is not self._session_pool:
+            with pool:
+                yield
+            return
+        try:
+            yield
+        except BaseException:
+            self._session_pool = None
+            pool.__exit__(None, None, None)
+            raise
 
     def _run(self, pool, func, inputs):
         """Yield ``func`` over ``inputs``, in ``pool`` unless it is ``None``.
@@ -215,10 +274,10 @@ class LocalSynthesisExecutor:
             return
         if not recording_active():
             # Nothing listens: workers have nothing to hand off.
-            with pool:
+            with self._using(pool):
                 yield from _as_completed(pool, func, inputs)
             return
-        with self._handoff() as handoff, pool:
+        with self._handoff() as handoff, self._using(pool):
             yield from _as_completed(
                 pool,
                 _handed_off,
@@ -391,7 +450,16 @@ class LocalSynthesisExecutor:
             nominal_approach,
             min_approach_share=config.hens.min_exchanger_approach_share,
         )
-        arrays = problem_to_solver_arrays(problem, dTmin)
+        arrays = problem_to_solver_arrays(
+            problem,
+            _task_array_approach_temperature(
+                task,
+                nominal_approach,
+                min_approach_share=config.hens.min_exchanger_approach_share,
+            ),
+        )
+        # A site seed's task holds each process's levels within the process.
+        site_processes = task.settings.get("site_processes")
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
         is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
@@ -418,20 +486,35 @@ class LocalSynthesisExecutor:
                 ),
             }
 
-        return InternalHeatExchangerNetworkProblem(
+        internal = InternalHeatExchangerNetworkProblem(
             solver_arrays=arrays,
             name=_task_model_name(task),
             framework=_model_framework(task.method),
             solver=_solver_for_task(problem, task.method),
             dTmin=dTmin,
             dt_cont_multiplier=task.dt_cont_multiplier,
+            approach_share=(
+                float(config.hens.min_exchanger_approach_share)
+                if task.method
+                in {
+                    HeatExchangerNetworkDesignMethod.ThermalDerivative,
+                    HeatExchangerNetworkDesignMethod.NetworkEvolution,
+                }
+                else None
+            ),
             min_dqda=(
                 0.0
                 if task.derivative_threshold is None
                 else float(task.derivative_threshold)
             ),
             z_restriction=_topology_restriction_values(task, arrays),
-            minimisation_goal=_model_objective(task.method),
+            minimisation_goal=_model_objective(
+                task.method,
+                utility_choice=any(
+                    len(arrays.axis_maps[side]) > 1
+                    for side in ("hot_utilities", "cold_utilities")
+                ),
+            ),
             non_isothermal_model=is_evolution,
             integers=not is_evolution,
             parent=parent_problem,
@@ -454,7 +537,33 @@ class LocalSynthesisExecutor:
                 if is_heuristic
                 else 0
             ),
+            staged_utilities=site_processes is not None
+            or (
+                decompositions is not None
+                and _utility_placement(problem) == "temperature"
+                and _has_utility_levels(decompositions["above"])
+            ),
+            utility_slicing=bool(problem.master_zone.config.hens.utility_slices),
+            site_processes=site_processes,
+            site_level_holds=str(problem.master_zone.config.hens.site_level_holds),
+            level_holds=str(problem.master_zone.config.hens.evolution_level_holds),
+            held_level_targets=_held_level_targets(problem, task, parent_outcomes),
+            site_utility_system=(
+                None
+                if site_processes is None
+                else site_utility_system(
+                    arrays,
+                    capacities=utility_capacities(problem.master_zone),
+                    letdown_price=_site_letdown_price(problem.master_zone.config),
+                )
+            ),
         )
+        # A seeded task has no parent problem to take its levels from: its
+        # settings carry the seed's (``../targeting/_stage.py``).
+        seed_targets = task.settings.get("utility_level_targets")
+        if seed_targets is not None:
+            internal.utility_level_targets = dict(seed_targets)
+        return internal
 
     def _parent_problem(
         self,
@@ -558,12 +667,7 @@ def _solve_built_task(
         ):
             solved = internal_problem.get_solution(**solve_kwargs)
         if solved is None or getattr(solved, "mSuccess", 0) != 1:
-            reason = getattr(
-                internal_problem,
-                "solution_failure_reason",
-                "solver did not return a successful heat exchanger network model",
-            )
-            return task, _failed_task_outcome(task, reason), None
+            return task, _unsolved_outcome(task, internal_problem, solved), None
         return task, _solved_outcome(task, internal_problem, solved), internal_problem
     except Exception as exc:
         logger.debug(
@@ -582,10 +686,19 @@ _CANDIDATE_SINK: ContextVar[Callable[[Any], None] | None] = ContextVar(
 
 
 def _as_completed(pool, func, inputs):
-    """``func`` over ``inputs`` in ``pool``, each result as its task finishes."""
+    """``func`` over ``inputs`` in ``pool``, each result as its task finishes.
+
+    When the caller stops early (a solve raised, or the generator is
+    closed), the solves still waiting for a worker are cancelled, so the
+    pool's shutdown waits only for those already running.
+    """
     futures = [pool.submit(func, worker_args) for worker_args in inputs]
-    for future in as_completed(futures):
-        yield future.result()
+    try:
+        for future in as_completed(futures):
+            yield future.result()
+    finally:
+        for future in futures:
+            future.cancel()
 
 
 def _handed_off(worker_args: tuple[Callable, Any, Any]):
@@ -653,6 +766,11 @@ def _solved_outcome(
         if getattr(solver_run, "converged", True)
         else {"unconverged_termination": str(solver_run.termination_condition)}
     )
+    # A pinch side designed without its utility levels: results assembly
+    # warns, as a log line in a worker process does not reach the caller.
+    dropped = sorted(getattr(internal_problem, "_sides_without_levels", ()))
+    if dropped:
+        diagnostics["levels_dropped"] = " and ".join(dropped)
     return HeatExchangerNetworkSynthesisTaskOutcome(
         task=task,
         status="success",
@@ -766,6 +884,30 @@ def _can_build_tasks_in_workers(
     return not parent_outcomes and all(task.parent_task_id is None for task in tasks)
 
 
+def _unsolved_outcome(
+    task: HeatExchangerNetworkSynthesisTask,
+    internal_problem: Any,
+    solved: Any,
+) -> HeatExchangerNetworkSynthesisTaskOutcome:
+    """The failed outcome of a task whose solve returned no solved model.
+
+    An evolution whose seed model failed evolved nothing; the outcome keeps
+    that as ``diagnostics["evolution_skipped"]`` so results assembly warns.
+    """
+
+    reason = getattr(
+        internal_problem,
+        "solution_failure_reason",
+        "solver did not return a successful heat exchanger network model",
+    )
+    outcome = _failed_task_outcome(task, reason)
+    if getattr(solved, "evolution_skipped", False):
+        outcome = outcome.model_copy(
+            update={"diagnostics": {"evolution_skipped": reason}}
+        )
+    return outcome
+
+
 def _failed_task_outcome(
     task: HeatExchangerNetworkSynthesisTask,
     reason: str,
@@ -787,9 +929,20 @@ def _model_framework(method: HeatExchangerNetworkDesignMethod) -> str:
     }[method]
 
 
-def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
+def _model_objective(
+    method: HeatExchangerNetworkDesignMethod, *, utility_choice: bool = False
+) -> str:
+    """The goal a task's model minimises.
+
+    The thermal derivative step minimises hot utility duty, which is the
+    utility cost while each side has one utility. With a choice on a side
+    (``utility_choice``) the duty leaves the split between utilities free,
+    so it minimises their cost.
+    """
     if method == HeatExchangerNetworkDesignMethod.NetworkEvolution:
         return "variable total cost"
+    if method == HeatExchangerNetworkDesignMethod.ThermalDerivative and utility_choice:
+        return "utility costs"
     return "hot utility"
 
 
@@ -812,6 +965,35 @@ def _task_model_approach_temperature(
         HeatExchangerNetworkDesignMethod.NetworkEvolution,
     }:
         return max(0.1, min_approach_share * float(nominal_approach))
+    return float(nominal_approach)
+
+
+# The smallest nominal approach a task's arrays are built at, K: a share of 0
+# leaves nothing of the contributions to scale, and the arrays need a
+# positive value to say so.
+_LEAST_ARRAY_APPROACH = 1e-6
+
+
+def _task_array_approach_temperature(
+    task: HeatExchangerNetworkSynthesisTask,
+    nominal_approach: float,
+    *,
+    min_approach_share: float = 0.0,
+) -> float:
+    """Return the nominal approach a task's arrays scale contributions to.
+
+    Pinch design scales each contribution by the task's multiplier. The
+    thermal derivative and evolution steps scale it by the multiplier times
+    ``min_approach_share``, so a match is held to that share of its pinch
+    design approach; the models floor each pair at 0.1 K
+    (``pair_minimum_approach``), which a nominal floor here would not do for
+    a pair above the reference contribution.
+    """
+    if task.method in {
+        HeatExchangerNetworkDesignMethod.ThermalDerivative,
+        HeatExchangerNetworkDesignMethod.NetworkEvolution,
+    }:
+        return max(_LEAST_ARRAY_APPROACH, min_approach_share * float(nominal_approach))
     return float(nominal_approach)
 
 
@@ -934,25 +1116,57 @@ def _stage_packed_stagewise_factory():
     return StagePackedStageWiseModel
 
 
+def _site_letdown_price(config) -> float:
+    """``HENS_SITE_LETDOWN_PRICE`` ($/MWh) as an annual price ($/kW/y), as
+    the solver arrays price utilities."""
+    price_scale, _capital_scale = annual_cost_scales(config.costing)
+    return float(config.hens.site_letdown_price) * price_scale
+
+
 def _solve_tolerance(problem) -> float:
     return float(problem.master_zone.config.hens.solve_tolerance)
+
+
+def _held_level_targets(
+    problem,
+    task: HeatExchangerNetworkSynthesisTask,
+    parent_outcomes: dict[str, HeatExchangerNetworkSynthesisTaskOutcome],
+) -> dict[str, list[float]] | None:
+    """The utility levels ``task`` is to hold with
+    ``HENS_EVOLUTION_LEVEL_HOLDS: "fixed"``: those its parent's network
+    holds, which leaves out a pinch side that dropped its levels, or for a
+    seeded task those its seed holds (its ``held_utility_levels`` setting).
+    ``None`` without the option, or with neither, when the problem's own
+    targets stand."""
+
+    if str(problem.master_zone.config.hens.evolution_level_holds) == "none":
+        return None
+    parent = parent_outcomes.get(task.parent_task_id or "")
+    network = getattr(parent, "network", None)
+    if network is not None:
+        return held_utility_levels(network)
+    return task.settings.get("held_utility_levels")
 
 
 def _pdm_stage_selection(
     problem,
     task: HeatExchangerNetworkSynthesisTask | None = None,
 ) -> str | list[int]:
+    """The pinch design stage counts above and below the pinch, or
+    ``"automated"``: the task's own pair (a stage pair candidate), else
+    ``HENS_PDM_STAGES``. A heuristic pinch design task sets its own stages,
+    so the option does not reach it."""
     if task is not None:
         task_stage_selection = task.settings.get("stage_selection")
         if task_stage_selection is not None:
             selection = [int(value) for value in task_stage_selection]
             if len(selection) == 2:
                 return selection
-    selection = [
-        int(value) for value in problem.master_zone.config.hens.stage_selection
-    ]
-    if len(selection) == 2:
-        return selection
+        if task.method == HeatExchangerNetworkDesignMethod.HeuristicPinchDesign:
+            return "automated"
+    pdm_stages = problem.master_zone.config.hens.pdm_stages
+    if pdm_stages is not None:
+        return [int(value) for value in pdm_stages]
     return "automated"
 
 
@@ -996,3 +1210,35 @@ __all__ = [
     "SynthesisExecutor",
     "_failed_task_outcome",
 ]
+
+
+def _utility_placement(problem) -> str:
+    """``HENS_UTILITY_PLACEMENT``, with ``"auto"`` resolved by the design's scope.
+
+    A design covering one process zone (a zone designed in isolation, or a
+    problem of one process) places utility by price; one covering several,
+    a site design, by temperature, as site targeting does.
+    """
+    placement = problem.master_zone.config.hens.utility_placement
+    if placement != "auto":
+        return placement
+    return "temperature" if _process_zone_count(problem.master_zone) > 1 else "price"
+
+
+def _process_zone_count(zone) -> int:
+    own = 1 if str(getattr(zone, "type", "")) == ZoneType.P.value else 0
+    return own + sum(
+        _process_zone_count(child) for child in (zone.subzones or {}).values()
+    )
+
+
+def _has_utility_levels(decomposition) -> bool:
+    """Whether targeting splits utility between levels on either side.
+
+    With one hot and one cold utility there is no level to hold, and the
+    pinch design sides keep their stream-end heaters and coolers.
+    """
+    return (
+        len(decomposition.hot_utility_identities) > 1
+        or len(decomposition.cold_utility_identities) > 1
+    )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .._base import approach as _approach
 from .._base import execution as _execution
+from . import staged_utilities as _staged
 from .verification import _value
 
 
@@ -17,6 +18,7 @@ def set_initial_values_for_variables(
         _set_multiperiod_initial_values(owner, init_solution)
     else:
         _set_single_period_initial_values(owner, init_solution)
+    _staged.set_staged_initial_values(owner, init_solution)
     _approach.switch_on_idle_safe_utilities(owner)
 
 
@@ -223,20 +225,21 @@ def _set_multiperiod_initial_values(owner, init_solution) -> None:
                                 source_q_r[source_period_idx][i][j][k]
                             ),
                         )
-                        _execution._set_value(
-                            owner,
-                            owner.theta_1_by_period[n][i][j][k],
-                            owner._active_binary_value(
-                                source_theta_1[source_period_idx][i][j][k]
-                            ),
-                        )
-                        _execution._set_value(
-                            owner,
-                            owner.theta_2_by_period[n][i][j][k],
-                            owner._active_binary_value(
-                                source_theta_2[source_period_idx][i][j][k]
-                            ),
-                        )
+                        # A match that cannot run in period n keeps its
+                        # approach constants there.
+                        for theta, source in (
+                            (owner.theta_1_by_period, source_theta_1),
+                            (owner.theta_2_by_period, source_theta_2),
+                        ):
+                            if isinstance(theta[n][i][j][k], float):
+                                continue
+                            _execution._set_value(
+                                owner,
+                                theta[n][i][j][k],
+                                owner._active_binary_value(
+                                    source[source_period_idx][i][j][k]
+                                ),
+                            )
                     else:
                         _execution._set_value(
                             owner,
@@ -299,16 +302,20 @@ def _set_multiperiod_initial_values(owner, init_solution) -> None:
                     if owner.z_allowed[i][j][k] > 0
                     else 0,
                 )
-    for target, source in (
-        (owner.z_cu, init_solution.z_cu),
-        (owner.z_hu, init_solution.z_hu),
+    # A heater or cooler the owner disallows (one an evolution move removes)
+    # is off, whatever the source had, as on the single-period path.
+    for target, source, allowed in (
+        (owner.z_cu, init_solution.z_cu, owner.z_cu_allowed),
+        (owner.z_hu, init_solution.z_hu, owner.z_hu_allowed),
     ):
         for index, row in enumerate(target):
             for u, flag in enumerate(row):
                 _execution._set_value(
                     owner,
                     flag,
-                    owner._active_binary_value(source[index][u]),
+                    owner._active_binary_value(source[index][u])
+                    if allowed[index][u] > 0
+                    else 0,
                 )
 
     source_area_r = getattr(init_solution, "area_r_shared", None)

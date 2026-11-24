@@ -18,6 +18,7 @@ from ..domain._heat_exchanger import rules as _hx_rules
 from ..domain._validation import non_empty_str
 from ..domain.configuration_fields import validate_configuration_options
 from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
+from ..domain.heat_exchanger_network import NetworkHeatPump, NetworkOverdesign
 from ..domain.hpr import HPRResidualSnapshot
 from .common import PeriodValueWithUnitAndIds, ScalarOrVU
 
@@ -110,6 +111,23 @@ class TemperatureHeatProfileSchema(BaseModel):
         return float(value)
 
 
+class HeatPumpStreamSchema(BaseModel):
+    """Marks a process stream as one side of a heat pump of a fixed size.
+
+    ``machine`` names the heat pump; the streams of one machine share it.
+    A condenser is a hot stream, an evaporator a cold stream, and an ambient
+    source the hot stream of the air an evaporator draws on. ``placement``
+    says what the machine exchanges heat with: the process's streams
+    (``"process"``) or the site's utility levels (``"utility"``).
+    """
+
+    machine: Annotated[str, non_empty_str("heat pump machine name must be non-empty")]
+    role: Literal["condenser", "evaporator", "ambient_source"]
+    placement: Literal["process", "utility"] = "process"
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""
 
@@ -132,6 +150,8 @@ class StreamSchema(BaseModel):
     fluid_name: Optional[str] = None
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
+    # Set on the streams a heat pump target adds to a case.
+    heat_pump: Optional[HeatPumpStreamSchema] = None
 
     model_config = ConfigDict(
         use_enum_values=True,
@@ -513,6 +533,10 @@ class HeatExchangerNetworkSchema(BaseModel):
     summary_metrics: dict[str, float | int | str | bool | None] = Field(
         default_factory=dict
     )
+    # A rated network's overdesign margin, as the network records it.
+    overdesign: NetworkOverdesign | None = None
+    # The heat pumps whose streams the network serves, as it records them.
+    heat_pumps: tuple[NetworkHeatPump, ...] = ()
 
     @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod
@@ -526,12 +550,14 @@ class HeatExchangerNetworkSchema(BaseModel):
             raise ValueError("stage_count must be a positive integer when supplied")
         return value
 
-    @field_validator(
-        "objective_value",
-        "total_annual_cost",
-        "utility_cost",
-        "capital_cost",
-    )
+    # A site network's net utility cost, and so its objective and total
+    # annual cost, is negative where steam credits exceed purchases.
+    @field_validator("objective_value", "total_annual_cost", "utility_cost")
+    @classmethod
+    def _validate_optional_signed_cost(cls, value: float | None) -> float | None:
+        return _hx_rules.optional_finite(value, _hx_rules.NETWORK_COST_MESSAGE)
+
+    @field_validator("capital_cost")
     @classmethod
     def _validate_optional_non_negative_finite(
         cls,

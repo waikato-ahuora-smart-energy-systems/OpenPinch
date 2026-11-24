@@ -307,7 +307,11 @@ def test_generic_annotation_coercion_fallbacks_cover_custom_metadata_specs():
 
 def test_min_exchanger_approach_share_is_a_share_below_one():
     spec = meta.CONFIG_FIELD_SPECS["HENS_MIN_EXCHANGER_APPROACH_SHARE"]
-    assert spec.default == 0.0
+    # A quarter: the thermal derivative and evolution steps hold
+    # max((dtcont_src + dtcont_snk) * m / 4, 0.1 K) by default (was 0, which
+    # let every match close to 0.1 K). See
+    # test_an_evolution_task_holds_a_quarter_of_the_pinch_design_approach.
+    assert spec.default == pytest.approx(0.25)
     assert (
         meta.validate_configuration_option_value(
             "HENS_MIN_EXCHANGER_APPROACH_SHARE", 0.5

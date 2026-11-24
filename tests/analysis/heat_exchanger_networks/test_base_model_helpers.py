@@ -586,6 +586,25 @@ def test_optimise_handles_failure_negative_success_and_unsolved_paths(monkeypatc
     assert model.post_processed is True
 
 
+def test_optimise_accepts_a_negative_objective_of_a_site_balanced_model(monkeypatch):
+    """A site model costs its net utility balance, which a steam credit can
+    make negative; any other model's objective cannot be."""
+    model = _model()
+    model.site_utilities = object()
+    model.get_post_process = lambda: setattr(model, "post_processed", True)
+    _set_success_diagnostics(model)
+    monkeypatch.setattr(
+        base_execution.backend, "solve_pyomo_model", _solve_reporting_fake_options
+    )
+    model.m = _FakeModel(solve_status=1, objective=-91200.4)
+
+    model.optimise(print_output=False)
+
+    assert model.mSuccess == 1
+    assert model.solver_run.failure_reason is None
+    assert model.post_processed is True
+
+
 def test_optimise_removes_run_directory_on_success_and_failure(monkeypatch, tmp_path):
     model = _model()
     model.get_post_process = lambda: setattr(model, "post_processed", True)

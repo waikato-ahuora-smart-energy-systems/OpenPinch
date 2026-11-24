@@ -1,8 +1,11 @@
 # One validation pipeline for every change.
 #
-#   pull_request -> develop : standard profile
-#   pull_request -> main    : full profile (+ solver tests, + other Python and
-#                             dependency-floor lanes, + performance,
+#   pull_request -> develop : standard profile (solver tests without the
+#                             packaged HEN notebook runs)
+#   pull_request -> claude/** : standard profile (a stacked pull request,
+#                             based on the branch of the one below it)
+#   pull_request -> main    : full profile (+ solver notebook runs, + other
+#                             Python and dependency-floor lanes, + performance,
 #                             + version-bump check)
 #   push develop            : standard profile (post-merge health)
 #   workflow_call           : used by release.yml on every push to main (full)
@@ -12,7 +15,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [develop, main, "claude/**"]
   push:
     branches: [develop]
   workflow_dispatch:
@@ -205,7 +208,9 @@ jobs:
 
   solver:
     name: Tests (solver)
-    if: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
+    # Every pull request runs the solver tests; the packaged HEN notebook
+    # runs (tutorial_profile, about 8 of the lane's 14 minutes) only run
+    # when headed for main.
     # IDAES solver binaries are built for 22.04.
     runs-on: ubuntu-22.04
     timeout-minutes: 120
@@ -228,7 +233,10 @@ jobs:
           missing = [s for s in ("couenne", "ipopt") if not SolverFactory(s).available(exception_flag=False)]
           assert not missing, f"Unavailable solver binaries: {missing}"
           PY
-      - run: uv run --no-sync pytest --hypothesis-seed="$HYPOTHESIS_SEED" -m solver --junitxml=reports/solver.xml --durations=20
+      - name: Solver tests
+        env:
+          MARKERS: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'solver' || 'solver and not tutorial_profile' }}
+        run: uv run --no-sync pytest --hypothesis-seed="$HYPOTHESIS_SEED" -m "$MARKERS" --junitxml=reports/solver.xml --durations=20
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
@@ -493,15 +501,15 @@ jobs:
       - name: Every required job passed
         env:
           RESULTS: ${{ toJSON(needs) }}
-          # Headed for (or already on) main: solver and compat lanes are mandatory.
+          # Headed for (or already on) main: the compat lane is mandatory too.
           FULL: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
           PR_TO_MAIN: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
         run: |
           echo "$RESULTS" | jq -r 'to_entries[] | "- \(.key): \(.value.result)"' | tee -a "$GITHUB_STEP_SUMMARY"
           # audit stays informational: a newly published advisory must not
           # block unrelated merges. pyodide is required (see its job).
-          required='["lint","tests","build","smoke","pyodide"]'
-          [ "$FULL" = true ] && required="$(jq -c '. + ["solver","compat"]' <<< "$required")"
+          required='["lint","tests","build","smoke","pyodide","solver"]'
+          [ "$FULL" = true ] && required="$(jq -c '. + ["compat"]' <<< "$required")"
           [ "$PR_TO_MAIN" = true ] && required="$(jq -c '. + ["version"]' <<< "$required")"
           failed="$(jq -r --argjson req "$required" \
             'to_entries | map(select((.key | IN($req[])) and .value.result != "success") | .key) | join(", ")' <<< "$RESULTS")"

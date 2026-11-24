@@ -21,6 +21,7 @@ from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
     fixed_network_structure,
     heat_exchanger_network_duty_optimisation_service,
 )
+from OpenPinch.analysis.heat_exchanger_networks.errors import WorkflowContractError
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
@@ -923,6 +924,95 @@ def test_executor_reports_solver_failure_after_removals() -> None:
     )
 
 
+def test_executor_records_a_solve_stopped_at_its_limit(monkeypatch) -> None:
+    # A fixed-structure solve that stopped at max_iter or the time limit is
+    # recorded as unconverged, as a synthesis task is.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
+
+    class Unconverged(_ScriptedModel):
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.solver_run = SimpleNamespace(
+                converged=False, termination_condition="maxIterations", status="ok"
+            )
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    Unconverged.calls = []
+    Unconverged.zero_by_call = [set()]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Unconverged).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert outcome.status == "success", outcome.error
+    assert outcome.diagnostics == {"unconverged_termination": "maxIterations"}
+
+
+def test_an_unconverged_point_failing_verification_says_to_raise_the_limit(
+    monkeypatch,
+) -> None:
+    # The failure's own error carries the termination and the advice, so a
+    # summary that reads only the error still tells the user what to do.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ("short",))
+
+    class Unconverged(_ScriptedModel):
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.solver_run = SimpleNamespace(
+                converged=False, termination_condition="maxIterations", status="ok"
+            )
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    Unconverged.calls = []
+    Unconverged.zero_by_call = [set()]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Unconverged).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert outcome.status == "failed"
+    assert outcome.error.startswith("verification failed: short")
+    assert "maxIterations" in outcome.error
+    assert "HENS_SOLVER_OPTIONS_EVM" in outcome.error
+    assert outcome.diagnostics == {"unconverged_termination": "maxIterations"}
+
+
+@pytest.mark.parametrize(
+    ("termination", "advised"),
+    [("maxIterations", True), ("maxTimeLimit", True), ("minStepLength", False)],
+)
+def test_only_a_limit_termination_is_advised_to_raise_the_limit(
+    monkeypatch, termination, advised
+) -> None:
+    # A solve that stopped for another reason (a step too small, say) is
+    # named, but raising max_iter would not help it.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ("short",))
+
+    class Unconverged(_ScriptedModel):
+        def optimise(self, print_output=False):
+            super().optimise(print_output)
+            self.solver_run = SimpleNamespace(
+                converged=False, termination_condition=termination, status="ok"
+            )
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    Unconverged.calls = []
+    Unconverged.zero_by_call = [set()]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Unconverged).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert termination in outcome.error
+    assert ("HENS_SOLVER_OPTIONS_EVM" in outcome.error) is advised
+
+
 def test_four_stream_utility_objective_reaches_a_verified_network(
     scipy_backend,
 ) -> None:
@@ -974,6 +1064,57 @@ def test_service_runs_one_recorded_task_through_executor() -> None:
     assert task.stage_count == 2
     assert result.task_id == task.task_id
     assert problem.results.design.task_id == task.task_id
+
+
+def test_service_keeps_an_unconverged_allocation_and_warns() -> None:
+    # The allocation is verified, so it is returned rather than demoted as a
+    # synthesis task is, but with its termination and a warning to raise the
+    # limit: its objective is not a converged optimum.
+    class Unconverged(FakeSynthesisExecutor):
+        def execute(self, tasks, **kwargs):
+            return tuple(
+                outcome.model_copy(
+                    update={"diagnostics": {"unconverged_termination": "maxIterations"}}
+                )
+                for outcome in super().execute(tasks, **kwargs)
+            )
+
+    problem = _four_stream_problem()
+
+    with pytest.warns(UserWarning, match=r"maxIterations.*HENS_SOLVER_OPTIONS_EVM"):
+        result = heat_exchanger_network_duty_optimisation_service(
+            problem,
+            _four_stream_structure(),
+            objective="cost",
+            executor=Unconverged(),
+        )
+
+    assert result.ranked_networks[0].status == "success"
+    assert result.ranked_networks[0].diagnostics == {
+        "unconverged_termination": "maxIterations"
+    }
+
+
+def test_service_warns_a_non_limit_termination_without_limit_advice() -> None:
+    class Unconverged(FakeSynthesisExecutor):
+        def execute(self, tasks, **kwargs):
+            return tuple(
+                outcome.model_copy(
+                    update={"diagnostics": {"unconverged_termination": "minStepLength"}}
+                )
+                for outcome in super().execute(tasks, **kwargs)
+            )
+
+    with pytest.warns(UserWarning) as caught:
+        heat_exchanger_network_duty_optimisation_service(
+            _four_stream_problem(),
+            _four_stream_structure(),
+            objective="cost",
+            executor=Unconverged(),
+        )
+
+    (message,) = [str(w.message) for w in caught if "minStepLength" in str(w.message)]
+    assert "HENS_SOLVER_OPTIONS_EVM" not in message
 
 
 def test_public_accessor_returns_design_view_with_provenance(monkeypatch) -> None:
@@ -1091,6 +1232,50 @@ def test_three_duty_objectives_on_four_stream_case() -> None:
 
 
 @pytest.mark.synthesis
+@pytest.mark.solver
+@_needs_live_solver
+def test_live_solve_stopped_at_max_iter_returns_diagnostics_and_warns() -> None:
+    # Warm-started from a converged allocation, three iterations stay
+    # feasible: the allocation is returned, flagged and warned about.
+    problem = _four_stream_problem()
+    converged = problem.design.optimise_duties(
+        _four_stream_structure(), objective="cost"
+    )
+
+    with pytest.warns(UserWarning, match="before converging"):
+        view = problem.design.optimise_duties(
+            converged.selected_network,
+            objective="cost",
+            options={"HENS_SOLVER_OPTIONS_EVM": {"max_iter": 3}},
+        )
+
+    outcome = view.result.ranked_networks[0]
+    assert outcome.status == "success"
+    assert outcome.diagnostics["unconverged_termination"] == "maxIterations"
+
+
+@pytest.mark.solver
+@_needs_live_solver
+def test_live_unconverged_infeasible_allocation_says_to_raise_the_limit() -> None:
+    # Three iterations end infeasible from zero duties (cost) and when rating
+    # at the installed areas: verification rejects the point and the error
+    # names the solver limit.
+    problem = _four_stream_problem()
+    limited = {"HENS_SOLVER_OPTIONS_EVM": {"max_iter": 3}}
+    converged = problem.design.optimise_duties(
+        _four_stream_structure(), objective="cost"
+    )
+
+    with pytest.raises(WorkflowContractError, match="raise the limit"):
+        problem.design.optimise_duties(
+            _four_stream_structure(), objective="cost", options=limited
+        )
+    with pytest.raises(WorkflowContractError, match="raise the limit"):
+        problem.design.optimise_duties(
+            converged.selected_network, objective="rating", options=limited
+        )
+
+
 @pytest.mark.solver
 @_needs_live_solver
 def test_per_exchanger_minimum_approach_is_enforced() -> None:
@@ -1760,4 +1945,150 @@ def test_the_retrofit_goal_reports_how_far_its_rating_outruns_verification() -> 
         value == pytest.approx(1.0)
         for (side, _index), value in model.rating_allowances.items()
         if side == "utility"
+    )
+
+
+def _sliced_payload() -> dict:
+    """Two sliding cold utilities and two hot ones: the pinch design slices
+    cooling water (285 to 315 K) at the streams it must reach."""
+    payload = _small_payload()
+    payload["streams"] = [
+        _stream("H1", 10.0, 500.0, 300.0),
+        _stream("H2", 20.0, 305.0, 298.0),
+        _stream("C1", 5.0, 450.0, 650.0),
+        _stream("C2", 4.0, 320.0, 420.0),
+    ]
+    payload["utilities"] = [
+        _utility("HPS", "Hot", 700.0, 700.0, 80.0, 5.0),
+        _utility("LPS", "Hot", 480.0, 479.0, 40.0, 5.0),
+        _utility("CW", "Cold", 285.0, 315.0, 15.0, 1.0),
+        _utility("AIR", "Cold", 350.0, 360.0, 5.0, 0.5),
+    ]
+    return payload
+
+
+@_needs_live_solver
+@pytest.mark.solver
+@pytest.mark.parametrize("objective", ["cost", "rating"])
+def test_a_sliced_network_keeps_its_utility_slices(objective):
+    """A slice of cooling water can cool H2 (305 K in) though the whole
+    utility, out at 315 K, cannot; the fixed-structure tools rebuild the
+    network's slices from its exchanger ids, and report them under their
+    parent utility as synthesis does."""
+    problem = PinchProblem(_sliced_payload())
+    network = problem.design.heat_exchanger_network(width=0, depth=0).selected_network
+    assert any("@" in (e.exchanger_id or "") for e in network.exchangers)
+
+    optimised = problem.design.optimise_duties(
+        network, objective=objective
+    ).selected_network
+
+    utilities = {
+        e.source_stream if e.kind is HeatExchangerKind.HOT_UTILITY else e.sink_stream
+        for e in optimised.exchangers
+        if e.kind is not HeatExchangerKind.RECOVERY
+    }
+    assert not any("@" in name for name in utilities)
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_the_fit_to_every_period_keeps_a_networks_utility_slices():
+    """The fit pads stream ends from the network's own exchangers; a sliced
+    heater or cooler keeps its slice there, so the fit can solve."""
+    problem = PinchProblem(_sliced_payload())
+    network = problem.design.heat_exchanger_network(width=0, depth=0).selected_network
+
+    fitted = problem.design._fit_to_all_periods(network).selected_network
+
+    assert fitted.exchangers
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_a_rating_off_its_design_point_is_verified_with_its_allowance():
+    """Rating caps a unit's duty by its installed area, calibrated with
+    Chen's LMTD at the design point; off that point the cap can carry duty
+    exact sizing needs a little more area for. The rating is verified with
+    the same allowance retrofit uses, not rejected, and records it."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+
+    problem = PinchProblem(_small_payload())
+    structure = HeatExchangerNetwork.from_structure(
+        recovery=[("H1", "C1", 1)],
+        heaters=["C1"],
+        coolers=["H1"],
+        hot_utility="HPS",
+        cold_utility="CW",
+    )
+    design_point = HeatExchangerPeriodState(
+        period_id="0",
+        period_idx=0,
+        duty=100.0,
+        active=True,
+        approach_temperatures=(40.0, 2.0),
+    )
+    installed = structure.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"area": 4.0, "period_states": (design_point,)})
+                if e.kind is HeatExchangerKind.RECOVERY
+                else e.model_copy(update={"area": 1.0e3})
+                for e in structure.exchangers
+            )
+        }
+    )
+
+    rated = problem.design.optimise_duties(installed, objective="rating")
+
+    allowance = rated.selected_network.summary_metrics["rating_area_allowance"]
+    assert 1.0 < allowance < 1.1
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_rating_reads_the_share_a_network_was_designed_with():
+    """A network designed under a share of 0 (approach below 1 K) records
+    the share, so a rating with no option still holds it to its own design
+    approach, not to the configuration's quarter."""
+    problem = PinchProblem(_small_payload())
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=1, options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0}
+    ).selected_network
+    assert network.source_metadata["min_exchanger_approach_share"] == 0.0
+
+    rated = problem.design.optimise_duties(network, objective="rating")
+
+    assert rated.selected_network.total_annual_cost == pytest.approx(
+        network.total_annual_cost, rel=1e-2
+    )
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_rating_the_default_designs_own_network_keeps_its_design_approach():
+    """Evolution closes this network's approach below 1 K; rating it at its
+    own areas holds the approach it was designed to, not 1 K, so it rates.
+
+    The share is set to 0 so that evolution may close to the 0.1 K floor:
+    at the default quarter it stops at 2.5 K, above the 1 K this test is
+    about."""
+    problem = PinchProblem(_small_payload())
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=1, options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0}
+    ).selected_network
+    assert min(_recovery_approaches(network)) < 1.0
+
+    # The rating reads the share from the configuration, as the design did,
+    # so it is given the same option.
+    rated = problem.design.optimise_duties(
+        network,
+        objective="rating",
+        options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0},
+    )
+
+    assert rated.selected_network.total_annual_cost == pytest.approx(
+        network.total_annual_cost, rel=1e-2
     )

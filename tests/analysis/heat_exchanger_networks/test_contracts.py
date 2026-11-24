@@ -432,6 +432,7 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         "HENS_SEARCH_WIDTH": 2,
         "HENS_SEARCH_DEPTH": 3,
         "HENS_PDM_STAGE_PAIR_LIMIT": 6,
+        "HENS_PDM_STAGES": [3, 3],
         "HENS_TDM_PARENT_LIMIT": 4,
         "HENS_STAGE_PACKING": "pdm",
         "HENS_EVM_N_AD_BRANCHES": 2,
@@ -453,6 +454,8 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
     assert target_input.options["HENS_STAGE_SELECTION"] == [2, 3]
     assert (cfg.hens.search_width, cfg.hens.search_depth) == (2, 3)
     assert cfg.hens.pdm_stage_pair_limit == 6
+    assert cfg.hens.pdm_stages == [3, 3]
+    assert Configuration().hens.pdm_stages is None
     assert cfg.hens.tdm_parent_limit == 4
     assert cfg.hens.stage_packing == "pdm"
     assert target_input.options["HENS_SEARCH_DEPTH"] == 3
@@ -478,9 +481,8 @@ def test_hen_dt_cont_multipliers_override_the_search_width():
     assert settings.dt_cont_multipliers == (1.0, 1.5)
 
 
-def test_workflow_settings_solver_options_and_parent_limit_edges() -> None:
+def test_workflow_settings_solver_options_edges() -> None:
     standard = _workflow_settings()
-    limited = _workflow_settings(tdm_parent_limit=0)
 
     assert standard.solver_for("not-a-method") is None
     assert standard.solver_options_for("thermal_derivative_method") == {
@@ -488,8 +490,6 @@ def test_workflow_settings_solver_options_and_parent_limit_edges() -> None:
     }
     assert standard.solver_options_for("network_evolution_method") == {"time_limit": 30}
     assert standard.solver_options_for("not-a-method") == {}
-    assert standard.quality_tdm_parent_limit == 2
-    assert limited.quality_tdm_parent_limit == 1
 
 
 def test_workflow_settings_require_loaded_problem() -> None:
@@ -635,6 +635,9 @@ def test_search_depth_derives_evm_branch_widths() -> None:
         {"HENS_PDM_MILP": "sometimes"},
         {"HENS_PDM_STAGE_PAIR_LIMIT": -1},
         {"HENS_PDM_STAGE_PAIR_LIMIT": 13},
+        {"HENS_PDM_STAGES": [2]},
+        {"HENS_PDM_STAGES": [1, 2, 3]},
+        {"HENS_PDM_STAGES": [0, 2]},
         {"HENS_TDM_PARENT_LIMIT": 0},
         {"HENS_STAGE_PACKING": "everywhere"},
         {"HENS_EVM_N_AD_BRANCHES": 0},

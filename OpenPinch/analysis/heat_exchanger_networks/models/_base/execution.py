@@ -40,6 +40,8 @@ def _solve_and_post_process(model, print_output: bool) -> None:
     total_solve_time = 0.0
     piecewise_mappings = getattr(model, "_piecewise_active_mappings", [])
     active_mapping_stable = not piecewise_mappings or getattr(model, "integers", False)
+    # Cuts added after the last solve were never solved: that solution breaks them.
+    cuts_pending = False
     for _attempt in range(8):
         model.solver_run = backend.solve_pyomo_model(model.m, solver_name=model.solver)
         total_solve_time += float(model.solver_run.solve_time or 0.0)
@@ -50,7 +52,12 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             if not piecewise_mappings
             else not _piecewise._update_piecewise_active_segments(model)
         )
-        if active_mapping_stable:
+        if not active_mapping_stable:
+            continue
+        # A model may check each solution and add constraints it breaks.
+        add_cuts = getattr(model, "_add_lazy_cuts", None)
+        cuts_pending = add_cuts is not None and bool(add_cuts())
+        if not cuts_pending:
             break
     model.solve_time = total_solve_time
 
@@ -68,6 +75,19 @@ def _solve_and_post_process(model, print_output: bool) -> None:
             failure_reason=(
                 f"{model.solver_run.failure_reason}; segmented-stream active "
                 "interval solve was unresolved, so use Couenne or HiGHS"
+            ),
+        )
+
+    if model.solver_run.failure_reason is None and cuts_pending:
+        model.solver_run = backend.SolverRun(
+            name=model.solver_run.name,
+            extension=model.solver_run.extension,
+            status=model.solver_run.status,
+            objective_value=model.solver_run.objective_value,
+            solve_time=total_solve_time,
+            failure_reason=(
+                "the last solution still broke a cut the model added after it "
+                "(the solve ran out of attempts)"
             ),
         )
 
@@ -94,7 +114,10 @@ def _solve_and_post_process(model, print_output: bool) -> None:
         logger.log(failure_level, "[Failed] [model: %s] [path: %s]", model.name, path)
     elif status == 1:
         objective = model.solver_run.objective_value
-        if objective is None or objective + model.tol < 0:
+        # A site model costs its net utility balance, which steam credits
+        # can make negative; no other model's objective can be.
+        signed = getattr(model, "site_utilities", None) is not None
+        if objective is None or (not signed and objective + model.tol < 0):
             model.mSuccess = 0
             model.solver_run = backend.SolverRun(
                 name=model.solver_run.name,

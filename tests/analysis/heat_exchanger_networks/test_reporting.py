@@ -2335,3 +2335,298 @@ def _intermediate_labels(ax, text: str):
         and item.get_ha() == "center"
         and item.get_va() == "bottom"
     ]
+
+
+def test_heaters_at_different_stages_give_different_structures():
+    """A staged heater sits at a stage boundary; the same heater at another
+    boundary, or at the stream end, is another network, not a repeat."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import StreamID
+
+    def network(heater_stage):
+        recoveries = tuple(
+            HeatExchanger(
+                exchanger_id=f"recovery:H1->C1:S{stage}",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
+                stage=stage,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=5.0),
+                ),
+            )
+            for stage in (1, 2)
+        )
+        heater = HeatExchanger(
+            exchanger_id="hot-utility:LPS->C1",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="LPS",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            stage=heater_stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+            ),
+        )
+        return HeatExchangerNetwork(exchangers=(*recoveries, heater), run_id="n")
+
+    signatures = {network_structure_signature(network(stage)) for stage in (None, 2, 3)}
+
+    assert len(signatures) == 3
+
+
+def _utility_placement_network(recovery_stage, *, heater=None, cooler=None):
+    exchangers = [
+        HeatExchanger(
+            exchanger_id=f"recovery:H1->C1:S{recovery_stage}",
+            kind=HeatExchangerKind.RECOVERY,
+            source_stream="H1",
+            sink_stream="C1",
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Process,
+            stage=recovery_stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=5.0),
+            ),
+        )
+    ]
+    if heater is not None:
+        exchangers.append(
+            HeatExchanger(
+                exchanger_id="hot-utility:LPS->C1",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="LPS",
+                sink_stream="C1",
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
+                stage=heater,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+                ),
+            )
+        )
+    if cooler is not None:
+        exchangers.append(
+            HeatExchanger(
+                exchanger_id="cold-utility:H1->CW",
+                kind=HeatExchangerKind.COLD_UTILITY,
+                source_stream="H1",
+                sink_stream="CW",
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
+                stage=cooler,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+                ),
+            )
+        )
+    return HeatExchangerNetwork(exchangers=tuple(exchangers), run_id="n")
+
+
+def test_stage_shifted_grids_with_staged_utilities_share_a_signature():
+    """Utility stages move with the recovery stages when gaps are removed."""
+    assert network_structure_signature(
+        _utility_placement_network(2, heater=3)
+    ) == network_structure_signature(_utility_placement_network(1, heater=2))
+    assert network_structure_signature(
+        _utility_placement_network(3, cooler=2)
+    ) == network_structure_signature(_utility_placement_network(2, cooler=1))
+
+
+def test_utilities_on_either_side_of_recovery_give_different_signatures():
+    """A heater the cold stream meets before the recovery match is another
+    structure from one it meets after, however the stages are numbered."""
+    assert network_structure_signature(
+        _utility_placement_network(2, heater=2)
+    ) != network_structure_signature(_utility_placement_network(1, heater=2))
+    assert network_structure_signature(
+        _utility_placement_network(2, cooler=1)
+    ) != network_structure_signature(_utility_placement_network(1, cooler=1))
+
+
+def test_an_end_and_a_staged_heater_on_one_stream_sort_in_a_signature():
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import StreamID
+
+    def heater(stage):
+        return HeatExchanger(
+            exchanger_id=f"hot-utility:LPS->C1:{stage}",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream="LPS",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            stage=stage,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=3.0),
+            ),
+        )
+
+    network = HeatExchangerNetwork(exchangers=(heater(2), heater(None)), run_id="n")
+
+    assert network_structure_signature(network) == (
+        ("hot_utility", "LPS", "C1", None),
+        ("hot_utility", "LPS", "C1", 1),
+    )
+
+
+def _active_structure(recovery, **utilities):
+    network = HeatExchangerNetwork.from_structure(
+        recovery=recovery, hot_utility="HPS", cold_utility="CW", **utilities
+    )
+    return network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger.model_copy(
+                    update={
+                        "period_states": tuple(
+                            state.model_copy(update={"duty": 100.0, "active": True})
+                            for state in exchanger.period_states
+                        )
+                    }
+                )
+                for exchanger in network.exchangers
+            )
+        }
+    )
+
+
+def test_one_network_numbered_two_ways_has_one_signature():
+    """Round 3 review M7: Raw Milk meets Milk Conc. then CIP Water, and Milk
+    Conc. meets Raw Milk then HT Flash, in both; only the stage numbers of
+    the two matches that share no stream differ."""
+    ends = {"heaters": ("MC",), "coolers": ("RM", "HF")}
+    left = _active_structure(
+        (("RM", "MC", 1), ("HF", "MC", 2), ("RM", "CIP", 3)), **ends
+    )
+    right = _active_structure(
+        (("RM", "MC", 1), ("RM", "CIP", 2), ("HF", "MC", 2)), **ends
+    )
+
+    assert network_structure_signature(left) == network_structure_signature(right)
+
+
+def test_a_staged_cooler_keeps_its_place_among_relabelled_stages():
+    """A staged cooler on Raw Milk between its two matches is one network
+    however the independent HT Flash match is numbered, and another network
+    once it sits after both matches."""
+    between = _active_structure(
+        (("RM", "MC", 1), ("HF", "MC", 2), ("RM", "CIP", 3)),
+        coolers=(("RM", "CW", 1),),
+    )
+    relabelled = _active_structure(
+        (("RM", "MC", 1), ("RM", "CIP", 2), ("HF", "MC", 3)),
+        coolers=(("RM", "CW", 1),),
+    )
+    after = _active_structure(
+        (("RM", "MC", 1), ("RM", "CIP", 2), ("HF", "MC", 3)),
+        coolers=(("RM", "CW", 2),),
+    )
+
+    assert network_structure_signature(between) == network_structure_signature(
+        relabelled
+    )
+    assert network_structure_signature(between) != network_structure_signature(after)
+
+
+def _solver_available(solver: str) -> bool:
+    from OpenPinch.analysis.heat_exchanger_networks.solver import backend
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisSolverError,
+    )
+
+    try:
+        backend.require_solver_backend(solver)
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_solver_available('highs') and _solver_available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_the_four_stream_ranking_lists_each_network_once():
+    """Round 3 review M7: at width 1 and depth 1 the 1.0 and 1.5 multipliers
+    give one network, which used to take ranks 1 and 2."""
+    from OpenPinch import PinchProblem
+
+    view = PinchProblem(
+        "Four-stream-Yee-and-Grossmann-1990-1.json"
+    ).design.heat_exchanger_network(width=1, depth=1)
+
+    def physical(network):
+        # The two copies' duties differ by solver noise (0.0002 kW), so the
+        # exchangers alone tell them apart from every other network here.
+        return tuple(
+            sorted(
+                (exchanger.kind.value, exchanger.source_stream, exchanger.sink_stream)
+                for exchanger in network.exchangers
+                if any(state.active for state in exchanger.period_states)
+            )
+        )
+
+    networks = [physical(outcome.network) for outcome in view.top(5)]
+
+    assert len(networks) == len(set(networks))
+
+
+def test_a_rated_segmented_exchanger_is_judged_with_its_allowance():
+    """A segmented exchanger's installed area is compared with its
+    period-total segment area; a rated one is widened by its rating
+    allowance there too, as a single-segment one is."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+        _check_segment_contribution_areas,
+    )
+
+    exchanger = SimpleNamespace(
+        exchanger_id="E1",
+        state=lambda period: SimpleNamespace(active=True),
+        segment_area_contributions=(SimpleNamespace(period="other"),),
+        area=4.0,
+        segment_design_area=4.2,
+    )
+
+    assert _check_segment_contribution_areas([exchanger], "0")
+    assert not _check_segment_contribution_areas(
+        [exchanger], "0", allowances={"E1": 1.1}
+    )
+
+
+def test_network_feasibility_recomputes_capital_from_exchanger_costs() -> None:
+    """When every exchanger records its capital cost, the network's capital
+    must be their sum: halving capital and TAC together is under-costing."""
+    network = _feasible_balance_network("costed")
+    costed = network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger.model_copy(
+                    update={
+                        "capital_cost": 60.0
+                        if exchanger.kind.name == "RECOVERY"
+                        else 40.0
+                    }
+                )
+                for exchanger in network.exchangers
+            )
+        }
+    )
+    halved = costed.model_copy(
+        update={"capital_cost": 50.0, "total_annual_cost": 100.0}
+    )
+
+    assert verify_network_feasibility(costed) == ()
+    assert any(
+        "capital cost 50 does not match the exchangers' capital costs 100" in reason
+        for reason in verify_network_feasibility(halved)
+    )

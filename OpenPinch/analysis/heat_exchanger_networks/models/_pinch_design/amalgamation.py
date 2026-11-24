@@ -41,6 +41,10 @@ def amalgamate_networks(
         # The amalgamated network holds the sides' solved values and is read,
         # never solved: no constraints or objective are built.
         values_only=True,
+        staged_utilities=bool(
+            getattr(above_case, "staged_utilities", False)
+            or getattr(below_case, "staged_utilities", False)
+        ),
     )
     if (above_required and above_case.mSuccess == 0) or (
         below_required and below_case.mSuccess == 0
@@ -78,6 +82,7 @@ def amalgamate_networks(
                     )
                     _assign_value(amalgamated.T_c_by_period[n][j][k], [value])
         _copy_utility_matches(amalgamated, above_case, "hot")
+        _copy_staged_units(amalgamated, above_case, offset=0)
         if not below_required:
             _clear_utility_matches(amalgamated, "cold")
             amalgamated.minimisation_goal = "hot utility"
@@ -126,6 +131,7 @@ def amalgamate_networks(
                         value = amalgamated.T_c_in_period[n][j]
                     _assign_value(amalgamated.T_c_by_period[n][j][k], [value])
         _copy_utility_matches(amalgamated, below_case, "cold")
+        _copy_staged_units(amalgamated, below_case, offset=above_case.S)
         if not above_required:
             _clear_utility_matches(amalgamated, "hot")
             amalgamated.minimisation_goal = "cold utility"
@@ -142,6 +148,7 @@ def amalgamate_networks(
         amalgamated.S = above_case.S + below_case.S
 
     amalgamated.K = amalgamated.S + 1
+    _settle_unused_mid_temperatures(amalgamated)
     amalgamated.z_allowed = [
         [
             [
@@ -200,6 +207,12 @@ def _clear_utility_matches(target: StageWiseModel, side: str) -> None:
             _assign_value(flag, [0])
 
 
+def _idle_tolerance(source, target) -> float:
+    """The duty below which the side treats a match as carrying none."""
+    tolerance = getattr(source, "tol", None)
+    return float(target.tol if tolerance is None else tolerance)
+
+
 def _copy_recovery_match(
     owner,
     target: StageWiseModel,
@@ -213,18 +226,20 @@ def _copy_recovery_match(
     if target.N_periods != source.N_periods:
         raise ValueError("PDM side period counts must match during amalgamation.")
     for n in range(target.N_periods):
-        _assign_value(
-            target.Q_r_by_period[n][i][j][target_stage],
-            [_value(source.Q_r_by_period[n][i][j][source_stage])],
-        )
-        _assign_value(
-            target.theta_1_by_period[n][i][j][target_stage],
-            [_value(source.theta_1_by_period[n][i][j][source_stage])],
-        )
-        _assign_value(
-            target.theta_2_by_period[n][i][j][target_stage],
-            [_value(source.theta_2_by_period[n][i][j][source_stage])],
-        )
+        duty = _value(source.Q_r_by_period[n][i][j][source_stage])
+        _assign_value(target.Q_r_by_period[n][i][j][target_stage], [duty])
+        for name in ("theta_1_by_period", "theta_2_by_period"):
+            slot = getattr(target, name)[n][i][j][target_stage]
+            # A match that cannot run in this period has a constant approach
+            # in the joined model; the side's approach there means nothing
+            # while it carries no duty (a stream idle in that period).
+            # Idle by the side's own tolerance: a small active duty the
+            # joined model cannot run is refused, not copied without them.
+            if slot.__class__ is float and abs(duty or 0.0) <= _idle_tolerance(
+                source, target
+            ):
+                continue
+            _assign_value(slot, [_value(getattr(source, name)[n][i][j][source_stage])])
     if source.non_isothermal_model:
         for n in range(target.N_periods):
             _assign_value(
@@ -243,3 +258,90 @@ def _copy_recovery_match(
                 target.T_c_out_y_by_period[n][j][i][target_stage],
                 [_value(source.T_c_out_y_by_period[n][j][i][source_stage])],
             )
+
+
+def _copy_staged_units(target: StageWiseModel, source, *, offset: int) -> None:
+    """Copy one side's staged heaters and coolers, and its mid temperatures.
+
+    Side boundary ``k`` is the amalgamated network's boundary ``offset + k``
+    (the below side follows the above side's ``offset`` stages).
+    """
+    if not getattr(source, "staged_utilities", False):
+        return
+    for name, flags, duties, mids, mid_source in (
+        (
+            "hs",
+            target.z_hs,
+            target.Q_hs_by_period,
+            target.T_c_mid_by_period,
+            source.T_c_mid_by_period,
+        ),
+        (
+            "cs",
+            target.z_cs,
+            target.Q_cs_by_period,
+            target.T_h_mid_by_period,
+            source.T_h_mid_by_period,
+        ),
+    ):
+        source_allowed = getattr(source, f"z_{name}_allowed")
+        target_allowed = getattr(target, f"z_{name}_allowed")
+        source_flags = getattr(source, f"z_{name}")
+        source_duties = getattr(source, f"Q_{name}_by_period")
+        for s, row in enumerate(source_allowed):
+            for u, by_k in enumerate(row):
+                for k, offered in enumerate(by_k):
+                    if not offered:
+                        continue
+                    if not target_allowed[s][u][offset + k]:
+                        raise ValueError(
+                            "A pinch side's staged unit has no place in the "
+                            "amalgamated network."
+                        )
+                    _assign_value(
+                        flags[s][u][offset + k], [_value(source_flags[s][u][k])]
+                    )
+                    for n in range(target.N_periods):
+                        _assign_value(
+                            duties[n][s][u][offset + k],
+                            [_value(source_duties[n][s][u][k])],
+                        )
+                        _assign_value(
+                            mids[n][s][offset + k], [_value(mid_source[n][s][k])]
+                        )
+
+
+def _settle_unused_mid_temperatures(target: StageWiseModel) -> None:
+    """Set each mid temperature with no staged unit on to its boundary's.
+
+    No side writes the pinch boundary's mid temperature, and a side's
+    unused staged units leave theirs at the initial value, so the stage
+    outlet is otherwise wrong where the stream passes no staged unit.
+    """
+    if not getattr(target, "staged_utilities", False):
+        return
+    for flags, allowed, mids, boundaries in (
+        (
+            target.z_hs,
+            target.z_hs_allowed,
+            target.T_c_mid_by_period,
+            target.T_c_by_period,
+        ),
+        (
+            target.z_cs,
+            target.z_cs_allowed,
+            target.T_h_mid_by_period,
+            target.T_h_by_period,
+        ),
+    ):
+        for s, row in enumerate(allowed):
+            for k in range(1, target.S):
+                if any(
+                    by_k[k] and _value(flags[s][u][k]) > 0.5
+                    for u, by_k in enumerate(row)
+                ):
+                    continue
+                for n in range(target.N_periods):
+                    if mids[n][s][k] is boundaries[n][s][k]:
+                        continue
+                    _assign_value(mids[n][s][k], [_value(boundaries[n][s][k])])

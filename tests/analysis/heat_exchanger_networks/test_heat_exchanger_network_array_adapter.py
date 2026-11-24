@@ -620,3 +620,91 @@ def test_pinch_problem_satisfies_prepared_problem_protocol() -> None:
         object(),
     ):
         assert not isinstance(value, PreparedProblem)
+
+
+def _process_mvr_problem() -> PinchProblem:
+    pytest.importorskip("CoolProp")
+    return PinchProblem(
+        REPO_ROOT / "OpenPinch" / "tutorials" / "sample_cases" / "process_mvr.json",
+        project_name="Site",
+    )
+
+
+def test_adapter_takes_the_replacement_of_a_stream_a_process_mvr_replaced() -> None:
+    problem = _process_mvr_problem()
+    component = problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    )
+
+    arrays = problem_to_solver_arrays(problem, 10.0)
+
+    # Targeting sees the compressed stream in place of the original; so must
+    # synthesis, or the vapour's heat is counted twice.
+    hot = arrays.stream_identities["hot_process_streams"]
+    assert len(hot) == len(component.replacement_streams)
+    assert all("direct_MVR" in name for name in hot)
+    assert arrays.arrays["f_h_period"].shape[1] == len(component.replacement_streams)
+
+
+def test_adapter_takes_the_original_stream_of_a_deactivated_process_mvr() -> None:
+    problem = _process_mvr_problem()
+    component = problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    )
+    component.deactivate()
+
+    arrays = problem_to_solver_arrays(problem, 10.0)
+
+    assert arrays.stream_identities["hot_process_streams"] == [
+        "Evaporation Train.Evaporator vapour"
+    ]
+
+
+@pytest.mark.solver
+def test_a_problem_with_a_deactivated_process_mvr_designs() -> None:
+    problem = _process_mvr_problem()
+    problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    ).deactivate()
+
+    design = problem.design.pinch_design(options={"HENS_MAX_PARALLEL": 1})
+
+    # The original vapour stream alone: 100 kW recovered, 20 kW of heating.
+    assert design.total_heat_recovery == pytest.approx(100.0, abs=1e-3)
+    assert design.total_hot_utility == pytest.approx(20.0, abs=1e-3)
+
+
+def test_adapter_gives_a_one_segment_stream_its_own_flowrate() -> None:
+    problem = _process_mvr_problem()
+    (replacement,) = problem.components.add_process_mvr(
+        "Evaporator vapour", liquid_injection=False
+    ).replacement_streams
+    assert replacement.segment_count == 1
+
+    arrays = problem_to_solver_arrays(problem, 10.0).arrays
+
+    # The models read a parent as segmented only above one segment; with one
+    # they use the parent's flowrate, so it cannot be the zero placeholder.
+    span = float(arrays["T_h_in_period"][0][0] - arrays["T_h_out_period"][0][0])
+    assert arrays["f_h_period"][0][0] * span == pytest.approx(
+        float(replacement.heat_flow.to("kW")), rel=1e-9
+    )
+
+
+@pytest.mark.solver
+def test_a_problem_with_an_active_process_mvr_designs() -> None:
+    problem = _process_mvr_problem()
+    problem.components.add_process_mvr("Evaporator vapour", liquid_injection=False)
+    target = problem.target.direct_heat_integration()
+
+    # 0.75: the case's default utilities sit 5 K from the stream targets and
+    # cannot hold a larger scaled approach.
+    design = problem.design.pinch_design(
+        dt_cont_multipliers=[0.75], options={"HENS_MAX_PARALLEL": 1}
+    )
+
+    assert design.total_heat_recovery == pytest.approx(120.0, abs=1e-3)
+    assert design.total_hot_utility == pytest.approx(0.0, abs=1e-3)
+    assert design.total_cold_utility == pytest.approx(
+        float(target.cold_utility_target), abs=1e-3
+    )

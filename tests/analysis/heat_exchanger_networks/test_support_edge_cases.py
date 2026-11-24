@@ -908,6 +908,101 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
     assert stagewise_verification._check_area_costs(bad_cold_utility) is False
 
 
+def test_shared_area_costs_treat_a_slightly_negative_unused_area_as_none():
+    """A solver leaves an unused shared area a hair below zero; raised to a
+    fractional cost exponent it would be NaN and fail the cost check."""
+    import numpy as np
+
+    case = SimpleNamespace(
+        N_periods=1,
+        I=1,
+        J=1,
+        S=1,
+        NHU=1,
+        NCU=1,
+        Q_r_by_period=[[[[0.0]]]],
+        Q_h_by_period=[[[0.0]]],
+        Q_c_by_period=[[[0.0]]],
+        area_r_shared=[[[np.float64(-1e-9)]]],
+        area_hu_shared=[[np.float64(-1e-9)]],
+        area_cu_shared=[[np.float64(-1e-9)]],
+        A_coeff=[1000.0],
+        A_exp=[0.83],
+        hu_coeff=[1000.0],
+        hu_exp=[0.83],
+        cu_coeff=[1000.0],
+        cu_exp=[0.83],
+        recovery_area_cost_total=0.0,
+        hu_area_cost_total=0.0,
+        cu_area_cost_total=0.0,
+    )
+
+    assert stagewise_verification._check_area_costs(case) is True
+
+
+def test_shared_area_costs_leave_out_a_match_evolution_removed():
+    """Evolution removes a match by disallowing it; its area variable keeps
+    the value it was warm-started with, but the model no longer costs it."""
+    case = SimpleNamespace(
+        N_periods=1,
+        I=1,
+        J=1,
+        S=2,
+        NHU=1,
+        NCU=1,
+        z_allowed=[[[1, 0]]],
+        Q_r_by_period=[[[[0.0, 0.0]]]],
+        Q_h_by_period=[[[0.0]]],
+        Q_c_by_period=[[[0.0]]],
+        area_r_shared=[[[1.0, 6.0]]],
+        area_hu_shared=[[0.0]],
+        area_cu_shared=[[0.0]],
+        A_coeff=[1000.0],
+        A_exp=[1.0],
+        hu_coeff=[1000.0],
+        hu_exp=[1.0],
+        cu_coeff=[1000.0],
+        cu_exp=[1.0],
+        recovery_area_cost_total=1000.0,
+        hu_area_cost_total=0.0,
+        cu_area_cost_total=0.0,
+    )
+
+    assert stagewise_verification._check_area_costs(case) is True
+
+
+def test_a_period_that_does_not_set_a_shared_area_may_approach_wider():
+    """Over several periods one area serves every period, so the model only
+    bounds each period's approach difference by the actual one: a lighter
+    period, with bypass, has more approach than its theta. A theta above the
+    actual approach still fails."""
+
+    def case(theta_1):
+        return SimpleNamespace(
+            N_periods=2,
+            I=1,
+            J=1,
+            S=1,
+            Q_r_by_period=[[[[5.0]]], [[[5.0]]]],
+            non_isothermal_model=True,
+            T_h_by_period=[[[90.0, 60.0]], [[90.0, 60.0]]],
+            T_c_by_period=[[[80.0, 50.0]], [[80.0, 50.0]]],
+            T_c_out_y_by_period=[[[[80.0]]], [[[75.0]]]],
+            theta_1_by_period=[[[[10.0]]], [[[theta_1]]]],
+            T_h_out_x_by_period=[[[[60.0]]], [[[60.0]]]],
+            theta_2_by_period=[[[[10.0]]], [[[10.0]]]],
+        )
+
+    def check(state):
+        return stagewise_verification._check_state_temperatures(
+            state, rel_tol=1e-3, abs_tol=1e-2, q_tol=1e-2
+        )
+
+    assert check(case(10.0)) is True
+    assert check(case(15.0)) is True
+    assert check(case(16.0)) is False
+
+
 def test_seed_networks_accept_network_json():
     # JSON clients (the engine command layer) pass networks as they received
     # them in a design result.
@@ -1046,3 +1141,64 @@ def test_recovery_extraction_reads_each_match_binary_once():
 
     assert exchangers == ()
     assert {binary.reads for row in binaries for cell in row for binary in cell} == {1}
+
+
+class _NumpyLikeFloat(float):
+    """A float subclass, as NumPy's float64 is."""
+
+    @property
+    def value(self) -> float:
+        raise AssertionError("a float was asked for a value attribute")
+
+
+class _BracketedValue(list):
+    """A ``[value]`` list, which ``float()`` cannot convert."""
+
+    def __float__(self) -> float:
+        raise AssertionError("a [value] list was passed to float()")
+
+
+def test_extraction_reads_numbers_and_bracketed_values_directly():
+    # Floats, ints, NumPy floats and [value] lists are most of what extraction
+    # reads; a NumPy float took an extra lookup and a list raised and caught
+    # a TypeError in float() on every read.
+    assert extraction_metadata._optional_float(_NumpyLikeFloat(1.25)) == 1.25
+    assert extraction_metadata._optional_float(_BracketedValue([0.5])) == 0.5
+    assert extraction_metadata._optional_float(_BracketedValue()) is None
+    assert extraction_metadata._optional_float(3) == 3.0
+
+
+def test_a_failed_fixed_structure_task_is_named_by_its_objective():
+    """Fixed-structure duty optimisation is stamped with the evolution
+    method; its failure names the fixed-structure solve, not evolution."""
+    task = _task(method="network_evolution_method").model_copy(
+        update={"settings": {"fixed_structure": True, "duty_objective": "rating"}}
+    )
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task, status="failed", error="Solver termination condition: infeasible"
+    )
+
+    summary = assembly._failed_outcome_summary((outcome,))
+
+    assert summary == (
+        "fixed-structure duty optimisation ('rating' objective): "
+        "Solver termination condition: infeasible"
+    )
+
+
+def test_an_infeasible_fixed_structure_task_is_named_by_its_objective():
+    """The infeasible summary names a fixed-structure duty optimisation by
+    its objective too, not by the evolution method it is stamped with."""
+    task = _task(method="network_evolution_method").model_copy(
+        update={"settings": {"fixed_structure": True, "duty_objective": "cost"}}
+    )
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(task=task, status="success")
+
+    summary = assembly._infeasible_outcome_summary(
+        ((outcome, ("total annual cost does not match",)),)
+    )
+
+    assert summary == (
+        "fixed-structure duty optimisation ('cost' objective) infeasible: "
+        "total annual cost does not match"
+    )

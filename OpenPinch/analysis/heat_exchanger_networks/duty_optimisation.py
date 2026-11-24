@@ -33,6 +33,7 @@ remaining exchanger carries duty. Removed exchangers are named in the result's
 from __future__ import annotations
 
 import math
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -68,6 +69,14 @@ from .models.fixed_structure import (
 )
 from .prepared_problem import SynthesisProblem
 from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
+from .solver.backend import LIMIT_TERMINATION_CONDITIONS
+from .solver.utility_slices import (
+    slice_label,
+    slice_labels,
+    slice_parent,
+    utility_slices,
+    with_named_slices,
+)
 from .targeting._stage import run_single_method_workflow, run_stage
 
 DutyObjective = Literal["utility", "area", "cost", "rating"]
@@ -94,6 +103,12 @@ class DutyOptimisationRequest:
     exchanger_approach_temperatures: Mapping[str, float] = field(default_factory=dict)
     max_hot_utility: float | None = None
     max_cold_utility: float | None = None
+    # Utility name to per-period duty: each utility's exchangers together
+    # carry its target in every period.
+    level_targets: Mapping[str, tuple[float, ...]] | None = None
+    # The dt_cont multiplier the contributions are scaled by (the network's
+    # own); None is the reference multiplier.
+    dt_cont_multiplier: float | None = None
 
     @property
     def minimisation_goal(self) -> str:
@@ -121,8 +136,17 @@ def build_duty_optimisation_request(
     exchanger_approach_temperatures: Mapping[str, float] | None = None,
     max_hot_utility: float | None = None,
     max_cold_utility: float | None = None,
+    problem_approach: bool = False,
+    level_targets: Mapping[str, Sequence[float]] | None = None,
+    dt_cont_multiplier: float | None = None,
 ) -> DutyOptimisationRequest:
-    """Validate public arguments without touching the problem or a solver."""
+    """Validate public arguments without touching the problem or a solver.
+
+    With ``problem_approach`` and no ``min_approach_temperature``, the
+    ``"cost"`` and ``"rating"`` objectives keep each exchanger at its
+    streams' temperature contributions (the case's minimum approach) instead
+    of 1 K.
+    """
 
     if not isinstance(network, HeatExchangerNetwork):
         raise TypeError("network must be a HeatExchangerNetwork.")
@@ -159,7 +183,7 @@ def build_duty_optimisation_request(
                 "the 'rating' objective needs an installed area on every "
                 "exchanger; none on " + ", ".join(missing) + "."
             )
-        if approach is None:
+        if approach is None and not problem_approach:
             approach = DEFAULT_FEASIBILITY_APPROACH
     if objective == "cost":
         if hot_cap is not None or cold_cap is not None:
@@ -167,7 +191,7 @@ def build_duty_optimisation_request(
                 "the 'cost' objective trades utility against area itself; "
                 "utility caps apply to the 'area' objective only."
             )
-        if approach is None:
+        if approach is None and not problem_approach:
             approach = DEFAULT_FEASIBILITY_APPROACH
     if objective == "utility" and (hot_cap is not None or cold_cap is not None):
         raise ValueError(
@@ -181,6 +205,15 @@ def build_duty_optimisation_request(
         exchanger_approach_temperatures=per_exchanger,
         max_hot_utility=hot_cap,
         max_cold_utility=cold_cap,
+        level_targets=(
+            None
+            if level_targets is None
+            else {
+                name: tuple(float(duty) for duty in duties)
+                for name, duties in level_targets.items()
+            }
+        ),
+        dt_cont_multiplier=dt_cont_multiplier,
     )
 
 
@@ -286,9 +319,15 @@ def fixed_network_structure(
                 recovery_points[index] = _design_points(exchanger, periods)
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            # A sliced utility runs on the slice its id names, when the axis
+            # has it (``with_named_slices``).
+            sliced = slice_label(exchanger)
             if heater:
                 utility = _resolve_stream(
-                    exchanger.source_stream, hot_utility_axis, "hot utility", label
+                    sliced if sliced in hot_utility_axis else exchanger.source_stream,
+                    hot_utility_axis,
+                    "hot utility",
+                    label,
                 )
                 stream = _resolve_stream(
                     exchanger.sink_stream, cold_axis, "cold process", label
@@ -299,7 +338,10 @@ def fixed_network_structure(
                     exchanger.source_stream, hot_axis, "hot process", label
                 )
                 utility = _resolve_stream(
-                    exchanger.sink_stream, cold_utility_axis, "cold utility", label
+                    sliced if sliced in cold_utility_axis else exchanger.sink_stream,
+                    cold_utility_axis,
+                    "cold utility",
+                    label,
                 )
                 default_stage = stage_count
             stage = exchanger.stage if exchanger.stage is not None else default_stage
@@ -327,6 +369,7 @@ def fixed_network_structure(
         positions.append(position)
 
     _require_every_stream_served(hot_axis, cold_axis, recovery, utilities)
+    level_holds = _level_holds(request, exchangers, slots, positions)
     return FixedNetworkStructure(
         spec=FixedStructureSpec(
             stage_count=stage_count,
@@ -340,10 +383,45 @@ def fixed_network_structure(
             utility_areas=utility_areas,
             recovery_design_points=recovery_points,
             utility_design_points=utility_points,
+            level_holds=level_holds,
         ),
         positions=tuple(positions),
         slots=tuple(slots),
     )
+
+
+def _level_holds(request, exchangers, slots, positions) -> tuple:
+    """Each held level's utility exchangers (by utility index) and targets.
+
+    A level is matched to the heaters (by source) or coolers (by sink) that
+    name its utility; a level with duty to carry but no exchanger raises.
+    """
+    if not request.level_targets:
+        return ()
+    units: dict[str, list[int]] = {name: [] for name in request.level_targets}
+    for position, (kind, index) in zip(positions, slots, strict=True):
+        if kind != "utility":
+            continue
+        exchanger = exchangers[position]
+        name = (
+            exchanger.source_stream
+            if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            else exchanger.sink_stream
+        )
+        # A unit the fit's padding named by its slice counts for its parent.
+        name = slice_parent(name, units)
+        if name in units:
+            units[name].append(index)
+    holds = []
+    for name, targets in request.level_targets.items():
+        if not units[name]:
+            if any(abs(duty) > 1e-9 for duty in targets):
+                raise ValueError(
+                    f"utility level {name!r} has a target but no exchanger."
+                )
+            continue
+        holds.append((tuple(units[name]), tuple(targets)))
+    return tuple(holds)
 
 
 def build_solution_network(
@@ -363,6 +441,12 @@ def build_solution_network(
     period_ids = tuple(str(value) for value in solver_arrays.arrays["period_ids"])
     user_exchangers = _structural_exchangers(request.network)
     spec = structure.spec
+    # Each slice reported under its parent utility, as synthesis does.
+    parents = {
+        label: parent
+        for side in utility_slices(solver_arrays).values()
+        for label, (parent, _share) in side.items()
+    }
 
     exchangers: list[HeatExchanger] = []
     for position, (kind, index), result in zip(
@@ -381,14 +465,20 @@ def build_solution_network(
             match = spec.utilities[index]
             stage = user.stage
             if match.side == HEATER:
-                source = names["hot_utilities"][match.utility]
+                source = parents.get(
+                    names["hot_utilities"][match.utility],
+                    names["hot_utilities"][match.utility],
+                )
                 sink = names["cold_process_streams"][match.stream]
                 exchanger_kind = HeatExchangerKind.HOT_UTILITY
                 roles = (StreamID.Utility, StreamID.Process)
                 default_id = f"hot-utility:{source}->{sink}"
             else:
                 source = names["hot_process_streams"][match.stream]
-                sink = names["cold_utilities"][match.utility]
+                sink = parents.get(
+                    names["cold_utilities"][match.utility],
+                    names["cold_utilities"][match.utility],
+                )
                 exchanger_kind = HeatExchangerKind.COLD_UTILITY
                 roles = (StreamID.Process, StreamID.Utility)
                 default_id = f"cold-utility:{source}->{sink}"
@@ -454,7 +544,16 @@ def build_solution_network(
         capital_cost=float(model.capital_cost_value),
         summary_metrics=summary,
         solver_axis_metadata={"axis_maps": axis_maps},
-        source_metadata=_source_metadata(model, solver_arrays),
+        source_metadata=_source_metadata(model, solver_arrays)
+        | (
+            {
+                "utility_level_targets": {
+                    k: list(v) for k, v in request.level_targets.items()
+                }
+            }
+            if request.level_targets
+            else {}
+        ),
     )
     return network.model_copy(
         update={"objective_value": _objective_value(request.objective, network)}
@@ -513,11 +612,14 @@ class FixedStructureDutyExecutor:
         removed: list[str] = []
         warm: dict[int, float] | None = None
         try:
-            arrays = problem_to_solver_arrays(
-                problem,
-                nominal_approach_temperature(
-                    problem.master_zone.config, task.dt_cont_multiplier
+            arrays = with_named_slices(
+                problem_to_solver_arrays(
+                    problem,
+                    nominal_approach_temperature(
+                        problem.master_zone.config, task.dt_cont_multiplier
+                    ),
                 ),
+                slice_labels(user_exchangers),
             )
             while True:
                 structure = fixed_network_structure(
@@ -572,12 +674,46 @@ class FixedStructureDutyExecutor:
                 task_id=task.task_id,
                 removed=removed,
             )
-            failures = verify_solution(structure, model, network)
+            allowances = getattr(model, "rating_allowances", None)
+            if allowances:
+                # A rating's cap is calibrated with Chen's LMTD at the design
+                # point; off it, exact sizing can need a little more area. It
+                # is judged as the model rated it, as retrofit does, and the
+                # largest allowance is recorded.
+                network.summary_metrics["rating_area_allowance"] = max(
+                    allowances.values()
+                )
+                network.source_metadata["rating_area_allowances"] = {
+                    exchanger.exchanger_id: allowances.get(slot, 1.0)
+                    for exchanger, slot in zip(
+                        network.exchangers, structure.slots, strict=True
+                    )
+                    if exchanger.exchanger_id is not None
+                }
+                failures = verify_solution(
+                    structure, model, _with_allowances(network, structure, allowances)
+                )
+            else:
+                failures = verify_solution(structure, model, network)
         except ValueError as exc:
             return _failed_task_outcome(task, str(exc))
         if failures:
-            return _failed_task_outcome(
-                task, "verification failed: " + "; ".join(failures)
+            # An unconverged point that fails verification keeps its
+            # termination, and its error says to raise the solver limit: a
+            # failure summary reads only the error.
+            diagnostics = _unconverged_diagnostics(model)
+            error = "verification failed: " + "; ".join(failures)
+            termination = diagnostics.get("unconverged_termination")
+            if termination in LIMIT_TERMINATION_CONDITIONS:
+                error += (
+                    f" (the solver stopped at a limit ({termination}) before "
+                    "converging: raise max_iter or max_wall_time in "
+                    "HENS_SOLVER_OPTIONS_EVM)"
+                )
+            elif termination is not None:
+                error += f" (the solver stopped before converging ({termination}))"
+            return _failed_task_outcome(task, error).model_copy(
+                update={"diagnostics": diagnostics}
             )
         if task.task_id is not None:
             self.models_by_task_id[task.task_id] = model
@@ -587,7 +723,33 @@ class FixedStructureDutyExecutor:
             network=network,
             objective_value=network.objective_value,
             solver_status=_solver_status(model),
+            diagnostics=_unconverged_diagnostics(model),
         )
+
+
+def _with_allowances(
+    network: HeatExchangerNetwork,
+    structure: FixedNetworkStructure,
+    allowances: Mapping[tuple[str, int], float],
+) -> HeatExchangerNetwork:
+    """``network`` with each exchanger's area widened by its rating
+    allowance (``FixedStructureModel.rating_allowances``), for verification
+    only: the reported areas stay as installed."""
+
+    return network.model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger
+                if exchanger.area is None
+                else exchanger.model_copy(
+                    update={"area": exchanger.area * allowances.get(slot, 1.0)}
+                )
+                for exchanger, slot in zip(
+                    network.exchangers, structure.slots, strict=True
+                )
+            )
+        }
+    )
 
 
 def verify_solution(
@@ -643,9 +805,13 @@ def duty_optimisation_task(
     return HeatExchangerNetworkSynthesisTask(
         run_id=settings.run_id,
         method=_METHOD,
-        # Contributions at the reference multiplier; a requested minimum
-        # approach overrides them in the model.
-        dt_cont_multiplier=reference_dt_cont_multiplier(settings.dt_cont_multipliers),
+        # Contributions at the request's multiplier, else the reference one;
+        # a requested minimum approach overrides them in the model.
+        dt_cont_multiplier=(
+            request.dt_cont_multiplier
+            if request.dt_cont_multiplier is not None
+            else reference_dt_cont_multiplier(settings.dt_cont_multipliers)
+        ),
         stage_count=_stage_count(request.network, exchangers),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
@@ -669,6 +835,9 @@ def heat_exchanger_network_duty_optimisation_service(
     options: dict[str, Any] | None = None,
     workspace_variant: str | None = None,
     executor: SynthesisExecutor | None = None,
+    problem_approach: bool = False,
+    level_targets: Mapping[str, Sequence[float]] | None = None,
+    dt_cont_multiplier: float | None = None,
 ) -> HeatExchangerNetworkSynthesisResult:
     """Optimise exchanger duties on a fixed, user-defined network structure."""
 
@@ -679,6 +848,9 @@ def heat_exchanger_network_duty_optimisation_service(
         exchanger_approach_temperatures=exchanger_approach_temperatures,
         max_hot_utility=max_hot_utility,
         max_cold_utility=max_cold_utility,
+        problem_approach=problem_approach,
+        level_targets=level_targets,
+        dt_cont_multiplier=dt_cont_multiplier,
     )
     target_output, settings = prepare_service_context(
         problem,
@@ -696,7 +868,35 @@ def heat_exchanger_network_duty_optimisation_service(
         )
 
     workflow_result = run_single_method_workflow(settings, _METHOD, run_method_stage)
+    _warn_if_unconverged(workflow_result.outcomes)
     return finalise_design_result(problem, target_output, workflow_result)
+
+
+def _warn_if_unconverged(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    """Warn when the returned allocation stopped at a solver limit.
+
+    It passed verification, so it is kept (unlike a synthesis task's), but its
+    objective is not a converged optimum.
+    """
+    for outcome in outcomes:
+        termination = outcome.diagnostics.get("unconverged_termination")
+        if outcome.status != "success" or termination is None:
+            continue
+        advice = (
+            " Raise the limit (max_iter or max_wall_time for Ipopt) in "
+            "HENS_SOLVER_OPTIONS_EVM."
+            if termination in LIMIT_TERMINATION_CONDITIONS
+            else ""
+        )
+        warnings.warn(
+            "the fixed-structure duty optimisation stopped before converging "
+            f"({termination}); its duties are feasible but may not be "
+            f"optimal.{advice}",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 def _design_points(exchanger: HeatExchanger, periods) -> dict[int, tuple]:
@@ -909,10 +1109,15 @@ def _weighted_load(model, exchangers: Sequence[HeatExchanger], side: str) -> flo
 
 
 def _profile_totals(model, attribute: str) -> list[float] | None:
+    by_period = _profile_totals_by_period(model, attribute)
+    return None if by_period is None else by_period[0]
+
+
+def _profile_totals_by_period(model, attribute: str) -> list[list[float]] | None:
     profiles = getattr(model, attribute, None)
     if not profiles:
         return None
-    return [float(profile.total) for profile in profiles[0]]
+    return [[float(profile.total) for profile in row] for row in profiles]
 
 
 def _source_metadata(model, solver_arrays) -> dict[str, Any]:
@@ -943,15 +1148,29 @@ def _source_metadata(model, solver_arrays) -> dict[str, Any]:
         "cold_stream_heat_capacity_flowrates": first("f_c_period"),
         "cold_stream_heat_capacity_flowrates_by_period": by_period("f_c_period"),
         "hot_stream_heat_transfer_coefficients": first("htc_h_period"),
+        "hot_stream_heat_transfer_coefficients_by_period": by_period("htc_h_period"),
         "cold_stream_heat_transfer_coefficients": first("htc_c_period"),
+        "cold_stream_heat_transfer_coefficients_by_period": by_period("htc_c_period"),
         "hot_utility_heat_transfer_coefficients": first("htc_hu_period"),
+        "hot_utility_heat_transfer_coefficients_by_period": by_period("htc_hu_period"),
         "cold_utility_heat_transfer_coefficients": first("htc_cu_period"),
+        "cold_utility_heat_transfer_coefficients_by_period": by_period("htc_cu_period"),
         "hot_stream_supply_temperatures": first("T_h_in_period"),
+        "hot_stream_supply_temperatures_by_period": by_period("T_h_in_period"),
         "hot_stream_target_temperatures": first("T_h_out_period"),
+        "hot_stream_target_temperatures_by_period": by_period("T_h_out_period"),
         "cold_stream_supply_temperatures": first("T_c_in_period"),
+        "cold_stream_supply_temperatures_by_period": by_period("T_c_in_period"),
         "cold_stream_target_temperatures": first("T_c_out_period"),
+        "cold_stream_target_temperatures_by_period": by_period("T_c_out_period"),
         "hot_stream_total_duties": _profile_totals(model, "hot_profiles"),
+        "hot_stream_total_duties_by_period": _profile_totals_by_period(
+            model, "hot_profiles"
+        ),
         "cold_stream_total_duties": _profile_totals(model, "cold_profiles"),
+        "cold_stream_total_duties_by_period": _profile_totals_by_period(
+            model, "cold_profiles"
+        ),
     }
 
 
@@ -986,6 +1205,13 @@ def _solver_failure(model: Any) -> str:
     solver_run = getattr(model, "solver_run", None)
     reason = getattr(solver_run, "failure_reason", None)
     return str(reason or "solver did not return a successful duty allocation")
+
+
+def _unconverged_diagnostics(model: Any) -> dict[str, str]:
+    solver_run = getattr(model, "solver_run", None)
+    if getattr(solver_run, "converged", True):
+        return {}
+    return {"unconverged_termination": str(solver_run.termination_condition)}
 
 
 def _solver_status(model: Any) -> str:

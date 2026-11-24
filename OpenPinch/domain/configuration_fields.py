@@ -47,8 +47,20 @@ class ConfigurationOptionStatus:
 
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
 HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
+# How synthesis places utility between levels: as targeting does, by
+# temperature (least valuable level first), or by price; "auto" is by price
+# for a design of one process zone and by temperature for a site's.
+HENS_UTILITY_PLACEMENT_VALUES = frozenset({"auto", "temperature", "price"})
 # What a multiperiod HEN is synthesised from before it is fitted to every period.
 HENS_DESIGN_BASIS_VALUES = frozenset({"all", "period", "median"})
+# Which utility levels a total site network design uses: the case's own, or
+# placed by utility placement over a sweep of level counts.
+HENS_SITE_LEVELS_VALUES = frozenset({"given", "placed"})
+HENS_SITE_LEVEL_HOLDS_VALUES = frozenset({"fixed", "at_least"})
+# Whether network evolution of a single process keeps the utility levels
+# its pinch design held. There is no "at_least" as for a site: a level held
+# at or above its target does not bind, so the networks are those of "none".
+HENS_EVOLUTION_LEVEL_HOLDS_VALUES = frozenset({"none", "fixed"})
 # Which median-basis clusters a design is synthesised from.
 HENS_BASIS_CANDIDATES_VALUES = frozenset({"dominant", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
@@ -71,6 +83,17 @@ def _sequence(name: str, value: Any, *, allow_empty: bool) -> Sequence:
     if not allow_empty and not value:
         raise ValueError(f"{name} must contain at least one value.")
     return value
+
+
+def _name_pairs(name: str, value: Any) -> list[list[str]]:
+    """A list of pairs of non-empty names, each pair as a two-item list."""
+    pairs = []
+    for item in _sequence(name, value, allow_empty=True):
+        pair = _sequence(name, item, allow_empty=False)
+        if len(pair) != 2:
+            raise ValueError(f"{name} entries must be pairs of names; got {item!r}.")
+        pairs.append([_non_empty_string(name, entry) for entry in pair])
+    return pairs
 
 
 def _positive_float_grid(name: str, value: Any) -> list[float]:
@@ -133,6 +156,26 @@ def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
     return stages
 
 
+def _stage_pair_or_none(name: str, value: Any) -> list[int] | None:
+    """Two positive stage counts, which may be equal, or ``None``."""
+    if value is None:
+        return None
+    stages = [
+        _positive_int(name, item) for item in _sequence(name, value, allow_empty=False)
+    ]
+    if len(stages) != 2:
+        raise ValueError(f"{name} must hold exactly two stage counts.")
+    return stages
+
+
+def _site_level_counts(name: str, value: Any) -> list[int]:
+    """Unique level counts of at least two, in ascending order."""
+    counts = _positive_unique_int_grid(name, value)
+    if min(counts) < 2:
+        raise ValueError(f"{name} values must be at least 2.")
+    return sorted(counts)
+
+
 def _string_choice_grid(
     name: str,
     value: Any,
@@ -177,6 +220,10 @@ def _mvr_cascade_fluids(name: str, value: Any) -> list[str]:
             "must not include water: the MVR stages always run on water."
         )
     return fluids
+
+
+def _positive_float_or_none(name: str, value: Any) -> float | None:
+    return None if value is None else _positive_float(name, value)
 
 
 def _positive_float(name: str, value: Any) -> float:
@@ -426,13 +473,28 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_OVERDESIGN_MAX": _spec(float, 50.0, "hens", "overdesign_max", numeric_min=0.0),
     "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_positive_float_grid_or_none),
     "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
-    "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.0, "hens", "min_exchanger_approach_share", validator=_share_below_one),
+    "HENS_MIN_EXCHANGER_APPROACH_SHARE": _spec(float, 0.25, "hens", "min_exchanger_approach_share", validator=_share_below_one),
     "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
+    "HENS_PDM_STAGES": _spec(List[int] | None, None, "hens", "pdm_stages", validator=_stage_pair_or_none),
     "HENS_PDM_MIN_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_min_unit_networks", numeric_min=0.0),
     "HENS_PDM_EXTRA_UNIT_NETWORKS": _spec(int, 0, "hens", "pdm_extra_unit_networks", numeric_min=0.0),
     "HENS_HEURISTIC_PDM_NETWORKS": _spec(int | None, None, "hens", "heuristic_pdm_networks", numeric_min=0.0),
     "HENS_HEURISTIC_PDM_EVOLUTION_SEEDS": _spec(int | None, None, "hens", "heuristic_pdm_evolution_seeds", numeric_min=0.0),
     "HENS_PDM_MILP": _spec(bool | None, None, "hens", "pdm_milp"),
+    "HENS_UTILITY_PLACEMENT": _spec(str, "auto", "hens", "utility_placement", validator=partial(_string_choice, choices=HENS_UTILITY_PLACEMENT_VALUES)),
+    "HENS_UTILITY_SLICES": _spec(bool, True, "hens", "utility_slices"),
+    "HENS_FORBIDDEN_MATCHES": _spec(List[List[str]], [], "hens", "forbidden_matches", validator=_name_pairs),
+    "HENS_HEAT_PUMP_STREAM_EXCHANGERS": _spec(int, 2, "hens", "heat_pump_stream_exchangers", numeric_min=1.0),
+    "HENS_SITE_LEVELS": _spec(str, "given", "hens", "site_levels", validator=partial(_string_choice, choices=HENS_SITE_LEVELS_VALUES)),
+    "HENS_SITE_LEVEL_COUNTS": _spec(List[int], [2, 3, 4, 5], "hens", "site_level_counts", validator=_site_level_counts),
+    "HENS_SITE_LEVEL_EARLY_STOP": _spec(bool, False, "hens", "site_level_early_stop"),
+    "HENS_SITE_LEVEL_STEP": _spec(float, 5.0, "hens", "site_level_step", numeric_min=0.0),
+    "HENS_SITE_LEVEL_STEP_MIN": _spec(float, 1.0, "hens", "site_level_step_min", numeric_min=0.0, validator=_positive_float),
+    "HENS_SITE_TIME_LIMIT": _spec(float | None, None, "hens", "site_time_limit", validator=_positive_float_or_none),
+    "HENS_SITE_LETDOWN_PRICE": _spec(float, 0.0, "hens", "site_letdown_price", numeric_min=0.0),
+    "HENS_SITE_LEVEL_HOLDS": _spec(str, "fixed", "hens", "site_level_holds", validator=partial(_string_choice, choices=HENS_SITE_LEVEL_HOLDS_VALUES)),
+    "HENS_EVOLUTION_LEVEL_HOLDS": _spec(str, "none", "hens", "evolution_level_holds", validator=partial(_string_choice, choices=HENS_EVOLUTION_LEVEL_HOLDS_VALUES)),
+    "HENS_RETROFIT_LOOPS": _spec(bool, True, "hens", "retrofit_loops"),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),

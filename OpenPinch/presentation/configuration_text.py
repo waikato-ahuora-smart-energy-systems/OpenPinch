@@ -408,10 +408,12 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Minimum exchanger approach share", None,
         (
             "Smallest exchanger approach the thermal derivative and network evolution "
-            "steps may choose, as a share of twice THERMAL_DT_CONT times the dt_cont "
-            "multiplier, from 0 up to but not including 1. Those steps choose "
-            "approaches by cost, down to 0.1 K by default (0); at 0.5 a multiplier "
-            "of 1.0 with a 5 K THERMAL_DT_CONT keeps every exchanger at 5 K or more."
+            "steps may choose, as a share of each match's pinch design approach "
+            "(the sum of its two sides' dt_cont contributions times the dt_cont "
+            "multiplier), from 0 up to but not including 1, with a floor of 0.1 K "
+            "on the match. At the default a match of two 5 K streams, held to 10 K "
+            "in pinch design at a multiplier of 1.0, may close to 2.5 K; at 0 every "
+            "match may close to 0.1 K."
         ),
     ),
     "HENS_PDM_STAGE_PAIR_LIMIT": FieldText(
@@ -421,6 +423,139 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "above and below the pinch, up to 12. None adds none. Used only when "
             "the MILP runs at every multiplier (depth 2 and above, or "
             "HENS_PDM_MILP)."
+        ),
+    ),
+    "HENS_PDM_STAGES": FieldText(
+        "Pinch design stage counts", None,
+        (
+            "Two stage counts for the MILP pinch design, above then below the "
+            "pinch; they may be equal. None lets each side take the count its "
+            "streams need. A count too small for a side fails that design. The "
+            "heuristic pinch design sets its own stages."
+        ),
+    ),
+    "HENS_UTILITY_PLACEMENT": FieldText(
+        "Utility placement", None,
+        (
+            "How synthesis shares duty between utility levels when there is more "
+            "than one hot or cold utility. \"temperature\" holds each level at the "
+            "duty targeting gives it, the least valuable (lowest exergy) level "
+            "first, as the grand composite curve places them, as a site design "
+            "does. \"price\" lets the pinch design choose the levels by utility "
+            "cost, as an isolated process does. \"auto\" (the default) is "
+            "\"price\" for a design covering one process zone and \"temperature\" "
+            "for one covering more."
+        ),
+    ),
+    "HENS_UTILITY_SLICES": FieldText(
+        "Utility slices in series", None,
+        (
+            "With more than one hot or cold utility, the pinch design holds each "
+            "utility level at its target and runs a utility whose temperature "
+            "slides (hot water, say) through slices in series, so one utility "
+            "flow can heat or cool several process streams in turn. False keeps "
+            "each heater and cooler on the utility's whole range."
+        ),
+    ),
+    "HENS_FORBIDDEN_MATCHES": FieldText(
+        "Forbidden matches", None,
+        (
+            "Matches a design may not use, as pairs of names: the hot side then "
+            "the cold side. Either may be a process stream or a utility, so "
+            "[\"H1\", \"C2\"] forbids that recovery match and [\"HPS\", \"C1\"] "
+            "forbids heating C1 with HPS."
+        ),
+    ),
+    "HENS_HEAT_PUMP_STREAM_EXCHANGERS": FieldText(
+        "Exchangers per heat pump stream", None,
+        (
+            "The most exchangers one heat pump stream (a condenser or an "
+            "evaporator) may have in a network designed with a heat pump. A "
+            "network over it is left out of the ranking, and the design says "
+            "how many were."
+        ),
+    ),
+    "HENS_SITE_LEVELS": FieldText(
+        "Total site utility levels", None,
+        (
+            "Utility levels a total site network design uses: given uses the "
+            "case's own utilities; placed places them by utility placement once "
+            "per count in HENS_SITE_LEVEL_COUNTS, designs the site with each set "
+            "and keeps the cheapest design."
+        ),
+    ),
+    "HENS_SITE_LEVEL_COUNTS": FieldText(
+        "Total site level counts", None,
+        (
+            "Numbers of utility levels a placed total site design sweeps, each at "
+            "least 2. Each level serves heating and cooling, as a steam main does; "
+            "the case's sensible utilities (hot water, say) stay sensible while "
+            "two isothermal levels remain."
+        ),
+    ),
+    "HENS_SITE_LEVEL_EARLY_STOP": FieldText(
+        "Total site level early stop", None,
+        (
+            "End the level count sweep once two designed counts in a row cost "
+            "more than the cheapest before them."
+        ),
+    ),
+    "HENS_SITE_LEVEL_STEP": FieldText(
+        "Total site level step", "delta_degC",
+        (
+            "First step (K) by which a placed total site design moves each "
+            "placed level's temperature to lower the site total annual cost; it "
+            "halves when no move improves, down to HENS_SITE_LEVEL_STEP_MIN. 0 "
+            "moves no level."
+        ),
+    ),
+    "HENS_SITE_LEVEL_STEP_MIN": FieldText(
+        "Total site level minimum step", "delta_degC",
+        "Smallest level-temperature step (K) a placed total site design tries.",
+    ),
+    "HENS_SITE_TIME_LIMIT": FieldText(
+        "Total site time limit", "s",
+        (
+            "Wall-clock budget (s) for a placed total site design. Once it runs "
+            "out, no further level count or level move is started and the best "
+            "design so far is returned; a design already running finishes. At "
+            "least one level count is always designed. None sets no limit."
+        ),
+    ),
+    "HENS_SITE_LETDOWN_PRICE": FieldText(
+        "Total site letdown price", "$/MWh",
+        (
+            "Price of heat the site utility balance of a total site network "
+            "design lets down from a utility level to a colder one, as a "
+            "utility price is given; 0 lets heat down for free."
+        ),
+    ),
+    "HENS_SITE_LEVEL_HOLDS": FieldText(
+        "Total site level holds", None,
+        (
+            "How network evolution of a total site network design holds each "
+            "process's utility levels: fixed holds each at its targeted duty; "
+            "at_least holds each at or above it, so a process may take more "
+            "of a level when the site utility balance makes that cheaper."
+        ),
+    ),
+    "HENS_EVOLUTION_LEVEL_HOLDS": FieldText(
+        "Level holds in evolution", None,
+        (
+            "Whether the thermal derivative and network evolution steps of a "
+            "single process keep the utility levels its pinch design held "
+            "(utility placement by temperature): none lets them trade utility "
+            "for area by price; fixed holds each level at its targeted duty."
+        ),
+    ),
+    "HENS_RETROFIT_LOOPS": FieldText(
+        "Retrofit heat recovery loops", None,
+        (
+            "Let a retrofit of a network that spans several process zones "
+            "propose a new heat recovery loop: an intermediate fluid that a "
+            "hot stream of one process heats and that gives the same heat to "
+            "a cold stream of another, the only link between processes it "
+            "proposes. Off proposes new matches within each process only."
         ),
     ),
     "HENS_PDM_MIN_UNIT_NETWORKS": FieldText(
@@ -469,7 +604,12 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HENS_TDM_PARENT_LIMIT": FieldText(
         "Thermal derivative parent limit", None,
-        "Recorded in the synthesis manifest; no current synthesis step reads it.",
+        (
+            "The most MILP pinch design networks the thermal derivative step"
+            " refines, cheapest first. Below depth 3 the rest are not evolved"
+            " either; from depth 3 every MILP network seeds evolution anyway."
+            " Unset refines every one."
+        ),
     ),
     "HENS_STAGE_PACKING": FieldText(
         "Stage packing", None,
@@ -482,9 +622,8 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "HEN stage counts", None,
         (
             "Stage counts for the direct network evolution runs made when Couenne "
-            "is missing. Exactly two values also fix the MILP pinch design stages "
-            "above and below the pinch; the heuristic sets its own. Other runs "
-            "choose their stage counts."
+            "is missing. Other runs choose their stage counts; HENS_PDM_STAGES "
+            "sets those of the MILP pinch design."
         ),
     ),
     "HENS_SOLVER_PDM": FieldText(

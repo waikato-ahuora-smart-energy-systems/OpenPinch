@@ -8,7 +8,6 @@
     "COSTING_SERVICE_LIFE": 1.0,
     "HENS_BEST_SOLUTIONS_TO_SAVE": 10,
     "HENS_LOG_LEVEL": "WARNING",
-    "HENS_MAX_PARALLEL": 10,
     "HENS_OUTPUT_FOLDER": "",
     "HENS_OUTPUT_FORMATS": [],
     "HENS_RUN_ID": "Four-stream-Yee-and-Grossmann-1990-1",

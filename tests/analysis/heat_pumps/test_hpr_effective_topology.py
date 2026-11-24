@@ -125,13 +125,16 @@ def test_a_vapour_compression_target_reports_its_effective_topology():
 
 
 def test_an_mvr_target_reports_its_mvr_stages():
+    # R1233zd(E) found a paying MVR design here only from some seeds: moving
+    # the warm start's evaporator by 0.01 K lost it. Cyclopentane at a 0.3
+    # load keeps its MVR stage for seed shifts of 0 to 0.05 K.
     target = PinchProblem("basic_pinch.json").target.mvr_heat_pump(
-        mvr_fluids=["R1233zd(E)"],
+        mvr_fluids=[_SUBCRITICAL_HYDROCARBON],
         mvr_stages=1,
         condensers=1,
         evaporators=1,
         options=_PERMISSIVE,
-        **_SMALL_SEARCH,
+        **{**_SMALL_SEARCH, "load_fraction": 0.3},
     )
 
     topology = target.hpr_details.effective_topology

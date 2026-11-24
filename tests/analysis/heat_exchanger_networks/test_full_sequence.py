@@ -240,6 +240,127 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution(
     assert esm_success.task.derivative_threshold is None
 
 
+def test_a_milp_network_whose_derivative_tasks_all_fail_is_evolved_directly(
+    monkeypatch,
+) -> None:
+    """A thermal derivative task can fail for reasons other than a missing
+    Couenne (a time limit with no incumbent, a crash, a verification
+    failure). Its MILP parent is then evolved directly, so it is not left
+    as an unevolved final candidate."""
+
+    class FailingDerivativeExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+            if tasks and tasks[0].method == "thermal_derivative_method":
+                return tuple(
+                    HeatExchangerNetworkSynthesisTaskOutcome(
+                        task=task,
+                        status="failed",
+                        solver_status="failed",
+                        error="maxTimeLimit with no incumbent",
+                    )
+                    for task in tasks
+                )
+            return super().execute(
+                tasks,
+                problem=problem,
+                parent_outcomes=parent_outcomes,
+                max_parallel=max_parallel,
+            )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+
+    result = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FailingDerivativeExecutor()
+    )
+
+    outcomes = result.outcomes
+    milp_parents = {
+        outcome.task.task_id
+        for outcome in outcomes
+        if outcome.status == "success"
+        and outcome.task.method == "pinch_design_method"
+        and any(
+            child.task.parent_task_id == outcome.task.task_id
+            and child.task.method == "thermal_derivative_method"
+            for child in outcomes
+        )
+    }
+    evolved = {
+        outcome.task.parent_task_id
+        for outcome in outcomes
+        if outcome.task.method == "network_evolution_method"
+    }
+    assert milp_parents
+    assert milp_parents <= evolved
+
+
+def test_tdm_parent_limit_leaves_excluded_milp_parents_unevolved() -> None:
+    """``HENS_TDM_PARENT_LIMIT`` cuts work: a MILP parent the limit leaves
+    out gets neither a derivative task nor direct evolution."""
+
+    problem = _small_problem_with_options({"HENS_TDM_PARENT_LIMIT": 1})
+    settings = workflow_settings_from_problem(problem)
+
+    result = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    )
+
+    parents = [
+        outcome
+        for outcome in result.outcomes
+        if outcome.status == "success" and outcome.task.method == "pinch_design_method"
+    ]
+    children = {
+        parent.task.task_id: {
+            str(child.task.method)
+            for child in result.outcomes
+            if child.task.parent_task_id == parent.task.task_id
+        }
+        for parent in parents
+    }
+    assert len(parents) == 2
+    assert sorted(children.values(), key=len) == [
+        set(),
+        {"thermal_derivative_method"},
+    ]
+
+
+def test_manifest_records_stage_limits_only_for_stages_that_ran() -> None:
+    problem = _small_problem_with_options(
+        {
+            "HENS_SEARCH_DEPTH": 1,
+            "HENS_HEURISTIC_PDM_NETWORKS": 2,
+            "HENS_PDM_STAGE_PAIR_LIMIT": 3,
+            "HENS_TDM_PARENT_LIMIT": 2,
+        }
+    )
+    settings = workflow_settings_from_problem(problem)
+
+    manifest = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    ).accepted_result.manifest
+
+    assert "pinch_design_method" not in manifest.task_count_by_method
+    assert "thermal_derivative_method" not in manifest.task_count_by_method
+    assert manifest.pdm_stage_pair_limit is None
+    assert manifest.tdm_parent_limit is None
+
+
+def test_manifest_records_stage_limits_for_stages_that_ran() -> None:
+    problem = _small_problem_with_options(
+        {"HENS_PDM_STAGE_PAIR_LIMIT": 1, "HENS_TDM_PARENT_LIMIT": 2}
+    )
+    settings = workflow_settings_from_problem(problem)
+
+    manifest = workflow_module.execute_open_hens_method(
+        problem, settings, executor=FakeSynthesisExecutor()
+    ).accepted_result.manifest
+
+    assert manifest.pdm_stage_pair_limit == 1
+    assert manifest.tdm_parent_limit == 2
+
+
 def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     class MissingCouenneForPdmExecutor(FakeSynthesisExecutor):
         def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
@@ -416,6 +537,34 @@ def test_only_unconverged_outcomes_say_which_solver_limit_to_raise() -> None:
 
     with pytest.raises(WorkflowContractError, match="HENS_SOLVER_OPTIONS_PDM"):
         build_synthesis_result(settings, pdm_tasks, [unconverged])
+
+
+def test_a_non_limit_termination_is_not_advised_to_raise_a_limit() -> None:
+    # A solve that stopped at too small a step would not converge with a
+    # larger limit: the error names the termination but gives no limit.
+    from OpenPinch.analysis.heat_exchanger_networks.results.assembly import (
+        build_synthesis_result,
+    )
+
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)[:1]
+    (outcome,) = FakeSynthesisExecutor().execute(
+        pdm_tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    unconverged = outcome.model_copy(
+        update={
+            "status": "failed",
+            "error": "solver stopped before converging (minStepLength)",
+            "diagnostics": {"unconverged_termination": "minStepLength"},
+        }
+    )
+
+    with pytest.raises(WorkflowContractError) as raised:
+        build_synthesis_result(settings, pdm_tasks, [unconverged])
+
+    assert "minStepLength" in str(raised.value)
+    assert "raise the limit" not in str(raised.value)
 
 
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
@@ -1249,3 +1398,67 @@ def _neither_couenne_nor_scip(monkeypatch) -> None:
         real(name)
 
     monkeypatch.setattr(backend, "require_solver_backend", require)
+
+
+def test_a_skipped_evolution_warns_once_per_task() -> None:
+    # The seed of an evolution task failed, so the task evolved nothing: the
+    # user sees it as a warning, not only in the log of a worker.
+    problem = _small_problem()
+    settings = workflow_settings_from_problem(problem)
+    pdm_tasks = build_pinch_design_method_tasks(settings)
+    outcomes = FakeSynthesisExecutor().execute(
+        pdm_tasks, problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    assert len(outcomes) == 2
+    skipped = [
+        outcome.model_copy(
+            update={
+                "status": "failed",
+                "network": None,
+                "error": "not solved",
+                "diagnostics": {"evolution_skipped": "seed model not solved"},
+            }
+        )
+        for outcome in outcomes
+    ]
+
+    with pytest.warns(UserWarning, match="evolution") as caught:
+        build_synthesis_result(settings, pdm_tasks, [*outcomes, *skipped])
+
+    messages = [
+        str(item.message) for item in caught if "evolution" in str(item.message)
+    ]
+    assert len(messages) == 2
+    assert all("seed model not solved" in message for message in messages)
+
+
+def test_an_unsolved_evolution_seed_is_kept_as_a_diagnostic() -> None:
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        _unsolved_outcome,
+    )
+
+    task = build_pinch_design_method_tasks(
+        workflow_settings_from_problem(_small_problem())
+    )[0]
+    solved = SimpleNamespace(mSuccess=0, evolution_skipped=True)
+
+    outcome = _unsolved_outcome(task, SimpleNamespace(), solved)
+
+    assert outcome.status == "failed"
+    assert "evolution_skipped" in outcome.diagnostics
+    assert _unsolved_outcome(task, SimpleNamespace(), None).diagnostics == {}
+
+
+def test_evolution_of_an_unsolved_model_is_marked_skipped() -> None:
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.evolution import (
+        get_net_benefit_evolution,
+    )
+
+    owner = SimpleNamespace(mSuccess=0)
+
+    assert get_net_benefit_evolution(owner, print_output=False) is owner
+    assert owner.evolution_skipped is True

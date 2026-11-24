@@ -119,8 +119,20 @@ Interaction Matrix
    * - ``design.retrofit``
      - Find cost-effective modifications of an existing network
      - ``HeatExchangerNetworkRetrofitResult``
-     - none
+     - targeted (the direct target, when not cached); the cached design is
+       not changed
      - HEN solver
+   * - ``design.retrofit_heat_pumps``
+     - Heat pump targets for an existing network, ideal and as piped
+     - ``RetrofitHeatPumpTargets``
+     - targeted (the first period's direct target, when not cached)
+     - HPR; HEN solver when the network's heaters or coolers lack solved
+       temperatures (it is rated first)
+   * - ``design.design_basis``
+     - Preview the median design basis of a multiperiod HEN
+     - ``HenDesignBasis``
+     - none
+     - base
    * - ``summary_frame``, ``metrics``, ``report`` and state properties
      - Inspect prepared or cached state
      - dataframe, mapping, report, or record
@@ -136,9 +148,10 @@ Interaction Matrix
      - zone
      - re-prepare; clears stale results
      - base
-   * - ``residual_utility``, ``with_utilities_from``
-     - Derive a new unsolved problem from a residual HPR target or a donor's
-       utilities
+   * - ``residual_utility``, ``with_utilities_from``,
+       ``with_heat_pump_streams``
+     - Derive a new unsolved problem from a residual HPR target, a donor's
+       utilities or a heat pump target's streams
      - new problem
      - source unchanged
      - base
@@ -387,6 +400,19 @@ retaining the frozen HPR residual. ``problem.with_utilities_from(other_problem,
 project_name=None)`` creates an unsolved receiver-based study with the donor's
 canonical utilities. Matching period sets are required and arrays follow period
 identity; runtime components and receiver thermal inputs are preserved.
+
+``problem.with_heat_pump_streams(target, zone=None, machine="HP",
+project_name=None)`` creates an unsolved case that holds the problem's
+streams and the streams of a direct heat pump target: each condenser a hot
+stream, each evaporator a cold stream, at the ``HPR_DT_CONT`` the target
+was solved with, each marked
+``heat_pump: {"machine": ..., "role": ..., "placement": ...}``. Direct heat
+integration targeting of the new case gives the heat pump target's
+utilities. Given a utility heat pump's target solved on a site, it adds
+the condensers and the evaporators as two process zones of the site,
+``"<machine> condenser"`` and ``"<machine> evaporator"``, and total site
+targeting of the new case gives the target's net utility. See
+:doc:`../guides/heat-pump-workflows`.
 
 The keyword-only ``base_target=None`` on direct/all integration and utility
 placement selects a compatible scalar HPR residual. Without it, the established

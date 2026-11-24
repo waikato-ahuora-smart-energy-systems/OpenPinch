@@ -269,6 +269,30 @@ def test_a_heat_pumps_capital_is_its_components_installed_capital():
     )
 
 
+def test_a_heat_pump_reports_its_capital_without_process_exchangers():
+    # A retrofit that places the machine's process and air exchangers in the
+    # network itself pays the machine for the rest: its compressors and
+    # motors and its internal exchangers (the cascade exchanger, any IHX).
+    args = _target_inputs({"HPR_N_COND": 2})
+    args.refrigerant_ls = ["Ammonia"]
+    # A two-stage cascade, the upper stage taking heat through its cascade
+    # exchanger.
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.2)
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
+
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args)
+
+    (internal,) = machine_components(
+        [cycle._subcycles], process_areas=(0.0, 0.0, 0.0, 0.0), args=args
+    )
+    assert internal.exchanger_areas
+    assert result.hpr_machine_internal_capital_costs == pytest.approx(
+        (installed_capital(internal),)
+    )
+    assert installed_capital(internal) < result.hpr_machine_capital_costs[0]
+
+
 def test_the_evaluator_sizes_the_air_exchangers_for_the_cascades_air_duties(
     monkeypatch,
 ):

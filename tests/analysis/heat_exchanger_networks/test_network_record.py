@@ -285,6 +285,7 @@ def test_a_snapshot_lists_each_entry_as_json_data_in_rank_order():
         "task_id": "pdm",
         "dt_cont_multiplier": 0.75,
         "total_annual_cost": 100.0,
+        "holds_utility_levels": True,
         "unit_count": 1,
         "version": 2,
     }
@@ -762,3 +763,96 @@ def test_a_pooled_task_enters_the_record_when_it_finishes_not_in_input_order(
     )
 
     assert admitted == ["evm-b", "evm-a"]
+
+
+def _heated(task_id: str, hps: float, lps: float, tac: float):
+    """C1 heated by HPS and LPS; targeting put 40 kW on LPS and none on HPS."""
+    exchangers = tuple(
+        HeatExchanger(
+            exchanger_id=f"hot-utility:Hot Utility.{name}->C1",
+            kind=HeatExchangerKind.HOT_UTILITY,
+            source_stream=f"Hot Utility.{name}",
+            sink_stream="C1",
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=duty),
+            ),
+            area=1.0,
+        )
+        for name, duty in (("HPS", hps), ("LPS", lps))
+        if duty > 0.0
+    )
+    outcome = _outcome(task_id, A, tac)
+    network = outcome.network.model_copy(
+        update={
+            "exchangers": outcome.network.exchangers + exchangers,
+            "source_metadata": {
+                "utility_level_targets": {
+                    "Hot Utility.HPS": [0.0],
+                    "Hot Utility.LPS": [40.0],
+                }
+            },
+        }
+    )
+    return outcome.model_copy(update={"network": network})
+
+
+def test_a_network_that_holds_the_utility_levels_ranks_first():
+    record = HeatExchangerNetworkRecord()
+
+    with recording(record):
+        # Cheaper, but its heat comes from HPS, not the targeted LPS.
+        admit(_heated("by-price", 40.0, 0.0, 100.0))
+        admit(_heated("held", 0.0, 40.0, 120.0))
+
+    assert [entry.task.task_id for entry in record.outcomes()] == [
+        "held",
+        "by-price",
+    ]
+    assert [
+        entry["holds_utility_levels"] for entry in record.snapshot()["entries"]
+    ] == [
+        True,
+        False,
+    ]
+
+
+def _site_costed(outcome, site_tac: float):
+    network = outcome.network.model_copy(
+        update={
+            "summary_metrics": outcome.network.summary_metrics
+            | {"site_total_annual_cost": site_tac}
+        }
+    )
+    return outcome.model_copy(update={"network": network})
+
+
+def test_site_networks_rank_by_site_total_annual_cost():
+    """A site network's own TAC charges steam raised on a main as a cooler;
+    its site TAC credits it, and ranks it. A network without site metrics
+    ranks by its TAC."""
+    from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import (
+        outcome_ranking_key,
+    )
+
+    record = HeatExchangerNetworkRecord()
+    raises_steam = _site_costed(_outcome("raises", A, 300.0), 80.0)
+    buys_steam = _site_costed(_outcome("buys", B, 200.0), 150.0)
+    plain = _outcome("plain", C, 100.0)
+
+    with recording(record):
+        admit(buys_steam)
+        admit(raises_steam)
+        admit(plain)
+
+    assert [entry.task.task_id for entry in record.outcomes()] == [
+        "raises",
+        "plain",
+        "buys",
+    ]
+    assert [
+        entry.get("site_total_annual_cost") for entry in record.snapshot()["entries"]
+    ] == [80.0, None, 150.0]
+    ranked = sorted((plain, buys_steam, raises_steam), key=outcome_ranking_key)
+    assert [outcome.task.task_id for outcome in ranked] == ["raises", "plain", "buys"]

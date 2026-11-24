@@ -45,6 +45,7 @@ from OpenPinch.domain._stream.segment import StreamSegment
 from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import StreamType
 from OpenPinch.domain.stream import Stream
+from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.zone import Zone
 from tests.strategies.stream_segments import segmented_streams
 
@@ -453,13 +454,14 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
     [
         (3.0, 2.0, 6.0),
         (12.0, 2.0, 24.0),
-        (0.0, 2.0, 0.1),
-        (tol / 4.0, 2.0, 0.1),
-        (tol / 2.0, 2.0, 0.1),
+        # No per-stream fallback: the 0.1 K floor is on the pair
+        # (``pair_minimum_approach``), so a zero stays zero.
+        (0.0, 2.0, 0.0),
+        (tol / 4.0, 2.0, tol / 2.0),
         (tol, 2.0, 2.0 * tol),
     ],
 )
-def test_effective_temperature_contribution_uses_fallback_only(
+def test_effective_temperature_contribution_is_the_scaled_value(
     base, multiplier, expected
 ):
     stream = Stream(
@@ -469,7 +471,7 @@ def test_effective_temperature_contribution_uses_fallback_only(
         delta_t_contribution=base,
         delta_t_contribution_multiplier=multiplier,
     )
-    assert _temperature_contribution(stream, 20.0) == pytest.approx(expected)
+    assert _temperature_contribution(stream, 20.0) == pytest.approx(expected, abs=1e-12)
     assert stream.delta_t_contribution.value == pytest.approx(base)
 
 
@@ -483,7 +485,7 @@ def test_effective_temperature_contribution_selects_operating_period():
     )
     assert [
         _temperature_contribution(stream, 20.0, period_idx=n) for n in range(3)
-    ] == pytest.approx([0.1, 6.0, 24.0])
+    ] == pytest.approx([0.0, 6.0, 24.0], abs=1e-12)  # a zero stays zero
 
 
 @seed(20260918)
@@ -521,6 +523,8 @@ def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
             heat_recovery_target=140.0,
             hot_pinch=100.0,
             cold_pinch=90.0,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
         )
 
     monkeypatch.setattr(
@@ -575,7 +579,7 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
 
     # Effective contributions (2, 18) scale by the multiplier
-    # dTmin / (2 * THERMAL_DT_CONT) = 14 / 10; a zero becomes 0.1 K times it.
+    # dTmin / (2 * THERMAL_DT_CONT) = 14 / 10; a zero stays zero.
     assert zone.dt_cont_multiplier == 1.0
     assert zone.config.thermal.dt_cont == pytest.approx(7.0)
     np.testing.assert_allclose(
@@ -584,7 +588,9 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     )
     np.testing.assert_allclose(
         stream.segments[1].delta_t_contribution.to("delta_degC").period_values,
-        [0.14, 0.14],
+        # 0 and tol / 4, times the zone multiplier 2 and the task's 1.4.
+        [0.0, tol / 4.0 * 2.0 * 1.4],
+        atol=1e-12,
     )
     np.testing.assert_allclose(
         stream.delta_t_contribution.to("delta_degC").period_values,
@@ -625,7 +631,8 @@ def test_pdm_fallback_matches_arrays_and_is_idempotent_for_segments(stream, dTmi
     effective = np.asarray(original) * 2.0
     task_multiplier = dTmin / (2.0 * reference)
     scaled = effective * task_multiplier
-    expected = np.where(scaled > tol, scaled, 0.1 * task_multiplier)
+    # A zero contribution stays zero: the 0.1 K floor is on the pair.
+    expected = scaled
     from_arrays = [
         _temperature_contribution(segment, dTmin, reference_dt_cont=reference)
         for segment in next(iter(zone.process_streams)).segments
@@ -1058,9 +1065,12 @@ def test_couenne_segmented_cold_utility_uses_exact_traversed_segment_cost():
     )
     contributions = model.segment_area_cu_contributions_by_period[0][0][0]
     assert contributions
-    assert {item.cold_segment_identity for item in contributions} == {
-        model.solver_arrays.stream_identities["cold_utility_segments"][0]
-    }
+    # The 50 kW exactly fills the first segment, so the solve may end a
+    # feasibility sliver (about 4e-6 kW) into the second; that is not a
+    # traversed segment.
+    assert {
+        item.cold_segment_identity for item in contributions if item.duty > 1e-3
+    } == {model.solver_arrays.stream_identities["cold_utility_segments"][0]}
 
 
 @pytest.mark.solver
@@ -1330,3 +1340,244 @@ def test_verification_accepts_a_segmented_exchanger_with_spare_area():
 
     assert failures(1.2 * needed) == []
     assert failures(0.8 * needed)
+
+
+def _split_problem() -> PinchProblem:
+    """A segmented hot stream that two cold streams split in one stage."""
+    cold = [
+        {
+            "zone": "Site",
+            "name": name,
+            "t_supply": 40.0,
+            "t_target": 140.0,
+            "heat_flow": 150.0,
+            "htc": 1.0,
+        }
+        for name in ("C1", "C2")
+    ]
+    return PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Hot parent",
+                    "segments": [
+                        {
+                            "t_supply": 200.0,
+                            "t_target": 150.0,
+                            "heat_flow": 100.0,
+                            "htc": 1.0,
+                        },
+                        {
+                            "t_supply": 150.0,
+                            "t_target": 100.0,
+                            "heat_flow": 200.0,
+                            "htc": 1.0,
+                        },
+                    ],
+                },
+                *cold,
+            ],
+            "utilities": [
+                {
+                    "name": "HU",
+                    "type": "Hot",
+                    "t_supply": 250.0,
+                    "t_target": 249.99,
+                    "htc": 2.0,
+                },
+                {
+                    "name": "CU",
+                    "type": "Cold",
+                    "t_supply": 20.0,
+                    "t_target": 20.01,
+                    "htc": 2.0,
+                },
+            ],
+            "options": dict(UNIT_COST_BASIS),
+        },
+        project_name="Site",
+    )
+
+
+def _half_flow_branch_area() -> float:
+    """The area of one branch on half the hot stream's flow."""
+    branch = PiecewiseThermalProfile(
+        identities=("H.a", "H.b"),
+        temperatures_in=np.array([473.15, 423.15]),
+        temperatures_out=np.array([423.15, 373.15]),
+        duties=np.array([50.0, 100.0]),
+        heat_capacity_flowrates=np.array([1.0, 2.0]),
+        heat_transfer_coefficients=np.array([1.0, 1.0]),
+    )
+    cold = PiecewiseThermalProfile(
+        identities=("C",),
+        temperatures_in=np.array([313.15]),
+        temperatures_out=np.array([413.15]),
+        duties=np.array([150.0]),
+        heat_capacity_flowrates=np.array([1.5]),
+        heat_transfer_coefficients=np.array([1.0]),
+    )
+    return sum(
+        item.area
+        for item in duty_aligned_area_contributions(
+            branch,
+            cold,
+            duty=150.0,
+            hot_inlet_temperature=473.15,
+            cold_inlet_temperature=313.15,
+            period="0",
+        )
+    )
+
+
+def test_a_split_branch_is_sized_on_its_share_of_the_segmented_flow():
+    """Two matches share the hot stream in one stage, each over the whole
+    stage (200 to 100 C) on half its flow: each branch is sized on the
+    profile at half flow, not on the whole stream's profile, which would
+    end the branch at 137.5 C and understate its area."""
+    arrays = problem_to_solver_arrays(_split_problem(), 10.0)
+    solved = SimpleNamespace(
+        S=1,
+        Q_r=[[[150.0], [150.0]]],
+        Q_r_by_period=[[[[150.0], [150.0]]]],
+        z=[[[1.0], [1.0]]],
+        z_allowed=[[[1], [1]]],
+        Q_h=[0.0, 0.0],
+        Q_c=[0.0],
+        z_hu=[0.0, 0.0],
+        z_cu=[0.0],
+        T_h=[[473.15, 373.15]],
+        T_c=[[413.15, 313.15], [413.15, 313.15]],
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[413.15, 313.15], [413.15, 313.15]]],
+        area_r=[[[999.0], [999.0]]],
+    )
+    expected = _half_flow_branch_area()
+
+    network = extract_heat_exchanger_network(solved, arrays, run_id="split")
+
+    assert len(network.exchangers) == 2
+    for exchanger in network.exchangers:
+        slices = exchanger.segment_area_contributions
+        assert sum(item.area for item in slices) == pytest.approx(expected)
+        assert min(item.hot_outlet_temperature for item in slices) == pytest.approx(
+            373.15
+        )
+
+
+def test_a_stagewise_split_branch_area_uses_its_share_of_the_flow():
+    """The stage-wise model replaces each segmented match's area with its
+    duty-aligned slices; a split branch is sized on its share of the flow,
+    as extraction does."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.area import (
+        _apply_segment_recovery_areas,
+    )
+
+    arrays = problem_to_solver_arrays(_split_problem(), 10.0)
+    model = SimpleNamespace(
+        solver_arrays=arrays,
+        I=1,
+        J=2,
+        S=1,
+        N_periods=1,
+        period_ids=("0",),
+        tol=1e-6,
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[413.15, 313.15], [413.15, 313.15]]],
+        area_r_by_period=[[[[999.0], [999.0]]]],
+        _active_binary_value=lambda value: value,
+    )
+
+    _apply_segment_recovery_areas(model, [[[[150.0], [150.0]]]])
+
+    expected = _half_flow_branch_area()
+    assert model.area_r[0][0][0] == pytest.approx(expected)
+    assert model.area_r[0][1][0] == pytest.approx(expected)
+
+
+def test_a_non_isothermal_branch_is_sized_on_its_solved_flow_share():
+    """A non-isothermal model solves each branch's flow split (``X``, ``Y``)
+    and lets branch outlets differ, so a branch's share of the flow is its
+    split, not its share of the stage duty."""
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.area import (
+        _apply_segment_recovery_areas,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
+        branch_profile,
+    )
+
+    arrays = problem_to_solver_arrays(_split_problem(), 10.0)
+    model = SimpleNamespace(
+        solver_arrays=arrays,
+        I=1,
+        J=2,
+        S=1,
+        N_periods=1,
+        period_ids=("0",),
+        tol=1e-6,
+        non_isothermal_model=True,
+        X_by_period=[[[[0.6], [0.55]]]],
+        Y_by_period=[[[[1.0]], [[1.0]]]],
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[413.15, 313.15], [413.15, 313.15]]],
+        area_r_by_period=[[[[999.0], [999.0]]]],
+        _active_binary_value=lambda value: value,
+    )
+
+    _apply_segment_recovery_areas(model, [[[[150.0], [150.0]]]])
+
+    hot = profile_from_solver_arrays(arrays, side="hot", parent_index=0, period_index=0)
+    cold = profile_from_solver_arrays(
+        arrays, side="cold", parent_index=0, period_index=0
+    )
+    expected = sum(
+        item.area
+        for item in duty_aligned_area_contributions(
+            branch_profile(hot, 0.6),
+            cold,
+            duty=150.0,
+            hot_inlet_temperature=473.15,
+            cold_inlet_temperature=313.15,
+            period="0",
+        )
+    )
+    assert model.area_r[0][0][0] == pytest.approx(expected)
+
+
+def test_a_tiny_branch_share_keeps_a_valid_profile():
+    from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
+        branch_profile,
+    )
+
+    profile = _profile("Hot", hot=True)
+
+    scaled = branch_profile(profile, 1e-12)
+
+    assert all(duty > tol for duty in scaled.duties)
+    assert all(cp > tol for cp in scaled.heat_capacity_flowrates)
+
+
+def test_a_branch_never_carries_more_than_its_stream():
+    """The validity floor 2 * tol / smallest exceeds 1 when a segment's duty
+    is under 2 * tol; the branch is then the whole stream, never larger."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
+        branch_profile,
+    )
+
+    cp = np.array([2.0, 1.0])
+    temperatures_in = np.array([200.0, 150.0])
+    temperatures_out = np.array([150.0, 150.0 - 1.5 * tol])
+    profile = PiecewiseThermalProfile(
+        identities=("H.a", "H.b"),
+        temperatures_in=temperatures_in,
+        temperatures_out=temperatures_out,
+        duties=np.abs(temperatures_in - temperatures_out) * cp,
+        heat_capacity_flowrates=cp,
+        heat_transfer_coefficients=np.ones(2),
+    )
+
+    branch = branch_profile(profile, 0.5)
+
+    assert np.all(branch.duties <= profile.duties)
+    assert np.all(branch.heat_capacity_flowrates <= profile.heat_capacity_flowrates)

@@ -100,12 +100,16 @@ def _boiling_problem() -> PinchProblem:
 def test_milp_pinch_design_handles_a_near_flat_boiling_segment():
     view = _boiling_problem().design.pinch_design(
         dt_cont_multipliers=[1.0],
-        stages=[1, 2],
         best_solutions=1,
         max_parallel=1,
         solve_tolerance=0.01,
-        # The MILP method builds its network by amalgamating pinch sides.
-        options={"HENS_PDM_MILP": True, "HENS_HEURISTIC_PDM_NETWORKS": 0},
+        # The MILP method builds its network by amalgamating pinch sides,
+        # here with one stage above the pinch and two below.
+        options={
+            "HENS_PDM_MILP": True,
+            "HENS_HEURISTIC_PDM_NETWORKS": 0,
+            "HENS_PDM_STAGES": [1, 2],
+        },
     )
 
     boiling_duty = sum(duty for _, _, duty in BOILING_WATER)

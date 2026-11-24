@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+
+import pytest
 
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
     LocalSynthesisExecutor,
@@ -12,6 +15,7 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     SynthesisWorkflowSettings,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method import (
+    build_direct_network_evolution_method_tasks,
     build_seeded_network_evolution_method_tasks,
 )
 from OpenPinch.application.problem import PinchProblem
@@ -129,6 +133,72 @@ def test_build_problem_reads_the_min_exchanger_approach_share() -> None:
     assert internal.dTmin == 5.0
 
 
+def test_an_evolution_task_holds_a_quarter_of_the_pinch_design_approach() -> None:
+    """With no option set, a match of two 5 K streams, held to 10 K in pinch
+    design at multiplier 1, is held to 2.5 K in evolution:
+    max((dtcont_src + dtcont_snk) * m / 4, 0.1 K)."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        pair_minimum_approach,
+    )
+
+    payload = json.loads(
+        (
+            FIXTURES_ROOT / "openhens" / "Four-stream-Yee-and-Grossmann-1990-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="method-test",
+        method="network_evolution_method",
+        dt_cont_multiplier=1.0,
+        stage_count=1,
+    )
+
+    internal = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task,
+        problem=PinchProblem(source=payload),
+        parent_outcomes={},
+    )
+
+    arrays = internal.solver_arrays.arrays
+    hot = float(arrays["T_h_cont_period"][0][0])
+    cold = float(arrays["T_c_cont_period"][0][0])
+    assert pair_minimum_approach(hot, cold) == pytest.approx(2.5, abs=1e-9)
+
+
+def test_a_share_of_zero_holds_every_match_to_the_floor() -> None:
+    """At a share of 0 a match of two 10 K streams, 20 K in pinch design, may
+    close to 0.1 K like any other match."""
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        pair_minimum_approach,
+    )
+
+    payload = json.loads(
+        (
+            FIXTURES_ROOT / "openhens" / "Four-stream-Yee-and-Grossmann-1990-1.json"
+        ).read_text(encoding="utf-8")
+    )
+    for stream in payload["streams"]:
+        stream["dt_cont"] = {"value": 10.0, "unit": "delta_degC"}
+    payload["options"]["HENS_MIN_EXCHANGER_APPROACH_SHARE"] = 0.0
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="method-test",
+        method="network_evolution_method",
+        dt_cont_multiplier=1.0,
+        stage_count=1,
+    )
+
+    internal = LocalSynthesisExecutor(print_output=False)._build_problem(
+        task,
+        problem=PinchProblem(source=payload),
+        parent_outcomes={},
+    )
+
+    arrays = internal.solver_arrays.arrays
+    hot = float(arrays["T_h_cont_period"][0][0])
+    cold = float(arrays["T_c_cont_period"][0][0])
+    assert pair_minimum_approach(hot, cold) == pytest.approx(0.1, abs=1e-9)
+
+
 def test_quality_seeded_network_evolution_uses_canonical_topology() -> None:
     seed = _seed_network(method="thermal_derivative_method").model_copy(
         update={
@@ -201,3 +271,14 @@ def _recovery_exchanger(hot: str, cold: str, stage: int) -> HeatExchanger:
             ),
         ),
     )
+
+
+def test_direct_evolution_tasks_skip_repeated_multipliers() -> None:
+    settings = replace(
+        _settings(), dt_cont_multipliers=(1.0, 1.0, 0.5), stage_selection=(2,)
+    )
+
+    tasks = build_direct_network_evolution_method_tasks(settings)
+
+    assert [task.dt_cont_multiplier for task in tasks] == [1.0, 0.5]
+    assert len({task.task_id for task in tasks}) == 2

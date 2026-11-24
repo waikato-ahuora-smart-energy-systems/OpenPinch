@@ -6,6 +6,8 @@ from typing import Any
 
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.piecewise import (
+    branch_fractions,
+    branch_profile,
     duty_aligned_area_contributions,
     profile_from_solver_arrays,
 )
@@ -72,19 +74,35 @@ def _recovery_segment_contributions(
             raise ValueError(
                 "Segment-aware HEN extraction requires stage boundary temperatures."
             )
+        hot_share, cold_share = _solved_splits(
+            solved_model, period_index, hot_index, cold_index, stage_index
+        ) or branch_fractions(
+            lambda a, b, c, n=period_index: _match_duty(solved_model, n, a, b, c),
+            len(arrays["hot_segment_count"]),
+            len(arrays["cold_segment_count"]),
+            hot_index,
+            cold_index,
+            stage_index,
+        )
         contributions.extend(
             duty_aligned_area_contributions(
-                profile_from_solver_arrays(
-                    solver_arrays,
-                    side="hot",
-                    parent_index=hot_index,
-                    period_index=period_index,
+                branch_profile(
+                    profile_from_solver_arrays(
+                        solver_arrays,
+                        side="hot",
+                        parent_index=hot_index,
+                        period_index=period_index,
+                    ),
+                    hot_share,
                 ),
-                profile_from_solver_arrays(
-                    solver_arrays,
-                    side="cold",
-                    parent_index=cold_index,
-                    period_index=period_index,
+                branch_profile(
+                    profile_from_solver_arrays(
+                        solver_arrays,
+                        side="cold",
+                        parent_index=cold_index,
+                        period_index=period_index,
+                    ),
+                    cold_share,
                 ),
                 duty=duty,
                 hot_inlet_temperature=hot_inlet,
@@ -94,6 +112,32 @@ def _recovery_segment_contributions(
             )
         )
     return tuple(contributions)
+
+
+def _solved_splits(solved_model: Any, n: int, i: int, j: int, k: int):
+    """A non-isothermal model's solved hot and cold branch splits, or None."""
+    if not getattr(solved_model, "non_isothermal_model", False):
+        return None
+    hot = _optional_float(
+        _index(getattr(solved_model, "X_by_period", None), n, i, j, k)
+    )
+    cold = _optional_float(
+        _index(getattr(solved_model, "Y_by_period", None), n, j, i, k)
+    )
+    if hot is None or cold is None:
+        return None
+    return (hot if hot > 0.0 else 1.0, cold if cold > 0.0 else 1.0)
+
+
+def _match_duty(solved_model: Any, period_index: int, i: int, j: int, k: int) -> float:
+    """A recovery match's solved duty in one period, 0 when unset."""
+    by_period = getattr(solved_model, "Q_r_by_period", None)
+    value = (
+        _index(by_period, period_index, i, j, k)
+        if by_period is not None
+        else _index(getattr(solved_model, "Q_r", None), i, j, k)
+    )
+    return _optional_float(value) or 0.0
 
 
 def _model_recovery_segment_contributions(

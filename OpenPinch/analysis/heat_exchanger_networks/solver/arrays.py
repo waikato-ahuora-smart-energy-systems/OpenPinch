@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,9 +20,30 @@ from ..prepared_problem import PreparedProblem
 
 _PreparedItem = tuple[str, Stream, Any | None]
 SEGMENT_PROFILE_VERSION = 2
-# A contribution of 0 (an explicit dt_cont of 0) runs at this many K, times
-# the task's dt_cont multiplier unless the stream's multiplier is locked.
-ZERO_CONTRIBUTION_REPLACEMENT = 0.1
+# No match is held to a smaller approach than this, K. It is a floor on the
+# pair, not on a stream, and the dt_cont multiplier does not scale it.
+MINIMUM_PAIR_APPROACH = 0.1
+
+
+def pair_minimum_approach(
+    source_contribution: float,
+    sink_contribution: float,
+    *,
+    share: float = 1.0,
+) -> float:
+    """Return the minimum approach temperature of one match, K.
+
+    ``source_contribution`` and ``sink_contribution`` are the two sides'
+    temperature contributions, already scaled by the task's dt_cont
+    multiplier. Pinch design holds their sum (``share`` 1); the thermal
+    derivative and evolution steps hold ``share`` of it. A pair whose value
+    falls below ``MINIMUM_PAIR_APPROACH`` is held to that floor, so a stream
+    with a zero contribution adds nothing to a partner that already supplies
+    an approach.
+    """
+
+    held = (float(source_contribution) + float(sink_contribution)) * float(share)
+    return max(held, MINIMUM_PAIR_APPROACH)
 
 
 def nominal_approach_temperature(config: Any, dt_cont_multiplier: float) -> float:
@@ -123,8 +145,10 @@ def problem_to_solver_arrays(
         raise ValueError("dTmin must be finite and positive.")
 
     zone = problem.master_zone
-    hot_items = _ordered_stream_items(problem, zone.hot_streams.items())
-    cold_items = _ordered_stream_items(problem, zone.cold_streams.items())
+    # A process component (a process MVR) leaves the stream it replaces in the
+    # zone, switched off; targeting skips inactive streams, and so does this.
+    hot_items = _ordered_stream_items(problem, _active_items(zone.hot_streams))
+    cold_items = _ordered_stream_items(problem, _active_items(zone.cold_streams))
     hot_utility_items = _ordered_utility_items(problem, zone.hot_utilities.items())
     cold_utility_items = _ordered_utility_items(problem, zone.cold_utilities.items())
 
@@ -167,6 +191,24 @@ def problem_to_solver_arrays(
                 price_scale=annual_cost_scales(costing)[0],
             )
         )
+    arrays.update(
+        _forbidden_match_arrays(
+            [
+                *hens.forbidden_matches,
+                *_heat_pump_match_rules(
+                    heat_pump_stream_roles(problem),
+                    hot=[key for key, _, _ in hot_items],
+                    cold=[key for key, _, _ in cold_items],
+                    hot_utilities=[key for key, _, _ in hot_utility_items],
+                    cold_utilities=[key for key, _, _ in cold_utility_items],
+                ),
+            ],
+            hot=[key for key, _, _ in hot_items],
+            cold=[key for key, _, _ in cold_items],
+            hot_utilities=[key for key, _, _ in hot_utility_items],
+            cold_utilities=[key for key, _, _ in cold_utility_items],
+        )
+    )
 
     axis_maps = {
         "cold_process_streams": {
@@ -266,8 +308,8 @@ def problem_to_solver_arrays(
             "temperature_contribution": (
                 "K, effective_delta_t_contribution times the dt_cont multiplier "
                 "dTmin / (2 * THERMAL_DT_CONT), unscaled for a stream whose "
-                "multiplier is locked; 0.1 K times that multiplier replaces a "
-                "contribution <= tol"
+                "multiplier is locked; a zero stays zero, and the 0.1 K floor "
+                "is on each pair (pair_minimum_approach)"
             ),
             "utility_price": (
                 "$/kW/y: price in $/MWh times COSTING_ANNUAL_OP_TIME / 1000, "
@@ -279,6 +321,107 @@ def problem_to_solver_arrays(
             "hot_utilities": [key for key, _, _ in hot_utility_items],
         },
     )
+
+
+def _heat_pump_match_rules(
+    roles: dict[str, str],
+    *,
+    hot: Sequence[str],
+    cold: Sequence[str],
+    hot_utilities: Sequence[str],
+    cold_utilities: Sequence[str],
+) -> list[tuple[str, str]]:
+    """The pairs, by key, that the streams' heat pump roles rule out.
+
+    A condenser may not heat an evaporator: the pair is feasible and would
+    hand the machine's output back to its input. No cold utility may cool
+    a condenser: its heat is the machine's product. No hot utility may heat
+    an evaporator: it is there to take waste heat. An ambient source (the
+    air an evaporator draws on) meets evaporators only: it is not heat for
+    the process, nor heat to cool away.
+    """
+
+    condensers = [key for key in hot if roles.get(key) == "condenser"]
+    evaporators = [key for key in cold if roles.get(key) == "evaporator"]
+    air = [key for key in hot if roles.get(key) == "ambient_source"]
+    others = [key for key in cold if roles.get(key) != "evaporator"]
+    return (
+        [(hot, cold) for hot in condensers for cold in evaporators]
+        + [(hot, utility) for hot in condensers + air for utility in cold_utilities]
+        + [(utility, cold) for utility in hot_utilities for cold in evaporators]
+        + [(hot, cold) for hot in air for cold in others]
+    )
+
+
+def _forbidden_match_arrays(
+    pairs: Sequence[Sequence[str]],
+    *,
+    hot: Sequence[str],
+    cold: Sequence[str],
+    hot_utilities: Sequence[str],
+    cold_utilities: Sequence[str],
+) -> dict[str, np.ndarray]:
+    """``HENS_FORBIDDEN_MATCHES`` as masks by index (1 forbids), or nothing
+    when there are no pairs.
+
+    Each pair names the hot side then the cold side, either a process stream
+    or a utility, by its key (``Plant.H1``, ``Hot Utility.HPS``) or the tail
+    of it (``H1``, ``HPS``): a recovery match (``forbidden_recovery``,
+    hot by cold), a heater (``forbidden_hu``, hot utility by cold stream) or
+    a cooler (``forbidden_cu``, cold utility by hot stream). The two utility
+    masks run along the utility axis first and carry ``hu`` or ``cu`` in
+    their names, as ``utility_slices`` needs to give a utility's slices
+    their parent's row.
+    """
+
+    if not pairs:
+        return {}
+
+    def index(name: str, keys: Sequence[str]) -> int | None:
+        found = [
+            n for n, key in enumerate(keys) if key == name or key.endswith("." + name)
+        ]
+        if len(found) > 1:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {name!r} names more than one of "
+                f"{[keys[n] for n in found]}; give its full key."
+            )
+        return found[0] if found else None
+
+    def side(name: str, streams: Sequence[str], utilities: Sequence[str], kind: str):
+        stream, utility = index(name, streams), index(name, utilities)
+        if stream is not None and utility is not None:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {name!r} is both a {kind} stream and "
+                f"a {kind} utility; give its full key."
+            )
+        if stream is None and utility is None:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {name!r} is not a {kind} stream or "
+                f"{kind} utility of this problem."
+            )
+        return stream, utility
+
+    masks = {
+        "forbidden_recovery": np.zeros((len(hot), len(cold)), dtype=int),
+        "forbidden_hu": np.zeros((len(hot_utilities), len(cold)), dtype=int),
+        "forbidden_cu": np.zeros((len(cold_utilities), len(hot)), dtype=int),
+    }
+    for hot_name, cold_name in pairs:
+        i, hot_utility = side(hot_name, hot, hot_utilities, "hot")
+        j, cold_utility = side(cold_name, cold, cold_utilities, "cold")
+        if i is not None and j is not None:
+            masks["forbidden_recovery"][i][j] = 1
+        elif j is not None:
+            masks["forbidden_hu"][hot_utility][j] = 1
+        elif i is not None:
+            masks["forbidden_cu"][cold_utility][i] = 1
+        else:
+            raise ValueError(
+                f"HENS_FORBIDDEN_MATCHES: {hot_name!r} and {cold_name!r} are "
+                "two utilities; a pair needs a process stream."
+            )
+    return masks
 
 
 # fmt: off
@@ -559,18 +702,14 @@ def _temperature_contribution(
     nominal approach of :func:`nominal_approach_temperature`), and every
     effective contribution is scaled by it, as targeting scales them with a
     zone multiplier; a ``locked`` stream keeps its effective contribution. A
-    contribution that is zero after scaling becomes 0.1 K times the same
-    multiplier. Testing after scaling keeps the policy idempotent: applying it
-    again with ``reference_dt_cont = dTmin / 2`` returns the same values.
+    zero contribution stays zero: the 0.1 K floor is on a pair of streams
+    (:func:`pair_minimum_approach`), not on one stream.
     """
     contribution = _value(
         stream.effective_delta_t_contribution, "delta_degC", period_idx=period_idx
     )
     multiplier = 1.0 if locked else _array_dt_cont_multiplier(dTmin, reference_dt_cont)
-    contribution *= multiplier
-    if contribution <= tol:
-        return ZERO_CONTRIBUTION_REPLACEMENT * multiplier
-    return contribution
+    return contribution * multiplier
 
 
 def _utility_solver_target(
@@ -592,10 +731,12 @@ def _stream_heat_capacity_flowrate(
     *,
     period_idx: int = 0,
 ) -> float:
-    if getattr(stream, "has_segments", False):
+    if getattr(stream, "segment_count", 0) > 1:
         # Parent axes require this placeholder to preserve the current equation
         # shape. A zero sentinel directs segmented equations to the authoritative
         # segment-profile tensors instead of the parent's effective flowrate.
+        # A stream with one segment is not segmented to the models (they read
+        # ``segment_count > 1``), so it keeps its own flowrate.
         return 0.0
     raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
     if raw_flowrate is not None:
@@ -607,6 +748,62 @@ def _stream_heat_capacity_flowrate(
         if parsed is not None:
             return parsed
     return _value(stream.heat_capacity_flowrate, "kW/delta_degC", period_idx=period_idx)
+
+
+def _active_items(streams) -> list[tuple[str, Stream]]:
+    """The ``(key, stream)`` items of the streams that are switched on."""
+    return [(key, stream) for key, stream in streams.items() if stream.is_active]
+
+
+def heat_pump_stream_keys(problem: PreparedProblem) -> frozenset[str]:
+    """Keys of the process streams whose input record is marked as one side
+    of a heat pump (``heat_pump``): its condensers, evaporators and ambient
+    sources."""
+    return frozenset(heat_pump_stream_roles(problem))
+
+
+def heat_pump_stream_roles(
+    problem: PreparedProblem, placements: tuple[str, ...] = ("process",)
+) -> dict[str, str]:
+    """The heat pump role of each marked process stream, by its key in the
+    problem's master zone.
+
+    A record is found by its own zone and name, where its key is the zone's
+    address and the name, and followed to the master zone by the stream
+    object the zones share. Matching by name alone would put the mark on a
+    namesake in another branch of the zone tree.
+
+    By default only a heat pump placed on the process has a role here. The
+    streams of one placed on the utility system exchange with utility
+    levels, which the rules written from these roles forbid; a caller that
+    wants them too names both ``placements``.
+    """
+
+    records = getattr(getattr(problem, "_validated_data", None), "streams", None)
+    marked = {
+        f"{record.zone}.{record.name}": record.heat_pump.role
+        for record in records or ()
+        if getattr(record, "heat_pump", None) is not None
+        and record.heat_pump.placement in placements
+    }
+    if not marked:
+        return {}
+    master = problem.master_zone
+    role_of: dict[int, str] = {}
+    pending = [master]
+    while pending:
+        zone = pending.pop()
+        pending.extend(zone.subzones.values())
+        for streams in (zone.hot_streams, zone.cold_streams):
+            for key, stream in streams.items():
+                if key in marked:
+                    role_of[id(stream)] = marked[key]
+    return {
+        key: role_of[id(stream)]
+        for streams in (master.hot_streams, master.cold_streams)
+        for key, stream in streams.items()
+        if id(stream) in role_of
+    }
 
 
 def _ordered_stream_items(problem: PreparedProblem, items) -> list[_PreparedItem]:
@@ -719,8 +916,11 @@ def _str_array(values) -> np.ndarray:
 
 __all__ = [
     "SEGMENT_PROFILE_VERSION",
-    "ZERO_CONTRIBUTION_REPLACEMENT",
+    "MINIMUM_PAIR_APPROACH",
     "PreparedSolverArrays",
+    "heat_pump_stream_keys",
+    "heat_pump_stream_roles",
     "nominal_approach_temperature",
+    "pair_minimum_approach",
     "problem_to_solver_arrays",
 ]
