@@ -1,11 +1,15 @@
 """Application-owned case derivation with independent runtime ownership."""
 
 from copy import deepcopy
+from types import SimpleNamespace
 
 import numpy as np
 
 from ..analysis.heat_pumps.common._shared.air import UTILITY_BAND_MAX_SPAN_K
+from ..analysis.heat_pumps.common._shared.streams import get_ambient_air_stream
+from ..domain.configuration import tol
 from ..domain.enums import StreamType, ZoneType
+from ..domain.stream import Stream
 from ..domain.targets import DirectHeatPumpTarget, IndirectHeatPumpTarget
 from ._problem.input.utilities import _set_utilities_for_zone_and_subzones
 from ._problem.targeting.state import snapshot_problem
@@ -502,18 +506,23 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
     stream name.
 
     The target's own stream collections hold one period; its period
-    outputs hold every period's.
+    outputs hold every period's. The air the evaporators draw on is role
+    ``"ambient_source"``: the period outputs hold its duty alone
+    (``Q_amb_hot``), and the air is the same stream in every period (the
+    ambient temperature is one setting), so each period's is the target's
+    own air stream at that period's duty.
     """
     outputs = target.hpr_details.period_outputs
     # A period the machine is off in (an off season, a load too small to
     # run for) is left out of the outputs, or is there without streams.
     each_output = [outputs.get(period) or {} for period in periods]
-    if any(float(output.get("Q_amb_hot") or 0.0) > 0.0 for output in each_output):
-        raise ValueError(
-            "The heat pump draws on ambient air, and the air's stream is not "
-            "built for a problem with several periods yet."
-        )
+    drawn = [float(output.get("Q_amb_hot") or 0.0) for output in each_output]
     found = {}
+    if any(q > tol for q in drawn):
+        air = _air_stream(target)
+        found["ambient_source"] = {
+            air.name: [_at_duty(air, q) if q > tol else None for q in drawn]
+        }
     for role, group in (
         ("condenser", "hpr_hot_streams"),
         ("evaporator", "hpr_cold_streams"),
@@ -523,6 +532,50 @@ def _period_heat_pump_streams(target, periods) -> dict[str, dict[str, list]]:
         # ``None`` where the stream is off in a period.
         found[role] = {name: [streams.get(name) for streams in each] for name in names}
     return found
+
+
+def _air_stream(target):
+    """The hot air stream a heat pump target's evaporators draw on.
+
+    A shared design's own air stream is its selected period's, which may
+    draw none; the air is then built as the heat pump service builds it,
+    from the target's configuration (the ambient temperature, the phase
+    change span and ``HPR_DT_ENV_CONT``).
+    """
+    own = next(
+        (
+            stream
+            for _key, stream in target.hpr_details.amb_streams.items()
+            if stream.stream_type == StreamType.Hot.value
+        ),
+        None,
+    )
+    if own is not None:
+        return own
+    config = target.config
+    built = get_ambient_air_stream(
+        1.0,
+        0.0,
+        SimpleNamespace(
+            T_env=float(config.environment.temperature),
+            dt_phase_change=float(config.thermal.dt_phase_change),
+            dt_env_cont=float(config.hpr.dt_env_cont),
+        ),
+    )
+    return next(stream for _key, stream in built.items())
+
+
+def _at_duty(stream, duty: float):
+    """``stream`` (one period's) at ``duty`` kW, its temperatures, film
+    coefficient and contribution kept."""
+    return Stream(
+        name=stream.name,
+        supply_temperature=float(stream.supply_temperature.value),
+        target_temperature=float(stream.target_temperature.value),
+        heat_flow=float(duty),
+        heat_transfer_coefficient=float(stream.heat_transfer_coefficient.value),
+        delta_t_contribution=float(stream.delta_t_contribution.value),
+    )
 
 
 def _period_thermal_record(streams) -> dict:
