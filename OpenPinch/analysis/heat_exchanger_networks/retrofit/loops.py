@@ -303,5 +303,6 @@ __all__ = [
     "loop_heater_name",
     "loop_placement",
     "screen_heat_recovery_loops",
+    "with_constant_utilities",
     "with_loop_utilities",
 ]
