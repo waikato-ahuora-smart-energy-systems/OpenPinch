@@ -29,8 +29,6 @@ from ....contracts.synthesis.retrofit import (
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ...economics import compute_capital_recovery_factor
-from ...heat_pumps.common.compressor_efficiency import compressor_efficiency_model
-from ...heat_pumps.cycles.limits import CycleLimits
 from ...parallelism import supported_workers
 from ..context import ensure_target_results
 from ..duty_optimisation import (
@@ -43,20 +41,8 @@ from ..duty_optimisation import (
 )
 from ..execution.settings import configured_stage_solver, stage_solver_options
 from ..heat_pump_cost import network_with_heat_pumps
-from ..solver.arrays import annual_cost_scales
 from .frontier import mark_dominated
 from .heat_pump_streams import with_heat_pump_matches
-from .heat_pumps import (
-    HeatPumpCandidate,
-    carnot_rating,
-    condenser_name,
-    evaporator_name,
-    heat_pump_candidates,
-    screen_heat_pumps,
-    vapour_compression_capital,
-    vapour_compression_rating,
-    with_heat_pump_utilities,
-)
 from .loops import (
     HeatRecoveryLoop,
     heat_recovery_loop_candidates,
@@ -94,8 +80,7 @@ _MIN_KEPT_AREA = 1.0
 # The search warns when more than this share of its solves failed.
 _FAILED_SOLVE_WARNING_SHARE = 0.25
 STRATEGIES = ("stepwise", "structure")
-HEAT_PUMP_CYCLES = (None, "carnot", "vapour_compression")
-# The solver axes whose names a heat pump or loop utility must not take.
+# The solver axes whose names a loop utility must not take.
 _NAMED_AXES = (
     "hot_process_streams",
     "cold_process_streams",
@@ -103,7 +88,7 @@ _NAMED_AXES = (
     "cold_utilities",
 )
 # Moves that already pair two utility exchangers take no new end utility.
-_UTILITY_PAIRS = ("heat_pump", "heat_recovery_loop")
+_UTILITY_PAIRS = ("heat_recovery_loop",)
 
 logger = logging.getLogger(__name__)
 
@@ -141,19 +126,10 @@ class RetrofitSettings:
     can take) keep every design's inserts within each stream's allowance.
     ``repiping_cost`` ($ per stream) adds to a new match, relocation or
     new end heater or cooler the cost of each stream whose piping it
-    changes. ``heat_pump_cycle`` enables heat pump moves (None: none): an
-    evaporator at the end of a hot stream and a condenser at the end of a
-    cold one, rated by the HPR service's cycle models, with work at
-    ``COSTING_HPR_ELE_PRICE``. "carnot" rates them with
-    ``HPR_ETA_II_CARNOT``, pricing the evaporator and condenser like any new
-    exchanger (``new_unit_cost`` and their area) and the compressor and its
-    package at ``heat_pump_cost`` ($ per kW of condenser capacity). A Carnot
-    cycle has a COP at any lift, so it serves a pair only up to
-    ``heat_pump_max_lift`` (K from evaporating to condensing; 140 by
-    default, about a two-stage cascade; ``None`` for no limit).
-    "vapour_compression" rates them with a single stage on the best of
-    ``HPR_REFRIGERANTS`` within the HPR cycle limits, and prices the whole
-    machine with the HPR service's installed capital.
+    changes. ``heat_pump_cycle`` and ``heat_pump_cost`` are the heat pump
+    stream step's (``retrofit_with_heat_pump``): the search itself refuses a
+    cycle, its linked heat pump move being retired; it starts from a heat
+    pump only as streams (``heat_pump=``).
     ``heat_recovery_loops`` (default on) lets a retrofit whose existing
     network spans several process zones link two of them through a new heat
     recovery loop, the only link it proposes between processes: a loop
@@ -199,7 +175,6 @@ class RetrofitSettings:
     repiping_cost: float = 0.0
     heat_pump_cycle: str | None = None
     heat_pump_cost: float = 0.0
-    heat_pump_max_lift: float | None = 140.0
     heat_recovery_loops: bool = True
     heat_recovery_loop_cost: float = 0.0
     utility_switch_cost: float | None = None
@@ -213,7 +188,6 @@ class _Move:
     splits: tuple[str, ...] = ()
     utility_id: str | None = None
     repiped: tuple[str, ...] = ()
-    heat_pump: HeatPumpCandidate | None = None
     loop: HeatRecoveryLoop | None = None
     # The heat pump whose stream this new match serves, when the search
     # started from a heat pump step.
@@ -249,9 +223,9 @@ def run_retrofit_search(
     """Search modifications of ``existing``, one at a time.
 
     Every exchanger of ``existing`` needs its installed ``area``; a
-    ``ValueError`` names those without one. ``max_added_area_fraction`` and
-    ``heat_pump_max_lift`` must each be None or finite and non-negative, and
-    every exchanger id and stream in
+    ``ValueError`` names those without one. ``max_added_area_fraction`` must
+    be None or finite and non-negative, a ``heat_pump_cycle`` is refused (the
+    linked heat pump move is retired), and every exchanger id and stream in
     ``enhancement_factors``, ``enhancement_pressure_drops`` and
     ``pressure_drop_allowances`` must be in the existing network.
     """
@@ -272,12 +246,6 @@ def run_retrofit_search(
         raise ValueError(
             "max_added_area_fraction must be None or a finite fraction of at "
             f"least 0; got {fraction!r}."
-        )
-    lift = settings.heat_pump_max_lift
-    if lift is not None and not (math.isfinite(lift) and lift >= 0.0):
-        raise ValueError(
-            "heat_pump_max_lift must be None or a finite lift of at least 0 K; "
-            f"got {lift!r}."
         )
     missing = [
         str(e.exchanger_id)
@@ -598,12 +566,12 @@ def _within_pressure_drop(
 
 
 def _structural_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
-    """The screened new matches, the screened heat pumps (with a
-    ``heat_pump_cost``) and, with a ``relocation_cost``, the relocations
-    from ``parent``, each as ``(network, move)``."""
+    """The screened heat recovery loops, the screened new matches, the
+    utility switches (with a ``utility_switch_cost``) and, with a
+    ``relocation_cost``, the relocations from ``parent``, each as
+    ``(network, move)``."""
 
     network = parent.state.network
-    yield from _heat_pump_steps(parent, settings, evaluator)
     yield from _loop_steps(parent, settings, evaluator)
     matches = screen_new_matches(
         parent.solved,
@@ -682,37 +650,6 @@ def _switch_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
         )
 
 
-def _heat_pump_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
-    """The ``new_match_candidates`` heat pumps that could relieve the most
-    utility in ``parent``, each not yet installed, as ``(network, move)``:
-    the evaporator added at its hot stream's end, the condenser at its cold
-    stream's."""
-
-    network = parent.state.network
-    installed = {str(e.source_stream) for e in network.exchangers}
-    for candidate in screen_heat_pumps(
-        parent.solved,
-        [c for c in evaluator.heat_pumps if condenser_name(c) not in installed],
-        limit=settings.new_match_candidates,
-        weights=evaluator.weights,
-    ):
-        evaporator = NewUtility(candidate.hot, evaporator_name(candidate), False)
-        evaporator_id = _new_utility_id(network, evaporator)
-        piped = apply_new_utility(network, evaporator, evaporator_id)
-        condenser = NewUtility(candidate.cold, condenser_name(candidate), True)
-        condenser_id = _new_utility_id(piped, condenser)
-        yield (
-            apply_new_utility(piped, condenser, condenser_id),
-            _Move(
-                "heat_pump",
-                evaporator_id,
-                utility_id=condenser_id,
-                repiped=(candidate.hot, candidate.cold),
-                heat_pump=candidate,
-            ),
-        )
-
-
 def _loop_steps(parent: _Evaluated, settings: RetrofitSettings, evaluator):
     """The ``new_match_candidates`` heat recovery loops that could relieve
     the most utility in ``parent``, each not yet installed, as
@@ -758,23 +695,6 @@ def _loop_links(state: _State, structure, ids) -> tuple:
         (slot[m.exchanger_id], slot[m.utility_id])
         for m in state.moves
         if m.kind == "heat_recovery_loop"
-    )
-
-
-def _heat_pump_links(state: _State, structure, ids) -> tuple:
-    """Each heat pump of ``state`` as (evaporator, condenser, COP), the two
-    by index among ``structure``'s utility exchangers (``ids`` names each
-    slot)."""
-
-    slot = {
-        exchanger_id: index
-        for (kind, index), exchanger_id in zip(structure.slots, ids)
-        if kind == "utility"
-    }
-    return tuple(
-        (slot[m.exchanger_id], slot[m.utility_id], m.heat_pump.cop)
-        for m in state.moves
-        if m.kind == "heat_pump"
     )
 
 
@@ -1009,42 +929,6 @@ class _Evaluator:
             "hot_utilities": tuple(self.names[n] for n in axes["hot_utilities"]),
             "cold_utilities": tuple(self.names[n] for n in axes["cold_utilities"]),
         }
-        # Heat pumps add their condensers and evaporators as utilities,
-        # after the network's own (which new utility exchangers draw on).
-        self.heat_pumps: list[HeatPumpCandidate] = []
-        self.cycle_settings = _cycle_settings(config.hpr)
-        if settings.heat_pump_cycle is not None:
-            rating = (
-                carnot_rating(
-                    float(config.hpr.eta_ii_carnot),
-                    max_lift=settings.heat_pump_max_lift,
-                )
-                if settings.heat_pump_cycle == "carnot"
-                else vapour_compression_rating(
-                    list(config.hpr.normalised_refrigerants), **self.cycle_settings
-                )
-            )
-            # A pump whose condenser or evaporator would take a name the
-            # problem already uses is left out, so that name keeps resolving
-            # to the problem's own stream or utility.
-            taken = [str(key) for axis in _NAMED_AXES for key in axes[axis]]
-            self.heat_pumps = [
-                candidate
-                for candidate in heat_pump_candidates(
-                    self.ends, approach=self.screen_approach, rating=rating
-                )
-                if not any(
-                    key == name or key.endswith("." + name)
-                    for name in (condenser_name(candidate), evaporator_name(candidate))
-                    for key in taken
-                )
-            ]
-            price_scale, _capital = annual_cost_scales(config.costing)
-            self.arrays = with_heat_pump_utilities(
-                self.arrays,
-                self.heat_pumps,
-                float(config.costing.hpr_ele_price) * price_scale,
-            )
         # A site retrofit may link two processes through a heat recovery
         # loop: its cooler and heater join the utilities, free.
         self.loops: list[HeatRecoveryLoop] = []
@@ -1126,7 +1010,6 @@ class _Evaluator:
                 enlargeable_utilities=enlargeable["utility"],
                 enhanced_recovery=enhanced["recovery"],
                 enhanced_utilities=enhanced["utility"],
-                heat_pumps=_heat_pump_links(state, structure, ids),
                 loops=_loop_links(state, structure, ids),
             ),
         )
@@ -1354,7 +1237,6 @@ class _Evaluator:
                     structure.spec,
                     recovery_areas={},
                     utility_areas={},
-                    heat_pumps=_heat_pump_links(state, structure, ids),
                     loops=_loop_links(state, structure, ids),
                 ),
                 minimisation_goal="utility cost",
@@ -1556,27 +1438,6 @@ class _Evaluator:
         elif move.kind == "utility_switch":
             # Its added area, if any, is an area addition of its own.
             added, fixed = 0.0, settings.utility_switch_cost
-        elif move.kind == "heat_pump" and move.heat_pump.refrigerant is not None:
-            # The HPR machine capital covers the exchangers too.
-            added = 0.0
-            try:
-                fixed = vapour_compression_capital(
-                    move.heat_pump,
-                    utility.max_duty,
-                    (float(result.added_area), float(utility.added_area)),
-                    **self.cycle_settings,
-                )
-            except (ValueError, RuntimeError) as exc:
-                # The cycle can fail at the solved capacity: drop this one.
-                logger.debug("Heat pump %s not priced: %s", move.heat_pump, exc)
-                return None
-        elif move.kind == "heat_pump":
-            # The compressor at its capacity; the evaporator and condenser
-            # are new exchangers, as any new match is.
-            added = float(result.added_area)
-            fixed = (
-                settings.heat_pump_cost * utility.max_duty + 2 * settings.new_unit_cost
-            )
         elif move.kind == "heat_recovery_loop":
             # Two new exchangers and the loop's pump and piping run.
             added = float(result.added_area)
@@ -1597,12 +1458,10 @@ class _Evaluator:
                 else settings.area_addition_cost
             )
         utility_area = 0.0 if utility is None else float(utility.added_area)
-        machine = move.heat_pump is not None and move.heat_pump.refrigerant is not None
         if utility is not None and move.kind not in _UTILITY_PAIRS:
             fixed += settings.new_unit_cost
         fixed += settings.repiping_cost * len(move.repiped)
         match = move.match
-        pump = move.heat_pump
         loop = move.loop
         if loop is not None:
             return HeatExchangerNetworkRetrofitModification(
@@ -1618,24 +1477,6 @@ class _Evaluator:
                 repiped_streams=move.repiped,
                 loop_temperature=loop.temperature - 273.15,
                 loop_duty=utility.max_duty,
-            )
-        if pump is not None:
-            return HeatExchangerNetworkRetrofitModification(
-                kind=move.kind,
-                exchanger_id=move.exchanger_id,
-                added_area=float(result.added_area),
-                fixed_cost=float(fixed),
-                area_cost=0.0
-                if machine
-                else self._area_cost(added) + self._area_cost(utility_area),
-                hot_stream=pump.hot,
-                cold_stream=pump.cold,
-                utility_exchanger_id=move.utility_id,
-                utility_area=utility_area,
-                repiped_streams=move.repiped,
-                heat_pump_cop=pump.cop,
-                heat_pump_capacity=utility.max_duty,
-                heat_pump_refrigerant=pump.refrigerant,
             )
         hot, cold = (match.hot, match.cold) if match else move.switch or (None, None)
         return HeatExchangerNetworkRetrofitModification(
@@ -1658,25 +1499,6 @@ class _Evaluator:
         """Installed cost ($) of ``area`` m2 of new area."""
 
         return self.area_coeff * area**self.area_exp if area > 0.0 else 0.0
-
-
-def _cycle_settings(hpr) -> dict:
-    """The HPR service's vapour compression settings: the approach,
-    compressor and motor efficiencies and cycle limits (pressures in Pa)."""
-
-    return {
-        "dtcont": float(hpr.dt_cont),
-        "eta_comp": compressor_efficiency_model(hpr.compressor_model, hpr.eta_comp),
-        "eta_motor": float(hpr.eta_motor),
-        "limits": CycleLimits(
-            max_discharge_superheat=hpr.max_discharge_superheat,
-            max_pressure_ratio=hpr.max_pressure_ratio,
-            max_discharge_pressure=hpr.max_discharge_pressure * 1e5,
-            max_discharge_pressure_co2=hpr.max_discharge_pressure_co2 * 1e5,
-            min_suction_pressure=hpr.screen_min_suction_pressure * 1e5,
-            min_lift=float(hpr.min_stage_lift),
-        ),
-    }
 
 
 def _spanned_processes(
