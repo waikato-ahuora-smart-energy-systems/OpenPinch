@@ -7,6 +7,7 @@ import numpy as np
 
 from ..analysis.heat_pumps.common._shared.air import UTILITY_BAND_MAX_SPAN_K
 from ..analysis.heat_pumps.common._shared.streams import get_ambient_air_stream
+from ..domain._stream.linearisation import align_temperature_heat_profiles
 from ..domain.configuration import tol
 from ..domain.enums import StreamType, ZoneType
 from ..domain.stream import Stream
@@ -578,6 +579,83 @@ def _at_duty(stream, duty: float):
     )
 
 
+def _aligned_segments(streams) -> list[dict]:
+    """A segmented stream's segments in every period, cut alike.
+
+    Segment names are positional, and periods can break a profile at
+    different duties (a condenser with no subcooling in one period), so
+    segments are not paired by name. Each running period's segments, in
+    order, are one temperature-heat profile; the profiles are cut at the
+    union of their cumulative duty fractions
+    (``align_temperature_heat_profiles``), so every period has the same
+    number of segments and each period's chain end to end. A period the
+    stream is off in (``None``, or no duty) has no duty there, at the
+    temperatures of the first period it runs in. A segment's film
+    coefficient is that of the first running period's segment it lies in.
+    """
+
+    def carrying(stream) -> list:
+        if stream is None:
+            return []
+        return [p for p in stream.segments if float(p.heat_flow.value) > 0.0]
+
+    parts = [carrying(stream) for stream in streams]
+    running = [n for n, each in enumerate(parts) if each]
+    profiles = [
+        np.column_stack(
+            (
+                np.concatenate(
+                    ([0.0], np.cumsum([float(p.heat_flow.value) for p in parts[n]]))
+                ),
+                [float(parts[n][0].supply_temperature.value)]
+                + [float(p.target_temperature.value) for p in parts[n]],
+            )
+        )
+        for n in running
+    ]
+    aligned = dict(zip(running, align_temperature_heat_profiles(profiles)))
+    first = parts[running[0]]
+    # The first running period's segment boundaries as duty fractions.
+    bounds = np.cumsum([float(p.heat_flow.value) for p in first])
+    bounds = bounds / bounds[-1]
+    reference = aligned[running[0]]
+    fractions = reference[:, 0] / reference[-1, 0]
+    name = next(stream for stream in streams if stream is not None).name
+    t_unit = _value_record(first[0].supply_temperature)["unit"]
+    q_unit = _value_record(first[0].heat_flow)["unit"]
+    segments = []
+    for k in range(1, len(fractions)):
+        middle = 0.5 * (fractions[k - 1] + fractions[k])
+        within = first[min(int(np.searchsorted(bounds, middle)), len(first) - 1)]
+
+        def per_period(column: int, step: int) -> list[float]:
+            return [
+                float(aligned[n][k - step, column])
+                if n in aligned
+                else float(reference[k - step, column])
+                for n in range(len(streams))
+            ]
+
+        segments.append(
+            {
+                "name": f"{name}.S{k}",
+                "t_supply": {"values": per_period(1, 1), "unit": t_unit},
+                "t_target": {"values": per_period(1, 0), "unit": t_unit},
+                "heat_flow": {
+                    "values": [
+                        float(aligned[n][k, 0] - aligned[n][k - 1, 0])
+                        if n in aligned
+                        else 0.0
+                        for n in range(len(streams))
+                    ],
+                    "unit": q_unit,
+                },
+                "htc": _value_record(within.heat_transfer_coefficient),
+            }
+        )
+    return segments
+
+
 def _period_thermal_record(streams) -> dict:
     """The temperatures and duty of one stream in each period, in order.
 
@@ -587,40 +665,7 @@ def _period_thermal_record(streams) -> dict:
     """
     running = next(stream for stream in streams if stream is not None)
     if running.has_segments:
-        # Each segment by name in every period; one absent in a period (or
-        # the whole stream off there) has no duty there.
-        names = list(
-            dict.fromkeys(
-                segment.name
-                for stream in streams
-                if stream is not None
-                for segment in stream.segments
-            )
-        )
-        each = {
-            name: [
-                None
-                if stream is None
-                else next((s for s in stream.segments if s.name == name), None)
-                for stream in streams
-            ]
-            for name in names
-        }
-        return {
-            "segments": [
-                {"name": name}
-                | _period_thermal_record(parts)
-                # Its film coefficient, as a single period's segment keeps.
-                | {
-                    "htc": _value_record(
-                        next(
-                            p for p in parts if p is not None
-                        ).heat_transfer_coefficient
-                    )
-                }
-                for name, parts in each.items()
-            ]
-        }
+        return {"segments": _aligned_segments(streams)}
 
     def values(attribute: str, off=None) -> dict:
         per_period = [
