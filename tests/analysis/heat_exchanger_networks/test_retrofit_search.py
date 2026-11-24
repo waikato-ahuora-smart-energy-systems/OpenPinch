@@ -1574,6 +1574,9 @@ def test_a_heat_pump_whose_machine_cannot_be_priced_is_dropped(
         _existing_network(),
         max_modifications=1,
         heat_pump_cycle="vapour_compression",
+        # The linked move, whose pricing fails here: vapour compression now
+        # runs the stream step by default, which never reaches it.
+        heat_pump_streams=False,
         heat_pump_cost=300.0,
         repiping_cost=1_000.0,
         min_approach_temperature=1.0,
