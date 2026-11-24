@@ -139,8 +139,8 @@ Heat pumps and refrigeration
   and verification checks the total against all three parts.
 - Stream records take an optional ``heat_pump`` mark,
   ``{"machine": ..., "role": ...}`` with role ``condenser``, ``evaporator``
-  or ``ambient_source``. ``with_heat_pump_streams`` sets it; the mark
-  changes no result yet.
+  or ``ambient_source``. ``with_heat_pump_streams`` sets it, and the
+  design's match rules for heat pump streams read it.
 
 Zones and targeting
 ~~~~~~~~~~~~~~~~~~~
@@ -189,11 +189,8 @@ Heat exchanger network synthesis
 - Breaking: the retrofit search's linked heat pump move is retired. A
   heat pump enters a retrofit only as streams: ``design.retrofit`` with
   ``heat_pump_cycle="carnot"`` or ``"vapour_compression"`` always runs the
-  as-piped stream step, and its ``heat_pump_streams`` and
-  ``heat_pump_max_lift`` keywords are gone (passing either raises
-  ``TypeError``). ``run_retrofit_search`` refuses a
-  ``RetrofitSettings.heat_pump_cycle``, and
-  ``RetrofitSettings.heat_pump_max_lift``, ``FixedStructureSpec.heat_pumps``
+  as-piped stream step. ``run_retrofit_search`` refuses a
+  ``RetrofitSettings.heat_pump_cycle``, and ``FixedStructureSpec.heat_pumps``
   and ``retrofit/heat_pumps.py`` are removed. The stream step netted
   $2.81M/y on the guide's case where the linked move netted $1.23M/y,
   and found a machine on a low-temperature case where the linked move
@@ -253,8 +250,8 @@ Heat exchanger network synthesis
   cold stream's 150 kW past the plateau, and now takes 63.8 kW, the cold
   stream leaving 2 K under the kink.
 - ``design.retrofit(heat_pump_cycle="vapour_compression")`` retrofits a
-  vapour compression heat pump as streams by default, as Carnot does
-  (``heat_pump_streams=False`` keeps the linked move). The as-piped target is a cascade of vapour compression cycles
+  vapour compression heat pump as streams, as Carnot does. The as-piped
+  target is a cascade of vapour compression cycles
   on ``HPR_REFRIGERANTS`` (``HPR_N_COND`` and ``HPR_N_EVAP`` levels), its
   condensers kept as one stream each with their desuperheating,
   condensing and subcooling segments. The machine costs what the heat
@@ -290,8 +287,8 @@ Heat exchanger network synthesis
   the evaporators.
 - ``design.retrofit(heat_pump_cycle="carnot")`` now tries the existing
   network's as-piped heat pump target as one
-  machine added as streams, in place of the linked heat pump move
-  (``heat_pump_streams=False`` keeps the linked move): several condensers along the heaters'
+  machine added as streams, in place of the linked heat pump move:
+  several condensers along the heaters'
   temperatures and several evaporators along the coolers', where the
   linked heat pump is one evaporator and one condenser at the ends of two
   streams. The step is one ``heat_pump`` modification with the compressor
@@ -303,15 +300,15 @@ Heat exchanger network synthesis
   at each of ``heat_pump_sizes``, shares of the heaters' load (by default
   1.0, 0.75 and 0.5), one search per size, and records its share in
   ``NetworkHeatPump.load_fraction``. On Ciric and Floudas at the guide's
-  settings (electricity $30/MWh, compressor $300/kW, lift limit 200 K)
+  settings (electricity $30/MWh, compressor $300/kW)
   the linked heat pump nets $1.23M/y and the as-piped machine at the full
   load (17.5 MW, COP 2.37) $2.81M/y, in about 20 s against under a second
   for the linked move. ``heat_pump_search`` bounds each size's target
   search, by default at 2000 evaluations (``{}`` for the full search, ten
   times as long there for the same machine). The step is left out
-  with a warning on a problem with several periods, on one with process
-  components or a site of several process zones, and when the network
-  cannot serve the machine's duties.
+  with a warning on a problem with process components or a site of
+  several process zones, and when the network cannot serve the machine's
+  duties.
 - ``HENS_FORBIDDEN_MATCHES`` lists matches a design may not use, as pairs
   of names, the hot side then the cold side. Either may be a process
   stream or a utility: ``["H1", "C2"]`` forbids that recovery match,
@@ -479,19 +476,12 @@ Heat exchanger network synthesis
   room keep the loop midway between them. More loops are offered (26 to
   428 on the chocolate factory's streams) but no more are solved at each
   step, and a one-step retrofit there takes 3.0 s against 2.9 s.
-- **Breaking:** a Carnot retrofit heat pump (``heat_pump_cycle="carnot"``)
-  now serves a pair of streams only when its lift from evaporating to
-  condensing is at most ``heat_pump_max_lift``, 140 K by default (about a
-  two-stage cascade); ``None`` restores the old behaviour. A Carnot cycle
-  has a COP at any lift, so the search proposed machines no compressor
-  builds: on the Ciric and Floudas case with electricity at 30 $/MWh, a
-  15.2 MW heat pump lifting 208 K (67 to 275 degC) at a COP of 1.82. That
-  case now gets no heat pump by default and its frontier is new matches.
 - ``design.retrofit`` warns when ``heat_pump_cycle="carnot"`` is used with
   ``heat_pump_cost`` left at 0. The compressor is then free and the heat
-  pump costs only its two exchangers: the 15.2 MW machine above had a
-  fixed cost of 69,200 $ and a net benefit of 3.94 M$/y, against
-  4.63 M$ and 3.03 M$/y with the compressor at 300 $/kW.
+  pump costs only its exchangers: a 15.2 MW machine on the Ciric and
+  Floudas case had a fixed cost of 69,200 $ and a net benefit of
+  3.94 M$/y, against 4.63 M$ and 3.03 M$/y with the compressor at
+  300 $/kW.
 - A retrofit design's network now gives each existing exchanger the area
   it has after the retrofit, installed plus any added. It gave the area
   the exchanger's duty needs, which for a unit on a segmented stream is
