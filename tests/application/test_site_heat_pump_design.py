@@ -1,0 +1,47 @@
+"""Site design ranks a utility heat pump's designs with the plain site's.
+
+``design.total_site_heat_exchanger_network(heat_pump=...)`` designs the
+site without a heat pump and, at each dt_cont multiplier, the site with
+a utility heat pump's zones, and ranks every network by its site cost,
+the machine's electricity and compressor included. On the two-level
+site, a 50-evaluation target (COP 2.65) designs to a site cost of
+76,000 $/y but its machine costs 273,000 $/y, so the plain site
+(315,000 $/y) is selected: the heat pump networks rank, and lose.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from OpenPinch.analysis.heat_exchanger_networks.reporting.ranking import ranking_cost
+from OpenPinch.analysis.heat_exchanger_networks.results.selection import (
+    ranked_networks,
+)
+from tests.analysis.heat_pumps.two_level_site import recovering_two_level_site
+from tests.application.test_utility_heat_pump_site_design import _solvers_available
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_site_design_ranks_its_utility_heat_pump_networks_with_the_plain_ones():
+    view = recovering_two_level_site().design.total_site_heat_exchanger_network(
+        width=0,
+        depth=1,
+        heat_pump={
+            "cycle": "carnot",
+            "load": {"fraction": 1.0},
+            "levels": {"condensers": 1, "evaporators": 1},
+            "search": {"restarts": 0, "evaluations": 50},
+        },
+        heat_pump_cost=300.0,
+    )
+
+    networks = [outcome.network for outcome in ranked_networks(view.result)]
+    pumped = [n for n in networks if n.heat_pumps]
+    assert pumped
+    assert all(n.heat_pumps[0].machine == "HP" for n in pumped)
+    costs = [ranking_cost(n, n.total_annual_cost) for n in networks]
+    selected = view.selected_network
+    assert ranking_cost(selected, selected.total_annual_cost) == min(costs)
+    assert not selected.heat_pumps

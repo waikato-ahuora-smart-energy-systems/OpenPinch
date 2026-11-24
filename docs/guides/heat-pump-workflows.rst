@@ -345,9 +345,24 @@ level's temperatures, and when the evaporator draws on ambient air. A site
 with several periods, a target solved on one process zone and a ``zone=``
 are refused by name. The direct match rules do not apply to these streams:
 exchanging with utility levels is what they are for. Electricity and the
-compressor are not in the case's costs, and
-``design.total_site_heat_exchanger_network`` has no ``heat_pump=`` of its
-own yet.
+compressor are not in the case's costs.
+
+``design.total_site_heat_exchanger_network(heat_pump=...)`` does all of
+this in one call, as ``heat_exchanger_network(heat_pump=...)`` does for one
+process, except that its heat pump heats and cools the site's utility
+levels, never process streams. It designs the site without a heat pump
+and, at each dt_cont multiplier and load, targets the utility heat pump on
+the site scaled to that multiplier, adds its zones and designs the site
+again at that multiplier alone. Every network is ranked by its site cost,
+the machine's electricity and annualised compressor (``heat_pump_cost``,
+$ per kW of condenser capacity) included, and the cheapest is selected.
+``heat_pump`` takes a cycle name or a mapping as for one process; without
+a ``load`` the machine is tried at 1.0, 0.75 and 0.5 of its full load,
+since the load kinks are the processes' profile, not the site utilities'.
+A site with several periods is refused before any design. On the
+two-level site above, a 50-evaluation target (COP 2.65) designs to a site
+cost of $76,000/y, but its machine costs $273,000/y, so the site without a
+heat pump ($315,000/y) is selected.
 
 Designing a network with and without the heat pump
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

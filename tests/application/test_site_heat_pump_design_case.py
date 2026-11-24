@@ -8,6 +8,8 @@ on the site, with its condenser and evaporator as zones of the site.
 
 from __future__ import annotations
 
+import pytest
+
 from OpenPinch.application.heat_pump_design import heat_pump_design_case
 from tests.analysis.heat_pumps.two_level_site import recovering_two_level_site
 
@@ -33,3 +35,18 @@ def test_a_utility_heat_pump_case_holds_the_machine_as_zones_of_the_site():
         "HP_H1": ("two level site/HP condenser", "utility"),
         "HP_C1": ("two level site/HP evaporator", "utility"),
     }
+
+
+def test_a_site_design_with_several_periods_and_a_heat_pump_is_refused():
+    # The utility heat pump's zones are not built over several periods
+    # (with_heat_pump_streams refuses them too); refused before any design.
+    from OpenPinch import PinchProblem
+    from tests.analysis.heat_pumps.two_level_site import two_level_site_source
+
+    source = two_level_site_source(
+        {"PROBLEM_PERIOD_IDS": ["base", "peak"], "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5]}
+    )
+    problem = PinchProblem(source=source, project_name="periods")
+
+    with pytest.raises(ValueError, match="utility heat pump.*2 periods"):
+        problem.design.total_site_heat_exchanger_network(heat_pump="carnot")

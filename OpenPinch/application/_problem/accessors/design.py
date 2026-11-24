@@ -724,6 +724,8 @@ class _DesignAccessor:
         levels: str | None = None,
         level_counts: Sequence[int] | None = None,
         placement: Mapping[str, Any] | None = None,
+        heat_pump: str | Mapping[str, Any] | None = None,
+        heat_pump_cost: float = 0.0,
     ) -> HeatExchangerNetworkDesignView:
         """Design one network for a site of several process zones.
 
@@ -777,6 +779,17 @@ class _DesignAccessor:
         ``level_counts``, ``placement`` and ``HENS_SITE_TIME_LIMIT`` and
         warns when any is set. ``HENS_SITE_LETDOWN_PRICE`` ($/MWh, default
         0) prices heat the site balance lets down to a colder level.
+
+        ``heat_pump`` (a cycle name or a mapping as for
+        ``heat_exchanger_network``) adds a utility heat pump, one that heats
+        and cools the site's utility levels, never process streams: the
+        site is designed without it and, at each dt_cont multiplier and
+        load (1.0, 0.75 and 0.5 of its full load unless ``load`` is given),
+        with its condenser and evaporator as zones of the site
+        (``with_heat_pump_streams``), and every network is ranked by its
+        site cost with the machine's electricity and compressor
+        (``heat_pump_cost``, $ per kW of condenser capacity). A site with
+        several periods is refused.
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected
@@ -787,6 +800,38 @@ class _DesignAccessor:
             raise ValueError(
                 "a site network needs more than one process zone; design a "
                 "single process with heat_exchanger_network()."
+            )
+        if heat_pump is not None:
+            from ....analysis.heat_exchanger_networks.execution.search import (
+                resolve_search,
+            )
+            from ...heat_pump_design import design_with_heat_pump
+
+            _runtime, configuration = self._arguments(
+                options=options, period_id=None, width=width, depth=depth
+            )
+            hens = self._effective_hens(configuration)
+            root = self._problem._require_prepared_root_zone()
+            with temporary_zone_configuration(root, configuration):
+                # The prices and annualisation this call costs its networks
+                # with, for the heat pump's electricity and compressor.
+                costing = copy(root.config.costing)
+            return design_with_heat_pump(
+                self._problem,
+                heat_pump,
+                cost_per_kw=heat_pump_cost,
+                costing=costing,
+                max_exchangers=hens.heat_pump_stream_exchangers,
+                multipliers=resolve_search(hens).dt_cont_multipliers,
+                arguments=dict(
+                    width=width,
+                    depth=depth,
+                    options=options,
+                    levels=levels,
+                    level_counts=level_counts,
+                    placement=placement,
+                ),
+                placement="utility",
             )
         hens = self._effective_hens(options)
         levels = hens.site_levels if levels is None else levels

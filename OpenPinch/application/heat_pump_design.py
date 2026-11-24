@@ -168,6 +168,11 @@ def heat_pump_request(heat_pump) -> dict[str, Any]:
     return {"cycle": "carnot"} | dict(heat_pump)
 
 
+# The shares of its full load a utility heat pump is tried at without a
+# load, as a retrofit tries its heat pump sizes.
+_UTILITY_LOADS = (1.0, 0.75, 0.5)
+
+
 def _load_fractions(problem) -> list[float]:
     """The heat pump sizes worth trying on ``problem``: the logical load
     fractions of its net load profile, over every period.
@@ -192,17 +197,41 @@ def design_with_heat_pump(
     arguments: Mapping,
     costing=None,
     max_exchangers: int | None = None,
+    placement: str = "process",
 ):
     """Design ``problem`` without a heat pump and, at each of
     ``multipliers``, with one, and rank every network together.
 
     ``heat_pump`` is a cycle name or a mapping of the keyword arguments of
     ``heat_pump_design_case``; ``arguments`` are those of
-    ``design.heat_exchanger_network``.
+    ``design.heat_exchanger_network``, or with ``placement`` "utility" of
+    ``design.total_site_heat_exchanger_network``: the heat pump then heats
+    and cools the site's utility levels, and without a load it is tried at
+    each of ``_UTILITY_LOADS`` of its full load.
     """
+    site = placement == "utility"
+
+    def design(case, multiplier=None):
+        if not site:
+            at = {} if multiplier is None else {"dt_cont_multipliers": [multiplier]}
+            return case.design.heat_exchanger_network(**dict(arguments) | at)
+        options = dict(arguments.get("options") or {})
+        if multiplier is not None:
+            # The site design takes its multipliers from its options.
+            options["HENS_DT_CONT_MULTIPLIERS"] = [multiplier]
+        return case.design.total_site_heat_exchanger_network(
+            **dict(arguments) | {"options": options}
+        )
+
     request = heat_pump_request(heat_pump)
     # Before any design runs its solvers or replaces the stored design.
     _require_heat_pump_stream_support(problem)
+    periods = len(problem.period_ids)
+    if site and periods > 1:
+        raise ValueError(
+            "The zones of a utility heat pump are not built for a problem "
+            f"with {periods} periods yet; design a single-period case."
+        )
     if not cost_per_kw:
         warnings.warn(
             "heat_pump_cost is 0, so the heat pump designs are ranked with a "
@@ -211,7 +240,7 @@ def design_with_heat_pump(
             UserWarning,
             stacklevel=2,
         )
-    plain = problem.design.heat_exchanger_network(**arguments)
+    plain = design(problem)
     # A heat pump's size is chosen outside the design: each is its own
     # target and its own networks. Without a load, every size worth trying.
     asked = request.pop("load", None)
@@ -219,14 +248,16 @@ def design_with_heat_pump(
     for multiplier in multipliers:
         # The kinks of the profile as the design at this multiplier sees it:
         # scaling the contributions moves the pinch and the profile's kinks.
-        loads = (
-            [asked]
-            if asked is not None
-            else [
+        # The kinks are the process profile's, not the site utilities'.
+        if asked is not None:
+            loads = [asked]
+        elif site:
+            loads = [{"fraction": fraction} for fraction in _UTILITY_LOADS]
+        else:
+            loads = [
                 {"fraction": fraction}
                 for fraction in _load_fractions(_scaled(problem, multiplier))
             ]
-        )
         for load in loads:
             try:
                 run = heat_pump_design_case(
@@ -235,11 +266,10 @@ def design_with_heat_pump(
                     load=load,
                     cost_per_kw=cost_per_kw,
                     costing=costing,
+                    placement=placement,
                     **request,
                 )
-                view = run.case.design.heat_exchanger_network(
-                    **dict(arguments) | {"dt_cont_multipliers": [multiplier]}
-                )
+                view = design(run.case, multiplier)
             except (HPRTargetingError, WorkflowContractError) as error:
                 # No target at this multiplier and size, or no network
                 # around its streams.
