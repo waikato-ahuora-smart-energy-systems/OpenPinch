@@ -46,7 +46,9 @@ def heat_pump_machine(
     With ``period_weights`` (by period id) and a shared design's
     ``period_outputs``, the duties are the largest of any period, the work
     each period's at its share of the weights (none where the machine is
-    off) and the COP the heat so delivered over that work.
+    off) and the COP the heat so delivered over that work; a
+    "vapour_compression" machine installs each of its machines at the
+    largest internal capital any period needs.
     """
 
     def duty(streams) -> float:
@@ -57,6 +59,7 @@ def heat_pump_machine(
     evaporator = duty(solved.hpr_cold_streams)
     work = float(solved.w_net)
     cop = float(solved.cop_h)
+    internal = tuple(getattr(solved, "hpr_machine_internal_capital_costs", None) or ())
     outputs = getattr(solved, "period_outputs", None)
     if period_weights and outputs:
         # A shared design: sized for the period it delivers most in, each
@@ -75,8 +78,18 @@ def heat_pump_machine(
         evaporator = max(
             (duty(o["hpr_cold_streams"]) for o in running.values()), default=0.0
         )
+        # Each machine installed for the period that needs it largest: the
+        # solve's own costs are the selected period's alone.
+        each = [internal] + [
+            tuple(o.get("hpr_machine_internal_capital_costs") or ())
+            for o in running.values()
+        ]
+        internal = tuple(
+            max(float(costs[n]) for costs in each if n < len(costs))
+            for n in range(max(map(len, each)))
+        )
     capital = (
-        sum(float(c) for c in solved.hpr_machine_internal_capital_costs)
+        sum(float(c) for c in internal)
         if cycle == "vapour_compression"
         else float(cost_per_kw) * capacity
     )
