@@ -114,6 +114,40 @@ def test_a_site_heat_pump_is_tried_at_several_approaches(monkeypatch):
 @pytest.mark.synthesis
 @pytest.mark.solver
 @pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
+def test_a_site_of_several_periods_is_designed_with_its_heat_pump():
+    # The zones are written per period from a shared-design target, so a
+    # site of several periods is designed with its heat pump, not refused.
+    from OpenPinch import PinchProblem
+
+    source = recovering_two_level_site().to_problem_json()
+    source["options"] |= {
+        "PROBLEM_PERIOD_IDS": ["base", "peak"],
+        "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5],
+    }
+    problem = PinchProblem(source=source, project_name="periods")
+
+    view = problem.design.total_site_heat_exchanger_network(
+        width=0,
+        depth=1,
+        heat_pump={
+            "cycle": "carnot",
+            "load": {"fraction": 1.0},
+            "levels": {
+                "condensers": 1,
+                "evaporators": 1,
+                "minimum_approach_temperature": 5.0,
+            },
+            "search": {"restarts": 0, "evaluations": 50},
+        },
+        heat_pump_cost=300.0,
+    )
+
+    assert any(o.network.heat_pumps for o in ranked_networks(view.result))
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+@pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
 def test_a_zero_heat_pump_approach_is_tried_once(monkeypatch):
     # With HPR_DT_CONT at 0 every multiple is 0 K: one case, not three alike.
     from OpenPinch.application import heat_pump_design

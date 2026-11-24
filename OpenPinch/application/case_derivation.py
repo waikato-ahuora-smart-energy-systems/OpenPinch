@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+import numpy as np
+
 from ..analysis.heat_pumps.common._shared.air import UTILITY_BAND_MAX_SPAN_K
 from ..domain.enums import StreamType, ZoneType
 from ..domain.targets import DirectHeatPumpTarget, IndirectHeatPumpTarget
@@ -276,12 +278,8 @@ def with_heat_pump_streams(
                 "gets zones of its own under the zone it was targeted on; "
                 "drop zone=."
             )
-        if len(problem.period_ids) > 1:
-            raise ValueError(
-                "The zones of a heat pump on the utility system are not built "
-                f"for a problem with {len(problem.period_ids)} periods yet; "
-                "derive a single-period case and target the heat pump on it."
-            )
+        # Several periods take a shared design, its streams in each period.
+        _require_heat_pump_stream_support(problem, target)
         case = _case_with_utility_heat_pump_zones(
             problem,
             target,
@@ -350,13 +348,25 @@ def _require_heat_pump_site_target(case, target) -> None:
     )
 
 
+def _at_period(value, period: int | None) -> float:
+    """``value``'s magnitude in ``period`` (its only one when it has one)."""
+
+    return float(np.asarray(value[period].value, dtype=float).reshape(-1)[0])
+
+
 def _band_move(
-    stream, role: str, approach: float, levels, multiplier: float = 1.0
+    stream,
+    role: str,
+    approach: float,
+    levels,
+    multiplier: float = 1.0,
+    period: int | None = None,
 ) -> float:
     """The kelvin to move a utility heat pump stream by so that the
     utility level whose band it lies in serves all of it. ``approach`` is
     the heat pump's own contribution as the target used it; each level's
     contribution counts ``multiplier`` times, the zone's dt_cont multiplier.
+    A level's temperatures and contribution are read in ``period``.
 
     A utility level is written as a narrow band of temperature (a steam
     main as 0.1 K), and a heat pump target places its streams against the
@@ -371,12 +381,12 @@ def _band_move(
     moves = [0.0]
     for level in levels:
         ends = sorted(
-            float(end.value)
+            _at_period(end, period)
             for end in (level.supply_temperature, level.target_temperature)
         )
         if not 0.0 < ends[1] - ends[0] <= UTILITY_BAND_MAX_SPAN_K:
             continue
-        gap = approach + multiplier * float(level.delta_t_contribution.value)
+        gap = approach + multiplier * _at_period(level.delta_t_contribution, period)
         for part in stream.segments or (stream,):
             end = float(part.supply_temperature.value)
             if role == "condenser" and ends[0] + gap <= end < ends[1] + gap:
@@ -386,15 +396,18 @@ def _band_move(
     return max(moves, key=abs)
 
 
-def _moved_record(record: dict, move: float) -> dict:
+def _moved_record(record: dict, moves: list[float]) -> dict:
     """A stream record with its temperatures, and its segments', moved by
-    ``move`` K."""
+    ``moves`` K, one per period of a record with a value per period (one
+    for a record with a single value)."""
+
+    def shifted(value: dict) -> dict:
+        if "values" in value:
+            return value | {"values": [v + m for v, m in zip(value["values"], moves)]}
+        return value | {"value": value["value"] + moves[0]}
 
     def moved(part: dict) -> dict:
-        return part | {
-            key: part[key] | {"value": part[key]["value"] + move}
-            for key in ("t_supply", "t_target")
-        }
+        return part | {key: shifted(part[key]) for key in ("t_supply", "t_target")}
 
     if "segments" in record:
         return record | {"segments": [moved(part) for part in record["segments"]]}
@@ -432,6 +445,9 @@ def _case_with_utility_heat_pump_zones(
     approach = float(dt_cont)
     multiplier = float(scope.dt_cont_multiplier)
     dt_cont = {"value": approach / multiplier, "unit": "delta_degC"}
+    periods = list(problem.period_ids)
+    # A shared design over several periods: each stream in every period.
+    by_period = _period_heat_pump_streams(target, periods) if len(periods) > 1 else {}
     for role, streams, levels in (
         ("condenser", target.hpr_hot_streams, scope.cold_utilities),
         ("evaporator", target.hpr_cold_streams, scope.hot_utilities),
@@ -447,15 +463,34 @@ def _case_with_utility_heat_pump_zones(
             *(node["children"] or ()),
             {"name": name, "type": ZoneType.P.value, "children": None},
         ]
-        for _key, stream in streams.items():
+        named = by_period.get(role) or {
+            stream.name: [stream] for _key, stream in streams.items()
+        }
+        for each in named.values():
+            running = next(stream for stream in each if stream is not None)
             record = _heat_pump_stream_record(
-                stream,
+                running,
                 zone=f"{scope.address}/{name}",
                 dt_cont=dt_cont,
                 mark={"machine": machine, "role": role, "placement": "utility"},
             )
-            move = _band_move(stream, role, approach, levels, multiplier)
-            source["streams"].append(_moved_record(record, move))
+            if by_period:
+                record |= _period_thermal_record(each)
+            # Each period's stream to the end of the band it lies in.
+            # One period's stream against that period's levels; a single
+            # period reads each level as it is.
+            moves = [
+                _band_move(
+                    running if s is None else s,
+                    role,
+                    approach,
+                    levels,
+                    multiplier,
+                    period=n if by_period else None,
+                )
+                for n, s in enumerate(each)
+            ]
+            source["streams"].append(_moved_record(record, moves))
     return type(problem)(
         source,
         project_name=problem.project_name if project_name is None else project_name,

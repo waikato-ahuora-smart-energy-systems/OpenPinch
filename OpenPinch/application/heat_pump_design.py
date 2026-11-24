@@ -235,12 +235,6 @@ def design_with_heat_pump(
     request = heat_pump_request(heat_pump)
     # Before any design runs its solvers or replaces the stored design.
     _require_heat_pump_stream_support(problem)
-    periods = len(problem.period_ids)
-    if site and periods > 1:
-        raise ValueError(
-            "The zones of a utility heat pump are not built for a problem "
-            f"with {periods} periods yet; design a single-period case."
-        )
     if not cost_per_kw:
         warnings.warn(
             "heat_pump_cost is 0, so the heat pump designs are ranked with a "

@@ -55,8 +55,9 @@ Heat pumps and refrigeration
   written as is moved to the band's end, so the level serves all of it.
   The case is refused when it would not target as the heat pump did (a
   level the heat pump delivers into or draws on has to be of type
-  ``Both``), on a site with several periods, and for a target solved on
-  one process zone. A heat pump stream's mark gains ``placement``,
+  ``Both``) and for a target solved on one process zone; on a site with
+  several periods it takes a shared-design target and writes each stream
+  per period. A heat pump stream's mark gains ``placement``,
   ``"process"`` by default; streams marked ``"utility"`` take none of the
   match rules of a heat pump on the process. Electricity and the
   compressor are not in the case's costs.
@@ -146,7 +147,8 @@ Heat exchanger network synthesis
   needed 2,804 m2 of exchangers and lost to the plain site ($330,740/y
   against $315,299/y), while 5 K (572 m2) won at $259,717/y. A size whose case would not target as the heat pump did (a
   level it delivers into that only gives heat, for one) is left out with
-  a warning; a site with several periods is refused. A site network's
+  a warning. A site with several periods is designed with a shared-design
+  machine, its zones' streams written per period. A site network's
   heat pump now also joins its ``site_total_annual_cost``, the cost it
   ranks by. On a two-level site a 50-evaluation target (COP 2.65) designs
   to $76,000/y of site cost plus $273,000/y for the machine, against
