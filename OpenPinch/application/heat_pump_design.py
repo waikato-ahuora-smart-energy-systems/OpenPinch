@@ -175,11 +175,6 @@ def heat_pump_request(heat_pump) -> dict[str, Any]:
 # The shares of its full load a utility heat pump is tried at without a
 # load, as a retrofit tries its heat pump sizes.
 _UTILITY_LOADS = (1.0, 0.75, 0.5)
-# The approaches, in multiples of HPR_DT_CONT, a utility heat pump is tried
-# at without one given: on a two-level site the machine stood 1 K off the
-# steam needed 2,804 m2 of exchangers and lost to the plain site, where 5 K
-# (572 m2) won by $55,600/y.
-_UTILITY_APPROACH_FACTORS = (1.0, 5.0, 10.0)
 
 
 def _load_fractions(problem) -> list[float]:
@@ -251,18 +246,9 @@ def design_with_heat_pump(
     # target and its own networks. Without a load, every size worth trying.
     asked = request.pop("load", None)
     levels = HprLevels.model_validate(request.pop("levels", None) or {})
-    if site and levels.minimum_approach_temperature is None:
-        # A machine stood HPR_DT_CONT off the levels needs large
-        # exchangers; a wider approach costs COP. The ranking chooses.
-        options = request.get("options") or {}
-        root = problem._require_prepared_root_zone()
-        base = float(options.get("HPR_DT_CONT", root.config.hpr.dt_cont))
-        # In order, once each: at a base of 0 every multiple is the same.
-        approaches = list(
-            dict.fromkeys(factor * base for factor in _UTILITY_APPROACH_FACTORS)
-        )
-    else:
-        approaches = [levels.minimum_approach_temperature]
+    # One approach: the one given, else HPR_DT_CONT. Only the dt_cont
+    # multiplier varies the approach the machine stands off by.
+    approaches = [levels.minimum_approach_temperature]
     runs = []
     for multiplier in multipliers:
         # The kinks of the profile as the design at this multiplier sees it:
