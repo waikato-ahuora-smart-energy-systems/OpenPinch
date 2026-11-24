@@ -790,8 +790,9 @@ class _DesignAccessor:
         with its condenser and evaporator as zones of the site
         (``with_heat_pump_streams``), and every network is ranked by its
         site cost with the machine's electricity and compressor
-        (``heat_pump_cost``, $ per kW of condenser capacity). A site with
-        several periods is refused.
+        (``heat_pump_cost``, $ per kW of condenser capacity). On a site with
+        several periods the machine is a shared design, its zones written
+        per period.
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected

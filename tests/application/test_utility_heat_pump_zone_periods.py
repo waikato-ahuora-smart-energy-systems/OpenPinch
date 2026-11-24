@@ -28,7 +28,9 @@ def _shared_target(problem):
 
 
 def test_the_zones_write_each_heat_pump_stream_in_every_period():
-    problem = PinchProblem(source=two_level_site_source(PERIODS), project_name="periods")
+    problem = PinchProblem(
+        source=two_level_site_source(PERIODS), project_name="periods"
+    )
 
     case = _case_with_utility_heat_pump_zones(
         problem, _shared_target(problem), dt_cont=1.0
@@ -44,7 +46,9 @@ def test_the_zones_write_each_heat_pump_stream_in_every_period():
 
 
 def test_with_heat_pump_streams_takes_a_shared_design_on_a_site_of_periods():
-    problem = PinchProblem(source=two_level_site_source(PERIODS), project_name="periods")
+    problem = PinchProblem(
+        source=two_level_site_source(PERIODS), project_name="periods"
+    )
 
     case = problem.with_heat_pump_streams(_shared_target(problem))
 

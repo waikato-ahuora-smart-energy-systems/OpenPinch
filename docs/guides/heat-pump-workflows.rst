@@ -341,8 +341,10 @@ The new case is checked before it is returned. It is refused when it would
 not target as the heat pump did: when a level the heat pump delivers into
 is a hot utility alone or one it draws on a cold utility alone (the level
 has to be of type ``Both``), when a stream sits part way through a wide
-level's temperatures, and when the evaporator draws on ambient air. A site
-with several periods, a target solved on one process zone and a ``zone=``
+level's temperatures, and when the evaporator draws on ambient air. On a site
+with several periods a target that is not a shared design is refused;
+the case is then checked in the period the target's own fields describe.
+A target solved on one process zone and a ``zone=``
 are refused by name. The direct match rules do not apply to these streams:
 exchanging with utility levels is what they are for. Electricity and the
 compressor are not in the case's costs.
@@ -366,7 +368,10 @@ the two-level site a fully searched machine at 1 K (COP 5.90) needed
 2,804 m2 and cost $330,740/y with the site, more than the site without
 it ($315,299/y); at 5 K (COP 5.08, 572 m2) it cost $259,717/y, at 10 K
 $262,354/y and at 20 K $289,897/y.
-A site with several periods is refused before any design. On the
+On a site with several periods the target is a shared design
+(``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) and the zones write each stream
+with its temperatures and duty per period, each period's stream moved
+within its level band on its own. On the
 two-level site above, a 50-evaluation target (COP 2.65) designs to a site
 cost of $76,000/y, but its machine costs $273,000/y, so the site without a
 heat pump ($315,000/y) is selected.
