@@ -53,3 +53,27 @@ def test_the_heat_pump_streams_carry_hpr_dt_cont_over_the_multiplier():
         "HP_H1": pytest.approx(approach / 2.0),
         "HP_C1": pytest.approx(approach / 2.0),
     }
+
+
+def test_the_air_carries_its_own_contribution_over_the_multiplier():
+    # The target stood the air its own contribution (here 4 K) off the
+    # evaporators as given; written at 4 K, the zone scaled it to 8 K.
+    problem = levels_problem()
+    problem.set_dt_cont_multiplier(2.0)
+    ambient = StreamCollection()
+    air = _stream("AIR_H1", 15.0, 14.99, 50.0)
+    air.delta_t_contribution = 4.0
+    ambient.add(air)
+    solved = SimpleNamespace(
+        hpr_hot_streams={"a": _stream("HP_H1", 110.0, 109.99, 120.0)},
+        hpr_cold_streams={"b": _stream("HP_C1", 9.99, 10.0, 80.0)},
+        amb_streams=ambient,
+    )
+
+    case = heat_pump_case(problem, solved, machine="HP")
+
+    written = {
+        record["name"]: record["dt_cont"]["value"]
+        for record in case.to_problem_json()["streams"]
+    }
+    assert written["AIR_H1"] == pytest.approx(2.0)
