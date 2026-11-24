@@ -284,10 +284,11 @@ def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
 
 
 def as_piped_profiles(
-    problem, network: HeatExchangerNetwork
+    problem, network: HeatExchangerNetwork, *, period: int = 0
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The shifted temperatures (degC, hottest first) and the source and
-    sink profiles of ``network``'s coolers and heaters, in its first period.
+    sink profiles of ``network``'s coolers and heaters, in the period of
+    index ``period`` (the first by default).
 
     Each cooler is a hot segment and each heater a cold one, between the
     process stream's solved inlet and outlet temperatures (K) at the
@@ -309,7 +310,7 @@ def as_piped_profiles(
             segments, process = sinks, zone.cold_streams
         else:
             continue
-        state = exchanger.period_states[0]
+        state = exchanger.period_states[period]
         stream = _process_stream(process, name)
         segments.add(
             Stream(
@@ -350,7 +351,10 @@ def as_piped_period_profiles(
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """``as_piped_profiles`` in each of the problem's periods, by period id."""
 
-    return {period: as_piped_profiles(problem, network) for period in problem.period_ids}
+    return {
+        period: as_piped_profiles(problem, network, period=index)
+        for period, index in problem.period_ids.items()
+    }
 
 
 def _process_stream(streams: StreamCollection, name: str) -> Stream:
