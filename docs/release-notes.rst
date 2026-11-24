@@ -178,7 +178,9 @@ Heat exchanger network synthesis
   move finds no heat pump, and the stream step with two condenser levels
   and one evaporator level an 858 kW machine (COP 3.6) netting
   181,000 $/y in 79 s; with the zone's default three and two levels its
-  search finds none.
+  search finds none. The vapour compression retrofit therefore targets two
+  condenser levels and one evaporator level unless the problem's options
+  or the retrofit's ``options`` set ``HPR_N_COND`` or ``HPR_N_EVAP``.
 - The retrofit search can start from a heat pump added to the case as
   streams. ``run_retrofit_search(problem, existing, settings,
   heat_pump=HeatPumpStep(...))`` takes a machine of a fixed size whose

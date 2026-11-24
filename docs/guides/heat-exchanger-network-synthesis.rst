@@ -922,9 +922,11 @@ The as-piped heat pump as streams
    service's installed capital without its process and air exchangers)
    and one new match per exchanger; a vapour compression condenser is one
    stream with its desuperheating, condensing and subcooling segments,
-   and the zone's ``HPR_N_COND`` and ``HPR_N_EVAP`` levels set the
-   cascade (on a low-temperature case two and one found an 858 kW machine
-   netting $181,000/y where the default three and two found none); the electricity
+   and the cascade has two condenser levels and one evaporator level
+   unless the problem's options or the retrofit's ``options`` set
+   ``HPR_N_COND`` or ``HPR_N_EVAP`` (on a low-temperature case two and one
+   found an 858 kW machine netting $181,000/y where the zone's default
+   three and two found none); the electricity
    is in the design's utility cost and the network records the machine in
    ``heat_pumps``. The machine is tried at each of ``heat_pump_sizes``,
    shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
