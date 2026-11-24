@@ -18,7 +18,11 @@ from ..domain.enums import StreamType
 from ..domain.heat_exchanger_network import NetworkHeatPump
 from ._problem.arguments import temporary_zone_configuration
 from ._problem.targeting.state import snapshot_problem
-from .case_derivation import _case_with_heat_pump_streams, _heat_pump_zone_address
+from .case_derivation import (
+    _case_with_heat_pump_streams,
+    _heat_pump_zone_address,
+    _period_heat_pump_streams,
+)
 
 
 def heat_pump_machine(
@@ -122,6 +126,9 @@ def heat_pump_case(problem, solved, *, machine: str):
     outputs = getattr(solved, "period_outputs", None)
     target = SimpleNamespace(
         provenance=SimpleNamespace(zone_address=root.address),
+        # The air a period draws on is built from it when the solve's own
+        # period draws none.
+        config=root.config,
         # A shared design over several periods: the case writes each
         # stream in every period from its period outputs, a level without
         # duty in a period off there.
@@ -197,6 +204,13 @@ def heat_pump_step(
     # a match it may not be able to have.
     condensers = _carrying(solved.hpr_hot_streams)
     evaporators = _carrying(solved.hpr_cold_streams)
+    # The air the evaporators draw on; air that takes heat the heat pump
+    # leaves is not a stream of the case.
+    ambient_sources = tuple(
+        stream
+        for _key, stream in solved.amb_streams.items()
+        if stream.stream_type == StreamType.Hot.value
+    )
     in_periods = weights = None
     if getattr(solved, "period_outputs", None):
         # A shared design: a level is a stream if it carries duty in any
@@ -226,6 +240,22 @@ def heat_pump_step(
                 )
             )
         condensers, evaporators = levels
+        # The air of any period, each period's at that period's duty: the
+        # solve's own air is the selected period's, which may draw none.
+        air = _period_heat_pump_streams(
+            SimpleNamespace(
+                config=problem.master_zone.config,
+                hpr_details=SimpleNamespace(
+                    amb_streams=solved.amb_streams,
+                    period_outputs=solved.period_outputs,
+                ),
+            ),
+            periods,
+        ).get("ambient_source", {})
+        in_periods |= air
+        ambient_sources = tuple(
+            next(s for s in each if s is not None) for each in air.values()
+        )
     step = HeatPumpStep(
         record=heat_pump_machine(
             solved,
@@ -239,13 +269,7 @@ def heat_pump_step(
         evaporators=evaporators,
         in_periods=in_periods,
         base=base,
-        # The air the evaporators draw on; air that takes heat the heat
-        # pump leaves is not a stream of the case.
-        ambient_sources=tuple(
-            stream
-            for _key, stream in solved.amb_streams.items()
-            if stream.stream_type == StreamType.Hot.value
-        ),
+        ambient_sources=ambient_sources,
     )
     return step, solved
 

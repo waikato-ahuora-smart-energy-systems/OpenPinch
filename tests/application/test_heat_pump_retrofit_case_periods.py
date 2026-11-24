@@ -59,3 +59,25 @@ def test_the_case_writes_the_heat_pumps_streams_in_every_period():
         "HP_H1": pytest.approx([600.0, 1000.0]),
         "HP_C1": pytest.approx([450.0, 700.0]),
     }
+
+
+def test_the_case_writes_air_a_later_period_draws_on():
+    # The solve's own air is its selected period's, here none; the peak
+    # draws 50 kW, so the air is built from the problem's configuration.
+    base, peak = _output(600.0, 450.0), _output(1000.0, 700.0)
+    peak["Q_amb_hot"] = 50.0
+    solved = SimpleNamespace(
+        hpr_hot_streams=base["hpr_hot_streams"],
+        hpr_cold_streams=base["hpr_cold_streams"],
+        amb_streams=StreamCollection(),
+        period_outputs={"base": base, "peak": peak},
+    )
+
+    case = heat_pump_case(periods.two_period_problem(), solved, machine="HP")
+
+    air = {
+        record["name"]: record["heat_flow"].get("values")
+        for record in case.to_problem_json()["streams"]
+        if (record["heat_pump"] or {}).get("role") == "ambient_source"
+    }
+    assert air == {"AIR_H1": pytest.approx([0.0, 50.0])}
