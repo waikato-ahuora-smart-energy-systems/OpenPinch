@@ -100,13 +100,30 @@ def heat_pump_case(problem, solved, *, machine: str):
     Each condenser is a hot stream and each evaporator a cold stream of
     the problem's process zone, marked with ``machine`` and its role, at
     ``HPR_DT_CONT``: the as-piped target stands the heat pump that far
-    off the coolers and heaters.
+    off the coolers and heaters. A shared design over several periods
+    (``period_outputs``) writes each stream in every period, with no duty
+    where it is off; a level without duty in any period is no stream.
     """
 
     root = problem._require_prepared_root_zone()
+    outputs = getattr(solved, "period_outputs", None)
     target = SimpleNamespace(
         provenance=SimpleNamespace(zone_address=root.address),
-        hpr_details=SimpleNamespace(amb_streams=solved.amb_streams),
+        # A shared design over several periods: the case writes each
+        # stream in every period from its period outputs, a level without
+        # duty in a period off there.
+        hpr_shared_design=bool(outputs),
+        hpr_details=SimpleNamespace(
+            amb_streams=solved.amb_streams,
+            period_outputs={
+                period: output
+                | {
+                    group: {s.name: s for s in _carrying(output.get(group) or {})}
+                    for group in ("hpr_hot_streams", "hpr_cold_streams")
+                }
+                for period, output in (outputs or {}).items()
+            },
+        ),
         # Only the levels that carry duty, as in the step.
         hpr_hot_streams={s.name: s for s in _carrying(solved.hpr_hot_streams)},
         hpr_cold_streams={s.name: s for s in _carrying(solved.hpr_cold_streams)},
