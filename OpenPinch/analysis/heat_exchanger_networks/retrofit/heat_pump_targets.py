@@ -284,7 +284,11 @@ def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
 
 
 def as_piped_profiles(
-    problem, network: HeatExchangerNetwork, *, period: int = 0
+    problem,
+    network: HeatExchangerNetwork,
+    *,
+    period: int = 0,
+    grid_periods: tuple[int, ...] = (),
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The shifted temperatures (degC, hottest first) and the source and
     sink profiles of ``network``'s coolers and heaters, in the period of
@@ -295,8 +299,43 @@ def as_piped_profiles(
     exchanger's duty, shifted by that stream's temperature contribution
     and its multiplier.
     The sources and sinks are cascaded apart, so none recovers heat from
-    another.
+    another. The temperatures of the periods of index ``grid_periods``
+    join the grid too, carrying no duty.
     """
+
+    sources, sinks = _as_piped_segments(problem, network, period)
+    every = sources + sinks
+    for other in grid_periods:
+        # Fresh segments: a collection renames a stream it adds whose name
+        # it already holds.
+        more_sources, more_sinks = _as_piped_segments(problem, network, other)
+        every = every + more_sources + more_sinks
+    source = get_process_heat_cascade(
+        hot_streams=sources,
+        cold_streams=StreamCollection(),
+        all_streams=every,
+        is_shifted=True,
+        is_full_analysis=True,
+    )
+    sink = get_process_heat_cascade(
+        hot_streams=StreamCollection(),
+        cold_streams=sinks,
+        all_streams=every,
+        is_shifted=True,
+        is_full_analysis=True,
+    )
+    return (
+        np.asarray(source[ProblemTableLabel.T], dtype=float),
+        np.asarray(source[ProblemTableLabel.H_NET_HOT], dtype=float),
+        np.asarray(sink[ProblemTableLabel.H_NET_COLD], dtype=float),
+    )
+
+
+def _as_piped_segments(
+    problem, network: HeatExchangerNetwork, period: int
+) -> tuple[StreamCollection, StreamCollection]:
+    """``network``'s coolers as hot segments and heaters as cold ones, in
+    the period of index ``period``; see ``as_piped_profiles``."""
 
     zone = problem.master_zone
     sources = StreamCollection()
@@ -324,35 +363,18 @@ def as_piped_profiles(
                 ),
             )
         )
-    every = sources + sinks
-    source = get_process_heat_cascade(
-        hot_streams=sources,
-        cold_streams=StreamCollection(),
-        all_streams=every,
-        is_shifted=True,
-        is_full_analysis=True,
-    )
-    sink = get_process_heat_cascade(
-        hot_streams=StreamCollection(),
-        cold_streams=sinks,
-        all_streams=every,
-        is_shifted=True,
-        is_full_analysis=True,
-    )
-    return (
-        np.asarray(source[ProblemTableLabel.T], dtype=float),
-        np.asarray(source[ProblemTableLabel.H_NET_HOT], dtype=float),
-        np.asarray(sink[ProblemTableLabel.H_NET_COLD], dtype=float),
-    )
+    return sources, sinks
 
 
 def as_piped_period_profiles(
     problem, network: HeatExchangerNetwork
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    """``as_piped_profiles`` in each of the problem's periods, by period id."""
+    """``as_piped_profiles`` in each of the problem's periods, by period id,
+    all on one temperature grid, as a shared heat pump design needs."""
 
+    indices = tuple(problem.period_ids.values())
     return {
-        period: as_piped_profiles(problem, network, period=index)
+        period: as_piped_profiles(problem, network, period=index, grid_periods=indices)
         for period, index in problem.period_ids.items()
     }
 
