@@ -270,6 +270,9 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
 
     if owner.non_isothermal_model:
         _set_multiperiod_non_isothermal_equations(owner)
+        if not owner.values_only:
+            # As the isothermal model does, on each match's own branches.
+            _interior.install_interior_cuts(owner, owner.M_ij_period)
     elif not owner.values_only:
         _set_multiperiod_isothermal_approach_equations(owner)
         # The approach inside a match on a segmented stream, checked on each
