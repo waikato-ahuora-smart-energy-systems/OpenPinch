@@ -278,34 +278,6 @@ def test_the_heat_pump_screen_weights_the_networks_duties_over_the_periods():
 
 @pytest.mark.synthesis
 @pytest.mark.solver
-def test_the_search_screens_heat_pumps_with_the_period_weights(monkeypatch):
-    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
-
-    seen = []
-    screen = search.screen_heat_pumps
-
-    def spy(*args, **kwargs):
-        seen.append(kwargs.get("weights"))
-        return screen(*args, **kwargs)
-
-    monkeypatch.setattr(search, "screen_heat_pumps", spy)
-
-    _problem(idle_first=True).design.retrofit(
-        EXISTING,
-        max_modifications=1,
-        new_unit_cost=0.0,
-        min_approach_temperature=10.0,
-        heat_pump_cycle="carnot",
-        # The linked heat pump move (the stream step is the Carnot default).
-        heat_pump_streams=False,
-    )
-
-    assert seen
-    assert all(weights == pytest.approx([0.1, 0.9]) for weights in seen)
-
-
-@pytest.mark.synthesis
-@pytest.mark.solver
 def test_the_loop_screen_weights_the_networks_duties_over_the_periods():
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.loops import (
         HeatRecoveryLoop,

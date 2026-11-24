@@ -260,10 +260,12 @@ def run_retrofit_search(
         raise ValueError(
             f"strategy must be one of {STRATEGIES}; got {settings.strategy!r}."
         )
-    if settings.heat_pump_cycle not in HEAT_PUMP_CYCLES:
+    if settings.heat_pump_cycle is not None:
         raise ValueError(
-            f"heat_pump_cycle must be one of {HEAT_PUMP_CYCLES}; got "
-            f"{settings.heat_pump_cycle!r}."
+            "the retrofit search's linked heat pump move is retired; a heat "
+            "pump enters a retrofit as streams (design.retrofit with "
+            f"heat_pump_cycle={settings.heat_pump_cycle!r}, or "
+            "retrofit_with_heat_pump)."
         )
     fraction = settings.max_added_area_fraction
     if fraction is not None and not (math.isfinite(fraction) and fraction >= 0.0):
