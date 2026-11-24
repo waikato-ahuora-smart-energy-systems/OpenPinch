@@ -301,15 +301,47 @@ def with_heat_pump_streams(
         )
     # The value the target was solved with: a per-call
     # ``minimum_approach_temperature`` or a zone's own setting can differ
-    # from the problem's.
+    # from the problem's. The target stood the heat pump that far off as
+    # given, and the air its own contribution; the zone the streams join
+    # scales each by its multiplier, so both are written over it.
+    multiplier = _zone_multiplier(
+        problem, _heat_pump_zone_address(problem, target, zone)
+    )
     return _case_with_heat_pump_streams(
         problem,
         target,
-        dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]),
+        dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"])
+        / multiplier,
         zone=zone,
         machine=machine,
         project_name=project_name,
+        ambient_scale=1.0 / multiplier,
     )
+
+
+def _zone_multiplier(problem, address: str) -> float:
+    """The dt_cont multiplier of the zone at ``address``, which scales
+    every stream written into it.
+
+    A heat pump's streams are written over it so they keep the approach
+    their target stood them off by; at a multiplier of 0 no contribution
+    is kept, so a zone without a positive multiplier raises ``ValueError``.
+    """
+    root = problem._require_prepared_root_zone()
+    multiplier = float(
+        next(
+            zone.dt_cont_multiplier
+            for zone in problem._walk_zone_tree(root)
+            if zone.address == address
+        )
+    )
+    if not multiplier > 0.0:
+        raise ValueError(
+            f"Zone {address!r} has a dt_cont multiplier of {multiplier:g}, so "
+            "a heat pump stream written there cannot keep the approach its "
+            "target stood it off by; give the zone a positive multiplier."
+        )
+    return multiplier
 
 
 def _tree_node(tree: dict, path: list[str]) -> dict:
