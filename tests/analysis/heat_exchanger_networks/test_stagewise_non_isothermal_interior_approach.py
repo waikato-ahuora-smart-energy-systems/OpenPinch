@@ -20,13 +20,22 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
 from tests.analysis.heat_exchanger_networks.test_stagewise_nlp_interior_approach import (
-    _couenne_available,
     _kink_problem,
 )
 
 
+def _couenne_available() -> bool:
+    # Checked when the test runs, not at import: several workers importing
+    # at once race to create the solver's home directory.
+    from tests.analysis.heat_exchanger_networks.test_stagewise_nlp_interior_approach import (
+        _couenne_available as available,
+    )
+
+    return available()
+
+
 @pytest.mark.solver
-@pytest.mark.skipif(not _couenne_available(), reason="needs couenne")
+@pytest.mark.skipif("not _couenne_available()", reason="needs couenne")
 def test_a_non_isothermal_model_holds_the_approach_at_the_kink():
     model = StageWiseModel(
         name="kink-non-isothermal",
