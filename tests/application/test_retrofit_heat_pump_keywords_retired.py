@@ -25,3 +25,14 @@ def test_design_retrofit_takes_no_heat_pump_streams(monkeypatch):
         levels_problem().design.retrofit(
             EXISTING, heat_pump_cycle="carnot", heat_pump_streams=False
         )
+
+
+def test_design_retrofit_takes_no_heat_pump_max_lift(monkeypatch):
+    # The lift limit bounded the linked Carnot move's pairs; the stream
+    # step's as-piped target places its own levels.
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    monkeypatch.setattr(search, "run_retrofit_search", lambda *a, **k: object())
+
+    with pytest.raises(TypeError, match="heat_pump_max_lift"):
+        levels_problem().design.retrofit(EXISTING, heat_pump_max_lift=100.0)
