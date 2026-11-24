@@ -22,7 +22,13 @@ from .case_derivation import _case_with_heat_pump_streams, _heat_pump_zone_addre
 
 
 def heat_pump_machine(
-    solved, *, name: str, cycle: str, cost_per_kw: float, costing
+    solved,
+    *,
+    name: str,
+    cycle: str,
+    cost_per_kw: float,
+    costing,
+    period_weights=None,
 ) -> NetworkHeatPump:
     """The as-piped heat pump target ``solved`` as the machine a retrofit
     search starts from.
@@ -36,6 +42,11 @@ def heat_pump_machine(
     (``hpr_machine_internal_capital_costs``: compressors, motors, cascade
     exchangers and IHXs): its condensers and evaporators are the
     network's exchangers, priced there.
+
+    With ``period_weights`` (by period id) and a shared design's
+    ``period_outputs``, the duties are the largest of any period, the work
+    each period's at its share of the weights (none where the machine is
+    off) and the COP the heat so delivered over that work.
     """
 
     def duty(streams) -> float:
@@ -43,7 +54,27 @@ def heat_pump_machine(
 
     price_scale, capital_scale = annual_cost_scales(costing)
     capacity = duty(solved.hpr_hot_streams)
+    evaporator = duty(solved.hpr_cold_streams)
     work = float(solved.w_net)
+    cop = float(solved.cop_h)
+    outputs = getattr(solved, "period_outputs", None)
+    if period_weights and outputs:
+        # A shared design: sized for the period it delivers most in, each
+        # period's work drawn for its share of the year. A period the
+        # machine is off in has no output and draws nothing.
+        total = float(sum(period_weights.values()))
+        running = {p: outputs[p] for p in period_weights if p in outputs}
+        delivered = {p: duty(o["hpr_hot_streams"]) for p, o in running.items()}
+        work = sum(
+            float(period_weights[p]) / total * float(o["w_net"])
+            for p, o in running.items()
+        )
+        heat = sum(float(period_weights[p]) / total * q for p, q in delivered.items())
+        cop = heat / work if work else cop
+        capacity = max(delivered.values(), default=0.0)
+        evaporator = max(
+            (duty(o["hpr_cold_streams"]) for o in running.values()), default=0.0
+        )
     capital = (
         sum(float(c) for c in solved.hpr_machine_internal_capital_costs)
         if cycle == "vapour_compression"
@@ -53,9 +84,9 @@ def heat_pump_machine(
         machine=name,
         cycle=cycle,
         condenser_duty=capacity,
-        evaporator_duty=duty(solved.hpr_cold_streams),
+        evaporator_duty=evaporator,
         work=work,
-        cop=float(solved.cop_h),
+        cop=cop,
         electricity_cost=work * float(costing.hpr_ele_price) * price_scale,
         capital_cost=capital,
         annual_capital_cost=capital * capital_scale,
