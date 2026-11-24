@@ -48,6 +48,10 @@ _FITTED_BASES = ("median", "period")
 # contribution scales to nothing and each pair is held to its 0.1 K floor;
 # the arrays need a positive multiplier to say so.
 _LEAST_MULTIPLIER = 1e-6
+# The vapour compression retrofit's levels unless told: on a
+# low-temperature retrofit the zone's default three condensers and two
+# evaporators found no machine where two and one netted 181,000 $/y.
+_RETROFIT_VAPOUR_COMPRESSION_LEVELS = {"HPR_N_COND": 2, "HPR_N_EVAP": 1}
 
 
 def _rounded(value):
@@ -1777,10 +1781,11 @@ class _DesignAccessor:
         is refused) tries the existing network's as-piped heat pump target
         instead, as one machine of that size (with "vapour_compression" a
         cascade of vapour compression cycles on ``HPR_REFRIGERANTS``, with
-        ``HPR_N_COND`` and ``HPR_N_EVAP`` levels, its condensers each one
-        stream with their desuperheating, condensing and subcooling
-        segments; fewer levels than the zone's default three and two can
-        find a machine where they find none): its condensers
+        two condenser levels and one evaporator level unless the problem's
+        options or ``options`` set ``HPR_N_COND`` or ``HPR_N_EVAP`` (the
+        zone's default three and two found no machine where two and one
+        did), its condensers each one stream with their desuperheating,
+        condensing and subcooling segments): its condensers
         and evaporators, placed along
         the heaters' and coolers' own temperatures, join the case as
         streams, and a second search starts from the existing network with
@@ -1871,6 +1876,12 @@ class _DesignAccessor:
         )
         if solver is not None:
             configuration["HENS_SOLVER_EVM"] = solver
+        if streams and heat_pump_cycle == "vapour_compression":
+            # The problem's own options name only the keys the user set.
+            named = self._problem.to_problem_json().get("options") or {}
+            for key, level in _RETROFIT_VAPOUR_COMPRESSION_LEVELS.items():
+                if key not in named:
+                    configuration.setdefault(key, level)
         isolated = snapshot_problem(self._problem)
         root = isolated._build_execution_master_zone()
         stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
