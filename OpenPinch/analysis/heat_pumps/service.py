@@ -161,7 +161,9 @@ def compute_shared_profile_heat_pump_target(
 
     The profiles lie on one temperature grid. Each period's load is its
     sink's, capped by ``config``'s HPR load in that period, and counts by
-    its share of ``weights``; ``period_ids`` gives each period's index.
+    its share of ``weights``; ``period_ids`` gives each period's index. A
+    period whose load is below ``tol`` runs no machine and keeps its share;
+    with no load in any period there is no target (``None``).
     """
 
     cases = []
@@ -206,6 +208,8 @@ def compute_shared_profile_heat_pump_target(
                 optimizer_pt=None,
             )
         )
+    if not cases:
+        return None
     return get_multiperiod_hpr_targets(
         period_cases=cases,
         selected_period_id=cases[0].period_id,

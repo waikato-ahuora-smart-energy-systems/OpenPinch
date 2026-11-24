@@ -68,3 +68,22 @@ def test_a_period_without_load_runs_no_machine_and_keeps_its_share(monkeypatch):
     assert [case.period_id for case in captured["period_cases"]] == ["peak"]
     assert captured["selected_period_id"] == "peak"
     assert captured["idle_period_weight"] == pytest.approx(0.25)
+
+
+def test_no_load_in_any_period_is_no_target(monkeypatch):
+    # As a single period's profile target: no load, no machine.
+    solved = []
+    monkeypatch.setattr(
+        service, "get_multiperiod_hpr_targets", lambda **kwargs: solved.append(kwargs)
+    )
+    idle = (T_VALS, np.array([0.0, 0.0, -60.0]), np.zeros(3))
+
+    result = service.compute_shared_profile_heat_pump_target(
+        profiles={"base": idle, "peak": idle},
+        period_ids={"base": 0, "peak": 1},
+        weights={"base": 0.5, "peak": 0.5},
+        config=Configuration(),
+    )
+
+    assert result is None
+    assert solved == []
