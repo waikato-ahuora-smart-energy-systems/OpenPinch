@@ -946,12 +946,16 @@ Heat pumps
    needing 720 kW in the peak, with electricity at $50/MWh and the
    compressor at $100/kW, the condensers deliver 240 kW in the base and
    317 kW in the peak, the steam is all but gone in both, and the design
-   nets $31,900/y. An air-source machine and segmented (vapour
-   compression) streams are not built over several periods yet.
+   nets $31,900/y. A vapour compression machine's condensers keep their
+   segments in every period: on the second case above, its heater needing
+   1200 kW in the base and 1500 kW in the peak, the machine at 0.75 of the
+   load delivers 900 and 1125 kW at a COP of 4.17 and nets $349,700/y
+   (196 s for three sizes). An air-source machine is not built over
+   several periods yet.
    The step is left out, with a ``UserWarning`` giving the reason, on a
    problem with process components or a site of several process zones
    (the machine's streams cannot be added to the case), over several
-   periods where the machine draws on air or has segmented streams, and
+   periods where the machine draws on air, and
    when the network cannot serve the machine's duties.
    With ``min_approach_temperature`` not given, each of the heat pump's
    matches stands off by its process stream's own contribution (its

@@ -8,13 +8,10 @@ so the stream keeps its condensing plateau in each.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from OpenPinch import PinchProblem
 from OpenPinch.application.case_derivation import _period_thermal_record
-from OpenPinch.contracts.input import StreamSchema
 from tests.application.heat_pump_stream_cases import basic_source
 from tests.application.test_heat_pump_stream_record_segments import PIECES
 
