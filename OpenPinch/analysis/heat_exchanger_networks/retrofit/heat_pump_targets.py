@@ -380,6 +380,12 @@ def _as_piped_segments(
         else:
             continue
         state = exchanger.period_states[period]
+        if not state.active or None in (
+            getattr(state, f"{side}_inlet_temperature"),
+            getattr(state, f"{side}_outlet_temperature"),
+        ):
+            # Off in this period: no duty, and its temperatures may be unset.
+            continue
         stream = _process_stream(process, name)
         segments.add(
             Stream(
