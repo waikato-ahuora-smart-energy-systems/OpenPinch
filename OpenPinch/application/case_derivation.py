@@ -310,8 +310,7 @@ def with_heat_pump_streams(
     return _case_with_heat_pump_streams(
         problem,
         target,
-        dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"])
-        / multiplier,
+        dt_cont=float(target.provenance.effective_settings["HPR_DT_CONT"]) / multiplier,
         zone=zone,
         machine=machine,
         project_name=project_name,
@@ -480,7 +479,7 @@ def _case_with_utility_heat_pump_zones(
     # inherit that multiplier, which scales every stream in them, so the
     # heat pump's contribution is written over it.
     approach = float(dt_cont)
-    multiplier = float(scope.dt_cont_multiplier)
+    multiplier = _zone_multiplier(problem, scope.address)
     dt_cont = {"value": approach / multiplier, "unit": "delta_degC"}
     periods = list(problem.period_ids)
     # A shared design over several periods: each stream in every period.

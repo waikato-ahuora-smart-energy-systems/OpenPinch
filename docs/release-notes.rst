@@ -63,7 +63,12 @@ Heat pumps and refrigeration
   that holds the problem's streams and the streams of a direct heat pump
   target: each condenser a hot stream and each evaporator a cold stream, at
   the ``HPR_DT_CONT`` the target was solved with, with their segments. The air an evaporator draws on is
-  added as a hot stream; the air a condenser rejects to is not. Direct heat
+  added as a hot stream at its own contribution; the air a condenser
+  rejects to is not. Both are written over the dt_cont multiplier of the
+  zone they join, which scales them back to the approach the target used;
+  a zone with a multiplier of 0 is refused with a ``ValueError``, here
+  and wherever a heat pump's streams are added (the site's heat pump
+  zones and the retrofit's heat pump case). Direct heat
   integration targeting of the new case gives the heat pump target's
   utilities (on the basic pinch sample at full load: no hot utility and
   513.4 kW of cooling, against 750 and 1000 kW without the heat pump), so

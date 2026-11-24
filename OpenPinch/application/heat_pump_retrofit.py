@@ -22,6 +22,7 @@ from .case_derivation import (
     _case_with_heat_pump_streams,
     _heat_pump_zone_address,
     _period_heat_pump_streams,
+    _zone_multiplier,
 )
 
 
@@ -151,13 +152,8 @@ def heat_pump_case(problem, solved, *, machine: str):
     # The zone the streams join scales each one's contribution by its own
     # multiplier; the target stood the heat pump HPR_DT_CONT off, and the
     # air its own contribution, as given.
-    address = _heat_pump_zone_address(problem, target, None)
-    multiplier = float(
-        next(
-            zone.dt_cont_multiplier
-            for zone in problem._walk_zone_tree(root)
-            if zone.address == address
-        )
+    multiplier = _zone_multiplier(
+        problem, _heat_pump_zone_address(problem, target, None)
     )
     return _case_with_heat_pump_streams(
         problem,
