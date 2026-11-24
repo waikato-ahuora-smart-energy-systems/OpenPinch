@@ -139,6 +139,10 @@ def test_a_cut_without_integers_is_recorded_for_release():
         integers=False,
         m=SimpleNamespace(Equation=equation),
         z=[[[1.0]]],
+        # The match's four branch ends: _cut reads them together.
+        T_h_by_period=[[[200.0, 170.0]]],
+        T_h_mid_by_period=[[[200.0, 170.0]]],
+        T_c_by_period=[[[148.0, 118.0]]],
         T_c_mid_by_period=[[[148.0, 118.0]]],
         _interior_cuts={},
         _interior_constraints={},

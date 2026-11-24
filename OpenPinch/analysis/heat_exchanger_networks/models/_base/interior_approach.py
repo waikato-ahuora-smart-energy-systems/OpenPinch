@@ -24,6 +24,18 @@ _CUT_TOLERANCE = 1e-6
 """Kelvin a solved match may fall short of its approach inside by rounding."""
 
 
+def _branch_ends(owner, n: int, i: int, j: int, k: int) -> tuple:
+    """The match's hot inlet and outlet and cold inlet and outlet
+    temperatures in stage ``k``."""
+
+    return (
+        owner.T_h_by_period[n][i][k],
+        owner.T_h_mid_by_period[n][i][k + 1],
+        owner.T_c_by_period[n][j][k + 1],
+        owner.T_c_mid_by_period[n][j][k],
+    )
+
+
 def install_interior_cuts(owner, M_ij_period) -> None:
     """Check each solution of a model with a segmented stream.
 
@@ -85,10 +97,9 @@ def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
                     ):
                         continue
                     hot, cold = profile("hot", i, n), profile("cold", j, n)
-                    h_in = value(owner.T_h_by_period[n][i][k])
-                    h_out = value(owner.T_h_mid_by_period[n][i][k + 1])
-                    c_in = value(owner.T_c_by_period[n][j][k + 1])
-                    c_out = value(owner.T_c_mid_by_period[n][j][k])
+                    h_in, h_out, c_in, c_out = (
+                        value(t) for t in _branch_ends(owner, n, i, j, k)
+                    )
                     hot_span = hot.heat_at_temperature(h_out) - hot.heat_at_temperature(
                         h_in
                     )
@@ -175,18 +186,13 @@ def _release_cuts_off_their_boundary(owner) -> bool:
             continue
         n, i, j, k, side, _rounded = key
         boundary, approach = owner._interior_cuts[key]
+        h_in, h_out, c_in, c_out = (value(t) for t in _branch_ends(owner, n, i, j, k))
         if side == "hot":
-            ends = (
-                value(owner.T_h_mid_by_period[n][i][k + 1]),
-                value(owner.T_h_by_period[n][i][k]),
-            )
-            gap = boundary - value(owner.T_c_mid_by_period[n][j][k])
+            ends = (h_out, h_in)
+            gap = boundary - c_out
         else:
-            ends = (
-                value(owner.T_c_by_period[n][j][k + 1]),
-                value(owner.T_c_mid_by_period[n][j][k]),
-            )
-            gap = value(owner.T_h_mid_by_period[n][i][k + 1]) - boundary
+            ends = (c_in, c_out)
+            gap = h_out - boundary
         inside = ends[0] < boundary < ends[1]
         if not inside and gap <= approach + _CUT_TOLERANCE:
             constraint.deactivate()
@@ -239,11 +245,8 @@ def _cut(
     owner._interior_cuts[key] = (boundary, approach)
     m = owner.m
     big = M_ij_period[n][i][j]
-    gap = (
-        boundary - owner.T_c_mid_by_period[n][j][k]
-        if side == "hot"
-        else owner.T_h_mid_by_period[n][i][k + 1] - boundary
-    )
+    h_in, h_out, c_in, c_out = _branch_ends(owner, n, i, j, k)
+    gap = boundary - c_out if side == "hot" else h_out - boundary
     if not owner.integers:
         # The stage crossed with the boundary inside the branch; the cut
         # holds there until the branch leaves the boundary, so it is kept
@@ -253,10 +256,10 @@ def _cut(
         )
         return True
     if side == "hot":
-        ends = (owner.T_h_by_period[n][i][k], owner.T_h_mid_by_period[n][i][k + 1])
+        ends = (h_in, h_out)
         span = abs(owner.T_h_in_period[n][i] - owner.T_h_out_period[n][i]) + 1.0
     else:
-        ends = (owner.T_c_mid_by_period[n][j][k], owner.T_c_by_period[n][j][k + 1])
+        ends = (c_out, c_in)
         span = abs(owner.T_c_out_period[n][j] - owner.T_c_in_period[n][j]) + 1.0
     # 1 when the branch end is at or above the boundary: the boundary is
     # inside the branch when its upper end is above and its lower end not.
