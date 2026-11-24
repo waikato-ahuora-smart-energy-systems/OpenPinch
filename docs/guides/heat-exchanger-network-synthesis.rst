@@ -884,91 +884,58 @@ Repiping
    exchanger keeps its id, so it can also take added area, which makes a
    move to a match that needs a bigger unit a resized reassignment.
 Heat pumps
-   ``heat_pump_cycle`` lets a step add a heat pump. With ``"carnot"`` or
-   ``"vapour_compression"`` that is by default the as-piped machine added
-   as streams (next paragraph); with ``heat_pump_streams=False`` it is the
-   linked heat pump described here: a
-   heat pump between two streams, as
-   Bütün et al. (2018) retrofit heat pumping with the network: an
-   evaporator at the end of a hot stream, evaporating
-   ``min_approach_temperature`` below its target, and a condenser at the
-   end of a cold stream, condensing as far above its target. The HPR
-   service's cycle models rate it. ``"carnot"`` takes the heating COP
-   ``1 + HPR_ETA_II_CARNOT * T_evap / (T_cond - T_evap)``, prices the
-   compressor and package at ``heat_pump_cost`` per kW of condenser
-   capacity and the two exchangers by the area law. A Carnot cycle has a
-   COP at any lift, so it serves a pair only up to ``heat_pump_max_lift``
-   (K from evaporating to condensing; 140 by default, about a two-stage
-   cascade; ``None`` for no limit), and ``heat_pump_cost`` is 0 unless
-   set, which a ``UserWarning`` points out: the machine then costs only
-   its two exchangers. ``"vapour_compression"``
-   solves a single stage on each of ``HPR_REFRIGERANTS`` within the HPR
-   cycle limits, keeps the fluid with the best COP and prices the whole
-   machine (compressor, motor, evaporator and condenser) with the HPR
-   service's installed capital. The work costs ``COSTING_HPR_ELE_PRICE``.
-   The model links the two duties by the COP; the search screens stream
-   pairs by the utility the heat pump could relieve, and its condenser and
-   evaporator duties do not count as hot and cold utility. On the Ciric
-   and Floudas case the only heater is on C2, heated to 265 degC, so a heat
-   pump there lifts 208 K from H1 or 197 K from H2: within the default
-   limit none is offered and new matches make the frontier. With the limit
-   raised to 200 K, electricity at $30/MWh and the compressor at $300/kW, a
-   linked Carnot heat pump from H2 to C2 (COP 1.89, 7.7 MW, $2.39M fixed
-   cost) is the best first step at $1.22M/y net, level with the best new
-   match ($1.21M/y). At the case's $100/MWh new matches win.
-The as-piped heat pump as streams
-   The linked heat pump is one evaporator linked to one condenser, each at
-   the end of its stream, so it lifts through the whole range the cooler
-   and the heater cover. With ``heat_pump_cycle="carnot"`` or
-   ``"vapour_compression"`` the retrofit instead tries, by default, the
-   machine the
-   as-piped target of ``design.retrofit_heat_pumps`` describes, which
-   places several condensers along the heaters' temperatures and several
-   evaporators along the coolers'. Its condensers and evaporators join
-   the case as streams of fixed duty and a second search starts from the
-   existing network with the matches that serve them. The step is one
-   ``heat_pump`` modification (the compressor at ``heat_pump_cost`` per kW
-   of condenser capacity; a vapour compression machine at the HPR
-   service's installed capital without its process and air exchangers)
-   and one new match per exchanger; a vapour compression condenser is one
-   stream with its desuperheating, condensing and subcooling segments,
-   and the cascade has two condenser levels and one evaporator level
-   unless the problem's options or the retrofit's ``options`` set
-   ``HPR_N_COND`` or ``HPR_N_EVAP`` (on a low-temperature case two and one
-   found an 858 kW machine netting $181,000/y where the zone's default
-   three and two found none); the electricity
-   is in the design's utility cost and the network records the machine in
+   ``heat_pump_cycle`` (``"carnot"`` or ``"vapour_compression"``) adds the
+   machine the as-piped target of ``design.retrofit_heat_pumps``
+   describes, which places several condensers along the heaters'
+   temperatures and several evaporators along the coolers'. Its
+   condensers and evaporators join the case as streams of fixed duty and
+   a second search starts from the existing network with the matches that
+   serve them. The step is one ``heat_pump`` modification (the compressor
+   at ``heat_pump_cost`` per kW of condenser capacity, 0 unless set, which
+   a ``UserWarning`` points out for Carnot; a vapour compression machine at
+   the HPR service's installed capital without its process and air
+   exchangers) and one new match per exchanger; a vapour compression
+   condenser is one stream with its desuperheating, condensing and
+   subcooling segments, and the cascade has two condenser levels and one
+   evaporator level unless the problem's options or the retrofit's
+   ``options`` set ``HPR_N_COND`` or ``HPR_N_EVAP`` (on a low-temperature
+   case two and one found an 858 kW machine netting $181,000/y where the
+   zone's default three and two found none); the electricity is in the
+   design's utility cost and the network records the machine in
    ``heat_pumps``. The machine is tried at each of ``heat_pump_sizes``,
    shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
    default 1.0, 0.75 and 0.5), one search per size, and the machine
    records its share in ``load_fraction``. Each step of the result holds
-   the best design of the plain search (which then offers no linked heat
-   pump) and every size's, so the result is never worse than the search
-   without a heat pump.
+   the best design of the plain search and every size's, so the result is
+   never worse than the search without a heat pump.
 
-   On a process cooled from 54 degC and heated from 80 degC, with steam at
+   The search once also offered a linked heat pump: one evaporator at the
+   end of a hot stream linked by its COP to one condenser at the end of a
+   cold stream, as Bütün et al. (2018) retrofit heat pumping with the
+   network. It lifted through the whole range the cooler and the heater
+   cover and was retired on 2026-11-24 in favour of the streams. On a
+   process cooled from 54 degC and heated from 80 degC, with steam at
    $40/MWh and electricity at $100/MWh, a heat pump pays above a COP of
-   2.5. The linked heat pump lifts from 20 to 130 degC at a COP of 2.33
-   and is never selected; the as-piped machine reaches 3.1 to 3.3 with
-   three condensers and two evaporators and takes 156 to 187 kW of the
-   240 kW of steam.
+   2.5: the linked heat pump lifted from 20 to 130 degC at a COP of 2.33
+   and was never selected, while the as-piped machine reaches 3.1 to 3.3
+   with three condensers and two evaporators and takes 156 to 187 kW of
+   the 240 kW of steam. On Ciric and Floudas, with electricity at $30/MWh
+   and the compressor at $300/kW, the linked heat pump (H2 to C2, COP
+   1.89) netted $1.23M/y, while the as-piped machine at the full load
+   (17.5 MW, three condensers and two evaporators, COP 2.37) takes all of
+   the steam and nets $2.81M/y, ahead of its own smaller sizes (0.7 of
+   the load: $2.11M/y; 0.4: $1.25M/y).
 
    Within one search a machine's size is fixed, so it is not traded
-   against exchanger area as the linked heat pump's duty is; the sizes
-   are tried instead. The target stands its levels close to the streams
-   (``HPR_DT_CONT`` beyond their own contributions), so on the case above
-   the exchangers at the default area price cost about as much as the
-   machine saves. On Ciric and Floudas at the settings of the paragraph
-   above the linked heat pump (H2 to C2, COP 1.89) nets $1.23M/y, while
-   the as-piped machine at the full load (17.5 MW, three condensers and
-   two evaporators, COP 2.37) takes all of the steam and nets $2.81M/y,
-   ahead of its own smaller sizes (0.7 of the load: $2.11M/y; 0.4:
-   $1.25M/y). The whole retrofit takes about 20 s there; with
-   ``heat_pump_streams=False`` it takes the linked heat pump, $1.23M/y, in
-   under a second. ``heat_pump_search`` bounds each size's target search,
-   by default at ``{"maximum_evaluations": 2000}``; ``{}`` asks for the
-   full search, which found the same machine on this case in ten times as
-   long. A level the target leaves without duty is not added.
+   against exchanger area; the sizes are tried instead. The target stands
+   its levels close to the streams (``HPR_DT_CONT`` beyond their own
+   contributions), so on the first case above the exchangers at the
+   default area price cost about as much as the machine saves. The whole
+   retrofit takes about 20 s on Ciric and Floudas. ``heat_pump_search``
+   bounds each size's target search, by default at
+   ``{"maximum_evaluations": 2000}``; ``{}`` asks for the full search,
+   which found the same machine on that case in ten times as long. A level
+   the target leaves without duty is not added.
    The step is left out, with a ``UserWarning`` giving the reason, on a
    problem with several periods, on one with process components or a
    site of several process zones (the machine's streams cannot be added

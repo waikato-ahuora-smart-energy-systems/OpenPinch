@@ -1672,8 +1672,6 @@ class _DesignAccessor:
         repiping_cost: float = 0.0,
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
-        heat_pump_max_lift: float | None = 140.0,
-        heat_pump_streams: bool | None = None,
         heat_pump_sizes: Sequence[float] = (1.0, 0.75, 0.5),
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
@@ -1764,28 +1762,13 @@ class _DesignAccessor:
         cooler changes: both streams of a new match, the streams a relocated
         exchanger leaves and joins (not one it stays on in the same stage),
         and the stream of a new heater or cooler. A relocated exchanger may
-        also take added area, as an area addition. With ``heat_pump_cycle``
-        (None, the default: no heat pumps) a step may add a heat pump: an
-        evaporator at the end of a hot stream, evaporating
-        ``min_approach_temperature`` below its target, and a condenser at the
-        end of a cold stream, condensing as far above its target, rated by
-        the HPR service. "carnot" uses its Carnot cycle
-        (``HPR_ETA_II_CARNOT``), pricing the compressor and package at
-        ``heat_pump_cost`` ($ per kW of condenser capacity) and the two
-        exchangers' area by the area law; it serves a pair only up to
-        ``heat_pump_max_lift`` (K from evaporating to condensing, 140 by
-        default, about a two-stage cascade; ``None`` for no limit), since a
-        Carnot cycle has a COP at any lift. "vapour_compression" solves a
-        single stage on the best of ``HPR_REFRIGERANTS`` within the HPR cycle
-        limits (the other ``HPR_*`` cycle options apply) and prices the
-        machine with the HPR service's installed capital. The work costs
-        ``COSTING_HPR_ELE_PRICE``; the heat pump's duties are not counted as
-        utility.
+        also take added area, as an area addition.
 
-        With either cycle the retrofit by default (``heat_pump_streams``
-        None or True; False keeps the linked move above; True with no cycle
-        is refused) tries the existing network's as-piped heat pump target
-        instead, as one machine of that size (with "vapour_compression" a
+        With ``heat_pump_cycle`` ("carnot" or "vapour_compression"; None, the
+        default: no heat pump) the retrofit tries the existing network's
+        as-piped heat pump target, as one machine of that size (with
+        "carnot" the HPR service's Carnot cascade, ``HPR_ETA_II_CARNOT``;
+        with "vapour_compression" a
         cascade of vapour compression cycles on ``HPR_REFRIGERANTS``, with
         two condenser levels and one evaporator level unless the problem's
         options or ``options`` set ``HPR_N_COND`` or ``HPR_N_EVAP`` (the
@@ -1812,12 +1795,14 @@ class _DesignAccessor:
         size, and records its share in ``load_fraction``; each step of the
         result holds the best design of the plain search and every size's.
         Within one search the machine's size is fixed, not traded against
-        exchanger area as the linked heat pump's duty is. ``heat_pump_search`` bounds
-        each size's target search (``maximum_iterations``,
+        exchanger area. The work costs ``COSTING_HPR_ELE_PRICE``; the heat
+        pump's duties are not counted as utility. ``heat_pump_search``
+        bounds each size's target search (``maximum_iterations``,
         ``maximum_evaluations``), by default at 2000 evaluations; ``{}``
         asks for the full search, which can take more than a minute per
-        size. The plain search the step is joined with offers no linked
-        heat pump. The step is left out, with a ``UserWarning`` giving the
+        size. The plain search the step is joined with offers no heat pump
+        of its own: the linked heat pump move it once offered was retired
+        on 2026-11-24. The step is left out, with a ``UserWarning`` giving the
         reason, on a problem with several periods, on one with process
         components or a site of several process zones, when the target
         finds no machine the cycle can model that pays, and when the
@@ -1858,20 +1843,9 @@ class _DesignAccessor:
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit")
-        if heat_pump_streams and heat_pump_cycle not in (
-            "carnot",
-            "vapour_compression",
-        ):
-            raise ValueError(
-                "heat_pump_streams is built for heat_pump_cycle='carnot' or "
-                f"'vapour_compression' only; got {heat_pump_cycle!r}."
-            )
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
-        # Both cycles run the stream step unless told not to.
-        streams = (
-            heat_pump_cycle in ("carnot", "vapour_compression")
-            and heat_pump_streams is not False
-        )
+        # A heat pump enters as streams: the linked move is retired.
+        streams = heat_pump_cycle in ("carnot", "vapour_compression")
         if streams and outside:
             raise ValueError(
                 "heat_pump_sizes are shares of the existing heaters' load, "
@@ -1976,11 +1950,6 @@ class _DesignAccessor:
                     repiping_cost=float(repiping_cost),
                     heat_pump_cycle=heat_pump_cycle,
                     heat_pump_cost=float(heat_pump_cost),
-                    heat_pump_max_lift=(
-                        None
-                        if heat_pump_max_lift is None
-                        else float(heat_pump_max_lift)
-                    ),
                     heat_recovery_loops=bool(
                         isolated.master_zone.config.hens.retrofit_loops
                     ),

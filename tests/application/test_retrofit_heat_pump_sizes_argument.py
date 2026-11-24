@@ -33,7 +33,6 @@ def test_design_retrofit_passes_the_sizes(monkeypatch):
             max_modifications=0,
             heat_pump_cycle="carnot",
             heat_pump_cost=100.0,
-            heat_pump_streams=True,
             **arguments,
         )
 

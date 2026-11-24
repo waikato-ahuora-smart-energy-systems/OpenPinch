@@ -27,7 +27,6 @@ def test_a_size_outside_zero_to_one_is_refused_before_the_search(monkeypatch):
             EXISTING,
             heat_pump_cycle="carnot",
             heat_pump_cost=100.0,
-            heat_pump_streams=True,
             heat_pump_sizes=(1.0, 1.5),
         )
     # The stream step is the Carnot default, so the sizes are checked

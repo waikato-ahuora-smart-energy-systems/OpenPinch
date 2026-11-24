@@ -879,28 +879,6 @@ def test_a_retrofit_match_of_two_zero_contributions_is_held_to_the_pair_floor():
     assert sorted(default) == pytest.approx([0.1, 5.0, 10.0, 10.0], abs=1e-12)
 
 
-def test_a_retrofit_without_an_approach_screens_at_the_cases_minimum_approach():
-    """The screens take one approach: twice THERMAL_DT_CONT (10 K) when
-    none is given, so a heat pump's evaporator sits 10 K below its hot
-    stream's target."""
-    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
-        RetrofitSettings,
-        _Evaluator,
-    )
-
-    problem = _case_problem()
-    problem.target.direct_heat_integration()
-    evaluator = _Evaluator(
-        problem,
-        _existing_network(),
-        RetrofitSettings(approach=None, heat_pump_cycle="carnot"),
-    )
-
-    assert evaluator.heat_pumps
-    for pump in evaluator.heat_pumps:
-        assert pump.evaporating == pytest.approx(evaluator.ends[pump.hot][1] - 10.0)
-
-
 @pytest.mark.synthesis
 @pytest.mark.solver
 @_needs_live_solver

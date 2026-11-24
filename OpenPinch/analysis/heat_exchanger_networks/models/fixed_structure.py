@@ -130,10 +130,6 @@ class FixedStructureSpec:
     # transfer coefficient, so its capacity, by the factor.
     enhanced_recovery: Mapping[int, float] = field(default_factory=dict)
     enhanced_utilities: Mapping[int, float] = field(default_factory=dict)
-    # Heat pumps, each (evaporator, condenser, COP): two utility exchangers,
-    # by index in ``utilities``, whose duties the COP links in every period
-    # (the condenser delivers the evaporator's heat plus the work).
-    heat_pumps: tuple[tuple[int, int, float], ...] = ()
     # Heat recovery loops, each (cooler, heater): two utility exchangers, by
     # index in ``utilities``, with equal duties in every period (the loop
     # delivers what it collects, with no loss).
@@ -817,11 +813,6 @@ def build_fixed_structure_equations(owner) -> None:
         _recovery_equations(owner, n, start)
         _utility_equations(owner, n, start)
         _utility_caps(owner, n)
-        for evaporator, condenser, cop in owner.spec.heat_pumps:
-            owner._equal(
-                owner.q_u[n][condenser] * (float(cop) - 1.0),
-                owner.q_u[n][evaporator] * float(cop),
-            )
         for cooler, heater in owner.spec.loops:
             owner._equal(owner.q_u[n][heater], owner.q_u[n][cooler])
         for units, targets in owner.spec.level_holds:
