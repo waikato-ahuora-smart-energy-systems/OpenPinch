@@ -2,7 +2,7 @@
 
 The fake keeps the real request building, structure and screen, and stands
 in for the NLP only: a design's utility cost falls by $100,000/y per
-recovery match, $150,000/y per heat pump or heat recovery loop and
+recovery match, $150,000/y per heat recovery loop and
 $20,000/y per enlarged or
 enhanced unit, every exchanger carries 100 kW, every installed unit needs
 its whole widened area (so it is at its cap), and every new unit gets 25 m2.
@@ -73,7 +73,7 @@ class _Backend:
         self.area_values = lambda spec: None
         self.unbuildable = lambda spec: False
         self.rating_allowances = lambda spec: None
-        self.heat_pumps: list = []
+        self.utilities: list = []
         self.loops: list = []
 
 
@@ -102,13 +102,12 @@ def fake_solver(monkeypatch) -> _Backend:
             spec = self.spec
             enlarged = len(spec.enlargeable_recovery) + len(spec.enlargeable_utilities)
             enhanced = len(spec.enhanced_recovery) + len(spec.enhanced_utilities)
-            backend.heat_pumps.append((spec.utilities, spec.heat_pumps))
+            backend.utilities.append(spec.utilities)
             backend.loops.append(spec.loops)
             self.utility_cost_value = (
                 1_000_000.0
                 - 100_000.0 * len(spec.recovery)
                 - 20_000.0 * (enlarged + enhanced)
-                - 150_000.0 * len(spec.heat_pumps)
                 - 150_000.0 * len(spec.loops)
             )
             self.area_values = backend.area_values(spec)
@@ -1452,7 +1451,7 @@ def test_a_two_process_retrofit_links_the_processes_through_a_heat_recovery_loop
     assert design.net_annual_benefit > base.net_annual_benefit
     # The loop's own heat is neither hot nor cold utility.
     assert design.hot_utility == pytest.approx(design.utility_cost / 100.0 - 100.0)
-    (utilities, _pumps), loops = fake_solver.heat_pumps[-1], fake_solver.loops[-1]
+    utilities, loops = fake_solver.utilities[-1], fake_solver.loops[-1]
     ((cooler, heater),) = loops
     assert (utilities[cooler].side, utilities[heater].side) == ("cold", "hot")
 

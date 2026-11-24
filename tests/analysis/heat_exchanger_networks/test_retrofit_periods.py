@@ -250,34 +250,6 @@ def test_the_search_scores_relocations_with_the_period_weights(monkeypatch):
 
 @pytest.mark.synthesis
 @pytest.mark.solver
-def test_the_heat_pump_screen_weights_the_networks_duties_over_the_periods():
-    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pumps import (
-        HeatPumpCandidate,
-        screen_heat_pumps,
-    )
-
-    problem = _problem(idle_first=True)
-    problem.target.direct_heat_integration()
-    network = (
-        run_retrofit_search(
-            problem,
-            problem.design._network_from_structure(EXISTING),
-            RetrofitSettings(max_modifications=0),
-        )
-        .frontier[0]
-        .network
-    )
-    candidate = HeatPumpCandidate("A.H1", "A.C1", 383.15, 373.15, cop=3.0)
-
-    # The heater is off in the first period, so a first-period reading finds
-    # nothing to relieve; over the periods it runs 90 % of the time.
-    kept = screen_heat_pumps(network, [candidate], limit=1, weights=[0.1, 0.9])
-
-    assert kept == [candidate]
-
-
-@pytest.mark.synthesis
-@pytest.mark.solver
 def test_the_loop_screen_weights_the_networks_duties_over_the_periods():
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.loops import (
         HeatRecoveryLoop,
@@ -404,20 +376,6 @@ def test_a_match_relieves_nothing_when_its_streams_never_run_together():
     )
 
     assert relief == 0.0
-
-
-def test_a_heat_pump_is_left_out_when_its_streams_never_run_together():
-    from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pumps import (
-        HeatPumpCandidate,
-        screen_heat_pumps,
-    )
-
-    network = _two_period_network({"H1->CU": [100.0, 0.0], "HU->C1": [0.0, 100.0]})
-    candidate = HeatPumpCandidate("H1", "C1", 325.0, 365.0, cop=4.0)
-
-    kept = screen_heat_pumps(network, [candidate], limit=1, weights=[0.5, 0.5])
-
-    assert kept == []
 
 
 def test_a_loop_is_left_out_when_its_streams_never_run_together():

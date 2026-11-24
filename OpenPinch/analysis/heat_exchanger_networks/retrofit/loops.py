@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+
+import numpy as np
 
 from ....domain.enums import HeatExchangerKind
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..solver.arrays import PreparedSolverArrays
-from .heat_pumps import with_constant_utilities
 from .moves import joint_relief, utility_duties
 
 # The loop circulates over this many K about its temperature, as a utility
@@ -204,6 +205,94 @@ def with_loop_utilities(
         utilities.append(("hot", loop_heater_name(loop), warm, cool, 0.0))
         utilities.append(("cold", loop_cooler_name(loop), cool, warm, 0.0))
     return with_constant_utilities(arrays, utilities)
+
+
+def with_constant_utilities(
+    arrays: PreparedSolverArrays,
+    utilities: list[tuple[str, str, float, float, float]],
+) -> PreparedSolverArrays:
+    """``arrays`` with each of ``utilities`` (side "hot" or "cold", name,
+    inlet and outlet temperature in K, price per kW) added on its side,
+    after the problem's own, as one segment. Film coefficients, area costs
+    and temperature contributions are those of the first utility on each
+    side. ``arrays`` is not changed."""
+
+    data = {name: values.copy() for name, values in arrays.arrays.items()}
+    axis_maps = {axis: dict(names) for axis, names in arrays.axis_maps.items()}
+    streams = {axis: list(names) for axis, names in arrays.stream_identities.items()}
+    identities = {
+        axis: list(names) for axis, names in arrays.utility_identities.items()
+    }
+    for side, name, inlet, outlet, price in utilities:
+        _append_utility(data, side, inlet, outlet, price, f"{name}.S1")
+        axis = f"{side}_utilities"
+        segments = f"{side}_utility_segments"
+        axis_maps[axis][name] = len(axis_maps[axis])
+        axis_maps[segments][f"{name}.S1"] = len(axis_maps[segments])
+        identities[axis].append(name)
+        streams[segments].append(f"{name}.S1")
+    return replace(
+        arrays,
+        arrays=data,
+        axis_maps=axis_maps,
+        stream_identities=streams,
+        utility_identities=identities,
+    )
+
+
+def _append_utility(data, side: str, inlet, outlet, price, segment: str) -> None:
+    """Add a constant-temperature utility on ``side`` to ``data``, copying
+    the first utility's other properties (a ``None`` value below)."""
+
+    short = "hu" if side == "hot" else "cu"
+    long = f"{side}_utility"
+    duty = 1.0
+    # Key: (axis the utilities run along, the new utility's value).
+    values = {
+        f"T_{short}_in_period": (1, inlet),
+        f"T_{short}_out_period": (1, outlet),
+        f"T_{short}_cont_period": (1, None),
+        f"htc_{short}_period": (1, None),
+        f"{short}_cost_period": (1, price),
+        f"{short}_coeff": (0, None),
+        f"{short}_exp": (0, None),
+        f"{short}_unit_cost": (0, None),
+        f"{long}_segment_count": (0, 1),
+        f"{long}_parent_segmented": (0, False),
+    }
+    # One segment, the first: (its value, the value of the others).
+    segments = {
+        f"{long}_segment_mask_period": (True, False),
+        f"{long}_segment_t_in_period": (inlet, 0.0),
+        f"{long}_segment_t_out_period": (outlet, 0.0),
+        f"{long}_segment_duty_period": (duty, 0.0),
+        f"{long}_segment_cp_period": (duty / abs(inlet - outlet), 0.0),
+        f"{long}_segment_htc_period": (None, 0.0),
+        f"{long}_segment_price_period": (price, 0.0),
+        f"{long}_segment_dt_cont_period": (None, 0.0),
+        f"{long}_segment_cumulative_duty_period": (0.0, duty),
+    }
+
+    def grow(key: str, axis: int):
+        template = np.take(data[key], [0], axis=axis)
+        data[key] = np.concatenate([data[key], template], axis=axis)
+        return data[key]
+
+    for key, (axis, value) in values.items():
+        grown = grow(key, axis)
+        if value is not None:
+            if axis == 0:
+                grown[-1] = value
+            else:
+                grown[:, -1] = value
+    for key, (first, rest) in segments.items():
+        grown = grow(key, 1)
+        kept = grown[:, -1, 0].copy()
+        grown[:, -1, :] = rest
+        grown[:, -1, 0] = kept if first is None else first
+    identities = grow(f"{long}_segment_identities", 0)
+    identities[-1, :] = ""
+    identities[-1, 0] = segment
 
 
 __all__ = [
