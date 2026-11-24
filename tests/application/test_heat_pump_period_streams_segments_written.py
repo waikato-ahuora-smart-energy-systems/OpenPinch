@@ -47,3 +47,25 @@ def test_each_segment_keeps_its_film_coefficient():
     record = _period_thermal_record([condenser(1.0), condenser(2.0)])
 
     assert all("htc" in segment for segment in record["segments"])
+
+
+def test_periods_with_different_breakpoints_keep_each_profile_whole():
+    # Segment names are positional (S1, S2, ...): a period that condenses
+    # at 170 degC with no subcooling must not borrow the other period's
+    # subcooling temperatures. Each period's profile is cut at the union
+    # of both periods' duty fractions, so its segments chain end to end.
+    other = [(215.0, 170.0, 8.0), (170.0, 169.99, 200.0)]
+    record = _period_thermal_record([condenser(1.0), condenser(1.0, other)])
+
+    for period, total in ((0, 188.0), (1, 208.0)):
+        chain = [
+            (
+                segment["t_supply"]["values"][period],
+                segment["t_target"]["values"][period],
+                segment["heat_flow"]["values"][period],
+            )
+            for segment in record["segments"]
+        ]
+        assert sum(duty for _s, _t, duty in chain) == pytest.approx(total)
+        for (_s, end, _q), (start, _t, _d) in zip(chain, chain[1:]):
+            assert start == pytest.approx(end)
