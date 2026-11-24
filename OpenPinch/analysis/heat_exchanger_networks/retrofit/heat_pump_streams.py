@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ....contracts.synthesis.retrofit import HeatExchangerNetworkRetrofitDesign
@@ -58,13 +58,15 @@ def with_heat_pump_matches(
     ambient_approach: float | None = None,
     hot_approaches: Mapping[str, float] | None = None,
     cold_approaches: Mapping[str, float] | None = None,
+    in_periods: Mapping[str, Sequence] | None = None,
 ) -> tuple[HeatExchangerNetwork, tuple[PlacedMatch, ...]]:
     """``network`` with the matches that serve a heat pump's streams, and
     the ids of the exchangers added.
 
     ``network`` is solved, or ``solved`` is the same network solved: its
     coolers and heaters carry their process
-    side temperatures (first period). Each of ``evaporators`` (cold
+    side temperatures (the first period's without ``in_periods``). Each of
+    ``evaporators`` (cold
     streams, degC) is matched to every hot stream whose cooler starts at
     least ``approach`` K above the evaporator's hot end, in a new stage
     after the network's last, hottest evaporator first. Each of
@@ -74,14 +76,31 @@ def with_heat_pump_matches(
     ends at stage 1. A stream no cooler or heater can serve gets no match.
     ``hot_approaches`` and ``cold_approaches`` map a hot or a cold process
     stream to its own approach in place of ``approach``; a zone may name a
-    hot and a cold stream alike.
+    hot and a cold stream alike. ``in_periods`` maps a condenser or
+    evaporator to the stream in each period (``None`` where it is off),
+    and a match is placed only where its approach holds in every period
+    the level runs, against the cooler or heater as it starts there.
     """
 
     def needed(process: str, side) -> float:
         return float((side or {}).get(process, approach))
 
-    coolers = _starts(solved or network, HeatExchangerKind.COLD_UTILITY)
-    heaters = _starts(solved or network, HeatExchangerKind.HOT_UTILITY)
+    def each_period(level) -> tuple:
+        return tuple(in_periods[level.name]) if in_periods else (level,)
+
+    count = max((len(each_period(s)) for s in (*condensers, *evaporators)), default=1)
+    coolers, heaters = (
+        [_starts(solved or network, kind, period) for period in range(count)]
+        for kind in (HeatExchangerKind.COLD_UTILITY, HeatExchangerKind.HOT_UTILITY)
+    )
+
+    def holds(level, process: str, starts, gap, side) -> bool:
+        return all(
+            gap(stream, starts[period][process]) >= needed(process, side)
+            for period, stream in enumerate(each_period(level))
+            if stream is not None
+        )
+
     added: list[PlacedMatch] = []
 
     def add(hot: str, cold: str, stage: int, new_stage: bool) -> None:
@@ -102,8 +121,14 @@ def with_heat_pump_matches(
     for condenser in sorted(condensers, key=_cold_end):
         served = sorted(
             cold
-            for cold, start in heaters.items()
-            if _cold_end(condenser) - start >= needed(cold, cold_approaches)
+            for cold in heaters[0]
+            if holds(
+                condenser,
+                cold,
+                heaters,
+                lambda level, start: _cold_end(level) - start,
+                cold_approaches,
+            )
         )
         for position, cold in enumerate(served):
             add(condenser.name, cold, 1, position == 0)
@@ -111,8 +136,14 @@ def with_heat_pump_matches(
     for evaporator in sorted(evaporators, key=_hot_end, reverse=True):
         served = sorted(
             hot
-            for hot, start in coolers.items()
-            if start - _hot_end(evaporator) >= needed(hot, hot_approaches)
+            for hot in coolers[0]
+            if holds(
+                evaporator,
+                hot,
+                coolers,
+                lambda level, start: start - _hot_end(level),
+                hot_approaches,
+            )
         )
         stage = stage_count(network) + 1
         for position, hot in enumerate(served):
@@ -138,16 +169,19 @@ def with_heat_pump_matches(
     return network, tuple(added)
 
 
-def _starts(network: HeatExchangerNetwork, kind: HeatExchangerKind) -> dict[str, float]:
+def _starts(
+    network: HeatExchangerNetwork, kind: HeatExchangerKind, period: int = 0
+) -> dict[str, float]:
     """The temperature (degC) at which each process stream enters its
-    cooler (``kind`` cold utility) or heater (hot utility)."""
+    cooler (``kind`` cold utility) or heater (hot utility) in the period
+    of index ``period``."""
 
     cooler = kind is HeatExchangerKind.COLD_UTILITY
     starts: dict[str, float] = {}
     for exchanger in network.exchangers:
         if exchanger.kind is not kind:
             continue
-        state = exchanger.period_states[0]
+        state = exchanger.period_states[period]
         if cooler:
             name, inlet = exchanger.source_stream, state.source_inlet_temperature
             starts[name] = max(starts.get(name, -_KELVIN), float(inlet) - _KELVIN)
