@@ -162,15 +162,18 @@ def with_heat_pump_matches(
     # counter-current match, takes a share. The target places an
     # evaporator at the limit, so the comparison allows rounding.
     gap = approach if ambient_approach is None else float(ambient_approach)
+    def under(air, evaporator) -> bool:
+        # In every period both run, with ``in_periods``.
+        return all(
+            min(_hot_end(a) - _hot_end(e), _cold_end(a) - _cold_end(e))
+            >= gap - _APPROACH_TOLERANCE
+            for a, e in zip(each_period(air), each_period(evaporator))
+            if a is not None and e is not None
+        )
+
     for air in ambient_sources:
         below = sorted(
-            evaporator.name
-            for evaporator in evaporators
-            if min(
-                _hot_end(air) - _hot_end(evaporator),
-                _cold_end(air) - _cold_end(evaporator),
-            )
-            >= gap - _APPROACH_TOLERANCE
+            evaporator.name for evaporator in evaporators if under(air, evaporator)
         )
         stage = stage_count(network) + 1
         for position, cold in enumerate(below):
