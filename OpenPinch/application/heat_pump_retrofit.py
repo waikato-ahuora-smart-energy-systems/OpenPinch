@@ -18,7 +18,7 @@ from ..domain.enums import StreamType
 from ..domain.heat_exchanger_network import NetworkHeatPump
 from ._problem.arguments import temporary_zone_configuration
 from ._problem.targeting.state import snapshot_problem
-from .case_derivation import _case_with_heat_pump_streams
+from .case_derivation import _case_with_heat_pump_streams, _heat_pump_zone_address
 
 
 def heat_pump_machine(
@@ -73,20 +73,29 @@ def heat_pump_case(problem, solved, *, machine: str):
     """
 
     root = problem._require_prepared_root_zone()
+    target = SimpleNamespace(
+        provenance=SimpleNamespace(zone_address=root.address),
+        hpr_details=SimpleNamespace(amb_streams=solved.amb_streams),
+        # Only the levels that carry duty, as in the step.
+        hpr_hot_streams={s.name: s for s in _carrying(solved.hpr_hot_streams)},
+        hpr_cold_streams={s.name: s for s in _carrying(solved.hpr_cold_streams)},
+    )
+    # The zone the streams join scales each one's contribution by its own
+    # multiplier; the target stood the heat pump HPR_DT_CONT off, and the
+    # air its own contribution, as given.
+    address = _heat_pump_zone_address(problem, target, None)
+    multiplier = float(
+        next(
+            zone.dt_cont_multiplier
+            for zone in problem._walk_zone_tree(root)
+            if zone.address == address
+        )
+    )
     return _case_with_heat_pump_streams(
         problem,
-        SimpleNamespace(
-            provenance=SimpleNamespace(zone_address=root.address),
-            hpr_details=SimpleNamespace(amb_streams=solved.amb_streams),
-            # Only the levels that carry duty, as in the step.
-            hpr_hot_streams={s.name: s for s in _carrying(solved.hpr_hot_streams)},
-            hpr_cold_streams={s.name: s for s in _carrying(solved.hpr_cold_streams)},
-        ),
-        # The zone scales every stream's contribution by its multiplier;
-        # the target stood the heat pump HPR_DT_CONT off, and the air its
-        # own contribution, as given.
-        dt_cont=float(root.config.hpr.dt_cont) / float(root.dt_cont_multiplier),
-        ambient_scale=1.0 / float(root.dt_cont_multiplier),
+        target,
+        dt_cont=float(root.config.hpr.dt_cont) / multiplier,
+        ambient_scale=1.0 / multiplier,
         machine=machine,
     )
 
