@@ -29,7 +29,6 @@ def test_the_search_selects_the_as_piped_heat_pump():
         max_modifications=1,
         new_unit_cost=0.0,
         heat_pump_cycle="carnot",
-        heat_pump_streams=True,
         heat_pump_cost=0.0,
         # A full heat pump search takes a minute here; 200 evaluations
         # (0.4 s) already give a machine at a COP of 3.1.

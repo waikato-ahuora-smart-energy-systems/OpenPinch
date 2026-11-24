@@ -1673,7 +1673,6 @@ class _DesignAccessor:
         heat_pump_cycle: str | None = None,
         heat_pump_cost: float = 0.0,
         heat_pump_max_lift: float | None = 140.0,
-        heat_pump_streams: bool | None = None,
         heat_pump_sizes: Sequence[float] = (1.0, 0.75, 0.5),
         heat_pump_search: Mapping[str, int] | None = None,
         heat_recovery_loop_cost: float = 0.0,
@@ -1858,20 +1857,9 @@ class _DesignAccessor:
         if isinstance(existing, Mapping):
             existing = self._network_from_structure(existing)
         _refuse_site_network(existing, "retrofit")
-        if heat_pump_streams and heat_pump_cycle not in (
-            "carnot",
-            "vapour_compression",
-        ):
-            raise ValueError(
-                "heat_pump_streams is built for heat_pump_cycle='carnot' or "
-                f"'vapour_compression' only; got {heat_pump_cycle!r}."
-            )
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
-        # Both cycles run the stream step unless told not to.
-        streams = (
-            heat_pump_cycle in ("carnot", "vapour_compression")
-            and heat_pump_streams is not False
-        )
+        # A heat pump enters as streams: the linked move is retired.
+        streams = heat_pump_cycle in ("carnot", "vapour_compression")
         if streams and outside:
             raise ValueError(
                 "heat_pump_sizes are shares of the existing heaters' load, "
