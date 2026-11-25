@@ -30,6 +30,15 @@ Heat exchanger networks
   stream whose heat capacity flowrate changes, evolution returns a
   network at 223,429 $/y against 239,169 $/y from pinch design; it
   returned none.
+- Network evolution settles a segmented stream whose best stage
+  boundary is at a kink of its profile. Each segment's line then puts
+  the boundary in the other segment, and the solve went back and forth
+  until it gave up with "piecewise active segments did not stabilise".
+  A stream that returns to a segment it has left is now held in one
+  segment, where the solution is the kink. On a four-stream case with
+  one segmented hot and one segmented cold stream the default design
+  returns evolved networks from 175,645 $/y against 181,221 $/y from
+  pinch design; no evolution task had succeeded.
 - A case with a segmented stream designs with ``HENS_MAX_PARALLEL``
   above 1. Its models carried their check of the approach inside a match
   as a function that does not pickle, so the design raised
