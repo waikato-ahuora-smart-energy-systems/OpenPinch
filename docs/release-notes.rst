@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger networks
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.retrofit``, ``design.retrofit_heat_pumps`` and
+  ``design.optimise_duties`` now take a network's JSON (a mapping with
+  ``exchangers``, as a design command returns it through ``run_command``)
+  as the existing network. Such a mapping was read as a hand-written
+  structure and refused, so a client of the command layer could not
+  retrofit, or target heat pumps on, a network it had designed.
+
 0.10.0 (2026-11-25)
 -------------------
 

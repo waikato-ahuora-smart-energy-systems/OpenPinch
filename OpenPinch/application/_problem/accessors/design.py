@@ -1692,6 +1692,19 @@ class _DesignAccessor:
             }
         )
 
+    def _network_argument(
+        self, value: "HeatExchangerNetwork | Mapping[str, Any]"
+    ) -> "HeatExchangerNetwork":
+        """A network, a network's JSON (a mapping with ``exchangers``, as a
+        design command returns it) or a structure mapping."""
+        from ....domain.heat_exchanger_network import HeatExchangerNetwork
+
+        if not isinstance(value, Mapping):
+            return value
+        if "exchangers" in value:
+            return HeatExchangerNetwork.model_validate(value)
+        return self._network_from_structure(value)
+
     def retrofit(
         self,
         existing: "HeatExchangerNetwork | Mapping[str, Any]",
@@ -1729,8 +1742,9 @@ class _DesignAccessor:
     ) -> "HeatExchangerNetworkRetrofitResult":
         """Find cost-effective modifications of an existing network.
 
-        ``existing`` is the network as built: a ``HeatExchangerNetwork`` or a
-        mapping as for ``optimise_duties``, in which entries may be mappings
+        ``existing`` is the network as built: a ``HeatExchangerNetwork``, its
+        JSON, or a mapping as for ``optimise_duties``, in which entries may be
+        mappings
         carrying the installed ``area`` (m2) and an ``id``::
 
             {
@@ -1887,8 +1901,7 @@ class _DesignAccessor:
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
-        if isinstance(existing, Mapping):
-            existing = self._network_from_structure(existing)
+        existing = self._network_argument(existing)
         _refuse_site_network(existing, "retrofit")
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
         # A heat pump enters as streams: the linked move is retired.
@@ -2025,7 +2038,8 @@ class _DesignAccessor:
     ) -> "RetrofitHeatPumpTargets":
         """The ideal and the as-piped heat pump target of ``existing``.
 
-        ``existing`` is a network or, as for ``retrofit``, a mapping of its
+        ``existing`` is a network, its JSON or, as for ``retrofit``, a mapping
+        of its
         recovery matches, heaters and coolers with their installed areas. One
         that has not been solved is rated first as ``retrofit`` rates its
         existing network by default, each exchanger held to its two streams'
@@ -2068,8 +2082,7 @@ class _DesignAccessor:
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
-        if isinstance(existing, Mapping):
-            existing = self._network_from_structure(existing)
+        existing = self._network_argument(existing)
         _refuse_site_network(existing, "retrofit_heat_pumps")
         spec = cycle_spec(cycle)
         _runtime, configuration = self._arguments(options=options, period_id=None)
@@ -2127,7 +2140,8 @@ class _DesignAccessor:
 
         ``network`` lists every exchanger: recovery matches with a stage, plus
         heaters and coolers. Pass a ``HeatExchangerNetwork`` (for example a
-        previous design's ``selected_network``) or a mapping::
+        previous design's ``selected_network``), its JSON (a mapping with
+        ``exchangers``, as a design command returns it) or a mapping::
 
             {
                 "recovery": [("H1", "C1", 1), ("H2", "C1", 1), ("H1", "C2", 2)],
@@ -2183,8 +2197,7 @@ class _DesignAccessor:
         Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
-        if isinstance(network, Mapping):
-            network = self._network_from_structure(network)
+        network = self._network_argument(network)
         # Rating holds the approach the network was designed to, as
         # overdesign does: evolution designs down to 0.1 K.
         design = (
