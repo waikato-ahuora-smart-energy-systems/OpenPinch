@@ -15,6 +15,8 @@ crossed.
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from ...solver.arrays import pair_minimum_approach
@@ -70,7 +72,9 @@ def install_interior_cuts(owner, M_ij_period) -> None:
         owner._interior_cuts = {}
         owner._interior_constraints = {}
         owner._interior_big_m = M_ij_period
-        owner._add_lazy_cuts = lambda: _add_interior_approach_cuts(owner, M_ij_period)
+        # A partial of a module function, not a lambda: a worker process
+        # sends its solved model back pickled.
+        owner._add_lazy_cuts = partial(_add_interior_approach_cuts, owner, M_ij_period)
 
 
 def _add_interior_approach_cuts(owner, M_ij_period) -> bool:

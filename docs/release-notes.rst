@@ -18,6 +18,10 @@ Heat exchanger networks
   each solved end to its stream's own supply and target temperatures. On
   the basic pinch case with a condensing stream the best network is
   227,586 $/y again, against 238,102 $/y unevolved.
+- A case with a segmented stream designs with ``HENS_MAX_PARALLEL``
+  above 1. Its models carried their check of the approach inside a match
+  as a function that does not pickle, so the design raised
+  ``PicklingError`` as soon as a worker process sent a model back.
 - ``design.retrofit``, ``design.retrofit_heat_pumps`` and
   ``design.optimise_duties`` now take a network's JSON (a mapping with
   ``exchangers``, as a design command returns it through ``run_command``)
