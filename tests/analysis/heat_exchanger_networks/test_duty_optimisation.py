@@ -2068,6 +2068,27 @@ def test_rating_reads_the_share_a_network_was_designed_with():
 
 @_needs_live_solver
 @pytest.mark.solver
+def test_rating_a_networks_json_reads_the_share_it_was_designed_with():
+    """The share survives the network's JSON (what run_command returns and a
+    client sends back), so a rating of the JSON also holds the network to
+    its own design approach, not to the configuration's quarter (OpenPinch
+    PR 509 review)."""
+    problem = PinchProblem(_small_payload())
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=1, options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0}
+    ).selected_network
+
+    rated = problem.design.optimise_duties(
+        network.model_dump(mode="json"), objective="rating"
+    )
+
+    assert rated.selected_network.total_annual_cost == pytest.approx(
+        network.total_annual_cost, rel=1e-2
+    )
+
+
+@_needs_live_solver
+@pytest.mark.solver
 def test_rating_the_default_designs_own_network_keeps_its_design_approach():
     """Evolution closes this network's approach below 1 K; rating it at its
     own areas holds the approach it was designed to, not 1 K, so it rates.

@@ -463,6 +463,31 @@ def test_the_fit_to_every_period_keeps_the_designs_minimum_approach():
     assert _minimum_recovery_approach(network) >= 10.0 - 1e-3
 
 
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_fitted_networks_json_keeps_its_design_approach():
+    """The fit records the multiplier and share the network was designed
+    with; its JSON (what run_command returns and a client sends back) keeps
+    them, so a later fit or rating of the JSON holds the same approach
+    (OpenPinch PR 509 review)."""
+    problem = _two_period_problem()
+    options = {"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.5}
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=1, options=options
+    ).selected_network
+    design = problem.design
+    hens = design._effective_hens(None)
+
+    from_json = design._network_argument(network.model_dump(mode="json"))
+
+    assert design._design_approach(from_json, hens) == design._design_approach(
+        network, hens
+    )
+
+
 def test_a_fit_that_cannot_keep_the_minimum_approach_warns_and_fits_at_1_k(
     monkeypatch,
 ):
