@@ -18,6 +18,28 @@ Heat exchanger networks
   each solved end to its stream's own supply and target temperatures. On
   the basic pinch case with a condensing stream the best network is
   227,586 $/y again, against 238,102 $/y unevolved.
+- Network evolution no longer fails with "segmented-stream active
+  interval solve was unresolved" before it has solved anything. A model
+  without integers wrote one equality per segment of every segmented
+  stream's temperature, cost and approach profile, all but one switched
+  off, and one with no variable in it at each stream's supply end. Ipopt
+  counts equalities against variables and refused a model with more
+  ("Problem has too few degrees of freedom"), which two segmented
+  streams in one case were enough to reach. Each profile is now one
+  equality there; a model for an integer solver is written as it was.
+  On the basic pinch case with a condensing stream and a cold
+  stream whose heat capacity flowrate changes, evolution returns a
+  network at 223,429 $/y against 239,169 $/y from pinch design; it
+  returned none.
+- Network evolution settles a segmented stream whose best stage
+  boundary is at a kink of its profile. Each segment's line then puts
+  the boundary in the other segment, and the solve went back and forth
+  until it gave up with "piecewise active segments did not stabilise".
+  A stream that returns to a segment it has left is now held in one
+  segment, where the solution is the kink. On a four-stream case with
+  one segmented hot and one segmented cold stream the default design
+  returns evolved networks from 175,645 $/y against 181,221 $/y from
+  pinch design; no evolution task had succeeded.
 - A case with a segmented stream designs with ``HENS_MAX_PARALLEL``
   above 1. Its models carried their check of the approach inside a match
   as a function that does not pickle, so the design raised

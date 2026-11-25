@@ -116,16 +116,43 @@ def _utility_cost_value(
 
 
 def _update_piecewise_active_segments(model) -> bool:
+    """Move each relaxed mapping to the segment its solved heat lies in.
+
+    A mapping whose heat returns to a segment it has left is cycling:
+    each segment's line, extrapolated, puts the optimum in the other, so
+    the optimum is at the kink between them. Its heat coordinate is then
+    held to the segment it is in and the mapping moves no more. Returns
+    whether anything changed, so the caller solves again.
+    """
+
     changed = False
     for mapping in model._piecewise_active_mappings:
+        if mapping.get("held"):
+            continue
         coordinate = _execution._solver_value(model, mapping["heat_coordinate"])
         segment_index_at_heat = mapping.get(
             "segment_index_at_heat",
             mapping["profile"].segment_index_at_heat,
         )
         next_segment = segment_index_at_heat(coordinate)
-        if next_segment == mapping["active_segment"]:
+        active_segment = mapping["active_segment"]
+        if next_segment == active_segment:
             continue
+        left = mapping.setdefault("left_segments", set())
+        if next_segment in left:
+            heats = mapping["profile"].cumulative_duties
+            held_segment = active_segment
+            if abs(next_segment - active_segment) == 1:
+                # The mapping's own rule says which segment the kink
+                # between the two belongs to.
+                held_segment = segment_index_at_heat(
+                    float(heats[max(next_segment, active_segment)])
+                )
+            mapping["heat_coordinate"].setlb(float(heats[held_segment]))
+            mapping["heat_coordinate"].setub(float(heats[held_segment + 1]))
+            mapping["held"] = True
+            next_segment = held_segment
+        left.add(active_segment)
         for index, selector in enumerate(mapping["selectors"]):
             _execution._set_value(
                 model, selector, 1.0 if index == next_segment else 0.0
@@ -396,6 +423,7 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                             coordinate,
                             outlet_contribution,
                             profile,
+                            integer_capable=model.solver in backend.INTEGER_SOLVERS,
                             initial_segment=contribution_segment,
                         ),
                     )
