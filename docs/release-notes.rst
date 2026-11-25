@@ -26,7 +26,8 @@ Heat exchanger networks
   counts equalities against variables and refused a model with more
   ("Problem has too few degrees of freedom"), which two segmented
   streams in one case were enough to reach. Each profile is now one
-  equality. On the basic pinch case with a condensing stream and a cold
+  equality there; a model for an integer solver is written as it was.
+  On the basic pinch case with a condensing stream and a cold
   stream whose heat capacity flowrate changes, evolution returns a
   network at 223,429 $/y against 239,169 $/y from pinch design; it
   returned none.

@@ -610,13 +610,19 @@ def add_piecewise_temperature_contribution_mapping(
     contribution,
     profile: PiecewiseThermalProfile,
     *,
+    integer_capable: bool,
     initial_segment: int = 0,
 ):
     """Map duty to the traversed segment's approach contribution.
 
     The mapping follows the same active-set iteration as continuous piecewise
-    temperature and cost mappings. At an exact internal boundary the segment
-    carrying the larger adjacent contribution is selected.
+    temperature and cost mappings, with every solver. At an exact internal
+    boundary the segment carrying the larger adjacent contribution is
+    selected. For an integer solver it is one equality per segment, each
+    times its selector: such a solver does not count equalities, and
+    Couenne's search follows the rows it is given (with the switched-off
+    rows left out, one build solved a small case several times slower and
+    another did not finish).
     """
     if len(profile.duties) == 1:
         model.Equation(contribution == profile.temperature_contributions[0])
@@ -629,14 +635,15 @@ def add_piecewise_temperature_contribution_mapping(
         )
         for index in range(len(profile.duties))
     ]
-    _add_active_segment_equation(
-        model,
-        selectors,
-        [
-            contribution - profile.temperature_contributions[index]
-            for index in range(len(selectors))
-        ],
-    )
+    residuals = [
+        contribution - profile.temperature_contributions[index]
+        for index in range(len(selectors))
+    ]
+    if integer_capable:
+        for selector, residual in zip(selectors, residuals):
+            model.Equation(selector * residual == 0.0)
+    else:
+        _add_active_segment_equation(model, selectors, residuals)
     return {
         "heat_coordinate": heat_coordinate,
         "profile": profile,

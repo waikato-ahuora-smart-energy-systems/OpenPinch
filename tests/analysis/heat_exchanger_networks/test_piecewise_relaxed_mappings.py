@@ -121,8 +121,29 @@ def test_a_contribution_mapping_is_one_equality():
         model.Var(value=75.0),
         model.Var(value=2.0),
         _profile(),
+        integer_capable=False,
         initial_segment=1,
     )
 
     assert len(model.equations) == 1
+    assert len(mapping["selectors"]) == 3
+
+
+def test_a_contribution_mapping_for_an_integer_solver_is_an_equality_a_segment():
+    # Couenne's search follows the rows it is given: the same model with
+    # the switched-off rows left out solved several times slower on one
+    # build and not at all on another. Only a solver that counts
+    # equalities needs the single row.
+    model = _Model()
+
+    mapping = add_piecewise_temperature_contribution_mapping(
+        model,
+        model.Var(value=75.0),
+        model.Var(value=2.0),
+        _profile(),
+        integer_capable=True,
+        initial_segment=1,
+    )
+
+    assert len(model.equations) == 3
     assert len(mapping["selectors"]) == 3

@@ -423,6 +423,7 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                             coordinate,
                             outlet_contribution,
                             profile,
+                            integer_capable=model.solver in backend.INTEGER_SOLVERS,
                             initial_segment=contribution_segment,
                         ),
                     )
