@@ -365,10 +365,12 @@ class InternalHeatExchangerNetworkProblem:
         if balance is not None:
             network = with_site_cost(network, balance)
         if self.approach_share is not None:
+            # Also in the summary metrics, which a network's JSON keeps.
+            share = {"min_exchanger_approach_share": float(self.approach_share)}
             network = network.model_copy(
                 update={
-                    "source_metadata": network.source_metadata
-                    | {"min_exchanger_approach_share": float(self.approach_share)}
+                    "source_metadata": network.source_metadata | share,
+                    "summary_metrics": network.summary_metrics | share,
                 }
             )
         if self.utility_level_targets is None:

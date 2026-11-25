@@ -1004,7 +1004,8 @@ class _DesignAccessor:
             # The share the network records it was designed with; one that
             # records none takes the configuration's.
             recorded = (network.source_metadata or {}).get(
-                "min_exchanger_approach_share"
+                "min_exchanger_approach_share",
+                (network.summary_metrics or {}).get("min_exchanger_approach_share"),
             )
             share = float(
                 hens.min_exchanger_approach_share if recorded is None else recorded
@@ -1102,12 +1103,18 @@ class _DesignAccessor:
             ) or recorded.get("dt_cont_multiplier")
             if multiplier is not None:
                 metadata["dt_cont_multiplier"] = float(multiplier)
+            metrics = dict(view.selected_network.summary_metrics or {})
             if recorded.get("min_exchanger_approach_share") is not None:
-                metadata["min_exchanger_approach_share"] = recorded[
-                    "min_exchanger_approach_share"
-                ]
+                share = recorded["min_exchanger_approach_share"]
+                metadata["min_exchanger_approach_share"] = share
+                # Also in the summary metrics, which a network's JSON keeps.
+                metrics["min_exchanger_approach_share"] = share
             network = view.selected_network.model_copy(
-                update={"method": designed.method, "source_metadata": metadata}
+                update={
+                    "method": designed.method,
+                    "source_metadata": metadata,
+                    "summary_metrics": metrics,
+                }
             )
             final = outcome.model_copy(
                 update={

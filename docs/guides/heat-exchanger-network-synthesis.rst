@@ -141,7 +141,8 @@ network whose exchangers sit exactly at that approach.
 ``verify_network_feasibility`` still checks approaches against the 0.1 K
 floor, not against this share. A thermal derivative or evolution network
 records the share it was designed with
-(``source_metadata["min_exchanger_approach_share"]``), and a fit to every
+(``source_metadata["min_exchanger_approach_share"]``, and in its
+``summary_metrics`` so that its JSON keeps it), and a fit to every
 period, a rating or an overdesign of it holds that share, whatever the
 configuration says by then.
 

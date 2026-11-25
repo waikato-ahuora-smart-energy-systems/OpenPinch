@@ -13,6 +13,12 @@ Heat exchanger networks
   as the existing network. Such a mapping was read as a hand-written
   structure and refused, so a client of the command layer could not
   retrofit, or target heat pumps on, a network it had designed.
+- A thermal derivative or evolution network now also records the
+  approach share it was designed with as
+  ``summary_metrics["min_exchanger_approach_share"]``, so its JSON keeps
+  it. A fit, rating or overdesign of the JSON holds the network to that
+  share; it took the configuration's, so a network designed below the
+  default quarter could rate as infeasible.
 
 0.10.0 (2026-11-25)
 -------------------
