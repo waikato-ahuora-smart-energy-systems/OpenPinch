@@ -529,7 +529,12 @@ class InternalHeatExchangerNetworkProblem:
                         "highs",
                         None,
                         seconds=(
-                            _ipopt_time_limit(self.args.get("solver_options")) or {}
+                            _ipopt_time_limit(
+                                backend._normalise_solver_options(
+                                    self.args.get("solver_options")
+                                )
+                            )
+                            or {}
                         ).get("max_wall_time", backend.PLACED_UNITS_TIME_LIMIT),
                     ),
                     "minimisation_goal": "utility costs",
