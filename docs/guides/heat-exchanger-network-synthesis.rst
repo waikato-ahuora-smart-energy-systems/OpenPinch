@@ -144,7 +144,10 @@ records the share it was designed with
 (``source_metadata["min_exchanger_approach_share"]``, and in its
 ``summary_metrics`` so that its JSON keeps it), and a fit to every
 period, a rating or an overdesign of it holds that share, whatever the
-configuration says by then.
+configuration says by then. A network also records the dt_cont multiplier
+it was designed at (``summary_metrics["dt_cont_multiplier"]``), which its
+JSON keeps as well, so a network designed at 1.5 is rated at 1.5 times its
+streams' contributions from the object and from its JSON alike.
 
 Several Hot or Cold Utilities
 -----------------------------

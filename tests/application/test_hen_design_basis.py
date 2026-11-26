@@ -488,6 +488,31 @@ def test_a_fitted_networks_json_keeps_its_design_approach():
     )
 
 
+@pytest.mark.solver
+@pytest.mark.skipif(
+    "not (_available('highs') and _available('ipopt-pyomo'))",
+    reason="needs HiGHS and Ipopt",
+)
+def test_a_fitted_networks_json_rates_at_its_dt_cont_multiplier():
+    """A pinch design at multiplier 1.5 holds 15 K on the crude preheat
+    train. Its JSON keeps the multiplier, so a rating of the JSON holds 15 K
+    too; it used to rate at the contributions unscaled, 10 K, and so at less
+    utility than the design uses."""
+    from OpenPinch import PinchProblem
+
+    problem = PinchProblem("crude_preheat_train_multiperiod.json")
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=0, dt_cont_multipliers=[1.5], max_parallel=1
+    ).selected_network
+
+    rated = problem.design.optimise_duties(
+        network.model_dump(mode="json"), objective="rating"
+    ).selected_network
+
+    assert _minimum_recovery_approach(rated) >= 15.0 - 1e-3
+    assert rated.total_annual_cost == pytest.approx(network.total_annual_cost, rel=1e-6)
+
+
 def test_a_fit_that_cannot_keep_the_minimum_approach_warns_and_fits_at_1_k(
     monkeypatch,
 ):

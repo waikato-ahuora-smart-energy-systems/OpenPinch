@@ -56,6 +56,15 @@ Heat exchanger networks
   it. A fit, rating or overdesign of the JSON holds the network to that
   share; it took the configuration's, so a network designed below the
   default quarter could rate as infeasible.
+- A network fitted to every period or rated at an overdesign margin now
+  also records its dt_cont multiplier as
+  ``summary_metrics["dt_cont_multiplier"]``, so its JSON keeps it. The
+  multiplier was kept only in ``source_metadata``, which the JSON leaves
+  out, so a fit, rating or overdesign of the JSON read a multiplier of 1.
+  On the crude preheat train a pinch design at 1.5 rated from its JSON
+  at 10 K and 286,974 $/y, against the 15 K and 295,037 $/y it was
+  designed to; a design at 0.75 could not be rated from its JSON at all
+  ("infeasible").
 
 0.10.0 (2026-11-25)
 -------------------
