@@ -80,6 +80,22 @@ Heat exchanger networks
   tolerance of 0.001). The heat pump step targets its machine on the
   coolers and heaters shifted at that multiplier, and keeps its streams
   ``HPR_DT_CONT`` off them.
+- A network ``design.retrofit`` returns records the approach the retrofit
+  held, and a later rating, overdesign or retrofit of it holds the same.
+  The network recorded a minimum approach of 1 K
+  (``summary_metrics["approach_temperature"]``) when the retrofit had
+  held its streams' contributions, and nothing that was read back, so it
+  was read as an evolved network at a quarter of the contributions. It
+  now records ``approach_temperature`` only when the retrofit was given
+  ``min_approach_temperature``, and otherwise the multiplier its
+  contributions were scaled by (``dt_cont_multiplier``, with a
+  ``min_exchanger_approach_share`` of 1). A network that records an
+  ``approach_temperature`` (also a duty optimisation given
+  ``min_approach_temperature``, or a fit that fell back to 1 K) is held
+  to it by a rating, overdesign or retrofit that is given no approach.
+  On the basic pinch case a second retrofit of the network a retrofit
+  returned rated it at 143,969 $/y of utility against the 145,250 $/y the
+  first reported; both now give 145,250 $/y.
   The guide said ``min_approach_temperature`` defaults to 1 K; it does
   not.
 
