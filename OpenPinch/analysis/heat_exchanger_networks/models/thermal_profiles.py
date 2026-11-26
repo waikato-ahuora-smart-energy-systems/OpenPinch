@@ -195,12 +195,14 @@ class ThermalProfile:
         if not self.segmented:
             return expression
         # Rounding a boundary shifts the curve's two ends; the shift is taken
-        # out so the span from supply to target is the stream's own.
+        # out so the span from supply to target is the stream's own: the sum
+        # of its segments' own, which leaves out a gap between two segments.
         at_supply = self._rounded(rates, self.supply, _rounded_max0)
         span = self._rounded(rates, self.target, _rounded_max0) - at_supply
         if span == 0.0:
             return expression - at_supply
-        return (expression - at_supply) * (self._exact(rates, self.target) / span)
+        own = sum(rate * abs(a - b) for rate, a, b in zip(rates, self.t_in, self.t_out))
+        return (expression - at_supply) * (own / span)
 
     def _rounded(self, rates: Sequence[float], temperature, max0):
         widths = self.rounding_widths

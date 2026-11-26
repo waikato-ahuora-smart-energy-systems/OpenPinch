@@ -46,6 +46,27 @@ def test_the_rounded_heat_at_the_target_is_the_stream_duty():
     )
 
 
+def test_the_rounded_heat_at_the_target_is_the_duty_across_a_gap_between_segments():
+    # Segment ends may differ by up to 1e-6 K. After a condensing segment
+    # that gap is worth 0.009 kW at its heat capacity flowrate, which no
+    # segment holds: the stream's duty is the sum of its segments' own.
+    gap = 5e-7
+    profile = ThermalProfile(
+        side="hot",
+        identities=("condensing", "subcooling"),
+        t_in=(447.91, 447.9 - gap),
+        t_out=(447.9, 420.0),
+        cp=(177.1 / 0.01, 2.0),
+        htc=(1.0, 1.0),
+        dt_cont=(1.0, 1.0),
+        price=(0.0, 0.0),
+    )
+
+    assert profile.heat(solver_value(profile.target))[0] == pytest.approx(
+        profile.total, rel=1e-9
+    )
+
+
 def test_the_rounded_heat_at_the_supply_is_zero():
     profile = condenser()
 
