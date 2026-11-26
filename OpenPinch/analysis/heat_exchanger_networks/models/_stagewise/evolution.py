@@ -636,6 +636,7 @@ def _update_with_best_model(owner, best_model) -> None:
         (owner.I, owner.J, owner.S),
     )
     owner.set_initial_values_for_variables(best_model)
+    _adopt_site_balance(owner, best_model)
 
     owner.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
     owner.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
@@ -683,6 +684,31 @@ def _update_with_best_model(owner, best_model) -> None:
     if hasattr(best_model, "solver_run"):
         owner.solver_run = best_model.solver_run
     owner.get_post_process()
+
+
+def _adopt_site_balance(owner, best_model) -> None:
+    """Take the candidate's solved site imports, dumps and letdowns.
+
+    A site task's model closes each utility level with them
+    (``site_utilities.py``). The adopted heater and cooler duties are the
+    candidate's, so the levels balance only with the candidate's own: left
+    at this model's, a level whose use or generation the candidate changed
+    misses its balance, and the adopted network fails verification.
+    """
+
+    solved = getattr(best_model, "_site_balance_blocks", None) or {}
+    for n, block in (getattr(owner, "_site_balance_blocks", None) or {}).items():
+        other = solved.get(n)
+        if other is None:
+            continue
+        for mine, theirs in (
+            (block.imports, other.imports),
+            (block.dumps, other.dumps),
+            (block.flows, other.flows),
+        ):
+            for key, variable in mine.items():
+                if key in theirs:
+                    _assign_value(variable, _value(theirs[key]))
 
 
 def _solved_values(values):

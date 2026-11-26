@@ -1101,6 +1101,55 @@ def test_update_with_best_model_adopts_the_candidates_own_alpha():
     assert target.alpha == [[[[0.25]]]]
 
 
+def test_update_with_best_model_adopts_the_candidates_site_balance():
+    # The adopted duties are the candidate's, and a site level's balance
+    # closes only with the imports, dumps and letdowns solved with them.
+    # Left at this model's own, two levels miss by equal and opposite
+    # amounts and the adopted network fails its site balance check.
+    from OpenPinch.analysis.heat_exchanger_networks.site.utility_system import (
+        SiteBalancePeriod,
+    )
+
+    def period(imported, dumped, let_down):
+        return SiteBalancePeriod(
+            period_idx=0,
+            use=(),
+            generation=(),
+            imports={0: _PyomoLikeVariable(imported)},
+            dumps={1: _PyomoLikeVariable(dumped)},
+            flows={(0, 1): _PyomoLikeVariable(let_down)},
+            hot_cost=0.0,
+            cold_cost=0.0,
+        )
+
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.z_allowed = [[[1]]]
+    target.alpha = []
+    target.set_initial_values_for_variables = lambda best: None
+    target.get_post_process = lambda: None
+    target._site_balance_blocks = {0: period(40.0, 10.0, 0.0)}
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+        _site_balance_blocks={0: period(55.0, 0.0, 25.0)},
+    )
+
+    _update_with_best_model(target, best)
+
+    block = target._site_balance_blocks[0]
+    assert block.imports[0].value == 55.0
+    assert block.dumps[1].value == 0.0
+    assert block.flows[(0, 1)].value == 25.0
+
+
 def test_update_with_best_model_keeps_solved_cost_values_not_expressions():
     # Copying a Pyomo expression copies the whole model behind it; verify()
     # only reads the solved values, so those are what the owner keeps.
