@@ -77,8 +77,9 @@ Heat exchanger networks
   such as a hand-written one, is retrofitted as before. On the basic
   pinch case the default design is now accepted and rated at 105,357 $/y
   of utility against the 105,397 $/y it was designed at (at an area
-  tolerance of 0.001). The heat pump step keeps its streams
-  ``HPR_DT_CONT`` off the coolers and heaters whatever that multiplier.
+  tolerance of 0.001). The heat pump step targets its machine on the
+  coolers and heaters shifted at that multiplier, and keeps its streams
+  ``HPR_DT_CONT`` off them.
   The guide said ``min_approach_temperature`` defaults to 1 K; it does
   not.
 

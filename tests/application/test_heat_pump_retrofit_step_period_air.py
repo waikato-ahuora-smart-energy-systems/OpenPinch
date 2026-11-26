@@ -52,7 +52,9 @@ def test_the_step_carries_the_air_of_every_period(monkeypatch):
         period_ids={"base": 0, "peak": 1},
         master_zone=SimpleNamespace(config=Configuration(), weights=[0.5, 0.5]),
     )
-    settings = SimpleNamespace(heat_pump_cycle="carnot", heat_pump_cost=0.0)
+    settings = SimpleNamespace(
+        heat_pump_cycle="carnot", heat_pump_cost=0.0, dt_cont_multiplier=1.0
+    )
 
     step, _solved = heat_pump_retrofit.heat_pump_step(
         problem, SimpleNamespace(network=object()), settings

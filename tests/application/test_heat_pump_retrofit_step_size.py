@@ -49,7 +49,9 @@ def test_the_step_asks_for_its_share_and_records_it(monkeypatch):
             config=SimpleNamespace(costing=Configuration().costing)
         )
     )
-    settings = SimpleNamespace(heat_pump_cycle="carnot", heat_pump_cost=0.0)
+    settings = SimpleNamespace(
+        heat_pump_cycle="carnot", heat_pump_cost=0.0, dt_cont_multiplier=1.0
+    )
 
     step, _solved = heat_pump_retrofit.heat_pump_step(
         problem, SimpleNamespace(network=object()), settings, load_fraction=0.5

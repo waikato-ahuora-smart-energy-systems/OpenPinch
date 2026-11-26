@@ -45,7 +45,9 @@ def test_levels_without_duty_are_left_out_of_the_step(monkeypatch):
             config=SimpleNamespace(costing=Configuration().costing)
         )
     )
-    settings = SimpleNamespace(heat_pump_cycle="carnot", heat_pump_cost=0.0)
+    settings = SimpleNamespace(
+        heat_pump_cycle="carnot", heat_pump_cost=0.0, dt_cont_multiplier=1.0
+    )
 
     step, _solved = heat_pump_retrofit.heat_pump_step(
         problem, SimpleNamespace(network=object()), settings

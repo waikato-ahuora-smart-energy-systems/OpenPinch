@@ -197,6 +197,8 @@ def heat_pump_step(
         args=dict(limits) if limits else None,
         load_fraction=load_fraction,
         cycle=settings.heat_pump_cycle,
+        # The coolers and heaters shifted as the retrofit's model holds them.
+        dt_cont_multiplier=settings.dt_cont_multiplier,
     )
     if solved is None:
         # The heaters carry no load: no heat pump to add.
