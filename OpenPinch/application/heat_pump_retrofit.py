@@ -111,14 +111,18 @@ def heat_pump_machine(
     )
 
 
-def heat_pump_case(problem, solved, *, machine: str):
+def heat_pump_case(problem, solved, *, machine: str, dt_cont_multiplier: float = 1.0):
     """A copy of ``problem`` holding the streams of the as-piped heat pump
     target ``solved``.
 
     Each condenser is a hot stream and each evaporator a cold stream of
     the problem's process zone, marked with ``machine`` and its role, at
     ``HPR_DT_CONT``: the as-piped target stands the heat pump that far
-    off the coolers and heaters. A shared design over several periods
+    off the coolers and heaters. ``dt_cont_multiplier`` is the multiplier
+    the retrofit's model scales every contribution by (a designed existing
+    network's, ``RetrofitSettings.dt_cont_multiplier``); the streams are
+    written over it, so the model holds them at ``HPR_DT_CONT`` and the air
+    at its own contribution still. A shared design over several periods
     (``period_outputs``) writes each stream in every period, with no duty
     where it is off; a level without duty in any period is no stream.
     """
@@ -151,10 +155,11 @@ def heat_pump_case(problem, solved, *, machine: str):
     )
     # The zone the streams join scales each one's contribution by its own
     # multiplier; the target stood the heat pump HPR_DT_CONT off, and the
-    # air its own contribution, as given.
+    # air its own contribution, as given. The retrofit's model scales them
+    # once more, by the existing network's multiplier.
     multiplier = _zone_multiplier(
         problem, _heat_pump_zone_address(problem, target, None)
-    )
+    ) * float(dt_cont_multiplier)
     return _case_with_heat_pump_streams(
         problem,
         target,
@@ -192,6 +197,8 @@ def heat_pump_step(
         args=dict(limits) if limits else None,
         load_fraction=load_fraction,
         cycle=settings.heat_pump_cycle,
+        # The coolers and heaters shifted as the retrofit's model holds them.
+        dt_cont_multiplier=settings.dt_cont_multiplier,
     )
     if solved is None:
         # The heaters carry no load: no heat pump to add.
@@ -356,7 +363,14 @@ def retrofit_with_heat_pump(
             )
             if step is None:
                 continue
-            case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
+            case = snapshot_problem(
+                heat_pump_case(
+                    problem,
+                    solved,
+                    machine=machine,
+                    dt_cont_multiplier=settings.dt_cont_multiplier,
+                )
+            )
             with temporary_zone_configuration(
                 case._build_execution_master_zone(), configuration
             ):

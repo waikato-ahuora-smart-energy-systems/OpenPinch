@@ -102,7 +102,10 @@ class RetrofitSettings:
     each. ``area_tolerance`` widens every installed area (a fraction) and
     ``approach`` is the minimum approach (K) on every exchanger; ``None``
     gives each exchanger the sum of its two sides' temperature contributions
-    and screens new matches and heat pumps at twice ``THERMAL_DT_CONT``.
+    and screens new matches and heat pumps at twice ``THERMAL_DT_CONT``,
+    both scaled by ``dt_cont_multiplier`` (1 by default; the multiplier, and
+    for an evolved network the multiplier times the approach share, that a
+    designed existing network records; left at 1 with an ``approach``).
     ``max_added_area_fraction`` caps the area added to an existing exchanger
     as a fraction of its installed area (None: no cap).
     ``new_unit_cost`` ($ per new exchanger), ``area_addition_cost`` ($ per
@@ -178,6 +181,7 @@ class RetrofitSettings:
     heat_recovery_loops: bool = True
     heat_recovery_loop_cost: float = 0.0
     utility_switch_cost: float | None = None
+    dt_cont_multiplier: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -863,11 +867,17 @@ class _Evaluator:
     def __init__(
         self, problem, existing: HeatExchangerNetwork, settings, heat_pump=None
     ) -> None:
-        from ..solver.arrays import problem_to_solver_arrays
+        from ..solver.arrays import (
+            nominal_approach_temperature,
+            problem_to_solver_arrays,
+        )
 
         config = problem.master_zone.config
         self.config = config
         self.settings = settings
+        # The streams' contributions at the multiplier the existing network
+        # was designed at.
+        nominal = nominal_approach_temperature(config, settings.dt_cont_multiplier)
         # The heat pump step the search starts from, if any.
         self.heat_pump = heat_pump
         self.existing = frozenset(
@@ -876,11 +886,9 @@ class _Evaluator:
         self.installed = {
             e.exchanger_id: float(e.area) for e in _structural_exchangers(existing)
         }
-        self.arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
+        self.arrays = problem_to_solver_arrays(problem, nominal)
         self.screen_approach = (
-            2.0 * float(config.thermal.dt_cont)
-            if settings.approach is None
-            else float(settings.approach)
+            nominal if settings.approach is None else float(settings.approach)
         )
         hens = config.hens
         self.solver = configured_stage_solver(hens, "HENS_SOLVER_EVM")

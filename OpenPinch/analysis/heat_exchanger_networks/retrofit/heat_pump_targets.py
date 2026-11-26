@@ -87,6 +87,7 @@ def as_piped_heat_pump(
     args=None,
     load_fraction=None,
     cycle: str | None = None,
+    dt_cont_multiplier: float = 1.0,
 ):
     """The as-piped heat pump target of ``network`` as the heat pump
     service solved it (``HeatPumpTargetOutputs``), with its condenser
@@ -97,6 +98,9 @@ def as_piped_heat_pump(
     its heaters and coolers carry their temperatures. ``cycle``
     ("carnot" or "vapour_compression") solves a cascade of that cycle
     whatever the zone's ``HPR_TYPE``; ``None`` takes ``HPR_TYPE``.
+    ``dt_cont_multiplier`` scales each cooler's and heater's stream
+    contribution once more, as a retrofit of a designed network holds them
+    (``RetrofitSettings.dt_cont_multiplier``).
 
     With several periods the machine is designed once for the coolers and
     heaters of every period (``as_piped_period_profiles``), each period's
@@ -106,7 +110,9 @@ def as_piped_heat_pump(
 
     if len(problem.period_ids) > 1:
         return compute_shared_profile_heat_pump_target(
-            profiles=as_piped_period_profiles(problem, network),
+            profiles=as_piped_period_profiles(
+                problem, network, dt_cont_multiplier=dt_cont_multiplier
+            ),
             period_ids=problem.period_ids,
             weights={
                 period: float(problem.master_zone.weights[index])
@@ -119,7 +125,7 @@ def as_piped_heat_pump(
         )
     return _profile_target(
         problem,
-        as_piped_profiles(problem, network),
+        as_piped_profiles(problem, network, dt_cont_multiplier=dt_cont_multiplier),
         _network_prices(problem, network),
         args,
         load_fraction=load_fraction,
@@ -319,6 +325,7 @@ def as_piped_profiles(
     *,
     period: int = 0,
     grid_periods: tuple[int, ...] = (),
+    dt_cont_multiplier: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The shifted temperatures (degC, hottest first) and the source and
     sink profiles of ``network``'s coolers and heaters, in the period of
@@ -327,18 +334,21 @@ def as_piped_profiles(
     Each cooler is a hot segment and each heater a cold one, between the
     process stream's solved inlet and outlet temperatures (K) at the
     exchanger's duty, shifted by that stream's temperature contribution
-    and its multiplier.
+    and its multiplier, times ``dt_cont_multiplier`` (the multiplier a
+    retrofit of a designed network holds its contributions at).
     The sources and sinks are cascaded apart, so none recovers heat from
     another. The temperatures of the periods of index ``grid_periods``
     join the grid too, carrying no duty.
     """
 
-    sources, sinks = _as_piped_segments(problem, network, period)
+    sources, sinks = _as_piped_segments(problem, network, period, dt_cont_multiplier)
     every = sources + sinks
     for other in grid_periods:
         # Fresh segments: a collection renames a stream it adds whose name
         # it already holds.
-        more_sources, more_sinks = _as_piped_segments(problem, network, other)
+        more_sources, more_sinks = _as_piped_segments(
+            problem, network, other, dt_cont_multiplier
+        )
         every = every + more_sources + more_sinks
     source = get_process_heat_cascade(
         hot_streams=sources,
@@ -362,10 +372,11 @@ def as_piped_profiles(
 
 
 def _as_piped_segments(
-    problem, network: HeatExchangerNetwork, period: int
+    problem, network: HeatExchangerNetwork, period: int, dt_cont_multiplier: float
 ) -> tuple[StreamCollection, StreamCollection]:
     """``network``'s coolers as hot segments and heaters as cold ones, in
-    the period of index ``period``; see ``as_piped_profiles``."""
+    the period of index ``period``, each stream's contribution scaled once
+    more by ``dt_cont_multiplier``; see ``as_piped_profiles``."""
 
     zone = problem.master_zone
     sources = StreamCollection()
@@ -395,7 +406,7 @@ def _as_piped_segments(
                 heat_flow=state.duty,
                 delta_t_contribution=stream.delta_t_contribution,
                 delta_t_contribution_multiplier=(
-                    stream.delta_t_contribution_multiplier
+                    stream.delta_t_contribution_multiplier * dt_cont_multiplier
                 ),
             )
         )
@@ -403,14 +414,20 @@ def _as_piped_segments(
 
 
 def as_piped_period_profiles(
-    problem, network: HeatExchangerNetwork
+    problem, network: HeatExchangerNetwork, *, dt_cont_multiplier: float = 1.0
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """``as_piped_profiles`` in each of the problem's periods, by period id,
     all on one temperature grid, as a shared heat pump design needs."""
 
     indices = tuple(problem.period_ids.values())
     return {
-        period: as_piped_profiles(problem, network, period=index, grid_periods=indices)
+        period: as_piped_profiles(
+            problem,
+            network,
+            period=index,
+            grid_periods=indices,
+            dt_cont_multiplier=dt_cont_multiplier,
+        )
         for period, index in problem.period_ids.items()
     }
 
