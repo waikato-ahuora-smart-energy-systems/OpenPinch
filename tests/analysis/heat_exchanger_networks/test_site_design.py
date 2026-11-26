@@ -344,6 +344,72 @@ def test_a_site_seed_keeps_each_processs_staged_heaters_and_coolers():
     }
 
 
+def test_joined_process_networks_keep_every_exchanger_and_add_up_the_capital():
+    """A seed takes the recovery matches and staged units only; the joined
+    network is each process's whole network, end heaters and coolers
+    included, for a site design to return when its evolution fails."""
+    from OpenPinch.analysis.heat_exchanger_networks.site import (
+        joined_process_networks,
+    )
+
+    a = _network(
+        [
+            _recovery("A.H1", "A.C1", 1),
+            _heater(LPS, "A.C1", 10.0),
+            _cooler("A.H1", CW, 4.0),
+        ],
+        stages=1,
+    ).model_copy(update={"capital_cost": 100.0})
+    b = _network(
+        [_recovery("B.H1", "B.C1", 2), _heater(HPS, "B.C1", 3.0)], stages=2
+    ).model_copy(update={"capital_cost": 30.0})
+
+    (joined,) = joined_process_networks({"A": (a,), "B": (b,)})
+
+    assert {e.exchanger_id for e in joined.exchangers} == {
+        e.exchanger_id for e in (*a.exchangers, *b.exchangers)
+    }
+    assert joined.capital_cost == 130.0
+    assert joined.stage_count == 2
+    assert joined.summary_metrics == {
+        "dt_cont_multiplier": 1.0,
+        "site_seed": "lowest_cost",
+    }
+    assert joined.source_metadata["site_processes"] == {
+        "A": {LPS: [10.0], CW: [4.0]},
+        "B": {HPS: [3.0]},
+    }
+
+
+def test_joined_process_networks_keep_networks_that_differ_only_in_cost():
+    """Two multipliers can give a process the same matches and utility
+    duties with different areas. As seeds they are one starting point; as
+    joined networks they are two designs at two costs, and the cheaper must
+    not be dropped for coming second."""
+    from OpenPinch.analysis.heat_exchanger_networks.site import (
+        joined_process_networks,
+    )
+
+    def process(name, multiplier, capital):
+        return _network(
+            [
+                _recovery(f"{name}.H1", f"{name}.C1", 1),
+                _heater(LPS, f"{name}.C1", 10.0),
+            ],
+            multiplier=multiplier,
+            stages=1,
+        ).model_copy(update={"capital_cost": capital})
+
+    joined = joined_process_networks(
+        {
+            "A": (process("A", 0.75, 120.0), process("A", 1.0, 100.0)),
+            "B": (process("B", 0.75, 60.0), process("B", 1.0, 50.0)),
+        }
+    )
+
+    assert [network.capital_cost for network in joined] == [180.0, 150.0]
+
+
 def test_a_site_task_keeps_a_stage_boundary_for_each_staged_unit():
     """A stream runs at most one staged cooler at a stage boundary, so H1's
     two coolers need two boundaries between its recovery matches. The
