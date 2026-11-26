@@ -1001,6 +1001,11 @@ class _Evaluator:
 
         Returns whether the network has such a period (an exchanger with
         duty in one period and none in another); without one nothing changes.
+        The periods are read from each design's own network, so they follow
+        the existing matches where they are. A relocated exchanger is a new
+        match somewhere else, with no duties yet: like a new unit it is free
+        in every period, since where it idled before says nothing of where
+        it now sits.
         """
 
         request = build_duty_optimisation_request(
