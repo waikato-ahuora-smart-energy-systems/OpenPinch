@@ -106,18 +106,38 @@ def _assert_sentinel_converged(
 ) -> None:
     """Require a strict-success sentinel to solve and show bounded convergence.
 
-    A high-lift sentinel may instead report that no heat pump pays.
+    A high-lift sentinel may instead report that no heat pump pays. Points
+    the search tried and rejected as physically infeasible (a negative
+    temperature lift, say) do not change that report, and how many it tries
+    depends on the platform's numerics: from the parallel Carnot start, four
+    on Linux and none on macOS (November 2026). A search with no viable
+    candidate, or one that ran out of budget, is still a failure.
     """
+    categories = (
+        set(outcome.error.diagnostics.category_counts)
+        if outcome.kind is HPROutcomeKind.TYPED_FAILURE
+        else set()
+    )
     if (
         assignment.profile.profile_id in HPR_HIGH_LIFT_SENTINEL_PROFILES
-        and outcome.kind is HPROutcomeKind.TYPED_FAILURE
-        and set(outcome.error.diagnostics.category_counts)
-        == {HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP}
+        and HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP in categories
+        and categories
+        <= {
+            HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP,
+            HPRFailureCategory.CANDIDATE_PHYSICAL_INFEASIBILITY,
+        }
     ):
         return
+    diagnostics = getattr(outcome.error, "diagnostics", None)
     assert outcome.kind is HPROutcomeKind.SOLVED, (
         f"strict-success sentinel {assignment.parameter_id} returned "
         f"{outcome.kind.value}"
+        + (
+            ""
+            if diagnostics is None
+            else f"; failure categories {dict(diagnostics.category_counts)}; "
+            f"representative failures {diagnostics.representative_failures}"
+        )
     )
     # A solved sentinel must be feasible: its objective is its cost, with no
     # feasibility penalty on top.

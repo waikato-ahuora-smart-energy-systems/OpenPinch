@@ -215,6 +215,19 @@ Heat exchanger networks
   streams, with the evolution made to fail, the design returns two
   networks in 14 s, at site costs of 7,388,155 and 7,467,152 $/y.
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- A parallel Carnot heat pump target gives its colder machines all the
+  source heat above them. Each evaporator's available heat is the source
+  heat between it and the evaporator above, and the cycle took the hotter
+  machines' duty from that share a second time: a second machine needing
+  231 kW with 231 kW left for it was allowed -73 kW and switched off, or
+  pushed to a colder temperature. On the basic pinch case at full load
+  with two condensers and two evaporators (``is_cascade_cycle=False``)
+  the target is now 216.0 kW of work at search seeds 0 and 1; it was
+  263.4 kW with the second machine idle at seed 0 and 230.7 kW at seed 1.
+
 0.10.0 (2026-11-25)
 -------------------
 
