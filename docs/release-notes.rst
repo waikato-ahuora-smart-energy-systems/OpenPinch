@@ -113,10 +113,34 @@ Heat exchanger networks
   streams in the same way. On the basic pinch case the cheapest network
   around a full-load Carnot heat pump rates from its JSON at the
   577,663 $/y it was designed at. A heat pump on a site's utility system
-  carries no streams, and a network around a vapour compression heat pump
-  still fails its rating, as it does on the design's own case.
+  carries no streams.
   The guide said ``min_approach_temperature`` defaults to 1 K; it does
   not.
+- A network on a stream that condenses or evaporates can be rated,
+  cost-optimised and retrofitted. The fixed-structure model behind
+  ``design.optimise_duties``, ``design.retrofit`` and the overdesign
+  margin rounds each segment boundary of a stream's heat curve so the
+  solver sees a smooth function, over 0.05 K. A phase change is entered
+  as a segment 0.01 K wide, narrower than the rounding, and its heat was
+  spread over the segments beside it: the condensing stream of the kink
+  case (187 kW, 177 kW of it condensing) was a 550 kW stream to the
+  model. The network a design had just returned was then infeasible to
+  rate ("Solver termination condition: infeasible"), failed its cost
+  optimisation ("Exchanger duty exceeds an available parent segment
+  profile") and was refused by the retrofit ("does not meet its targets
+  at its installed areas"), and a design with ``overdesign_percentage``
+  raised "no synthesised heat exchanger network could be fitted to every
+  period and rated". Every network around a vapour compression heat pump
+  was affected, since its condenser is such a stream. A boundary is now
+  rounded over at most a hundredth of the narrower segment beside it,
+  the rounded curve is exact at the stream's supply and target, and a
+  boundary outside a match is held to the match's end over the same
+  width. On the kink case the pinch design network rates at the
+  247,612 $/y it was designed at and the evolved one at 229,479 $/y; a
+  network around a water vapour compression heat pump on the basic pinch
+  case rates at its designed 241,592 $/y. Results on streams with wide
+  segments change in the last digits only: the curve's ends no longer
+  shift by the rounding.
 
 0.10.0 (2026-11-25)
 -------------------

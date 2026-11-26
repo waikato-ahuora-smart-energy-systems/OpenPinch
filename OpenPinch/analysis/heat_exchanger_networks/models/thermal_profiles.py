@@ -7,7 +7,10 @@ moving from the supply temperature to ``T``; it is piecewise linear in ``T``.
 
 For the NLP the kinks are rounded with ``smooth_max(x) = (x + sqrt(x**2 +
 delta**2)) / 2`` so IPOPT sees a smooth function; a single-segment profile is
-exactly linear. Reporting uses the exact piecewise functions.
+exactly linear. The rounded curve is shifted and scaled to be exact at the
+supply and the target, and a boundary beside a narrow segment is rounded over
+less (``ThermalProfile.rounding_widths``). Reporting uses the exact piecewise
+functions.
 """
 
 from __future__ import annotations
@@ -22,12 +25,22 @@ from ..solver.piecewise import PiecewiseThermalProfile
 SMOOTHING_K = 0.05
 """Width (K) of the rounding at segment boundaries in solver expressions."""
 
+NARROW_SEGMENT_SHARE = 0.01
+"""A boundary's rounding is at most this share of the narrower segment beside
+it, so a condensing segment 0.01 K wide keeps its heat to itself."""
+
 
 def smooth_max0(x, delta: float = SMOOTHING_K):
     """Smooth ``max(x, 0)``; exact for plain numbers."""
 
     if isinstance(x, int | float | np.floating):
         return max(float(x), 0.0)
+    return 0.5 * (x + (x * x + delta * delta) ** 0.5)
+
+
+def _rounded_max0(x: float, delta: float = SMOOTHING_K) -> float:
+    """The rounding of ``smooth_max0`` applied to a plain number."""
+
     return 0.5 * (x + (x * x + delta * delta) ** 0.5)
 
 
@@ -135,37 +148,6 @@ class ThermalProfile:
         return float(sum(self.duties))
 
     @property
-    def rounded_total(self) -> float:
-        """Heat between supply and target as the solver's rounded
-        ``heat(T)`` measures it. Rounding each boundary shifts the ends a
-        little: where heat capacity falls along the stream the span is
-        slightly more than ``total``, so a duty bound needs it."""
-
-        def rounded(temperature: float) -> float:
-            value = self.cp[0] * self._distance(self.supply, temperature)
-            for k in range(1, len(self.cp)):
-                step = self.cp[k] - self.cp[k - 1]
-                distance = self._distance(self.t_in[k], temperature)
-                value += (
-                    step
-                    * 0.5
-                    * (
-                        distance
-                        + (distance * distance + SMOOTHING_K * SMOOTHING_K) ** 0.5
-                    )
-                )
-            return value
-
-        return float(rounded(self.target) - rounded(self.supply))
-
-    @property
-    def duty_bound(self) -> float:
-        """Upper bound for a duty on this stream: its total, or the rounded
-        span the solver's balances use where that is larger."""
-
-        return max(self.total, self.rounded_total)
-
-    @property
     def lowest(self) -> float:
         return min(self.supply, self.target)
 
@@ -207,17 +189,43 @@ class ThermalProfile:
         return self._weighted(rates, temperature, smooth=smooth)
 
     def _weighted(self, rates: Sequence[float], temperature, *, smooth: bool):
-        if not smooth and isinstance(temperature, int | float | np.floating):
+        if isinstance(temperature, int | float | np.floating):
             return self._exact(rates, float(temperature))
+        expression = self._rounded(rates, temperature, smooth_max0)
+        if not self.segmented:
+            return expression
+        # Rounding a boundary shifts the curve's two ends; the shift is taken
+        # out so the span from supply to target is the stream's own.
+        at_supply = self._rounded(rates, self.supply, _rounded_max0)
+        span = self._rounded(rates, self.target, _rounded_max0) - at_supply
+        if span == 0.0:
+            return expression - at_supply
+        return (expression - at_supply) * (self._exact(rates, self.target) / span)
+
+    def _rounded(self, rates: Sequence[float], temperature, max0):
+        widths = self.rounding_widths
         expression = rates[0] * self._distance(self.supply, temperature)
         for k in range(1, len(rates)):
             step = rates[k] - rates[k - 1]
             if step == 0.0:
                 continue
-            expression = expression + step * smooth_max0(
-                self._distance(self.t_in[k], temperature)
+            expression = expression + step * max0(
+                self._distance(self.t_in[k], temperature), widths[k - 1]
             )
         return expression
+
+    @property
+    def rounding_widths(self) -> tuple[float, ...]:
+        """Rounding width (K) at each boundary: ``SMOOTHING_K``, or less
+        beside a narrow segment, whose heat the wider rounding would spread
+        over its neighbour. A segment of no width holds no heat and is not
+        counted, so no boundary is left unrounded."""
+
+        spans = [abs(a - b) or float("inf") for a, b in zip(self.t_in, self.t_out)]
+        return tuple(
+            min(SMOOTHING_K, NARROW_SEGMENT_SHARE * min(before, after))
+            for before, after in zip(spans, spans[1:])
+        )
 
     def _exact(self, rates: Sequence[float], temperature: float) -> float:
         value = rates[0] * self._distance(self.supply, temperature)
@@ -279,4 +287,10 @@ class ThermalProfile:
         )
 
 
-__all__ = ["SMOOTHING_K", "ThermalProfile", "smooth_clip", "smooth_max0"]
+__all__ = [
+    "NARROW_SEGMENT_SHARE",
+    "SMOOTHING_K",
+    "ThermalProfile",
+    "smooth_clip",
+    "smooth_max0",
+]
