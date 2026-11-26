@@ -984,10 +984,16 @@ class _DesignAccessor:
         does: a pinch design (or a network of unknown method) scaled by its
         dt_cont multiplier, a thermal derivative or evolution network by
         that multiplier times ``hens``'s ``min_exchanger_approach_share``.
-        The fixed-structure model floors each pair at 0.1 K.
+        The fixed-structure model floors each pair at 0.1 K. A network that
+        records the one approach it was solved at (its
+        ``approach_temperature`` summary metric) keeps that instead.
         """
         from ....domain.enums import HeatExchangerNetworkDesignMethod
 
+        # A network solved at one approach on every exchanger records it.
+        floor = (network.summary_metrics or {}).get("approach_temperature")
+        if floor is not None:
+            return {"min_approach_temperature": float(floor)}
         multiplier = float(
             (network.summary_metrics or {}).get("dt_cont_multiplier")
             or (network.source_metadata or {}).get("dt_cont_multiplier")
@@ -1917,18 +1923,17 @@ class _DesignAccessor:
 
         existing = self._network_argument(existing)
         _refuse_site_network(existing, "retrofit")
-        # The multiplier a designed network records (times its approach
-        # share for an evolved one); a network that records none has 1. A
-        # given approach replaces the contributions, so nothing is scaled.
-        recorded = (
-            float(
-                self._design_approach(existing, self._effective_hens(options))[
-                    "dt_cont_multiplier"
-                ]
-            )
+        # The approach the network records: the floor it was solved at, or
+        # the multiplier it was designed at (times its approach share for an
+        # evolved one); a network that records neither has a multiplier of
+        # 1. A given approach replaces the contributions, so nothing is
+        # scaled.
+        design = (
+            self._design_approach(existing, self._effective_hens(options))
             if min_approach_temperature is None
-            else 1.0
+            else {"min_approach_temperature": min_approach_temperature}
         )
+        recorded = float(design.get("dt_cont_multiplier", 1.0))
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
         # A heat pump enters as streams: the linked move is retired.
         streams = heat_pump_cycle in ("carnot", "vapour_compression")
@@ -2001,7 +2006,7 @@ class _DesignAccessor:
                     new_match_candidates=new_match_candidates,
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
-                    approach=min_approach_temperature,
+                    approach=design.get("min_approach_temperature"),
                     dt_cont_multiplier=recorded,
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),

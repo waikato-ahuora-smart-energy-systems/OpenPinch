@@ -106,6 +106,9 @@ class RetrofitSettings:
     both scaled by ``dt_cont_multiplier`` (1 by default; the multiplier, and
     for an evolved network the multiplier times the approach share, that a
     designed existing network records; left at 1 with an ``approach``).
+    Each design's network records which it was solved at, in its
+    ``summary_metrics``: ``approach_temperature`` for an ``approach``, else
+    ``dt_cont_multiplier`` with a ``min_exchanger_approach_share`` of 1.
     ``max_added_area_fraction`` caps the area added to an existing exchanger
     as a fraction of its installed area (None: no cap).
     ``new_unit_cost`` ($ per new exchanger), ``area_addition_cost`` ($ per
@@ -991,8 +994,13 @@ class _Evaluator:
         with self._count_lock:
             self.evaluations += 1
         settings = self.settings
+        # With no approach the model holds the contributions, so the solved
+        # network must not record the request's default floor of 1 K.
         request = build_duty_optimisation_request(
-            state.network, objective="cost", min_approach_temperature=settings.approach
+            state.network,
+            objective="cost",
+            min_approach_temperature=settings.approach,
+            problem_approach=settings.approach is None,
         )
         structure = fixed_network_structure(request, self.arrays.axis_maps)
         exchangers = _structural_exchangers(state.network)
@@ -1081,6 +1089,19 @@ class _Evaluator:
                 self._failed()
                 return None
             solved = _with_rating_allowances(solved, widened)
+            if settings.approach is None:
+                # What the model held, for a later rating or retrofit to
+                # read: every pair's contributions at the multiplier, whole
+                # (an approach share of 1).
+                solved = solved.model_copy(
+                    update={
+                        "summary_metrics": dict(solved.summary_metrics)
+                        | {
+                            "dt_cont_multiplier": float(settings.dt_cont_multiplier),
+                            "min_exchanger_approach_share": 1.0,
+                        }
+                    }
+                )
             widen = 1.0 + float(settings.area_tolerance)
             values = getattr(model, "area_values", None)
             worth = (

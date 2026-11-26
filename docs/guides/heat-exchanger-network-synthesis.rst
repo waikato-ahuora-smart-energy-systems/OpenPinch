@@ -147,7 +147,12 @@ period, a rating or an overdesign of it holds that share, whatever the
 configuration says by then. A network also records the dt_cont multiplier
 it was designed at (``summary_metrics["dt_cont_multiplier"]``), which its
 JSON keeps as well, so a network designed at 1.5 is rated at 1.5 times its
-streams' contributions from the object and from its JSON alike.
+streams' contributions from the object and from its JSON alike. A network
+solved at one minimum approach on every exchanger (a duty optimisation or
+a retrofit given ``min_approach_temperature``, or a fit that fell back to
+1 K) records it as ``summary_metrics["approach_temperature"]``, and a
+later rating, overdesign or retrofit that is given no approach holds that
+one.
 
 Several Hot or Cold Utilities
 -----------------------------
@@ -823,7 +828,12 @@ Search size
    returns, or its JSON, is therefore taken as it is: a pinch design at
    0.75 keeps 0.75 of each pair's contributions, and an evolved network a
    quarter of them by default, on its own exchangers and on new matches
-   alike.
+   alike. Each network the retrofit returns records what it was solved at
+   in its ``summary_metrics``: ``approach_temperature`` when
+   ``min_approach_temperature`` was given, else the multiplier its
+   contributions were scaled by (``dt_cont_multiplier``, with a
+   ``min_exchanger_approach_share`` of 1). A rating, an overdesign or a
+   second retrofit of that network, or of its JSON, holds the same.
 Utility switching
    ``utility_switch_cost`` (default ``None``: no switches) is the fixed
    cost of serving an existing heater or cooler by another utility of its
