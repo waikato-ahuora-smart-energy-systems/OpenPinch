@@ -985,12 +985,16 @@ class _DesignAccessor:
         dt_cont multiplier, a thermal derivative or evolution network by
         that multiplier times ``hens``'s ``min_exchanger_approach_share``.
         The fixed-structure model floors each pair at 0.1 K. A network that
-        records the one approach it was solved at (its
-        ``approach_temperature`` summary metric) keeps that instead.
+        records the minimum approach it was solved at (its
+        ``approach_temperature`` summary metric) keeps that instead, on
+        every exchanger: ``exchanger_approach_temperatures`` given to that
+        solve are not recorded.
         """
         from ....domain.enums import HeatExchangerNetworkDesignMethod
 
-        # A network solved at one approach on every exchanger records it.
+        # A network solved at a given minimum approach records it. It does
+        # not record that solve's per-exchanger approaches, which no later
+        # solve has read: they are given again where they are wanted.
         floor = (network.summary_metrics or {}).get("approach_temperature")
         if floor is not None:
             return {"min_approach_temperature": float(floor)}

@@ -152,7 +152,8 @@ solved at one minimum approach on every exchanger (a duty optimisation or
 a retrofit given ``min_approach_temperature``, or a fit that fell back to
 1 K) records it as ``summary_metrics["approach_temperature"]``, and a
 later rating, overdesign or retrofit that is given no approach holds that
-one.
+one. ``exchanger_approach_temperatures`` are not recorded: give them again
+to a later solve that should hold them.
 
 Several Hot or Cold Utilities
 -----------------------------
