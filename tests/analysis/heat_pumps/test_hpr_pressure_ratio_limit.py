@@ -87,9 +87,13 @@ def _ahmad_utility_refrigeration(*, limit: float | None = None):
         evaporators=1,
         maximum_restarts=1,
         maximum_iterations=3,
-        # The penalty decides the default limit's outcome at 28, but not at 24
-        # or 32: its test checks the reason, so a change here must keep it.
-        maximum_evaluations=28,
+        # Enough for the search to settle from its parallel Carnot start:
+        # with no limit it finds no improving design at 24 or 28
+        # evaluations and a steady one from 40 (12.57 M at 40, 48 and 60),
+        # and at a limit of 1.5 it fails at each. It was 28 while the
+        # Carnot start took a hotter machine's duty from a colder one's
+        # source heat twice, which left the idle machine elsewhere.
+        maximum_evaluations=40,
         refrigerants=["Water"],
         is_utility_refrigeration=True,
         is_cascade_cycle=False,

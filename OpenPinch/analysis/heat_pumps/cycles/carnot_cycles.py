@@ -182,7 +182,12 @@ class ParallelCarnotCycles:
             Qe_hx[is_hx] = Qc_hx[is_hx]
 
         Q_allocated = 0.0
+        # Each stage's availability is the source heat between it and the
+        # stage above, so a stage reaches what has passed every stage down
+        # to it, less what the stages above took.
+        Q_reachable = 0.0
         for i in np.argsort(-self._T_evap, kind="stable"):
+            Q_reachable += Q_cool_available[i]
             Q_stage = self._Q_evap_he[i] + Qe_hx[i] + Qe_hpr[i]
             if Q_stage < tol:
                 self._Q_cond_he[i] = 0.0
@@ -195,7 +200,7 @@ class ParallelCarnotCycles:
                 self._w_hpr[i] = 0.0
                 continue
 
-            Q_available = Q_cool_available[i] - Q_allocated
+            Q_available = Q_reachable - Q_allocated
             scale = 0.0 if Q_available < tol else min(Q_available / Q_stage, 1.0)
             self._Q_cond_he[i] *= scale
             self._Q_evap_he[i] *= scale
