@@ -167,8 +167,10 @@ Heat exchanger networks
     own path and does not try again this way.
 
   An idle period reports the difference its streams pass at as its
-  ``approach_temperatures``; it reported the approach limit. On the crude
-  case the margin now ranks all 137 networks.
+  ``approach_temperatures`` (zero where the cold stream is the hotter
+  there; its inlet and outlet temperatures show the crossing); it reported
+  the approach limit. On the crude case no rating fails now and the
+  margin ranks 138 networks.
   The first rule also changes a design on the median or one period: its
   fit to every period used to fail at the design approach on such a match,
   warn and fit at 1 K. It now keeps the design approach with the match
