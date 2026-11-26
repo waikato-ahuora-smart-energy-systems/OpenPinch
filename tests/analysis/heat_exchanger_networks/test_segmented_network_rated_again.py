@@ -59,12 +59,15 @@ def test_a_network_on_a_condensing_stream_is_cost_optimised(designed):
 
     optimised = view.selected_network
     assert optimised.total_annual_cost <= designed.total_annual_cost * (1 + 1e-6)
-    condenser = next(
-        exchanger
+    # Every exchanger on the condensing stream, however many the design
+    # gave it: together they take its 187.47 kW, not the 550 kW it was to
+    # the model.
+    condensing = sum(
+        exchanger.period_states[0].duty
         for exchanger in optimised.exchangers
         if exchanger.source_stream == "Plant.V"
     )
-    assert condenser.period_states[0].duty == pytest.approx(187.47, rel=1e-6)
+    assert condensing == pytest.approx(187.47, rel=1e-6)
 
 
 def test_a_retrofit_takes_a_network_on_a_condensing_stream(designed):
