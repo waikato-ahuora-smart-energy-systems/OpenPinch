@@ -315,6 +315,15 @@ Heat pumps and refrigeration
   a dot, the root among them, now has it written as a dash too, with the
   warning a stream's name gets. The root zone of such a problem is
   ``Plant v1-2`` in addresses and reports; ``project_name`` is unchanged.
+- ``design.retrofit_heat_pumps(cycle="vapour_compression")`` reports its
+  duties. ``heat_delivered``, ``process_heat_absorbed``, both duty tuples
+  and ``heat_pump_gap`` were NaN, with no warning: the summary read the
+  duties from fields only a Carnot result carries. It now reads a vapour
+  compression result's own (its stages' heating and cooling). On a dairy
+  process of a six-process site the as-piped target delivers 948.8 kW
+  for 268.1 kW of work. The duty tuples of a vapour compression target
+  list its stages, which can be more than its condensing or evaporating
+  temperatures, some at 0.
 
 0.10.0 (2026-11-25)
 -------------------

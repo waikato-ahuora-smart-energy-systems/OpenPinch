@@ -297,8 +297,19 @@ def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
             evaporator_duties=(),
             **prices,
         )
-    condenser = np.atleast_1d(np.asarray(result.Q_cond, dtype=float))
-    evaporator = np.atleast_1d(np.asarray(result.Q_evap, dtype=float))
+    # A Carnot result carries its levels' duties as Q_cond and Q_evap; a
+    # vapour compression result its stages' heating and cooling as Q_heat
+    # and Q_cool, with the Carnot fields None.
+    condenser = np.atleast_1d(
+        np.asarray(
+            result.Q_heat if result.Q_cond is None else result.Q_cond, dtype=float
+        )
+    )
+    evaporator = np.atleast_1d(
+        np.asarray(
+            result.Q_cool if result.Q_evap is None else result.Q_evap, dtype=float
+        )
+    )
     # Air heat the evaporators take (the service's ambient source); the
     # ambient sink is source heat left to air, not taken by the heat pump.
     ambient = float(result.Q_amb_hot)
