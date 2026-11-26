@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 from scipy.stats import qmc
 
 from ...contracts.hpr import (
+    AIR_ON_BOTH_SIDES_REASON,
     INFEASIBLE_HEAT_PUMP_REASON,
     INFEASIBLE_REFRIGERATION_REASON,
     ZERO_USEFUL_DUTY_REASON,
@@ -317,6 +318,8 @@ def reject_penalised_design(
     """
     if not result.success:
         return result
+    if _has_air_on_both_sides(result, args):
+        return HPRBackendResult.failure(reason=AIR_ON_BOTH_SIDES_REASON)
     if "Carnot" in str(args.hpr_type):
         return _reject_idle_carnot_design(result, args)
     allowed = PENALTY_TOLERANCE * abs(float(result.obj))
@@ -332,6 +335,20 @@ def reject_penalised_design(
             "heating duty it must meet."
         )
     return HPRBackendResult.failure(reason=reason)
+
+
+def _has_air_on_both_sides(
+    result: HPRBackendResult,
+    args: HeatPumpTargetInputs,
+) -> bool:
+    """Whether a design draws on air and rejects to air.
+
+    Air is on one side of a machine only. The heat taken from air to air
+    is a penalty in the search; here it is a kW duty, held to the penalty's
+    own tolerance of the targeted duty.
+    """
+    duty = max(1.0, abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0)))
+    return float(result.Q_air_to_air) > PENALTY_TOLERANCE * duty
 
 
 def _reject_idle_carnot_design(

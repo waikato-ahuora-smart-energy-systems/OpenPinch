@@ -312,6 +312,18 @@ def heating_allowance(args: HeatPumpTargetInputs) -> float:
     return allowance
 
 
+def _air_to_air(cond: CascadeWithAir, evap: CascadeWithAir) -> float:
+    """Heat a machine draws from air and rejects to air.
+
+    Air is on one side of a machine only: a source for its evaporators or a
+    sink for its condensers. ``cond`` and ``evap`` are the condenser and the
+    evaporator cascades; the air each places beside the process (air that
+    warms a cold process stream, air that cools a hot one) is not the
+    machine's.
+    """
+    return max(min(float(evap.Q_air_source), float(cond.Q_air_sink)), 0.0)
+
+
 def _cascade_air_duties(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
@@ -407,6 +419,7 @@ def evaluate_carnot_hpr_result(
             *_normalise_hpr_penalty_terms(penalty_terms),
             cond.Q_ext_bottom,
             evap.Q_ext_top,
+            _air_to_air(cond, evap),
         ],
         penalise_external_cold_when_refrigerating=True,
         refrigeration_allowance=refrigeration_allowance(args),
@@ -443,6 +456,7 @@ def evaluate_carnot_hpr_result(
         Q_refrigeration=Q_ext_cold,
         Q_amb_hot=cond.Q_air_source + evap.Q_air_source,
         Q_amb_cold=cond.Q_air_sink + evap.Q_air_sink,
+        Q_air_to_air=_air_to_air(cond, evap),
         cop_h=cop_h,
         eta_he=eta_he,
         T_cond=state.T_cond,
@@ -554,6 +568,10 @@ def evaluate_vapour_hpr_result(
         all_penalty_terms.append(
             max(Q_refrigeration - refrigeration_allowance(args), 0.0)
         )
+        # Its condensers may reject to air, so its evaporators may not draw
+        # on it: heat that goes from air to air. (A heat pump's whole
+        # condenser-to-air heat is a term above.)
+        all_penalty_terms.append(_air_to_air(cond, evap))
     penalty_weight = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,
@@ -624,6 +642,7 @@ def evaluate_vapour_hpr_result(
         feasibility_penalty=penalty,
         Q_amb_hot=Q_amb_hot,
         Q_amb_cold=Q_amb_cold,
+        Q_air_to_air=_air_to_air(cond, evap),
         cop_h=float(cop_h),
         T_cond=state.T_cond,
         T_evap=state.T_evap,

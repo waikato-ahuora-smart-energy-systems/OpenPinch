@@ -261,6 +261,18 @@ Heat pumps and refrigeration
   raises. ``design.retrofit`` with ``heat_pump_cycle="carnot"`` used to
   record such a 0 kW target as a heat pump modification and a machine
   with no streams; it now leaves that step out with its warning.
+- Ambient air is on one side of a heat pump or refrigerator only: a
+  source for its evaporators or a sink for its condensers. A design whose
+  evaporators draw on air while its condensers reject to air pumps heat
+  from air to air; nothing stopped a refrigeration target or a Carnot
+  target of either duty from returning one (a vapour compression heat
+  pump's condenser heat to air was already a penalty). That heat is now a
+  penalty in the search and a final design that still has any is not
+  returned. The Carnot targets of the packaged cases (heat pump and
+  refrigeration, one and two levels) have none, so they are unchanged.
+  The check is per period: a machine shared
+  by several periods that draws on air in one and rejects to air in
+  another is not caught.
 
 0.10.0 (2026-11-25)
 -------------------

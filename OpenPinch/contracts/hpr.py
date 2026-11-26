@@ -568,6 +568,10 @@ ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
 INFEASIBLE_REFRIGERATION_REASON = (
     "Refrigeration candidate carries a feasibility penalty, such as unserved cooling."
 )
+AIR_ON_BOTH_SIDES_REASON = (
+    "Candidate has ambient air on both sides of the machine: its evaporators "
+    "draw on air and its condensers reject to air."
+)
 INFEASIBLE_HEAT_PUMP_REASON = (
     "Heat pump candidate carries a feasibility penalty, such as a stage outside "
     "its limits."
@@ -607,6 +611,9 @@ class HPRBackendResult(BaseModel):
     Q_refrigeration: float = 0.0
     Q_amb_hot: float
     Q_amb_cold: float
+    # Heat the machine draws from air and rejects to air (kW): air is on
+    # one side of a machine only, so a final design with any is no target.
+    Q_air_to_air: float = 0.0
     success: bool = True
     w_hpr: float | list | np.ndarray | None = None
     w_he: float | list | np.ndarray | None = None
