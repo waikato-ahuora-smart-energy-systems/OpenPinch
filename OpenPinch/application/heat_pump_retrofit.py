@@ -372,11 +372,27 @@ def retrofit_with_heat_pump(
             )
             # The streams the case added go with the machine, as a designed
             # heat pump network's do: its networks can then be read again
-            # from the problem and themselves alone.
+            # from the problem and themselves alone. The step's own only:
+            # the problem may hold a machine of the same name already,
+            # whose streams its own record carries.
+            own = {
+                stream.name
+                for stream in (
+                    *step.condensers,
+                    *step.evaporators,
+                    *step.ambient_sources,
+                )
+            }
             step = replace(
                 step,
                 record=step.record.model_copy(
-                    update={"streams": heat_pump_stream_records(derived, machine)}
+                    update={
+                        "streams": tuple(
+                            record
+                            for record in heat_pump_stream_records(derived, machine)
+                            if record["name"] in own
+                        )
+                    }
                 ),
             )
             case = snapshot_problem(derived)

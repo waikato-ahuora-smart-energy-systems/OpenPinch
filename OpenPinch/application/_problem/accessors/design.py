@@ -2282,21 +2282,18 @@ class _DesignAccessor:
         case = heat_pump_network_case(self._problem, network)
         if case is not None:
             # A heat pump network: the case it was designed on holds its
-            # machine's streams, and the result keeps the machine.
-            return with_heat_pumps(
-                case.design.optimise_duties(
-                    network,
-                    objective=objective,
-                    min_approach_temperature=min_approach_temperature,
-                    exchanger_approach_temperatures=exchanger_approach_temperatures,
-                    max_hot_utility=max_hot_utility,
-                    max_cold_utility=max_cold_utility,
-                    options=options,
-                    period_id=period_id,
-                    solver=solver,
-                    solve_tolerance=solve_tolerance,
-                ),
-                network.heat_pumps,
+            # machine's streams.
+            return case.design.optimise_duties(
+                network,
+                objective=objective,
+                min_approach_temperature=min_approach_temperature,
+                exchanger_approach_temperatures=exchanger_approach_temperatures,
+                max_hot_utility=max_hot_utility,
+                max_cold_utility=max_cold_utility,
+                options=options,
+                period_id=period_id,
+                solver=solver,
+                solve_tolerance=solve_tolerance,
             )
         # Rating holds the approach the network was designed to, as
         # overdesign does: evolution designs down to 0.1 K.
@@ -2305,7 +2302,7 @@ class _DesignAccessor:
             if objective == "rating" and min_approach_temperature is None
             else {"min_approach_temperature": min_approach_temperature}
         )
-        return self._optimise_duties(
+        view = self._optimise_duties(
             network,
             objective=objective,
             **design,
@@ -2317,6 +2314,9 @@ class _DesignAccessor:
             solver=solver,
             solve_tolerance=solve_tolerance,
         )
+        # The solve returns networks of exchangers alone: a heat pump
+        # network's keep its machines and their annual cost.
+        return with_heat_pumps(view, network.heat_pumps) if network.heat_pumps else view
 
     def _optimise_duties(
         self,

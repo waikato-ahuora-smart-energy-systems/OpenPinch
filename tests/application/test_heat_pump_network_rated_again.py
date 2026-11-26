@@ -71,6 +71,22 @@ def test_the_networks_json_is_rated_at_the_cost_it_was_designed_at(pumped):
     assert rated.total_annual_cost == pytest.approx(pumped.total_annual_cost, rel=1e-6)
 
 
+def test_a_rating_on_the_networks_own_case_keeps_the_machine(pumped):
+    """A problem that already holds the machine's streams (the case, built
+    again) rates the network as the plain problem does. It returned the
+    network without its machine or the machine's cost."""
+    from OpenPinch.application.heat_pump_design import heat_pump_network_case
+
+    case = heat_pump_network_case(
+        PinchProblem(source=basic_source(), project_name="basic"), pumped
+    )
+
+    rated = case.design.optimise_duties(pumped, objective="rating").selected_network
+
+    assert rated.heat_pumps == pumped.heat_pumps
+    assert rated.total_annual_cost == pytest.approx(pumped.total_annual_cost, rel=1e-6)
+
+
 def test_a_retrofit_takes_the_networks_json_as_its_existing_network(pumped):
     """The existing network draws the utility it was designed to draw, and
     the retrofit's network keeps the machine. The design's utility cost
