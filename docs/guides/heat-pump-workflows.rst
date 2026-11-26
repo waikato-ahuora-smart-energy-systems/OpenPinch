@@ -423,6 +423,27 @@ network and are priced there. ``heat_pump_cost`` prices the compressor
 and its motor for every cycle for now; left at 0 the design warns that the
 compressor is free.
 
+The network names the heat pump's condenser and evaporator streams, which
+the problem does not hold: the design added them to a case of its own. The
+machine carries them (``NetworkHeatPump.streams``, the stream input records
+of that case, which the network's JSON keeps), so the problem can read the
+network again::
+
+   network = design.selected_network          # or its JSON
+   problem.design.optimise_duties(network, objective="rating")
+   problem.design.retrofit(network, max_modifications=2)
+
+Both build the case again from the problem and the streams the network
+carries, on a problem loaded under another project name too, and every
+network they return keeps the machine and its annual cost. A retrofit's
+designs include the existing machine's electricity in ``utility_cost``, as
+a retrofit's own heat pump step does. A heat pump on a site's utility
+system (``total_site_heat_exchanger_network``) carries no streams: a site
+network is not rated or retrofitted. A network around a vapour compression
+heat pump is read, but its rating fails as it does on the design's own
+case: a segmented condenser's network is not yet a feasible point of its
+own rating problem.
+
 On the basic pinch sample (steam at 10 $/MWh, electricity at 100 $/MWh) a
 Carnot heat pump at full load draws 263.4 kW at multiplier 1.0, 218,636
 $/y. With the compressor at 200 $/kW the best heat pump network, at
