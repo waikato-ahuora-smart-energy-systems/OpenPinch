@@ -184,38 +184,81 @@ def balance_of_loads(
     """The cheapest site balance of fixed loads.
 
     ``use`` and ``generation`` give each level's heater and cooler duty per
-    period (kW), by level name; a level left out has none. The balance is a
-    small linear model of its own, solved with HiGHS: what a site network's
-    model would reach with every duty fixed. Raises ``ValueError`` when the
-    loads cannot be balanced (an import capacity too small for them).
+    period (kW), by level name; a level left out has none. Each period is
+    the linear programme ``add_site_balance`` writes into a site network's
+    model, with every duty fixed, solved with SciPy: it needs no synthesis
+    solver. Raises ``ValueError`` when a period's loads cannot be balanced
+    (an import capacity too small for them).
     """
 
-    from ..solver import backend
-    from ..solver.pyomo_model import PyomoModel
+    from scipy.optimize import linprog
 
-    m = PyomoModel()
-    periods = range(len(levels.period_weights))
-    blocks = [
-        add_site_balance(
-            m,
-            levels,
-            n,
-            [m.Param(_load(use, level.name, n)) for level in levels.levels],
-            [m.Param(_load(generation, level.name, n)) for level in levels.levels],
+    items = levels.levels
+    blocks = []
+    for n in range(len(levels.period_weights)):
+        used = [_load(use, level.name, n) for level in items]
+        raised = [_load(generation, level.name, n) for level in items]
+        # One column per import, dump and letdown, as add_site_balance has
+        # variables: (kind, key, price, upper bound).
+        columns = []
+        for i, level in enumerate(items):
+            if level.imports:
+                capacity = level.import_capacity
+                columns.append(
+                    (
+                        "import",
+                        i,
+                        level.import_price[n],
+                        None if capacity is None else capacity[n],
+                    )
+                )
+            if level.dumps:
+                # A dump credit pays only for steam the processes raise.
+                credit = level.dump_price[n] < 0.0
+                columns.append(
+                    ("dump", i, level.dump_price[n], raised[i] if credit else None)
+                )
+        columns += [
+            ("flow", pair, levels.letdown_price, None) for pair in letdowns(levels, n)
+        ]
+        # use + letdowns out + dump == generation + letdowns in + imports.
+        rows = [[0.0] * len(columns) for _level in items]
+        for c, (kind, key, _price, _bound) in enumerate(columns):
+            if kind == "import":
+                rows[key][c] = -1.0
+            elif kind == "dump":
+                rows[key][c] = 1.0
+            else:
+                hotter, colder = key
+                rows[hotter][c] = 1.0
+                rows[colder][c] = -1.0
+        solved = linprog(
+            [price for _kind, _key, price, _bound in columns],
+            A_eq=rows,
+            b_eq=[raised[i] - used[i] for i in range(len(items))],
+            bounds=[(0.0, bound) for _kind, _key, _price, bound in columns],
+            method="highs",
         )
-        for n in periods
-    ]
-    m.Minimize(
-        sum(
-            weight * (block.hot_cost + block.cold_cost)
-            for weight, block in zip(levels.period_weights, blocks, strict=True)
-        )
-    )
-    run = backend.solve_pyomo_model(m, solver_name="highs")
-    if run.failure_reason is not None:
-        raise ValueError(
-            f"the site utility balance of these loads has no solution "
-            f"({run.failure_reason})."
+        if not solved.success:
+            raise ValueError(
+                "the site utility balance of these loads has no solution in "
+                f"period {n} ({solved.message})."
+            )
+        values = {
+            (kind, key): float(x)
+            for (kind, key, _price, _bound), x in zip(columns, solved.x, strict=True)
+        }
+        blocks.append(
+            SiteBalancePeriod(
+                period_idx=n,
+                use=tuple(used),
+                generation=tuple(raised),
+                imports={k: v for (kind, k), v in values.items() if kind == "import"},
+                dumps={k: v for (kind, k), v in values.items() if kind == "dump"},
+                flows={k: v for (kind, k), v in values.items() if kind == "flow"},
+                hot_cost=0.0,
+                cold_cost=0.0,
+            )
         )
     return solved_balance(levels, blocks)
 

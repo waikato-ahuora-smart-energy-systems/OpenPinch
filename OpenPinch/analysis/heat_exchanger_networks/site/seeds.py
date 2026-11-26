@@ -161,9 +161,13 @@ def _from_each_choice(pools, level_held, build) -> list[HeatExchangerNetwork]:
             )
         for kind, networks in kinds:
             seed = build(networks, m, kind)
+            # Seeds of one structure and level duties are one starting
+            # point; joined networks of different capital cost are not one
+            # design (a seed has no capital cost of its own).
             key = (
                 tuple(sorted(e.exchanger_id for e in seed.exchangers)),
                 repr(seed.source_metadata["site_processes"]),
+                seed.capital_cost,
             )
             if key not in seen:
                 seen.add(key)

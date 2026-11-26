@@ -381,6 +381,35 @@ def test_joined_process_networks_keep_every_exchanger_and_add_up_the_capital():
     }
 
 
+def test_joined_process_networks_keep_networks_that_differ_only_in_cost():
+    """Two multipliers can give a process the same matches and utility
+    duties with different areas. As seeds they are one starting point; as
+    joined networks they are two designs at two costs, and the cheaper must
+    not be dropped for coming second."""
+    from OpenPinch.analysis.heat_exchanger_networks.site import (
+        joined_process_networks,
+    )
+
+    def process(name, multiplier, capital):
+        return _network(
+            [
+                _recovery(f"{name}.H1", f"{name}.C1", 1),
+                _heater(LPS, f"{name}.C1", 10.0),
+            ],
+            multiplier=multiplier,
+            stages=1,
+        ).model_copy(update={"capital_cost": capital})
+
+    joined = joined_process_networks(
+        {
+            "A": (process("A", 0.75, 120.0), process("A", 1.0, 100.0)),
+            "B": (process("B", 0.75, 60.0), process("B", 1.0, 50.0)),
+        }
+    )
+
+    assert [network.capital_cost for network in joined] == [180.0, 150.0]
+
+
 def test_a_site_task_keeps_a_stage_boundary_for_each_staged_unit():
     """A stream runs at most one staged cooler at a stage boundary, so H1's
     two coolers need two boundaries between its recovery matches. The
