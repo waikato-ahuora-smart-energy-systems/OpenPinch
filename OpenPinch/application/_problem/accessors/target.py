@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from copy import deepcopy
@@ -146,6 +147,53 @@ _LEGACY_HPR_SURFACES = {
     ("brayton", "heat_pump"): "brayton_heat_pump",
     ("brayton", "refrigeration"): "brayton_refrigeration",
 }
+
+
+def _field(record, name: str):
+    """``name`` of a result held as an object or as a mapping."""
+    if isinstance(record, Mapping):
+        return record.get(name)
+    return getattr(record, name, None)
+
+
+def _warn_of_idle_levels(target) -> None:
+    """Warn when a Carnot target leaves a requested level without duty.
+
+    The search has then stopped at a design a level short of the best one
+    for the levels asked for, and the target reports success all the same.
+    """
+    details = getattr(target, "hpr_details", None)
+    # A design shared by several periods reports one period's duties at the
+    # top and every period's beneath: a level is idle only if no period
+    # uses it.
+    periods = [details, *(getattr(details, "period_outputs", None) or {}).values()]
+    idle = []
+    for name, field in (("condenser", "Q_cond"), ("evaporator", "Q_evap")):
+        by_period = [
+            duties
+            for duties in (_field(period, field) for period in periods)
+            if duties is not None
+        ]
+        if not by_period or len(by_period[0]) < 2:
+            continue
+        levels = [
+            max(abs(float(duties[level])) for duties in by_period)
+            for level in range(len(by_period[0]))
+        ]
+        floor = 1e-6 * max(1.0, max(levels))
+        unused = sum(duty <= floor for duty in levels)
+        if unused:
+            idle.append(f"{unused} of its {len(levels)} {name} levels")
+    if idle:
+        warnings.warn(
+            "the Carnot target leaves "
+            + " and ".join(idle)
+            + " without duty, so it is not the best design for the levels "
+            "asked for: the search stopped a level short. Ask for fewer "
+            "levels, or try another HPR_SEARCH_SEED or more restarts.",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 def _legacy_load(load_fraction, load_duty, period_loads):
@@ -905,7 +953,7 @@ class _TargetAccessor:
         load = request.load
         levels = request.levels or HprLevels()
         limits = request.search or HprSearchLimits()
-        return self._hpr(
+        target = self._hpr(
             surface=legacy or "heat_pump_and_refrigeration",
             cycle=spec.topologies[topology],
             is_heat_pump=request.duty == "heat_pump",
@@ -936,6 +984,9 @@ class _TargetAccessor:
                 }
             },
         )
+        if spec.id == "carnot":
+            _warn_of_idle_levels(target)
+        return target
 
     def _gateway_fluid_set_runs(self, spec, request, topology, cycle_options, zone):
         """Run a cycle with no named method once per screened fluid set."""

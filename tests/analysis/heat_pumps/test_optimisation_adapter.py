@@ -148,6 +148,111 @@ def test_explicit_failed_backend_result_becomes_finite_search_penalty():
     assert candidates[0].objective == pytest.approx(1e30)
 
 
+_NOT_SWEPT = HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+
+
+def _two_basin_hpr_objective(point, _args, debug=False) -> HPRBackendResult:
+    """A shallow basin at 0.2 and a deeper one at 0.7, with a rise between:
+    a heat pump level between two kinks of a composite curve."""
+    x = float(point[0])
+    return _result(min((x - 0.2) ** 2 + 0.05, (x - 0.7) ** 2))
+
+
+def _stops_in_the_shallow_basin(*_args, **_kwargs):
+    return OptimisationResult(
+        method=OptimisationMethod.RBF,
+        candidates=(OptimisationCandidate(objective=0.05, point=(0.2,)),),
+    )
+
+
+def test_a_carnot_search_sweeps_its_best_point_out_of_a_shallow_basin():
+    # On the basic pinch case a cascade Carnot target stopped at 231.4 kW of
+    # work at one search seed and 217.0 kW at the next: the first was a
+    # basin 0.3 % deep, one condenser level short of the optimum.
+    candidates = adapter.run_hpr_candidate_search(
+        objective=_two_basin_hpr_objective,
+        initial_points=None,
+        bounds=[(0.0, 1.0)],
+        args=_base_args(bb_minimiser="rbf_surrogate"),
+        optimiser=_stops_in_the_shallow_basin,
+    )
+
+    assert candidates[0].point == pytest.approx((0.7,), abs=1e-6)
+    assert candidates[0].objective == pytest.approx(0.0, abs=1e-9)
+
+
+def test_a_carnot_search_of_one_run_is_not_swept():
+    # A search asked for one run (``maximum_restarts`` 0 or 1) is one local
+    # search by request: a quick target. A sweep costs some 200 evaluations
+    # per variable whatever the search cost, which nearly doubled such a
+    # target (2.2 s to 3.9 s on the basic pinch case).
+    candidates = adapter.run_hpr_candidate_search(
+        objective=_two_basin_hpr_objective,
+        initial_points=None,
+        bounds=[(0.0, 1.0)],
+        args=_base_args(bb_minimiser="rbf_surrogate", max_multi_start=1),
+        optimiser=_stops_in_the_shallow_basin,
+    )
+
+    assert candidates[0].point == pytest.approx((0.2,), abs=1e-6)
+    assert candidates[0].objective == pytest.approx(0.05)
+
+
+def test_a_carnot_search_sweeps_again_from_each_polished_point(monkeypatch):
+    # On the real objective a better condenser level pays only once the
+    # evaporator levels have moved with it. A sweep moves one variable; the
+    # polish that follows moves them together, and the next sweep pass
+    # starts from where the polish ended, not from where the last one did.
+    from types import SimpleNamespace
+
+    starts = []
+
+    def sweep(objective, point, bounds, **_options):
+        starts.append(tuple(point))
+        reached = (0.5,) if len(starts) == 1 else tuple(point)
+        return reached, objective(reached)
+
+    def polish(objective, point, **_options):
+        return SimpleNamespace(x=np.array([0.6]), fun=objective((0.6,)))
+
+    monkeypatch.setattr(adapter, "sweep_coordinates", sweep)
+    monkeypatch.setattr(adapter, "minimize", polish)
+
+    def stops_at_one_fifth(*_args, **_kwargs):
+        return OptimisationResult(
+            method=OptimisationMethod.RBF,
+            candidates=(OptimisationCandidate(objective=0.8, point=(0.2,)),),
+        )
+
+    adapter.run_hpr_candidate_search(
+        objective=lambda x, _args, debug=False: _result(1.0 - float(x[0])),
+        initial_points=None,
+        bounds=[(0.0, 1.0)],
+        args=_base_args(bb_minimiser="rbf_surrogate"),
+        optimiser=stops_at_one_fifth,
+    )
+
+    assert starts == [(0.2,), (0.6,)]
+
+
+def test_a_carnot_search_reports_its_sweep_as_one_step():
+    # A sweep tries a hundred values per coordinate: reported as a step of
+    # its own, not as a run of the search repeated at every value.
+    events = []
+    with progress.reporting(events.append, min_interval=0):
+        adapter.run_hpr_candidate_search(
+            objective=_two_basin_hpr_objective,
+            initial_points=None,
+            bounds=[(0.0, 1.0)],
+            args=_base_args(bb_minimiser="rbf_surrogate"),
+            optimiser=_stops_in_the_shallow_basin,
+        )
+
+    steps = [(event.stage, event.done, event.total, event.unit) for event in events]
+    assert steps[-2:] == [("sweep", 0, 1, "sweeps"), ("sweep", 1, 1, "sweeps")]
+    assert events[-1].best_objective == pytest.approx(0.0, abs=1e-9)
+
+
 def test_warm_start_is_ranked_with_backend_candidates():
     def optimiser(*_args, **_kwargs):
         return OptimisationResult(
@@ -179,7 +284,9 @@ def test_no_backend_candidate_uses_valid_warm_start():
         objective=lambda x, _args, debug=False: _result(float(x[0])),
         initial_points=np.array([0.3]),
         bounds=[(0.0, 1.0)],
-        args=_base_args(),
+        # A vapour compression search: a Carnot search also sweeps its best
+        # point, which would add the points the sweep tries.
+        args=_base_args(hpr_type=_NOT_SWEPT),
         optimiser=no_candidates,
     )
 
@@ -466,7 +573,8 @@ def test_search_reports_warm_starts_then_multistart_runs_with_the_best_objective
             objective=lambda x, _args, debug=False: _result(float(x[0])),
             initial_points=np.array([0.7]),
             bounds=[(0.0, 1.0)],
-            args=_base_args(max_multi_start=2),
+            # Not a Carnot search, whose sweep reports after the runs.
+            args=_base_args(max_multi_start=2, hpr_type=_NOT_SWEPT),
             optimiser=optimiser,
         )
 
