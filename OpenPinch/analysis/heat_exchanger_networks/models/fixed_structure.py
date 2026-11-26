@@ -116,6 +116,9 @@ class FixedStructureSpec:
     utility_design_points: Mapping[int, Mapping[int, tuple]] = field(
         default_factory=dict
     )
+    # The solver periods each recovery match is held idle in, by match
+    # index: the network being solved carries no duty on it there.
+    recovery_idle: Mapping[int, frozenset[int]] = field(default_factory=dict)
     # The "retrofit" goal widens each installed area by this fraction, to
     # cover Chen's LMTD error and rounded plant areas.
     area_tolerance: float = 0.0
@@ -360,7 +363,7 @@ def prepare_fixed_structure(owner) -> None:
         for j in range(owner.J)
         for k in range(owner.S)
     }
-    _check_recovery_spans(owner)
+    owner.recovery_idle = _idle_recovery_periods(owner)
     _check_utility_reach(owner)
     owner.implied_cold_ends = utility_free_components(owner)
 
@@ -601,21 +604,37 @@ def utility_free_components(owner) -> set[int]:
     return implied
 
 
-def _check_recovery_spans(owner) -> None:
-    for n in range(owner.N_periods):
-        for r, match in enumerate(owner.spec.recovery):
-            span = (
-                owner.hot_profiles[n][match.hot].supply
-                - owner.cold_profiles[n][match.cold].supply
+def _idle_recovery_periods(owner) -> list[list[bool]]:
+    """Per period, the matches that carry no duty there.
+
+    A match whose supply temperatures are too close for its approach in a
+    period cannot run in it at any duty, so it idles there, as it does in
+    the design models. One that is too close in every period cannot run at
+    all and raises. A match also idles in the periods the structure holds
+    it idle in (``FixedStructureSpec.recovery_idle``).
+    """
+
+    periods = range(owner.N_periods)
+    idle = [[False] * len(owner.spec.recovery) for _n in periods]
+    for r, match in enumerate(owner.spec.recovery):
+        spans = [
+            owner.hot_profiles[n][match.hot].supply
+            - owner.cold_profiles[n][match.cold].supply
+            for n in periods
+        ]
+        close = [spans[n] < owner.recovery_dt[n][r] for n in periods]
+        if all(close):
+            raise ValueError(
+                f"recovery match {_name(owner, 'hot', match.hot)} -> "
+                f"{_name(owner, 'cold', match.cold)} in stage {match.stage + 1} "
+                f"cannot meet its {owner.recovery_dt[0][r]:g} K minimum "
+                f"approach: the hot supply is only {spans[0]:g} K above the cold "
+                "supply."
             )
-            if span < owner.recovery_dt[n][r]:
-                raise ValueError(
-                    f"recovery match {_name(owner, 'hot', match.hot)} -> "
-                    f"{_name(owner, 'cold', match.cold)} in stage {match.stage + 1} "
-                    f"cannot meet its {owner.recovery_dt[n][r]:g} K minimum "
-                    f"approach: the hot supply is only {span:g} K above the cold "
-                    "supply."
-                )
+        held = owner.spec.recovery_idle.get(r, ())
+        for n in periods:
+            idle[n][r] = close[n] or n in held
+    return idle
 
 
 def _check_utility_reach(owner) -> None:
@@ -842,7 +861,7 @@ def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
     owner.q_r.append(
         [
             owner._param(f"qr{r}p{n}", 0.0)
-            if _recovery_off(owner, n, m)
+            if _recovery_off(owner, n, m) or owner.recovery_idle[n][r]
             else owner._var(f"qr{r}p{n}", start["q_r"][r], 0.0, _q_max(owner, n, m))
             for r, m in enumerate(spec.recovery)
         ]
@@ -1017,6 +1036,18 @@ def _recovery_equations(owner, n: int, start: Mapping[str, Any]) -> None:
             if len(cold_branches) == 1
             else owner._var(f"y{r}p{n}", 1.0 / len(cold_branches), 0.0, 1.0)
         )
+        if owner.recovery_idle[n][r]:
+            # An idle match changes neither stream: each leaves at its inlet
+            # temperature, and the approaches are constants no equation holds.
+            dt = owner.recovery_dt[n][r]
+            x_row.append(x)
+            y_row.append(y)
+            hx_row.append(owner.th_in[n][i][k])
+            cy_row.append(owner.tc_in[n][j][k])
+            theta_row.append(
+                (owner._param(f"tr1{r}p{n}", dt), owner._param(f"tr2{r}p{n}", dt))
+            )
+            continue
         th_in0 = start["th_in"][i][k]
         tc_in0 = start["tc_in"][j][k]
         q0 = start["q_r"][r]
@@ -1629,6 +1660,9 @@ def post_process_fixed_structure(owner) -> None:
             y = value(owner.y[n][r])
             th_in = value(owner.th_in[n][match.hot][match.stage])
             tc_in = value(owner.tc_in[n][match.cold][match.stage])
+            if owner.recovery_idle[n][r]:
+                # An idle match holds no approach: its streams pass at this.
+                theta_1 = theta_2 = th_in - tc_in
             slices: tuple = ()
             if active and (hot.segmented or cold.segmented):
                 slices = _slices(

@@ -141,6 +141,41 @@ Heat exchanger networks
   case rates at its designed 241,592 $/y. Results on streams with wide
   segments change in the last digits only: the curve's ends no longer
   shift by the rounding.
+- An overdesign margin on a ``design_basis="all"`` design no longer drops
+  the networks that idle an exchanger in a period, and such a network can
+  be rated and optimised. The fixed-structure model behind
+  ``design.optimise_duties``, ``design.retrofit``, the fit to every period
+  and the overdesign margin held every recovery exchanger's approach in
+  every period, idle or not, and refused a match whose supply temperatures
+  are too close in any one period ("cannot meet its ... minimum approach:
+  the hot supply is only ... above the cold supply"). The design models
+  allow both, so a design returned networks its own rating could not
+  solve, and a margin dropped them without a warning: on the packaged
+  crude preheat train over three periods, 46 of 168 ratings failed and 102
+  networks were ranked against 137 without a margin. Two rules now match
+  the design models:
+
+  - A recovery exchanger whose hot supply is less than its approach above
+    its cold supply in one period idles in that period (no duty, no
+    approach held, each stream passes unchanged). One that is too close in
+    every period is still an error.
+  - When a solve fails and the given network idles recovery exchangers in
+    some periods, the solve is tried once more with each held idle in
+    those periods, on the whole network (an exchanger a first solve left
+    at zero duty comes back). ``summary_metrics["idle_periods_held"]``
+    counts the exchanger-periods held. ``design.retrofit`` solves by its
+    own path and does not try again this way.
+
+  An idle period reports the difference its streams pass at as its
+  ``approach_temperatures``; it reported the approach limit. On the crude
+  case the margin now ranks all 137 networks.
+  The first rule also changes a design on the median or one period: its
+  fit to every period used to fail at the design approach on such a match,
+  warn and fit at 1 K. It now keeps the design approach with the match
+  idle in that period, without the warning, so the fitted network's cost
+  differs: on a three-period case whose waste heat stream is lukewarm in
+  one period, a pinch design fitted to every period is 55,270 $/y at its
+  design approach, where it was 53,922 $/y at the 1 K fallback.
 
 0.10.0 (2026-11-25)
 -------------------

@@ -250,12 +250,15 @@ def fixed_network_structure(
     *,
     excluded: frozenset[int] = frozenset(),
     warm_duties: Mapping[int, float] | None = None,
+    hold_idle: bool = False,
 ) -> FixedNetworkStructure:
     """Map the user's exchangers onto solver indices and validate the layout.
 
     ``excluded`` lists allowed-exchanger positions removed after an earlier
     solve left them at zero duty; ``warm_duties`` maps positions to starting
     duties (defaults to the duties carried by the network itself).
+    ``hold_idle`` keeps each recovery exchanger idle in the periods the
+    network has it idle in.
     """
 
     hot_axis = axis_maps["hot_process_streams"]
@@ -276,6 +279,7 @@ def fixed_network_structure(
     recovery_areas: dict[int, float] = {}
     utility_areas: dict[int, float] = {}
     recovery_points: dict[int, dict[int, tuple]] = {}
+    recovery_idle: dict[int, frozenset[int]] = {}
     utility_points: dict[int, dict[int, tuple]] = {}
     # Solver period index by period id; without one, the network's own.
     periods = axis_maps.get("periods")
@@ -317,6 +321,9 @@ def fixed_network_structure(
             if exchanger.area is not None:
                 recovery_areas[index] = float(exchanger.area)
                 recovery_points[index] = _design_points(exchanger, periods)
+            idle = _idle_periods(exchanger, periods) if hold_idle else None
+            if idle:
+                recovery_idle[index] = idle
         else:
             heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
             # A sliced utility runs on the slice its id names, when the axis
@@ -382,6 +389,7 @@ def fixed_network_structure(
             recovery_areas=recovery_areas,
             utility_areas=utility_areas,
             recovery_design_points=recovery_points,
+            recovery_idle=recovery_idle,
             utility_design_points=utility_points,
             level_holds=level_holds,
         ),
@@ -621,12 +629,14 @@ class FixedStructureDutyExecutor:
                 ),
                 slice_labels(user_exchangers),
             )
+            hold_idle = False
             while True:
                 structure = fixed_network_structure(
                     request,
                     arrays.axis_maps,
                     excluded=frozenset(excluded),
                     warm_duties=warm,
+                    hold_idle=hold_idle,
                 )
                 model = factory(
                     name=f"fixed-structure-{request.objective}",
@@ -642,6 +652,22 @@ class FixedStructureDutyExecutor:
                 )
                 model.optimise(print_output=self.print_output)
                 if getattr(model, "mSuccess", 0) != 1:
+                    # An exchanger the network idles in a period may not be
+                    # able to run there (its streams can cross), which the
+                    # model cannot decide for itself: the idle periods are
+                    # held and the solve tried once more, on the whole
+                    # network. An exchanger a free solve left at zero duty
+                    # comes back: held, the others may not cover for it.
+                    if not hold_idle and (
+                        fixed_network_structure(
+                            request, arrays.axis_maps, hold_idle=True
+                        ).spec.recovery_idle
+                    ):
+                        hold_idle = True
+                        excluded.clear()
+                        removed.clear()
+                        warm = None
+                        continue
                     reason = _solver_failure(model)
                     if removed:
                         reason += (
@@ -674,6 +700,10 @@ class FixedStructureDutyExecutor:
                 task_id=task.task_id,
                 removed=removed,
             )
+            if structure.spec.recovery_idle:
+                network.summary_metrics["idle_periods_held"] = sum(
+                    len(periods) for periods in structure.spec.recovery_idle.values()
+                )
             allowances = getattr(model, "rating_allowances", None)
             if allowances:
                 # A rating's cap is calibrated with Chen's LMTD at the design
@@ -935,6 +965,25 @@ def _design_points(exchanger: HeatExchanger, periods) -> dict[int, tuple]:
             slice_areas.get(str(state.period_id)),
         )
     return points
+
+
+def _idle_periods(exchanger: HeatExchanger, periods) -> frozenset[int]:
+    """The solver periods ``exchanger`` idles in while it runs in another.
+
+    An exchanger with no active period carries no states of its own (a bare
+    structure has none), so nothing is known of when it idles.
+    """
+    states = exchanger.period_states
+    if not any(state.active for state in states):
+        return frozenset()
+    idle = set()
+    for state in states:
+        index = (
+            state.period_idx if periods is None else periods.get(str(state.period_id))
+        )
+        if index is not None and not state.active:
+            idle.add(int(index))
+    return frozenset(idle)
 
 
 def _structural_exchangers(network: HeatExchangerNetwork) -> tuple[HeatExchanger, ...]:

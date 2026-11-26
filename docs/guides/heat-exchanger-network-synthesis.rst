@@ -662,11 +662,33 @@ Utility exchangers
    defaults to 1 K, as for ``"cost"``. Overdesign rates networks this way.
 
 Zero-duty exchangers
-   Every listed exchanger carries its approach constraint even at zero duty.
+   Every listed exchanger carries its approach constraint even at zero duty,
+   in every period it can run.
    When a solve leaves an exchanger at zero duty in every period, it is
    removed with that constraint and the problem is solved again, one
    exchanger at a time, until all remaining exchangers carry duty.
    ``selected_network.summary_metrics["removed_exchangers"]`` names them.
+
+Exchangers that idle in a period
+   A recovery exchanger whose hot supply is less than its approach above its
+   cold supply in one period cannot run there at any duty. It idles in that
+   period: no duty, no approach held, and each stream passes it unchanged.
+   One that is too close in every period is an error.
+
+   A network can also idle a recovery exchanger in a period for where it
+   sits: a design on ``design_basis="all"`` leaves a match idle in a period
+   in which the cold stream reaches it hotter than the hot stream. With the
+   exchanger free to run there the problem has no solution, since its
+   approach would be held at zero duty. When a solve fails and the network
+   given idles recovery exchangers in some periods (an exchanger with duty in
+   one period and none in another), the solve is tried once more with each
+   held idle in those periods, on the whole network: an exchanger a first
+   solve left at zero duty comes back. ``design.retrofit`` solves by its own
+   path and does not try again this way.
+   ``selected_network.summary_metrics["idle_periods_held"]`` then counts the
+   exchanger-periods held. A bare structure carries no duties, so nothing is
+   held for it. An idle period's ``approach_temperatures`` are the
+   difference the two streams pass at, which may be negative.
 
 Segmented streams and utilities
    Streams with segments keep their piecewise temperature-heat profile: each
