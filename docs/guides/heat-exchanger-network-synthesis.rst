@@ -474,6 +474,13 @@ from a linear model that chooses its staged heaters and coolers; that model
 is given 60 s (or the time limit in ``HENS_SOLVER_OPTIONS_EVM``), and one
 stopped there starts the evolution from the best it found.
 
+When every seed's evolution fails, the design still returns a site network:
+the process networks each seed was made from, joined whole with their own
+heaters and coolers and costed by the site utility balance of what they use
+and raise. A warning says the site evolution failed and that nothing was
+refined across the site; such a network's ``method`` is
+``"site_pinch_design"``.
+
 A site network carries the site utility balance. On each utility level, use
 plus heat let down to lower levels plus heat dumped equals generation plus
 heat let down from above plus imports, period by period. Imports enter hot

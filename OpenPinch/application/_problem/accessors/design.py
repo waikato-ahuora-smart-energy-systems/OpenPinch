@@ -906,6 +906,7 @@ class _DesignAccessor:
 
     def _site_design(self, *, width, depth, options) -> HeatExchangerNetworkDesignView:
         """The site design with the case's utilities (``levels="given"``)."""
+        from ....analysis.heat_exchanger_networks.errors import WorkflowContractError
         from ....analysis.heat_exchanger_networks.execution.search import (
             resolve_search,
         )
@@ -930,14 +931,17 @@ class _DesignAccessor:
             "HENS_OVERDESIGN_PERCENTAGE": None,
         }
 
+        # A process outcome, kept as the pattern for a joined network's
+        # outcome should the site evolution fail.
+        templates: list = []
+
         def pool(name: str, placement: str):
-            return tuple(
-                outcome.network
-                for outcome in self.heat_exchanger_network(
-                    zone=name,
-                    options=process_options | {"HENS_UTILITY_PLACEMENT": placement},
-                ).top(_SITE_POOL)
-            )
+            outcomes = self.heat_exchanger_network(
+                zone=name,
+                options=process_options | {"HENS_UTILITY_PLACEMENT": placement},
+            ).top(_SITE_POOL)
+            templates.extend(outcomes[:1])
+            return tuple(outcome.network for outcome in outcomes)
 
         # Levels chosen by price (the lowest cost) and held at their
         # targets: evolution starts from both. A process whose design fails
@@ -959,11 +963,99 @@ class _DesignAccessor:
                 raise failure
             priced.setdefault(name, held.get(name))
             held.setdefault(name, priced[name])
-        return self.network_evolution(
-            site_seeds(priced, level_held=held),
-            options=options,
-            width=width,
-            depth=depth,
+        seeds = site_seeds(priced, level_held=held)
+        try:
+            return self.network_evolution(
+                seeds, options=options, width=width, depth=depth
+            )
+        except WorkflowContractError as failure:
+            # Every evolution task failed. The process networks are verified
+            # designs of their own: they are returned, not thrown away.
+            return self._joined_process_design(
+                priced, held, failure, templates, configuration
+            )
+
+    def _joined_process_design(self, priced, held, failure, templates, configuration):
+        """The site design when its evolution failed: each seed's process
+        networks joined into one site network, costed by the site utility
+        balance of their own utility use, with a warning."""
+        from ....analysis.heat_exchanger_networks.execution.executor import (
+            _site_letdown_price,
+        )
+        from ....analysis.heat_exchanger_networks.results.selection import (
+            select_network,
+        )
+        from ....analysis.heat_exchanger_networks.site import joined_process_networks
+        from ....analysis.heat_exchanger_networks.site.levels import (
+            priced_by_site_balance,
+            site_utility_system,
+            utility_capacities,
+        )
+        from ....analysis.heat_exchanger_networks.solver.arrays import (
+            nominal_approach_temperature,
+            problem_to_solver_arrays,
+        )
+        from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+        from ....domain.enums import StreamLoc
+        from ..targeting.provenance import make_provenance
+
+        root = self._problem.master_zone
+        config = root.config
+        networks = []
+        for network in joined_process_networks(priced, level_held=held):
+            arrays = problem_to_solver_arrays(
+                self._problem,
+                nominal_approach_temperature(
+                    config, network.summary_metrics["dt_cont_multiplier"]
+                ),
+            )
+            system = site_utility_system(
+                arrays,
+                capacities=utility_capacities(root),
+                letdown_price=_site_letdown_price(config),
+            )
+            networks.append(priced_by_site_balance(network, system))
+        result = HeatExchangerNetworkSynthesisResult(
+            network=networks[0],
+            run_id=networks[0].run_id,
+            ranked_networks=tuple(
+                templates[0].model_copy(
+                    update={
+                        "network": network,
+                        "objective_value": network.total_annual_cost,
+                    }
+                )
+                for network in networks
+            ),
+        )
+        select_network(result)
+        result.provenance = make_provenance(
+            self._problem,
+            "design.total_site_heat_exchanger_network",
+            root,
+            period_ids=tuple(root.period_ids),
+            settings={**root.config._values, **configuration},
+        )
+        if self._problem._results is not None:
+            self._problem._results.design = result
+        warnings.warn(
+            "the site evolution failed, so each process's own pinch design "
+            "network is returned, joined into one site network and costed by "
+            "the site utility balance of their utility use; nothing was "
+            f"refined across the site ({str(failure)[:300]}).",
+            UserWarning,
+            stacklevel=4,
+        )
+        return HeatExchangerNetworkDesignView(
+            result,
+            utility_names=[
+                f"{location.value}.{utility.name}"
+                for location, utilities in (
+                    (StreamLoc.HotU, self._problem.hot_utilities),
+                    (StreamLoc.ColdU, self._problem.cold_utilities),
+                )
+                for utility in utilities
+            ],
         )
 
     def _process_zones(self) -> list[str]:

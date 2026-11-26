@@ -17,7 +17,7 @@ for its net utility use. There is no separate accounting problem.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -176,6 +176,55 @@ def solved_balance(
     )
 
 
+def balance_of_loads(
+    levels: SiteUtilityLevels,
+    use: Mapping[str, Sequence[float]],
+    generation: Mapping[str, Sequence[float]],
+) -> UtilitySystemBalance:
+    """The cheapest site balance of fixed loads.
+
+    ``use`` and ``generation`` give each level's heater and cooler duty per
+    period (kW), by level name; a level left out has none. The balance is a
+    small linear model of its own, solved with HiGHS: what a site network's
+    model would reach with every duty fixed. Raises ``ValueError`` when the
+    loads cannot be balanced (an import capacity too small for them).
+    """
+
+    from ..solver import backend
+    from ..solver.pyomo_model import PyomoModel
+
+    m = PyomoModel()
+    periods = range(len(levels.period_weights))
+    blocks = [
+        add_site_balance(
+            m,
+            levels,
+            n,
+            [m.Param(_load(use, level.name, n)) for level in levels.levels],
+            [m.Param(_load(generation, level.name, n)) for level in levels.levels],
+        )
+        for n in periods
+    ]
+    m.Minimize(
+        sum(
+            weight * (block.hot_cost + block.cold_cost)
+            for weight, block in zip(levels.period_weights, blocks, strict=True)
+        )
+    )
+    run = backend.solve_pyomo_model(m, solver_name="highs")
+    if run.failure_reason is not None:
+        raise ValueError(
+            f"the site utility balance of these loads has no solution "
+            f"({run.failure_reason})."
+        )
+    return solved_balance(levels, blocks)
+
+
+def _load(loads: Mapping[str, Sequence[float]], level: str, n: int) -> float:
+    duties = loads.get(level)
+    return 0.0 if duties is None else float(duties[n])
+
+
 def _value(expression: Any) -> float:
     """A solved variable's or expression's number (0 for a plain 0)."""
     if isinstance(expression, int | float):
@@ -188,6 +237,7 @@ def _value(expression: Any) -> float:
 __all__ = [
     "SiteBalancePeriod",
     "add_site_balance",
+    "balance_of_loads",
     "letdowns",
     "period_cost",
     "solved_balance",

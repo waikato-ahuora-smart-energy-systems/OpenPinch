@@ -203,6 +203,17 @@ Heat exchanger networks
   raised, returns its network; the three-process site of 34 streams
   returns one, at a site cost of 7,690,675 $/y in 281 s, where both
   its seeds failed.
+- A site design whose evolution fails returns its process networks. Each
+  process is designed alone before the site evolution refines them as one
+  problem; when every evolution task failed the design raised "no
+  successful task outcomes" and the verified process networks were thrown
+  away. It now returns them joined into one site network per seed, whole
+  (their end heaters and coolers included), costed by the site utility
+  balance of their own utility use, with a warning that the site evolution
+  failed and nothing was refined across the site. Such a network's
+  ``method`` is ``"site_pinch_design"``. On the three-process site of 34
+  streams, with the evolution made to fail, the design returns two
+  networks in 14 s, at site costs of 7,388,155 and 7,467,152 $/y.
 
 0.10.0 (2026-11-25)
 -------------------
