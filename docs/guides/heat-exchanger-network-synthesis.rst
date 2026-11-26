@@ -469,7 +469,10 @@ On a multiperiod site each process is designed over every period at once
 (design basis ``"all"``, whatever ``HENS_DESIGN_BASIS`` says), so each level
 carries its targeted duty in every period; the evolution holds those duties
 period by period, with one area per exchanger sized for the period that
-needs most, and no fit to the periods follows.
+needs most, and no fit to the periods follows. Each seed's evolution starts
+from a linear model that chooses its staged heaters and coolers; that model
+is given 60 s (or the time limit in ``HENS_SOLVER_OPTIONS_EVM``), and one
+stopped there starts the evolution from the best it found.
 
 A site network carries the site utility balance. On each utility level, use
 plus heat let down to lower levels plus heat dumped equals generation plus

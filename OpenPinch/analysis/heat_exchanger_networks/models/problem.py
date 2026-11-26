@@ -509,8 +509,10 @@ class InternalHeatExchangerNetworkProblem:
         MILP on the seed's recovery topology, isothermal and priced by
         utility cost, with every seed match kept in use, holds the levels
         and picks the units; it is linear,
-        so HiGHS solves it. Without HiGHS, or when it fails, the task runs
-        as built.
+        so HiGHS solves it, within ``backend.PLACED_UNITS_TIME_LIMIT`` or
+        the time limit in the task's own solver options: a solve stopped
+        there gives its incumbent. Without HiGHS, or when it fails, the
+        task runs as built.
         """
 
         try:
@@ -523,7 +525,13 @@ class InternalHeatExchangerNetworkProblem:
                 | {
                     "name": f"placed-{self.name}",
                     "solver": "highs",
-                    "solver_options": None,
+                    "solver_options": _with_time_limit(
+                        "highs",
+                        None,
+                        seconds=(
+                            _ipopt_time_limit(self.args.get("solver_options")) or {}
+                        ).get("max_wall_time", backend.PLACED_UNITS_TIME_LIMIT),
+                    ),
                     "minimisation_goal": "utility costs",
                     "non_isothermal_model": False,
                     "integers": True,

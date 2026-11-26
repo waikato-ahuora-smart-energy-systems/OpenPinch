@@ -70,6 +70,11 @@ HEURISTIC_STAGE_TIME_LIMIT = 300.0
 # stopped there keeps its incumbent when it has one, and that network is
 # verified like any other; a task without one fails.
 TDM_TIME_LIMIT = 300.0
+# Seconds allowed for the MILP that places a seeded site task's staged units
+# before the task is relaxed, unless the user sets a limit: on three
+# processes (34 streams) HiGHS had not finished it after 15 minutes. A solve
+# stopped there gives its incumbent, which only starts the relaxed model.
+PLACED_UNITS_TIME_LIMIT = 60.0
 PYOMO_SOLVER_FACTORY_NAMES = {
     "couenne": "couenne",
     "ipopt-pyomo": "ipopt",
