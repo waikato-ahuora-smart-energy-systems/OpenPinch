@@ -96,6 +96,25 @@ Heat exchanger networks
   On the basic pinch case a second retrofit of the network a retrofit
   returned rated it at 143,969 $/y of utility against the 145,250 $/y the
   first reported; both now give 145,250 $/y.
+- A heat pump network can be rated, optimised and retrofitted on the
+  problem it was designed for. ``design.optimise_duties`` and
+  ``design.retrofit`` refused the network a design with ``heat_pump=``
+  had selected, and its JSON ("'Plant.HP_H1' is not a hot process
+  stream"): the network names the heat pump's condenser and evaporator
+  streams, which were in a case the design derived and did not keep. The
+  machine a network records now carries those streams
+  (``NetworkHeatPump.streams``, the case's stream input records, kept in
+  the network's JSON), and both calls build the case again from them, on
+  a problem loaded under another project name too. The networks they
+  return keep the machine and its annual cost; a retrofit's designs
+  include the existing machine's electricity in ``utility_cost`` and keep
+  the machine ahead of any heat pump the retrofit adds itself. The network
+  of a retrofit's own heat pump step (``heat_pump_cycle``) carries its
+  streams in the same way. On the basic pinch case the cheapest network
+  around a full-load Carnot heat pump rates from its JSON at the
+  577,663 $/y it was designed at. A heat pump on a site's utility system
+  carries no streams, and a network around a vapour compression heat pump
+  still fails its rating, as it does on the design's own case.
   The guide said ``min_approach_temperature`` defaults to 1 K; it does
   not.
 

@@ -24,6 +24,7 @@ from OpenPinch.domain.stream_collection import StreamCollection
 from tests.analysis.heat_exchanger_networks.heat_pump_levels_case import (
     levels_problem,
 )
+from tests.application.heat_pump_stream_cases import step_of_no_size
 
 
 def _stream(name: str, supply: float, target: float, duty: float) -> Stream:
@@ -56,7 +57,9 @@ def test_the_heat_pump_streams_carry_hpr_dt_cont_over_the_networks_multiplier(
 
     monkeypatch.setattr(heat_pump_retrofit, "run_retrofit_search", search)
     monkeypatch.setattr(
-        heat_pump_retrofit, "heat_pump_step", lambda *a, **k: (object(), solved)
+        heat_pump_retrofit,
+        "heat_pump_step",
+        lambda *a, **k: (step_of_no_size(), solved),
     )
     monkeypatch.setattr(heat_pump_retrofit, "joined", lambda first, *rest: rest)
 

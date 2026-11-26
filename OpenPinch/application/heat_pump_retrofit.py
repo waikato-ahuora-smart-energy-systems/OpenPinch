@@ -23,6 +23,7 @@ from .case_derivation import (
     _heat_pump_zone_address,
     _period_heat_pump_streams,
     _zone_multiplier,
+    heat_pump_stream_records,
 )
 
 
@@ -363,14 +364,22 @@ def retrofit_with_heat_pump(
             )
             if step is None:
                 continue
-            case = snapshot_problem(
-                heat_pump_case(
-                    problem,
-                    solved,
-                    machine=machine,
-                    dt_cont_multiplier=settings.dt_cont_multiplier,
-                )
+            derived = heat_pump_case(
+                problem,
+                solved,
+                machine=machine,
+                dt_cont_multiplier=settings.dt_cont_multiplier,
             )
+            # The streams the case added go with the machine, as a designed
+            # heat pump network's do: its networks can then be read again
+            # from the problem and themselves alone.
+            step = replace(
+                step,
+                record=step.record.model_copy(
+                    update={"streams": heat_pump_stream_records(derived, machine)}
+                ),
+            )
+            case = snapshot_problem(derived)
             with temporary_zone_configuration(
                 case._build_execution_master_zone(), configuration
             ):

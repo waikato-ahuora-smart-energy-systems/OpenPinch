@@ -746,6 +746,16 @@ def _require_heat_pump_stream_support(problem, target=None) -> None:
         )
 
 
+def heat_pump_stream_records(case, machine: str) -> tuple[dict, ...]:
+    """The stream input records of ``case`` marked as ``machine``'s: the
+    streams a heat pump case added to its problem."""
+    return tuple(
+        record
+        for record in case.to_problem_json()["streams"]
+        if (record.get("heat_pump") or {}).get("machine") == machine
+    )
+
+
 def _case_with_heat_pump_streams(
     problem,
     target,

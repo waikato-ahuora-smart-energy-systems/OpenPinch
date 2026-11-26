@@ -116,6 +116,10 @@ class NetworkHeatPump(BaseModel):
     # The share of the heating the process could give a heat pump that this
     # one takes (1.0: the full load); None when its target did not say.
     load_fraction: float | None = None
+    # The machine's condenser, evaporator and ambient source streams as the
+    # stream input records of the case its network was designed on; empty
+    # for a machine whose network's problem holds them, or on a site.
+    streams: tuple[dict[str, Any], ...] = ()
 
     @property
     def annual_cost(self) -> float:

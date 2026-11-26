@@ -1911,16 +1911,24 @@ class _DesignAccessor:
         keeps, or with "stepwise" one modification) with its savings,
         capital, payback and modifications, and ``selected`` the one with
         the best net annual benefit. The problem's cached design is not
-        changed. Requires the optional synthesis
+        changed. An ``existing`` heat pump network (or its JSON) is
+        retrofitted on the case it was designed on, built again from this
+        problem and the streams its machine carries: every design's network
+        keeps that machine and its ``utility_cost`` includes the machine's
+        electricity. Requires the optional synthesis
         dependencies and the ``HENS_SOLVER_EVM`` solver (Ipopt by default).
         """
 
         from functools import partial
 
+        from ....analysis.heat_exchanger_networks.heat_pump_cost import (
+            network_with_heat_pumps,
+        )
         from ....analysis.heat_exchanger_networks.retrofit.search import (
             RetrofitSettings,
             run_retrofit_search,
         )
+        from ...heat_pump_design import heat_pump_network_case
         from ...heat_pump_retrofit import retrofit_with_heat_pump
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
@@ -1957,7 +1965,10 @@ class _DesignAccessor:
             for key, level in _RETROFIT_VAPOUR_COMPRESSION_LEVELS.items():
                 if key not in named:
                     configuration.setdefault(key, level)
-        isolated = snapshot_problem(self._problem)
+        # A heat pump network is retrofitted on the case it was designed on,
+        # which holds its machine's streams.
+        problem = heat_pump_network_case(self._problem, existing) or self._problem
+        isolated = snapshot_problem(problem)
         root = isolated._build_execution_master_zone()
         stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
         with temporary_zone_configuration(root, configuration):
@@ -2059,8 +2070,34 @@ class _DesignAccessor:
             )
         for zone in walk_zone_tree(isolated._master_zone):
             zone.config = stored_configs[zone.address]
-        commit_problem(self._problem, isolated)
-        return result
+        commit_problem(problem, isolated)
+        if not existing.heat_pumps:
+            return result
+        # Every design serves the existing network's heat pump: its network
+        # keeps the machine, and its streams with it, ahead of any machine
+        # the retrofit's own heat pump step recorded. Its utility cost
+        # includes the machine's electricity, as a heat pump step's does.
+        electricity = sum(machine.electricity_cost for machine in existing.heat_pumps)
+        return result.model_copy(
+            update={
+                "frontier": tuple(
+                    design.model_copy(
+                        update={
+                            "utility_cost": design.utility_cost + electricity,
+                            "network": network_with_heat_pumps(
+                                design.network, existing.heat_pumps
+                            ).model_copy(
+                                update={
+                                    "heat_pumps": existing.heat_pumps
+                                    + design.network.heat_pumps
+                                }
+                            ),
+                        }
+                    )
+                    for design in result.frontier
+                )
+            }
+        )
 
     def retrofit_heat_pumps(
         self,
@@ -2230,10 +2267,37 @@ class _DesignAccessor:
         remaining exchanger carries duty. The result names removed exchangers
         in ``selected_network.summary_metrics["removed_exchangers"]``.
 
+        A heat pump network (one a design with ``heat_pump=`` or a retrofit
+        with ``heat_pump_cycle`` returned, or its JSON) is solved on the
+        case it was designed on, built again from this problem and the
+        streams its machine carries; the networks returned keep the machine
+        and its annual cost, and this problem's stored design is unchanged.
+
         Requires the optional synthesis dependencies (Pyomo and the configured
         ``HENS_SOLVER_EVM`` solver).
         """
+        from ...heat_pump_design import heat_pump_network_case, with_heat_pumps
+
         network = self._network_argument(network)
+        case = heat_pump_network_case(self._problem, network)
+        if case is not None:
+            # A heat pump network: the case it was designed on holds its
+            # machine's streams, and the result keeps the machine.
+            return with_heat_pumps(
+                case.design.optimise_duties(
+                    network,
+                    objective=objective,
+                    min_approach_temperature=min_approach_temperature,
+                    exchanger_approach_temperatures=exchanger_approach_temperatures,
+                    max_hot_utility=max_hot_utility,
+                    max_cold_utility=max_cold_utility,
+                    options=options,
+                    period_id=period_id,
+                    solver=solver,
+                    solve_tolerance=solve_tolerance,
+                ),
+                network.heat_pumps,
+            )
         # Rating holds the approach the network was designed to, as
         # overdesign does: evolution designs down to 0.1 K.
         design = (

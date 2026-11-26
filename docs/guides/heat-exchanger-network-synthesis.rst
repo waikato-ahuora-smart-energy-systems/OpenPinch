@@ -925,7 +925,9 @@ Heat pumps
    case two and one found an 858 kW machine netting $181,000/y where the
    zone's default three and two found none); the electricity is in the
    design's utility cost and the network records the machine in
-   ``heat_pumps``. The machine is tried at each of ``heat_pump_sizes``,
+   ``heat_pumps``, with the streams it added (``NetworkHeatPump.streams``),
+   so the network or its JSON can be given back to ``design.retrofit`` or
+   ``design.optimise_duties`` on the same problem. The machine is tried at each of ``heat_pump_sizes``,
    shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
    default 1.0, 0.75 and 0.5), one search per size, and the machine
    records its share in ``load_fraction``. Each step of the result holds

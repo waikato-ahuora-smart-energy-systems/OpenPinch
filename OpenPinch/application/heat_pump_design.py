@@ -19,6 +19,7 @@ from .case_derivation import (
     _case_with_utility_heat_pump_zones,
     _require_heat_pump_site_target,
     _require_heat_pump_stream_support,
+    heat_pump_stream_records,
 )
 
 
@@ -129,6 +130,11 @@ def heat_pump_design_case(
         # The zone multiplier scales the heat pump's streams too.
         case = _case_with_heat_pump_streams(
             problem, target, dt_cont=approach, machine=machine
+        )
+        # The streams the case added go with the machine, so a network of
+        # the case can be solved again from the problem and itself alone.
+        record = record.model_copy(
+            update={"streams": heat_pump_stream_records(case, machine)}
         )
     return HeatPumpDesignCase(
         multiplier=multiplier, target=target, case=case, record=record
@@ -380,11 +386,64 @@ def heat_pump_design_view(problem, plain, runs, *, max_exchangers: int | None = 
     return plain
 
 
+def heat_pump_network_case(problem, network):
+    """The case ``network`` was designed on: ``problem`` with the streams
+    its heat pumps carry (``NetworkHeatPump.streams``).
+
+    ``None`` for a network whose machines carry none, and for one whose
+    streams ``problem`` already holds (the case itself).
+    """
+    carried = [stream for machine in network.heat_pumps for stream in machine.streams]
+    if not carried:
+        return None
+    # A zone's address starts at the root zone, named for the project: the
+    # streams join the same zones under this problem's root.
+    root = problem._require_prepared_root_zone().address
+    carried = [
+        stream | {"zone": root + "".join(stream["zone"].partition("/")[1:])}
+        for stream in carried
+    ]
+    source = problem.to_problem_json()
+    held = {(record["zone"], record["name"]) for record in source["streams"]}
+    missing = [s for s in carried if (s["zone"], s["name"]) not in held]
+    if not missing:
+        return None
+    source["streams"].extend(missing)
+    return type(problem)(source, project_name=problem.project_name)
+
+
+def with_heat_pumps(view, heat_pumps):
+    """``view`` with ``heat_pumps`` recorded on every network of it and
+    their annual cost in its total (``network_with_heat_pumps``)."""
+    from ..analysis.heat_exchanger_networks.results.selection import (
+        ranked_networks,
+        select_network,
+    )
+
+    result = view.result
+    ranked = []
+    for outcome in ranked_networks(result):
+        network = network_with_heat_pumps(outcome.network, heat_pumps)
+        ranked.append(
+            outcome.model_copy(
+                update={
+                    "network": network,
+                    "objective_value": network.total_annual_cost,
+                }
+            )
+        )
+    result.ranked_networks = tuple(ranked)
+    select_network(result)
+    return view
+
+
 __all__ = [
     "HeatPumpDesignCase",
     "capped_heat_pump_streams",
     "design_with_heat_pump",
     "heat_pump_design_case",
     "heat_pump_design_view",
+    "heat_pump_network_case",
     "heat_pump_request",
+    "with_heat_pumps",
 ]
