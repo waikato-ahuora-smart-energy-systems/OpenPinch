@@ -761,3 +761,18 @@ def test_the_placed_units_model_takes_the_tasks_own_time_limit(monkeypatch):
     _seeded_site_task({"max_wall_time": 20.0})._placed_staged_units(2)
 
     assert _PlacedModelRecorder.built["solver_options"] == {"time_limit": 20.0}
+
+
+def test_the_placed_units_model_reads_a_time_limit_given_as_an_option_line(
+    monkeypatch,
+):
+    # A task's solver options may also be option lines, as the backend takes.
+    from OpenPinch.analysis.heat_exchanger_networks.models import (
+        problem as problem_module,
+    )
+
+    monkeypatch.setattr(problem_module, "StageWiseModel", _PlacedModelRecorder)
+
+    _seeded_site_task(["max_wall_time 20"])._placed_staged_units(2)
+
+    assert _PlacedModelRecorder.built["solver_options"] == {"time_limit": 20.0}
