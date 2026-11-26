@@ -81,12 +81,12 @@ def _on_process_temperatures(case, process, *, approach: float):
         return case
     source = case.to_problem_json()
 
-    def moved(temperature: float, sign: float) -> float:
+    def offset(temperature: float, sign: float) -> float:
+        """The move that puts ``temperature`` on the process temperature it
+        lies beside; 0 when it lies beside none."""
         shifted = temperature + sign * approach
         nearest = float(grid[np.argmin(np.abs(grid - shifted))])
-        if abs(nearest - shifted) > HEAT_PUMP_SNAP_K:
-            return temperature
-        return nearest - sign * approach
+        return nearest - shifted if abs(nearest - shifted) <= HEAT_PUMP_SNAP_K else 0.0
 
     for record in source["streams"]:
         role = (record.get("heat_pump") or {}).get("role")
@@ -95,18 +95,33 @@ def _on_process_temperatures(case, process, *, approach: float):
         # A condenser is a hot stream, shifted down by its contribution; an
         # evaporator a cold one, shifted up.
         sign = -1.0 if role == "condenser" else 1.0
-        for part in (record, *(record.get("segments") or ())):
-            for key in ("t_supply", "t_target"):
-                value = part.get(key)
-                if value is None:
-                    continue
-                if "values" in value:
-                    part[key] = {
-                        **value,
-                        "values": [moved(float(v), sign) for v in value["values"]],
-                    }
-                else:
-                    part[key] = {**value, "value": moved(float(value["value"]), sign)}
+        ends = [
+            (part, key)
+            for part in (record, *(record.get("segments") or ()))
+            for key in ("t_supply", "t_target")
+            if part.get(key) is not None
+        ]
+        if not ends:
+            continue
+        # The stream moves whole, each period by its own amount: the first
+        # of its temperatures that lies beside a process temperature sets
+        # the move. Moving one end of a 0.01 K stream alone would change the
+        # span the problem table reads its duty over.
+        periods = [
+            [float(v) for v in part[key].get("values", [part[key].get("value")])]
+            for part, key in ends
+        ]
+        moves = [
+            next((m for m in (offset(t, sign) for t in each) if m), 0.0)
+            for each in zip(*periods)
+        ]
+        for (part, key), values in zip(ends, periods):
+            placed = [t + move for t, move in zip(values, moves)]
+            part[key] = (
+                {**part[key], "values": placed}
+                if "values" in part[key]
+                else {**part[key], "value": placed[0]}
+            )
     return type(case)(source, project_name=case.project_name)
 
 

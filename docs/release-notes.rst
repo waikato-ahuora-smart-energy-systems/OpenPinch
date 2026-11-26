@@ -288,10 +288,11 @@ Heat pumps and refrigeration
   ``heat_pump=`` then warned "No heat pump network at dt_cont multiplier
   ..." and returned networks without one: on a two-stream case at
   multipliers 0.75 and 1.5 and on the basic pinch case at 2.0, of the
-  four multipliers tried on each. The heat pump's streams are now written
-  at five decimals, and the design moves each condenser and evaporator
-  temperature within 1e-4 K of a process temperature onto it. All eight
-  now design. A heat pump target from a search's first start (one
+  four multipliers tried on each. The design now moves each condenser
+  and evaporator stream that starts or ends within 1e-4 K of a process
+  temperature onto it, whole, so its duty is kept. All eight now design.
+  A level beside no process temperature stays exactly where the target
+  put it, and a heat pump target from a search's first start (one
   evaluation) was never that close and is unchanged.
 
 0.10.0 (2026-11-25)

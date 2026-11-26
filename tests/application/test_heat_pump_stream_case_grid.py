@@ -18,7 +18,7 @@ import pytest
 
 from OpenPinch import PinchProblem
 from OpenPinch.application.case_derivation import _case_with_heat_pump_streams
-from OpenPinch.application.heat_pump_design import _scaled
+from OpenPinch.application.heat_pump_design import _on_process_temperatures, _scaled
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
 from tests.analysis.heat_exchanger_networks.heat_pump_levels_case import (
@@ -62,8 +62,11 @@ def _case_at_the_design_multiplier(multiplier):
     problem = levels_problem()
     root = problem._require_prepared_root_zone()
     target = _target(root, condenser=CONDENSER, evaporator=EVAPORATOR)
-    case = _case_with_heat_pump_streams(
-        problem, target, dt_cont=float(root.config.hpr.dt_cont), machine="HP"
+    approach = float(root.config.hpr.dt_cont)
+    case = _case_with_heat_pump_streams(problem, target, dt_cont=approach, machine="HP")
+    # As the design case does.
+    case = _on_process_temperatures(
+        case, _scaled(problem, multiplier), approach=approach * multiplier
     )
     return _scaled(case, multiplier)
 
@@ -74,7 +77,6 @@ def test_a_condenser_just_under_a_process_temperature_is_moved_onto_it():
     # The search stopped 1e-5 K under it, which left the top 1e-5 K of F3
     # to the hot utility: a second pinch at the condenser and no network
     # (no design from 1e-5 to 1e-4 K under; twenty networks on it).
-    from OpenPinch.application.heat_pump_design import _on_process_temperatures
     from tests.application.heat_pump_stream_cases import basic_source
 
     problem = PinchProblem(source=basic_source(), project_name="basic")
@@ -94,8 +96,11 @@ def test_a_condenser_just_under_a_process_temperature_is_moved_onto_it():
         if record.get("heat_pump")
     }
     assert records["HP_H1"]["t_supply"]["value"] == 242.0
-    # The evaporator is beside no process temperature and stays.
-    assert records["HP_C1"]["t_target"]["value"] == 113.46405
+    # The evaporator is beside no process temperature and stays where the
+    # target put it, to the last digit: a level between two others sits at
+    # its approach limit, and a design of three condensers that closed
+    # with its levels as given did not with them rounded to 1e-5 K.
+    assert records["HP_C1"]["t_target"]["value"] == 113.46405008375231
     direct = _scaled(moved, 2.0).target.direct_heat_integration()
     assert (direct.hot_pinch, direct.cold_pinch) == (150.0, 150.0)
 
