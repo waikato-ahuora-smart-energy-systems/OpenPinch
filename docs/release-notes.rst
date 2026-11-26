@@ -65,6 +65,22 @@ Heat exchanger networks
   at 10 K and 286,974 $/y, against the 15 K and 295,037 $/y it was
   designed to; a design at 0.75 could not be rated from its JSON at all
   ("infeasible").
+- ``design.retrofit`` takes the network a design has just returned. With
+  no ``min_approach_temperature`` it held every exchanger to its streams'
+  full contributions, whatever the network was designed to, so it refused
+  a design made below a multiplier of 1 and every evolved network ("the
+  existing network does not meet its targets at its installed areas"),
+  and held a design made above 1 to less than its approach. It now keeps
+  the contributions at the multiplier the network records, times its
+  approach share for a thermal derivative or evolution network, on the
+  existing exchangers and on new matches; a network that records none,
+  such as a hand-written one, is retrofitted as before. On the basic
+  pinch case the default design is now accepted and rated at 105,357 $/y
+  of utility against the 105,397 $/y it was designed at (at an area
+  tolerance of 0.001). The heat pump step keeps its streams
+  ``HPR_DT_CONT`` off the coolers and heaters whatever that multiplier.
+  The guide said ``min_approach_temperature`` defaults to 1 K; it does
+  not.
 
 0.10.0 (2026-11-25)
 -------------------

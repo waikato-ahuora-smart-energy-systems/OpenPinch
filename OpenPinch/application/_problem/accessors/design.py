@@ -1799,7 +1799,12 @@ class _DesignAccessor:
         ``min_approach_temperature`` (default: the sum of its two sides'
         temperature contributions, per-stream ``dt_cont`` and zone
         multipliers included; new matches and heat pumps are screened at
-        twice ``THERMAL_DT_CONT``).
+        twice ``THERMAL_DT_CONT``). With that default a designed
+        ``existing`` keeps the approach it was designed to: the
+        contributions and the screen are scaled by the dt_cont multiplier
+        the network records, times its approach share for a thermal
+        derivative or evolution network (1 for a network that records
+        none).
         ``max_added_area_fraction`` caps the added area on an existing
         exchanger at that fraction of its installed area (None: no cap).
         With ``relocation_cost`` ($ per move, plus ``split_cost`` per new
@@ -1912,6 +1917,18 @@ class _DesignAccessor:
 
         existing = self._network_argument(existing)
         _refuse_site_network(existing, "retrofit")
+        # The multiplier a designed network records (times its approach
+        # share for an evolved one); a network that records none has 1. A
+        # given approach replaces the contributions, so nothing is scaled.
+        recorded = (
+            float(
+                self._design_approach(existing, self._effective_hens(options))[
+                    "dt_cont_multiplier"
+                ]
+            )
+            if min_approach_temperature is None
+            else 1.0
+        )
         outside = [s for s in heat_pump_sizes if not 0.0 <= float(s) <= 1.0]
         # A heat pump enters as streams: the linked move is retired.
         streams = heat_pump_cycle in ("carnot", "vapour_compression")
@@ -1985,6 +2002,7 @@ class _DesignAccessor:
                     area_tolerance=area_tolerance,
                     max_added_area_fraction=max_added_area_fraction,
                     approach=min_approach_temperature,
+                    dt_cont_multiplier=recorded,
                     new_unit_cost=float(unit_cost),
                     area_addition_cost=float(area_addition_cost),
                     split_cost=float(split_cost),

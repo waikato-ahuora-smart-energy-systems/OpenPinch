@@ -814,8 +814,16 @@ Search size
    the ``new_match_candidates`` best, about
    ``beam_width * (ceiling_candidates + 2 * new_match_candidates)`` small
    NLPs (stepwise: ``beam_width * (existing exchangers +
-   new_match_candidates)``). ``min_approach_temperature`` (default
-   1 K) applies to every exchanger.
+   new_match_candidates)``). ``min_approach_temperature`` applies to every
+   exchanger. With none given, each exchanger keeps the sum of its two
+   streams' temperature contributions, at the dt_cont multiplier the
+   existing network records it was designed at (times its approach share
+   for a thermal derivative or evolution network; 1 for a network that
+   records none, such as one written by hand). The network a design
+   returns, or its JSON, is therefore taken as it is: a pinch design at
+   0.75 keeps 0.75 of each pair's contributions, and an evolved network a
+   quarter of them by default, on its own exchangers and on new matches
+   alike.
 Utility switching
    ``utility_switch_cost`` (default ``None``: no switches) is the fixed
    cost of serving an existing heater or cooler by another utility of its
