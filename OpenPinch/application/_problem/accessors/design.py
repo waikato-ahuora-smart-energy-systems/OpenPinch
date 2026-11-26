@@ -1101,13 +1101,15 @@ class _DesignAccessor:
             multiplier = (designed.summary_metrics or {}).get(
                 "dt_cont_multiplier"
             ) or recorded.get("dt_cont_multiplier")
+            # Both also go in the summary metrics, which a network's JSON
+            # keeps; source_metadata is left out of it.
+            metrics = dict(view.selected_network.summary_metrics or {})
             if multiplier is not None:
                 metadata["dt_cont_multiplier"] = float(multiplier)
-            metrics = dict(view.selected_network.summary_metrics or {})
+                metrics["dt_cont_multiplier"] = float(multiplier)
             if recorded.get("min_exchanger_approach_share") is not None:
                 share = recorded["min_exchanger_approach_share"]
                 metadata["min_exchanger_approach_share"] = share
-                # Also in the summary metrics, which a network's JSON keeps.
                 metrics["min_exchanger_approach_share"] = share
             network = view.selected_network.model_copy(
                 update={

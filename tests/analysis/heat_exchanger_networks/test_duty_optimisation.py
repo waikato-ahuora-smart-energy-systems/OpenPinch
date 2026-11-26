@@ -2089,6 +2089,32 @@ def test_rating_a_networks_json_reads_the_share_it_was_designed_with():
 
 @_needs_live_solver
 @pytest.mark.solver
+def test_rating_a_fitted_networks_json_reads_a_multiplier_below_one():
+    """A pinch design at multiplier 0.75, fitted to every period, closes
+    its matches to 8.1 K. Its JSON keeps the multiplier, so a rating of the
+    JSON holds 7.5 K and rates it; read as multiplier 1, 10 K, the rating
+    was infeasible."""
+    from tests.analysis.heat_exchanger_networks.test_hen_period_handling import (
+        _two_period_problem,
+    )
+
+    problem = _two_period_problem()
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=0, dt_cont_multipliers=[0.75]
+    ).selected_network
+    assert min(_recovery_approaches(network)) < 10.0
+
+    rated = problem.design.optimise_duties(
+        network.model_dump(mode="json"), objective="rating"
+    )
+
+    assert rated.selected_network.total_annual_cost == pytest.approx(
+        network.total_annual_cost, rel=1e-6
+    )
+
+
+@_needs_live_solver
+@pytest.mark.solver
 def test_rating_the_default_designs_own_network_keeps_its_design_approach():
     """Evolution closes this network's approach below 1 K; rating it at its
     own areas holds the approach it was designed to, not 1 K, so it rates.
