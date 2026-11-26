@@ -770,8 +770,8 @@ def _q_max(owner, n: int, match: RecoveryMatch) -> float:
     return max(
         0.0,
         min(
-            owner.hot_profiles[n][match.hot].duty_bound,
-            owner.cold_profiles[n][match.cold].duty_bound,
+            owner.hot_profiles[n][match.hot].total,
+            owner.cold_profiles[n][match.cold].total,
         ),
     )
 
@@ -855,7 +855,7 @@ def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
                 f"qu{e}p{n}",
                 start["q_u"][e],
                 0.0,
-                stream_profile(owner, n, m).duty_bound,
+                stream_profile(owner, n, m).total,
             )
             for e, m in enumerate(spec.utilities)
         ]
@@ -1088,7 +1088,7 @@ def _interior_approaches(owner, tag: str, hot_side, cold_side, q, dt: float) -> 
     hot, a, h_in, h_out = hot_side
     cold, b, c_in, c_out = cold_side
     for index, boundary in enumerate(hot.breakpoints):
-        point = smooth_clip(boundary, h_out, h_in)
+        point = smooth_clip(boundary, h_out, h_in, hot.rounding_widths[index])
         given = a * (hot.heat(point) - hot.heat(h_in))
         partner = owner._var(
             f"bh{index}{tag}", _midpoint(cold), cold.lowest, cold.highest
@@ -1096,7 +1096,7 @@ def _interior_approaches(owner, tag: str, hot_side, cold_side, q, dt: float) -> 
         owner._equal(b * (cold.heat(partner) - cold.heat(c_in)), q - given)
         owner._at_least(point - partner, dt)
     for index, boundary in enumerate(cold.breakpoints):
-        point = smooth_clip(boundary, c_in, c_out)
+        point = smooth_clip(boundary, c_in, c_out, cold.rounding_widths[index])
         received = b * (cold.heat(point) - cold.heat(c_in))
         partner = owner._var(f"bc{index}{tag}", _midpoint(hot), hot.lowest, hot.highest)
         owner._equal(a * (hot.heat(partner) - hot.heat(h_in)), q - received)
@@ -1193,15 +1193,15 @@ def _linear_utility_interior(
     keeps the constraint smooth and trivially true at zero duty.
     """
 
-    for boundary in profile.breakpoints:
+    for boundary, width in zip(profile.breakpoints, profile.rounding_widths):
         if match.side == HEATER:
-            point = smooth_clip(boundary, stream_in, stream_out)
+            point = smooth_clip(boundary, stream_in, stream_out, width)
             d = profile.heat(point) - profile.heat(stream_in)
             owner._at_least(
                 q * (util_in - point) - (util_in - util_out) * (q - d), dt * q
             )
         else:
-            point = smooth_clip(boundary, stream_out, stream_in)
+            point = smooth_clip(boundary, stream_out, stream_in, width)
             d = profile.heat(point) - profile.heat(stream_in)
             owner._at_least(
                 q * (point - util_in) - (util_out - util_in) * (q - d), dt * q
