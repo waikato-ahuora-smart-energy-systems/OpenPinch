@@ -180,6 +180,18 @@ Heat exchanger networks
   differs: on a three-period case whose waste heat stream is lukewarm in
   one period, a pinch design fitted to every period is 55,270 $/y at its
   design approach, where it was 53,922 $/y at the 1 K fallback.
+- A total site design ends. Each site seed's evolution starts from a
+  linear model that places its staged heaters and coolers, solved with
+  HiGHS and no time limit: on a three-process site of 34 streams it had
+  not finished after 15 minutes, and neither a solver option nor
+  ``HENS_SITE_TIME_LIMIT`` reached it. It is now given 60 s, or the time
+  limit set in ``HENS_SOLVER_OPTIONS_EVM`` under any solver's option name,
+  and a solve stopped there starts the evolution from the best it found.
+  On that site the design now ends in 281 s. It ends in an error there
+  ("no successful task outcomes"): one site seed does not solve and the
+  other fails its site utility balance check, as they would have had the
+  model finished. ``HENS_SITE_TIME_LIMIT`` still does not apply to a
+  design with ``levels="given"``.
 
 0.10.0 (2026-11-25)
 -------------------
