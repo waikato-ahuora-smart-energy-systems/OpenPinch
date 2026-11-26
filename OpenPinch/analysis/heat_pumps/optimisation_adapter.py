@@ -637,7 +637,7 @@ def run_hpr_candidate_search(
         cached_scalar.runs_done = run_count
         cached_scalar.report("search", run_count, run_count, "runs")
         found = (*backend_candidates, *warm_start_candidates)
-        if found and "Carnot" in str(args.hpr_type):
+        if found and run_count > 1 and "Carnot" in str(args.hpr_type):
             # A Carnot objective costs milliseconds and has a kink at every
             # kink of the composite curves, with shallow basins between
             # them. The best point is swept one coordinate at a time and
@@ -645,6 +645,9 @@ def run_hpr_candidate_search(
             # once the others have moved with it, which the polish does, so
             # the two alternate until a sweep finds nothing. Every point
             # tried is ranked with the rest (``cached_scalar.viable``).
+            # A search of one run is a quick target by request and is not
+            # swept: a pass costs some 200 evaluations per variable, about
+            # as much as that search itself.
             best = min(found)
             point, value = best.point, best.objective
             # One step of its own, not a run reported at every value tried.
