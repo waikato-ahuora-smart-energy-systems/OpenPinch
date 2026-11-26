@@ -115,9 +115,16 @@ def _assert_sentinel_converged(
         == {HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP}
     ):
         return
+    diagnostics = getattr(outcome.error, "diagnostics", None)
     assert outcome.kind is HPROutcomeKind.SOLVED, (
         f"strict-success sentinel {assignment.parameter_id} returned "
         f"{outcome.kind.value}"
+        + (
+            ""
+            if diagnostics is None
+            else f"; failure categories {dict(diagnostics.category_counts)}; "
+            f"representative failures {diagnostics.representative_failures}"
+        )
     )
     # A solved sentinel must be feasible: its objective is its cost, with no
     # feasibility penalty on top.
