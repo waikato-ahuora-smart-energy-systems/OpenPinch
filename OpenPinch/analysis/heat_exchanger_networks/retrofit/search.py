@@ -317,11 +317,17 @@ def run_retrofit_search(
             UserWarning,
             stacklevel=3,
         )
-    base = evaluator.evaluate(
+    root = (
         _State(existing, frozenset(), ())
         if heat_pump is None
         else _heat_pump_root(existing, heat_pump, evaluator)
     )
+    base = evaluator.evaluate(root)
+    if base is None and evaluator.hold_idle_periods(root):
+        # An exchanger the network idles in a period may not be able to run
+        # there (its streams can cross): the idle periods are held, for the
+        # existing network and every design from it.
+        base = evaluator.evaluate(root)
     if base is None and heat_pump is not None:
         raise ValueError(
             f"the existing network with the heat pump {heat_pump.record.machine!r} "
@@ -970,6 +976,9 @@ class _Evaluator:
             None if heat_pump is None else float(heat_pump.base.utility_cost)
         )
         self.evaluations = 0
+        # Whether each recovery exchanger stays idle in the periods the
+        # network idles it in.
+        self.hold_idle = False
         # Solves that did not converge, or whose network failed its checks.
         self.failures = 0
         self._count_lock = threading.Lock()
@@ -985,6 +994,29 @@ class _Evaluator:
 
         with self._count_lock:
             self.failures += 1
+
+    def hold_idle_periods(self, state: _State) -> bool:
+        """Hold each recovery exchanger idle in the periods ``state``'s
+        network idles it in, in every solve from here on.
+
+        Returns whether the network has such a period (an exchanger with
+        duty in one period and none in another); without one nothing changes.
+        The periods are read from each design's own network, so they follow
+        the existing matches where they are. A relocated exchanger is a new
+        match somewhere else, with no duties yet: like a new unit it is free
+        in every period, since where it idled before says nothing of where
+        it now sits.
+        """
+
+        request = build_duty_optimisation_request(
+            state.network,
+            objective="cost",
+            min_approach_temperature=self.settings.approach,
+            problem_approach=self.settings.approach is None,
+        )
+        held = fixed_network_structure(request, self.arrays.axis_maps, hold_idle=True)
+        self.hold_idle = bool(held.spec.recovery_idle)
+        return self.hold_idle
 
     def evaluate(self, state: _State) -> _Evaluated | None:
         """Solve ``state``; ``None`` if the solve fails."""
@@ -1002,7 +1034,9 @@ class _Evaluator:
             min_approach_temperature=settings.approach,
             problem_approach=settings.approach is None,
         )
-        structure = fixed_network_structure(request, self.arrays.axis_maps)
+        structure = fixed_network_structure(
+            request, self.arrays.axis_maps, hold_idle=self.hold_idle
+        )
         exchangers = _structural_exchangers(state.network)
         ids = [exchangers[p].exchanger_id for p in structure.positions]
         enlargeable = {
@@ -1260,7 +1294,9 @@ class _Evaluator:
             objective="cost",
             min_approach_temperature=self.settings.approach,
         )
-        structure = fixed_network_structure(request, self.arrays.axis_maps)
+        structure = fixed_network_structure(
+            request, self.arrays.axis_maps, hold_idle=self.hold_idle
+        )
         exchangers = _structural_exchangers(state.network)
         ids = [exchangers[p].exchanger_id for p in structure.positions]
         try:

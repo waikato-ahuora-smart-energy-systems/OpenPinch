@@ -683,8 +683,9 @@ Exchangers that idle in a period
    given idles recovery exchangers in some periods (an exchanger with duty in
    one period and none in another), the solve is tried once more with each
    held idle in those periods, on the whole network: an exchanger a first
-   solve left at zero duty comes back. ``design.retrofit`` solves by its own
-   path and does not try again this way.
+   solve left at zero duty comes back. ``design.retrofit`` does the same
+   for the existing network: when its rating fails it is rated again with
+   those periods held, and they stay held in every design the search solves.
    ``selected_network.summary_metrics["idle_periods_held"]`` then counts the
    exchanger-periods held. A bare structure carries no duties, so nothing is
    held for it. An idle period's ``approach_temperatures`` are the
