@@ -192,6 +192,17 @@ Heat exchanger networks
   other fails its site utility balance check, as they would have had the
   model finished. ``HENS_SITE_TIME_LIMIT`` still does not apply to a
   design with ``levels="given"``.
+- A site design no longer fails with "verification failed: site utility
+  level ..." after its evolution has adopted a candidate. The adopting
+  model took the candidate's heater and cooler duties but kept its own
+  site imports, dumps and letdowns, so every level whose use or
+  generation the candidate changed missed its balance, by equal and
+  opposite amounts across two levels, and the task's networks were lost.
+  It now takes the candidate's solved imports, dumps and letdowns with
+  the duties. A two-process site beside a unit operation zone, which
+  raised, returns its network; the three-process site of 34 streams
+  returns one, at a site cost of 7,690,675 $/y in 281 s, where both
+  its seeds failed.
 
 0.10.0 (2026-11-25)
 -------------------
