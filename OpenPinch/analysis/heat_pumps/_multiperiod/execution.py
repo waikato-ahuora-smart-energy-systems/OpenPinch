@@ -166,19 +166,27 @@ def reject_penalised_periods(
 
     Each period is judged on its own result and inputs, so a penalty in a
     lightly weighted period is not diluted by the others, and the failure
-    reports that period's own duties.
+    reports that period's own duties. A period the machine is off in is no
+    failure unless it is off in all of them.
     """
     if not result.success:
         return result
     outputs = result.period_outputs or {}
+    idle, running = None, 0
     for case in args.period_cases:
         period = outputs.get(str(case.period_id))
         if period is None:
             continue
         checked = reject_penalised_design(period, case.args)
-        if not checked.success:
+        if checked.success:
+            running += 1
+        elif checked.failure_reason == ZERO_USEFUL_DUTY_REASON:
+            # A machine off in this period (a Carnot design that serves no
+            # duty there): no heat pump only if it is off in every period.
+            idle = checked
+        else:
             return checked
-    return result
+    return idle if idle is not None and not running else result
 
 
 __all__ = [
