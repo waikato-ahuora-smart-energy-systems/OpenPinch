@@ -143,7 +143,7 @@ Heat exchanger networks
   shift by the rounding.
 - An overdesign margin on a ``design_basis="all"`` design no longer drops
   the networks that idle an exchanger in a period, and such a network can
-  be rated and optimised. The fixed-structure model behind
+  be rated, optimised and retrofitted. The fixed-structure model behind
   ``design.optimise_duties``, ``design.retrofit``, the fit to every period
   and the overdesign margin held every recovery exchanger's approach in
   every period, idle or not, and refused a match whose supply temperatures
@@ -163,8 +163,10 @@ Heat exchanger networks
     some periods, the solve is tried once more with each held idle in
     those periods, on the whole network (an exchanger a first solve left
     at zero duty comes back). ``summary_metrics["idle_periods_held"]``
-    counts the exchanger-periods held. ``design.retrofit`` solves by its
-    own path and does not try again this way.
+    counts the exchanger-periods held. ``design.retrofit`` does the same
+    for the existing network, and then keeps those periods held in every
+    design it searches: it refused such a network as one that "does not
+    meet its targets at its installed areas".
 
   An idle period reports the difference its streams pass at as its
   ``approach_temperatures``; it reported the approach limit. On the crude
