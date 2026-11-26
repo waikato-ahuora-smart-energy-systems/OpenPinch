@@ -37,3 +37,27 @@ def test_a_carnot_target_warns_of_requested_levels_left_idle():
     assert sum(duty > 1e-6 for duty in target.hpr_details.Q_cond) == 1
     (warning,) = [w for w in caught if "condenser levels" in str(w.message)]
     assert "1 of its 2 evaporator levels" in str(warning.message)
+
+
+def test_a_level_a_shared_design_uses_in_another_period_is_not_idle():
+    # A design shared by several periods reports one period's duties at the
+    # top and every period's beneath. A level off in the reported period
+    # and running in another is in use.
+    import warnings
+    from types import SimpleNamespace
+
+    from OpenPinch.application._problem.accessors.target import _warn_of_idle_levels
+
+    def period(first_condenser):
+        return SimpleNamespace(Q_cond=[first_condenser, 300.0], Q_evap=[200.0])
+
+    reported = period(0.0)
+    details = SimpleNamespace(
+        Q_cond=reported.Q_cond,
+        Q_evap=reported.Q_evap,
+        period_outputs={"base": reported, "peak": period(120.0)},
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _warn_of_idle_levels(SimpleNamespace(hpr_details=details))

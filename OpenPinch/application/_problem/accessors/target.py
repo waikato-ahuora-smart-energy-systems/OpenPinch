@@ -149,6 +149,13 @@ _LEGACY_HPR_SURFACES = {
 }
 
 
+def _field(record, name: str):
+    """``name`` of a result held as an object or as a mapping."""
+    if isinstance(record, Mapping):
+        return record.get(name)
+    return getattr(record, name, None)
+
+
 def _warn_of_idle_levels(target) -> None:
     """Warn when a Carnot target leaves a requested level without duty.
 
@@ -156,17 +163,27 @@ def _warn_of_idle_levels(target) -> None:
     for the levels asked for, and the target reports success all the same.
     """
     details = getattr(target, "hpr_details", None)
+    # A design shared by several periods reports one period's duties at the
+    # top and every period's beneath: a level is idle only if no period
+    # uses it.
+    periods = [details, *(getattr(details, "period_outputs", None) or {}).values()]
     idle = []
-    for name, duties in (
-        ("condenser", getattr(details, "Q_cond", None)),
-        ("evaporator", getattr(details, "Q_evap", None)),
-    ):
-        if duties is None or len(duties) < 2:
+    for name, field in (("condenser", "Q_cond"), ("evaporator", "Q_evap")):
+        by_period = [
+            duties
+            for duties in (_field(period, field) for period in periods)
+            if duties is not None
+        ]
+        if not by_period or len(by_period[0]) < 2:
             continue
-        floor = 1e-6 * max(1.0, float(max(abs(duty) for duty in duties)))
-        unused = sum(abs(duty) <= floor for duty in duties)
+        levels = [
+            max(abs(float(duties[level])) for duties in by_period)
+            for level in range(len(by_period[0]))
+        ]
+        floor = 1e-6 * max(1.0, max(levels))
+        unused = sum(duty <= floor for duty in levels)
         if unused:
-            idle.append(f"{unused} of its {len(duties)} {name} levels")
+            idle.append(f"{unused} of its {len(levels)} {name} levels")
     if idle:
         warnings.warn(
             "the Carnot target leaves "
