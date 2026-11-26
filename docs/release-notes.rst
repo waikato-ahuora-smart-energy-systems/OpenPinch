@@ -246,7 +246,10 @@ Heat pumps and refrigeration
   third idle at some seeds and 210.8 kW with all three in use at others.
   A Carnot target that leaves a requested level without duty therefore
   warns, naming how many condenser and evaporator levels are idle.
-  Vapour compression and other cycles are not swept.
+  Vapour compression and other cycles are not swept, nor is a Carnot
+  search asked for one run (``maximum_restarts`` 0 or 1): a quick target,
+  which a sweep nearly doubles (a test that solves one on that case at a
+  quarter load went from 2.2 s to 3.9 s).
 
 0.10.0 (2026-11-25)
 -------------------

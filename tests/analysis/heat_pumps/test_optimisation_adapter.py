@@ -181,6 +181,23 @@ def test_a_carnot_search_sweeps_its_best_point_out_of_a_shallow_basin():
     assert candidates[0].objective == pytest.approx(0.0, abs=1e-9)
 
 
+def test_a_carnot_search_of_one_run_is_not_swept():
+    # A search asked for one run (``maximum_restarts`` 0 or 1) is one local
+    # search by request: a quick target. A sweep costs some 200 evaluations
+    # per variable whatever the search cost, which nearly doubled such a
+    # target (2.2 s to 3.9 s on the basic pinch case).
+    candidates = adapter.run_hpr_candidate_search(
+        objective=_two_basin_hpr_objective,
+        initial_points=None,
+        bounds=[(0.0, 1.0)],
+        args=_base_args(bb_minimiser="rbf_surrogate", max_multi_start=1),
+        optimiser=_stops_in_the_shallow_basin,
+    )
+
+    assert candidates[0].point == pytest.approx((0.2,), abs=1e-6)
+    assert candidates[0].objective == pytest.approx(0.05)
+
+
 def test_a_carnot_search_sweeps_again_from_each_polished_point(monkeypatch):
     # On the real objective a better condenser level pays only once the
     # evaporator levels have moved with it. A sweep moves one variable; the
