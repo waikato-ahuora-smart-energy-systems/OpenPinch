@@ -247,6 +247,20 @@ Heat pumps and refrigeration
   A Carnot target that leaves a requested level without duty therefore
   warns, naming how many condenser and evaporator levels are idle.
   Vapour compression and other cycles are not swept.
+- A Carnot target that serves nothing is an error, and a Carnot
+  refrigeration target says when it serves part of its duty. A threshold
+  problem with ambient air off leaves a heat pump nothing to draw on; its
+  Carnot target came back as a success of 0 kW of work, where the vapour
+  compression target of the same case raises. It now raises too
+  ("found no heat pump design that improves on the baseline without
+  one"). A Carnot refrigeration target still returns when it serves part
+  of the cooling asked for, as its model always can leave some to the cold
+  utilities (487 of 1,000 kW on the basic pinch case, whose cooling is all
+  above ambient), but it now warns with the duty served, the duty asked
+  for and the share; a vapour compression refrigerator in that position
+  raises. ``design.retrofit`` with ``heat_pump_cycle="carnot"`` used to
+  record such a 0 kW target as a heat pump modification and a machine
+  with no streams; it now leaves that step out with its warning.
 
 0.10.0 (2026-11-25)
 -------------------

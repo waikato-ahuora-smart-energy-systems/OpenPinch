@@ -315,8 +315,10 @@ def reject_penalised_design(
     at the end is not a target. Carnot designs only seed or screen, and their
     objective is not a cost, so they are kept.
     """
-    if not result.success or "Carnot" in str(args.hpr_type):
+    if not result.success:
         return result
+    if "Carnot" in str(args.hpr_type):
+        return _reject_idle_carnot_design(result, args)
     allowed = PENALTY_TOLERANCE * abs(float(result.obj))
     if float(result.feasibility_penalty) <= allowed:
         return result
@@ -330,6 +332,30 @@ def reject_penalised_design(
             "heating duty it must meet."
         )
     return HPRBackendResult.failure(reason=reason)
+
+
+def _reject_idle_carnot_design(
+    result: HPRBackendResult,
+    args: HeatPumpTargetInputs,
+) -> HPRBackendResult:
+    """Return a failure for a Carnot design that serves no duty.
+
+    A Carnot design keeps a penalty (it seeds and screens, and its objective
+    is not a cost), but one whose condensers and evaporators all carry
+    nothing is no heat pump: it fails as a vapour compression design of no
+    duty does. A result that reports no stage duties is left alone.
+    """
+    duties = [
+        np.asarray(stage, dtype=float)
+        for stage in (result.Q_cond, result.Q_evap)
+        if stage is not None
+    ]
+    if not duties:
+        return result
+    floor = 1e-9 * max(1.0, abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0)))
+    if all(float(np.sum(np.abs(stage))) <= floor for stage in duties):
+        return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+    return result
 
 
 def raise_hpr_targeting_error(

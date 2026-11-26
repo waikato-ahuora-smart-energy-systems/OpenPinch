@@ -179,6 +179,30 @@ def _warn_of_idle_levels(target) -> None:
         )
 
 
+def _warn_of_unserved_cooling(target) -> None:
+    """Warn when a Carnot refrigeration target serves part of its duty.
+
+    A Carnot target serves what its model can reach and reports success; a
+    vapour compression refrigerator that cannot serve its cooling raises.
+    """
+    load = getattr(target, "hpr_load", None)
+    if load is None or getattr(load, "mode", None) != "refrigeration":
+        return
+    selected, achieved = float(load.selected), float(load.achieved)
+    # A search stops a little short of the last watt.
+    if achieved >= selected * (1.0 - 1e-3):
+        return
+    warnings.warn(
+        f"the Carnot refrigeration target serves {achieved:.4g} of the "
+        f"{selected:.4g} {load.heat_flow_unit} of cooling asked for "
+        f"({100.0 * achieved / selected:.1f} %): the rest is left to the cold "
+        "utilities. A vapour compression refrigeration target of the same "
+        "case must serve its whole duty and raises when it cannot.",
+        UserWarning,
+        stacklevel=3,
+    )
+
+
 def _legacy_load(load_fraction, load_duty, period_loads):
     """An ``HprLoad`` from a named method's load arguments, or ``None``."""
     _load_options(
@@ -969,6 +993,7 @@ class _TargetAccessor:
         )
         if spec.id == "carnot":
             _warn_of_idle_levels(target)
+            _warn_of_unserved_cooling(target)
         return target
 
     def _gateway_fluid_set_runs(self, spec, request, topology, cycle_options, zone):
