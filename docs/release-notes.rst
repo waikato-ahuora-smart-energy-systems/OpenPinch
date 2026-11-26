@@ -227,6 +227,26 @@ Heat pumps and refrigeration
   with two condensers and two evaporators (``is_cascade_cycle=False``)
   the target is now 216.0 kW of work at search seeds 0 and 1; it was
   263.4 kW with the second machine idle at seed 0 and 230.7 kW at seed 1.
+- A Carnot heat pump target no longer stops in a shallow basin of its
+  objective, and says when it leaves a level idle. The Carnot objective
+  has a kink at every kink of the composite curves, with small rises
+  between them, and a restart of the search could stop behind one: on the
+  basic pinch case at full load, a cascade of two condensers and two
+  evaporators was 231.4 kW of work at ``HPR_SEARCH_SEED`` 0 and 217.0 kW at
+  seeds 1 and 2, with the second condenser at 200.3 degC against 176.0 degC
+  and a rise of 0.3 % of the objective between them. A Carnot search now
+  sweeps its best point one coordinate at a time across its bounds,
+  polishes what the sweep reaches, and repeats while that improves (about
+  1,200 evaluations of a millisecond objective per pass over six
+  variables; the target took 77 s where it took 61 s). That case is now
+  217.5, 217.0 and 217.0 kW at seeds 0, 1 and 2. A sweep moves one
+  variable at a time, so a target that needs two levels moved together can
+  still stop
+  with a level idle: three condensers on that case give 217.0 kW with the
+  third idle at some seeds and 210.8 kW with all three in use at others.
+  A Carnot target that leaves a requested level without duty therefore
+  warns, naming how many condenser and evaporator levels are idle.
+  Vapour compression and other cycles are not swept.
 
 0.10.0 (2026-11-25)
 -------------------

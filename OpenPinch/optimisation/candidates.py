@@ -20,11 +20,71 @@ logger = logging.getLogger(__name__)
 _POLISH_SOLVER_ERRORS = (ValueError, ArithmeticError, np.linalg.LinAlgError)
 
 __all__ = [
+    "SWEEP_POINTS",
+    "SWEEP_ROUNDS",
     "_cluster_candidates",
     "_evaluate_scalar_objective",
     "_polish_candidates",
     "_postprocess_candidates",
+    "sweep_coordinates",
 ]
+
+
+SWEEP_POINTS = 101
+"""Values a coordinate sweep tries across each coordinate's bounds."""
+
+SWEEP_ROUNDS = 6
+"""Passes a coordinate sweep makes over the coordinates at most."""
+
+
+def sweep_coordinates(
+    objective: Callable,
+    point,
+    bounds,
+    *,
+    points: int = SWEEP_POINTS,
+    rounds: int = SWEEP_ROUNDS,
+) -> tuple[tuple[float, ...], float]:
+    """Improve ``point`` one coordinate at a time by sweeping its bounds.
+
+    A local search stays in the basin it starts in. Each pass tries
+    ``points`` evenly spaced values of each coordinate in turn, the others
+    held, and moves to the best where that lowers the objective, so a rise
+    between two basins along one coordinate is stepped over. Each
+    coordinate is then tried again at ``points`` values between the grid
+    values beside its best, which finds an optimum at a kink to a
+    hundredth of a grid step. It stops after a pass that moves nothing, or
+    ``rounds`` passes. Returns the point and its objective, the start's
+    when nothing is better. A sweep costs up to ``2 * rounds * points``
+    evaluations per coordinate, so it suits cheap objectives; a coordinate
+    with equal bounds is left alone.
+    """
+
+    best = [float(value) for value in point]
+    best_value = float(objective(tuple(best)))
+    for _round in range(rounds):
+        moved = False
+        for index, (lower, upper) in enumerate(bounds):
+            if upper <= lower:
+                continue
+            # Twice: across the bounds, then between the grid values beside
+            # the best, since an optimum at a kink falls between grid values.
+            span = (float(lower), float(upper))
+            for _pass in range(2):
+                trial = list(best)
+                for candidate in np.linspace(*span, points):
+                    trial[index] = float(candidate)
+                    value = float(objective(tuple(trial)))
+                    if value < best_value:
+                        best[index], best_value, moved = float(candidate), value, True
+                step = (span[1] - span[0]) / (points - 1)
+                span = (
+                    max(float(lower), best[index] - step),
+                    min(float(upper), best[index] + step),
+                )
+        if not moved:
+            break
+    return tuple(best), best_value
 
 
 def _evaluate_scalar_objective(

@@ -11,6 +11,7 @@ Reusable bounded scalar minimisation that returns several ranked local minima ra
 - `TaskScopedObjective`, `TaskPhase` (`execution.py`): protocol for objectives that hold per-task state.
 - `_collect_candidates_in_parallel` (`execution.py`): run backend runs in worker processes when a batch is slow enough to justify them, serially otherwise.
 - `_cluster_candidates`, `_polish_candidates`, `_postprocess_candidates`, `_evaluate_scalar_objective` (`candidates.py`): shared ranking, clustering and local polishing, listed in `__all__` for the backends.
+- `sweep_coordinates(objective, point, bounds, points=, rounds=)`, `SWEEP_POINTS`, `SWEEP_ROUNDS` (`candidates.py`): improve a point one coordinate at a time by trying `points` evenly spaced values across its bounds, then `points` more between the grid values beside the best, for up to `rounds` passes or until a pass moves nothing; returns the point and its objective. It steps over a rise between two basins along one coordinate and finds an optimum at a kink; it costs up to `2 * rounds * points` evaluations per coordinate, so it is for cheap objectives.
 - Subdirectories: [backends](./backends/README.md) - the four search backends and their multistart plumbing.
 
 ## Invariants

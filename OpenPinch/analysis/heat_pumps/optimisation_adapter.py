@@ -39,6 +39,7 @@ from ...domain.enums import HeatPumpAndRefrigerationCycle
 from ...domain.progress import emit as emit_progress
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
+from ...optimisation.candidates import SWEEP_ROUNDS, sweep_coordinates
 from ...optimisation.errors import NoOptimisationCandidatesError
 from ...optimisation.models import (
     OptimisationCandidate,
@@ -609,6 +610,43 @@ def run_hpr_candidate_search(
                 continue
         cached_scalar.runs_done = run_count
         cached_scalar.report("search", run_count, run_count, "runs")
+        found = (*backend_candidates, *warm_start_candidates)
+        if found and "Carnot" in str(args.hpr_type):
+            # A Carnot objective costs milliseconds and has a kink at every
+            # kink of the composite curves, with shallow basins between
+            # them. The best point is swept one coordinate at a time and
+            # what the sweep reaches is polished; a better level pays only
+            # once the others have moved with it, which the polish does, so
+            # the two alternate until a sweep finds nothing. Every point
+            # tried is ranked with the rest (``cached_scalar.viable``).
+            best = min(found)
+            point, value = best.point, best.objective
+            # One step of its own, not a run reported at every value tried.
+            cached_scalar.runs_done = None
+            cached_scalar.report("sweep", 0, 1, "sweeps")
+            for _pass in range(SWEEP_ROUNDS):
+                swept, swept_value = sweep_coordinates(
+                    cached_scalar, point, problem.bounds, rounds=1
+                )
+                if not swept_value < value:
+                    break
+                point, value = swept, swept_value
+                if not _can_finish_gradient(cached_scalar, budget, point):
+                    break
+                polished = minimize(
+                    cached_scalar,
+                    point,
+                    method="SLSQP",
+                    bounds=problem.bounds,
+                    options={"maxiter": budget.maximum_iterations},
+                )
+                if float(polished.fun) < value:
+                    point = tuple(
+                        float(np.clip(x, lower, upper))
+                        for x, (lower, upper) in zip(polished.x, problem.bounds)
+                    )
+                    value = float(cached_scalar(point))
+            cached_scalar.report("sweep", 1, 1, "sweeps")
     except _HPRSearchBudgetExhausted:
         pass
 
