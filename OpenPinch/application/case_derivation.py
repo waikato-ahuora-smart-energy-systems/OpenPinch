@@ -226,6 +226,37 @@ def _thermal_record(part) -> dict:
     }
 
 
+HEAT_PUMP_TEMPERATURE_DECIMALS = 5
+"""Decimals a heat pump stream's temperatures are written at: one fewer
+than the problem table's tolerance (``tol``, 1e-6 K)."""
+
+
+def _clear_of_table_tolerance(record: dict) -> dict:
+    """``record`` with its temperatures (and its segments') rounded.
+
+    A converged target puts a level at a kink of the composite curves to
+    the search's tolerance, about 1e-6 K. The problem table merges
+    temperatures within 1e-6 K, so a 0.01 K stream that ends that far
+    under a process temperature is stretched onto it and gains 1e-4 of its
+    duty. Rounded one decimal coarser than the table's tolerance, the end
+    lands on the process temperature or clear of it.
+    """
+
+    def rounded(value: dict) -> dict:
+        if "values" in value:
+            each = [round(v, HEAT_PUMP_TEMPERATURE_DECIMALS) for v in value["values"]]
+            return {**value, "values": each}
+        return {**value, "value": round(value["value"], HEAT_PUMP_TEMPERATURE_DECIMALS)}
+
+    out = {
+        key: rounded(value) if key in ("t_supply", "t_target") else value
+        for key, value in record.items()
+    }
+    if "segments" in out:
+        out["segments"] = [_clear_of_table_tolerance(s) for s in out["segments"]]
+    return out
+
+
 def _heat_pump_zone_address(problem, target, zone) -> str:
     """The process zone a heat pump target's streams are added to: the
     target's own zone, or the process zone under it that ``zone`` names
@@ -821,7 +852,7 @@ def _case_with_heat_pump_streams(
             if by_period:
                 # A shared design: the stream's value in every period.
                 record |= _period_thermal_record(by_period[role][stream.name])
-            source["streams"].append(record)
+            source["streams"].append(_clear_of_table_tolerance(record))
     return type(problem)(
         source,
         project_name=problem.project_name if project_name is None else project_name,
