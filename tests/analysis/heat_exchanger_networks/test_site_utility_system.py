@@ -335,6 +335,30 @@ def _cascade_cost(levels, use, generation, dump) -> tuple[float, float, float]:
 
 @settings(deadline=None)
 @given(_cascades())
+def test_the_balance_of_fixed_loads_costs_what_the_models_own_block_does(case):
+    """``balance_of_loads`` writes the same rows for SciPy that
+    ``add_site_balance`` writes into a model; the two must not drift."""
+    from OpenPinch.analysis.heat_exchanger_networks.site.utility_system import (
+        balance_of_loads,
+    )
+
+    levels, use, generation, _dump = case
+    names = [level.name for level in levels]
+    site = SiteUtilityLevels(levels=tuple(levels))
+    used = {name: (q,) for name, q in zip(names, use, strict=True)}
+    raised = {name: (q,) for name, q in zip(names, generation, strict=True)}
+
+    alone = balance_of_loads(site, used, raised)
+
+    in_a_model = _balance(site, used, raised)
+    assert alone.operating_cost == pytest.approx(
+        in_a_model.operating_cost, rel=1e-7, abs=1e-5
+    )
+    _closes(alone)
+
+
+@settings(deadline=None)
+@given(_cascades())
 def test_with_prices_rising_with_temperature_the_balance_is_the_site_cascade(case):
     """The Total Site cascade sends generation down to the hottest unmet
     use; with import prices rising with temperature and one dump price,
