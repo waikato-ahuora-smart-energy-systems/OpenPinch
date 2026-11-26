@@ -106,11 +106,13 @@ def test_a_retrofit_takes_the_networks_json_as_its_existing_network(pumped):
     assert existing.network.heat_pumps == pumped.heat_pumps
 
 
-def test_a_retrofit_that_adds_a_heat_pump_keeps_the_existing_one():
-    """A retrofit with ``heat_pump_cycle`` records its own machine on the
-    networks of its heat pump step. The existing network's machine, at half
-    load here, stays ahead of it. The step's network recorded one machine:
-    the existing one had replaced the step's."""
+def test_a_retrofit_whose_heat_pump_step_serves_nothing_adds_no_machine():
+    """A retrofit with ``heat_pump_cycle`` on a network that holds a machine,
+    at half load here. The step's Carnot target of the heaters left serves
+    no duty, which is no target, so the step is left out and every design
+    keeps the one machine. That target used to come back as a success of
+    0 kW, and the retrofit recorded it as a heat pump modification and a
+    second machine with no streams."""
     view = PinchProblem(
         source=basic_source(), project_name="basic"
     ).design.heat_exchanger_network(
@@ -127,17 +129,15 @@ def test_a_retrofit_that_adds_a_heat_pump_keeps_the_existing_one():
     half = next(o.network for o in view.top(1000) if o.network.heat_pumps)
     problem = PinchProblem(source=basic_source(), project_name="basic")
 
-    result = problem.design.retrofit(
-        half.model_dump(mode="json"),
-        max_modifications=1,
-        heat_pump_cycle="carnot",
-        heat_pump_cost=200.0,
-    )
+    with pytest.warns(UserWarning, match="step at size 1 was left out of the"):
+        result = problem.design.retrofit(
+            half.model_dump(mode="json"),
+            max_modifications=1,
+            heat_pump_cycle="carnot",
+            heat_pump_cost=200.0,
+            heat_pump_sizes=(1.0,),
+        )
 
-    stepped = next(
-        design
-        for design in result.frontier
-        if any(m.kind == "heat_pump" for m in design.modifications)
-    )
-    assert len(stepped.network.heat_pumps) == 2
-    assert stepped.network.heat_pumps[0] == half.heat_pumps[0]
+    for design in result.frontier:
+        assert not any(m.kind == "heat_pump" for m in design.modifications)
+        assert design.network.heat_pumps == half.heat_pumps

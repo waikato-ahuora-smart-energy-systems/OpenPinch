@@ -699,6 +699,49 @@ def test_a_carnot_heat_pump_screen_keeps_its_penalised_design():
     assert result.obj == pytest.approx(100.0)
 
 
+def test_a_carnot_design_that_serves_no_duty_is_not_a_target():
+    # A Carnot heat pump with no source (a threshold problem with ambient
+    # air off) came back as a successful target of 0 kW; the vapour
+    # compression target of the same case raises.
+    def idle(point, _args, debug=False):
+        return _result(0.5).with_updates(
+            Q_cond=np.array([0.0, 0.0]), Q_evap=np.array([0.0, 0.0])
+        )
+
+    with pytest.raises(HPRTargetingError, match="improves on the baseline"):
+        adapter.solve_hpr_placement(
+            f_obj=idle,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_base_args(),
+            candidate_search=lambda **_kwargs: (
+                OptimisationCandidate(objective=0.5, point=(0.5,)),
+            ),
+        )
+
+
+def test_a_carnot_refrigerator_short_of_its_duty_is_still_a_target():
+    # A Carnot target serves what its model can: on the basic pinch case a
+    # refrigerator reaches 487 of 1,000 kW at a full search. It is kept, and
+    # the public target warns of the shortfall.
+    def short(point, _args, debug=False):
+        return _result(0.5).with_updates(
+            Q_cond=np.array([150.0]), Q_evap=np.array([90.0])
+        )
+
+    result = adapter.solve_hpr_placement(
+        f_obj=short,
+        x0_ls=None,
+        bnds=[(0.0, 1.0)],
+        args=_base_args(is_heat_pumping=False, Q_hpr_target=200.0),
+        candidate_search=lambda **_kwargs: (
+            OptimisationCandidate(objective=0.5, point=(0.5,)),
+        ),
+    )
+
+    assert result.obj == pytest.approx(0.5)
+
+
 def test_a_heat_pump_short_of_its_enforced_duty_says_what_it_serves():
     args = _base_args(
         hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
