@@ -304,6 +304,17 @@ Heat pumps and refrigeration
   air is now written so that it keeps its own contribution at the
   design's multiplier, as a retrofit and ``with_heat_pump_streams``
   already do.
+- A project name with a dot no longer breaks the heat pump paths. A
+  stream's zone label has its dots written as dashes when it is read, and
+  the root zone, named for the project, kept its dot: the JSON of a
+  problem named ``"Plant v1.2"`` named zones under ``Plant v1.2`` that
+  the reader looked for under ``Plant v1-2``, so
+  ``design.heat_exchanger_network(heat_pump=...)``,
+  ``with_heat_pump_streams`` and any other call that builds a problem
+  from another's JSON raised "could not resolve zone". A zone named with
+  a dot, the root among them, now has it written as a dash too, with the
+  warning a stream's name gets. The root zone of such a problem is
+  ``Plant v1-2`` in addresses and reports; ``project_name`` is unchanged.
 
 0.10.0 (2026-11-25)
 -------------------
