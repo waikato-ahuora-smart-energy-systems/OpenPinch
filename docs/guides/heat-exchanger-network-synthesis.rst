@@ -692,7 +692,9 @@ Exchangers that idle in a period
    ``selected_network.summary_metrics["idle_periods_held"]`` then counts the
    exchanger-periods held. A bare structure carries no duties, so nothing is
    held for it. An idle period's ``approach_temperatures`` are the
-   difference the two streams pass at, which may be negative.
+   difference the two streams pass at, reported as zero where the cold
+   stream is the hotter there (an approach is never negative): the period's
+   inlet and outlet temperatures show the crossing.
 
 Segmented streams and utilities
    Streams with segments keep their piecewise temperature-heat profile: each
