@@ -29,6 +29,7 @@ from ...domain.enums import (
 )
 from ...domain.heat_exchanger import HeatExchanger
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
+from ...domain.stream_collection import StreamCollection
 from ...domain.zone import Zone
 from ..targeting.utilities import _calculate_assigned_utility_duties, is_default_utility
 from .execution.settings import SynthesisWorkflowSettings
@@ -340,8 +341,12 @@ def _level_duties(
     """Each utility's duty in period ``n``, as targeting assigns it.
 
     By price, the cheapest utility serves first (a default one last), each
-    as far as its level reaches: on one side alone each level can take all
-    the heat beyond it, so this is the cheapest assignment.
+    as much as its cap and its reach allow. On one side alone a utility can
+    serve only the heat beyond its level (its reach, as targeting's
+    algorithm gives it for that utility alone), and the reaches nest: the
+    utilities reaching no further than one level share at most that level's
+    reach. Cheapest first within those limits is the cheapest assignment,
+    and a capped cheap utility leaves the far end of its reach to others.
     """
     levels = [
         _value(getattr(utility, name), "K", period_idx=n)
@@ -352,30 +357,61 @@ def _level_duties(
     # Targeting reads each utility's level in the unit it is stored in.
     reference = utilities[0][1].shifted_maximum_temperature
     offset = float(reference[n]) - _value(reference, "K", period_idx=n)
-    order = (
-        sorted(
-            range(len(utilities)),
-            key=lambda u: (
-                is_default_utility(utilities[u][1]),
-                _value(utilities[u][1].price, "$/MW/h", period_idx=n),
-                _assignment_rank(side, utilities[u][1], n),
-            ),
-        )
-        if by_price
-        else None
-    )
-    return list(
-        _calculate_assigned_utility_duties(
+
+    def assigned(u_ls) -> tuple[float, ...]:
+        return _calculate_assigned_utility_duties(
             T_vals=temperatures + offset,
             H_vals=heat,
-            u_ls=[utility for _, utility, _ in utilities],
+            u_ls=u_ls,
             pinch_row=len(temperatures) - 1 if side.heating else 0,
             is_hot_ut=side.heating,
             is_real_temperatures=False,
             idx=n,
-            order=order,
         )
+
+    targeted = list(assigned([utility for _, utility, _ in utilities]))
+    if not by_price:
+        return targeted
+    reach = [assigned([_Uncapped(utility)])[0] for _, utility, _ in utilities]
+    caps = [_cap(utility, n) for _, utility, _ in utilities]
+    order = sorted(
+        range(len(utilities)),
+        key=lambda u: (
+            is_default_utility(utilities[u][1]),
+            _value(utilities[u][1].price, "$/MW/h", period_idx=n),
+            _assignment_rank(side, utilities[u][1], n),
+        ),
     )
+    total = sum(targeted)
+    duties = [0.0] * len(utilities)
+    for u in order:
+        room = min(
+            reach[k]
+            - sum(duties[v] for v in range(len(duties)) if reach[v] <= reach[k])
+            for k in range(len(reach))
+            if reach[k] >= reach[u]
+        )
+        duties[u] = max(0.0, min(caps[u], room, total - sum(duties)))
+    return duties
+
+
+class _Uncapped:
+    """A utility with no maximum heat flow: what its level alone reaches."""
+
+    maximum_heat_flow = None
+
+    def __init__(self, utility) -> None:
+        self._utility = utility
+
+    def __getattr__(self, name: str):
+        return getattr(self._utility, name)
+
+
+def _cap(utility, n: int) -> float:
+    """A utility's maximum heat flow in period ``n``; infinite without one."""
+    if utility.maximum_heat_flow is None:
+        return float("inf")
+    return float(StreamCollection._value_at_idx(utility._maximum_heat_flow, n))
 
 
 def _bands(

@@ -243,6 +243,39 @@ def test_price_placement_cools_a_hot_only_problem_on_the_cheapest_utility():
     _assert_same_duties(_design_duties(network), {"CW": total})
 
 
+def test_price_placement_lets_a_capped_cheap_utility_take_the_cold_end():
+    """CW (5 $/MWh) is capped at 50 kW. By price it takes 50 kW at the
+    stream's cold end, leaving LPS (20 $/MWh) all the heat above its level,
+    92.5 kW, and chilled water (25 $/MWh) the 17.5 kW between. Taking CW's
+    50 kW at the hot end first left LPS 42.5 kW and chilled water 67.5 kW
+    (Codex review of #550)."""
+    capped_cw = {
+        **_utility("CW", "Cold", 20.0, 25.0, 5.0),
+        "maximum_heat_flow": _quantity(50.0, "kW"),
+    }
+    problem = PinchProblem(
+        {
+            "streams": [_stream("H1", 200.0, 40.0, 160.0)],
+            "utilities": [
+                _utility("MPS", "Cold", 150.0, 150.1, 30.0),
+                _utility("LPS", "Cold", 100.0, 100.1, 20.0),
+                capped_cw,
+                _utility("ChW", "Cold", 5.0, 10.0, 25.0),
+            ],
+            "options": {"HENS_UTILITY_PLACEMENT": "price"},
+        }
+    )
+
+    duties = _design_duties(
+        problem.design.heat_exchanger_network(width=0, depth=0).selected_network
+    )
+
+    assert duties["CW"] == pytest.approx(50.0)
+    assert duties["LPS"] == pytest.approx(92.5, abs=0.2)
+    assert duties["ChW"] == pytest.approx(17.5, abs=0.2)
+    assert "MPS" not in duties
+
+
 def _targets_of_zone(problem, zone):
     result = problem.target.direct_heat_integration(zone=zone)
     return {

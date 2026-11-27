@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Sequence
 from typing import Tuple
 
 import numpy as np
@@ -284,13 +283,8 @@ def _calculate_assigned_utility_duties(
     is_hot_ut: bool,
     is_real_temperatures: bool,
     idx: int | None,
-    order: Sequence[int] | None = None,
 ) -> tuple[float, ...]:
-    """Return ordered utility duties using the canonical targeting algorithm.
-
-    ``order`` (indices of ``u_ls``) replaces targeting's own order, the
-    least valuable level first, in which the utilities serve.
-    """
+    """Return ordered utility duties using the canonical targeting algorithm."""
     # Assisted heat transfer can keep a pocket below the pinch whose heating
     # demand still needs hot utility. Extend the hot segment to the last row of
     # the demand profile that has any, so the utility balance closes. Without
@@ -345,20 +339,16 @@ def _calculate_assigned_utility_duties(
     collection_order = (
         range(len(utilities) - 1, -1, -1) if is_hot_ut else range(len(utilities))
     )
-    indices = (
-        list(order)
-        if order is not None
-        else sorted(
-            collection_order,
-            key=lambda i: (
-                is_default_utility(utilities[i]),
-                *(
-                    (levels[i][0], levels[i][1])
-                    if is_hot_ut
-                    else (-levels[i][0], -levels[i][1])
-                ),
+    indices = sorted(
+        collection_order,
+        key=lambda i: (
+            is_default_utility(utilities[i]),
+            *(
+                (levels[i][0], levels[i][1])
+                if is_hot_ut
+                else (-levels[i][0], -levels[i][1])
             ),
-        )
+        ),
     )
     Q_assigned = 0.0
     for utility_index in indices:
