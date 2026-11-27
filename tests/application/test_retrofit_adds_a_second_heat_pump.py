@@ -109,3 +109,16 @@ def test_a_retrofits_machine_takes_a_name_the_network_does_not_hold():
     assert _free_machine_name(network()) == "HP"
     assert _free_machine_name(network("HP")) == "HP2"
     assert _free_machine_name(network("HP", "HP2")) == "HP3"
+
+
+def test_a_retrofits_machine_avoids_the_names_its_streams_would_take():
+    # A machine labelled HP2 whose streams kept a target's own names
+    # (HP_H1, HP_C1): a new machine HP would name its streams the same.
+    from OpenPinch.application._problem.accessors.design import _free_machine_name
+
+    held = SimpleNamespace(
+        machine="HP2",
+        streams=({"name": "HP_H1"}, {"name": "HP_C1"}, {"name": "AIR_H1"}),
+    )
+
+    assert _free_machine_name(SimpleNamespace(heat_pumps=[held])) == "HP3"
