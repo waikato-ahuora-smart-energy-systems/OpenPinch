@@ -331,10 +331,8 @@ Heat pumps and refrigeration
   out at every size with a warning to "rename the process stream". The
   added machine is now named ``HP2`` (the first of ``HP``, ``HP2``,
   ``HP3`` the network does not hold) and its streams after it
-  (``HP2_H1``, ``HP2_C1``). On the basic pinch case with a half-load
-  machine in the network and electricity at 20 $/MWh, the retrofit adds a
-  223 kW machine beside the 375 kW one, and the network reads again from
-  its JSON with both.
+  (``HP2_H1``, ``HP2_C1``). A network with both reads again from its
+  JSON.
 - A retrofit's heat pump step is no longer lost to a level at round-off.
   A heat pump search leaves a level it does not use at a duty of
   round-off, not 0 (a condenser at 0.0003 kW beside two of 760 and
