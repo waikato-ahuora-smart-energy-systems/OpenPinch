@@ -7,7 +7,8 @@ temperatures. The site is then designed again at the shifted level, each
 process holding its levels re-targeted there, and the move is adopted only
 on a lower site total annual cost. With no improving move the step halves,
 down to its minimum. The structure is not fixed by the move itself: the
-re-design starts from the current best network's recovery matches.
+re-design starts from the current best network's recovery matches and
+staged heaters and coolers.
 """
 
 from __future__ import annotations
@@ -191,14 +192,20 @@ def level_duties(
 
 
 def move_seed(case: "PinchProblem", network):
-    """A site seed for ``case``: ``network``'s recovery matches, with each
-    process's level duties re-targeted at ``case``'s levels."""
-    from ..analysis.heat_exchanger_networks.site.seeds import _multiplier, _recovery
+    """A site seed for ``case``: ``network``'s recovery matches and staged
+    heaters and coolers (as a site seed keeps them, so a stream keeps a
+    stage for each level between its matches), with each process's level
+    duties re-targeted at ``case``'s levels."""
+    from ..analysis.heat_exchanger_networks.site.seeds import (
+        _multiplier,
+        _recovery,
+        _staged,
+    )
     from ..domain.heat_exchanger_network import HeatExchangerNetwork
 
     multiplier = _multiplier(network)
     return HeatExchangerNetwork(
-        exchangers=tuple(_recovery(network)),
+        exchangers=tuple(_recovery(network) + _staged(network)),
         run_id="site-level-move",
         method="site_pinch_design",
         stage_count=network.stage_count,
@@ -222,7 +229,7 @@ def refine_levels(
     Each round tries every level of ``levels`` (default: every placed
     level) up and down by ``step``; ``evaluate(shifted, view)`` designs the
     shifted case from the current view (a move is seeded with its selected
-    network's recovery matches). The unshifted levels are first
+    network's ``move_seed``). The unshifted levels are first
     evaluated the same way, as the baseline the moves must beat (the
     start's network may come from a seed no move builds). The cheapest
     move below the current cost is adopted; with none, the step halves,

@@ -143,6 +143,27 @@ def test_a_one_sided_processs_level_duties_are_retargeted_too():
     assert all(d == [0.0] for name, d in boiling.items() if name.startswith("Cold"))
 
 
+def test_a_move_seed_keeps_the_networks_staged_heaters_and_coolers():
+    """As a site seed does: the staged coolers give the task a stage for each
+    of H1's levels between its matches. Without them a stream needing two
+    staged units between two matches cannot be designed, and every move
+    fails, the unshifted baseline included (review finding 14)."""
+    from tests.analysis.heat_exchanger_networks.test_site_design import (
+        IP,
+        LP,
+        _raising_network,
+    )
+
+    seed = moves.move_seed(_site(), _raising_network())
+
+    assert {e.exchanger_id for e in seed.exchangers} == {
+        "recovery:A.H1->A.C1:S1",
+        "recovery:A.H1->A.C2:S5",
+        f"cold-utility:A.H1->{IP}:S3",
+        f"cold-utility:A.H1->{LP}:S4",
+    }
+
+
 def _view(cost):
     return SimpleNamespace(
         selected_network=SimpleNamespace(total_annual_cost=cost, summary_metrics={})

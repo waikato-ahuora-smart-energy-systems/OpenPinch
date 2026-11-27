@@ -18,6 +18,12 @@ Heat exchanger networks
   ``heat_exchanger_network`` does. A site network does not record its
   processes, so evolving it again matched streams across processes with no
   piping cost and did not hold each process's levels, with no warning.
+- Site level moves design again. A move's seed kept only the selected
+  network's recovery matches, so a stream that needs two staged heaters or
+  coolers between two matches had no stage for the second, and every move
+  failed, the unshifted baseline included (all 13 designs on two of three
+  small sites). The seed now keeps the network's staged heaters and
+  coolers, as a site seed does.
 - The guide and ``design.thermal_derivative``'s docstring now say what the
   thermal derivative step minimises: hot utility (the utilities' cost
   where a side has a choice), not total annual cost as the guide said. On
