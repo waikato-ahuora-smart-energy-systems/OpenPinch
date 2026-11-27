@@ -14,6 +14,13 @@ Heat exchanger networks
   only in the peak period the design cost 332,284 $/y against 308,263 on
   ``design_basis="all"``, with no warning. A ``UserWarning`` now names
   each such stream and the share of the year it runs.
+- A multiperiod design's ``total_heat_recovery``, ``total_hot_utility``
+  and ``total_cold_utility`` are the year's. On every design over several
+  periods they raised "period_id is required when a network has multiple
+  period states", though the properties take no period. They are now the
+  mean over the periods, weighted by each period's share of the year: the
+  crude preheat train's hot utility is 792.3 kW (its three periods at 0.2,
+  0.6 and 0.2). ``views()`` still gives each period's own.
 - A small stream's exchangers are kept beside a large stream's.
   ``design.optimise_duties``, the multiperiod fit and every other use of
   the fixed-structure model took an exchanger with a duty under 1e-4 of
