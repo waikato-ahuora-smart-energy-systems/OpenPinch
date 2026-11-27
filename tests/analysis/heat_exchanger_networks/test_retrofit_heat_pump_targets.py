@@ -553,3 +553,44 @@ def test_a_target_is_priced_at_the_utilities_the_network_uses(monkeypatch):
 
     scale, _capital = annual_cost_scales(problem.master_zone.config.costing)
     assert piped.hot_utility_price == pytest.approx(40.68 * scale)
+
+
+def test_a_vapour_compression_target_reports_its_duties():
+    """A vapour compression result carries its stages' heating and cooling
+    as ``Q_heat`` and ``Q_cool``; ``Q_cond`` and ``Q_evap`` are a Carnot
+    result's and are ``None`` on it. The summary summed those and reported
+    NaN for the heat delivered, the heat absorbed and both duty tuples,
+    and so for ``heat_pump_gap``."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    result = SimpleNamespace(
+        Q_cond=None,
+        Q_evap=None,
+        Q_heat=np.array([60.0, 40.0]),
+        Q_cool=np.array([70.0]),
+        Q_amb_hot=10.0,
+        w_net=30.0,
+        cop_h=100.0 / 30.0,
+        T_cond=np.array([90.0, 70.0]),
+        T_evap=np.array([20.0]),
+        hpr_total_annualized_cost=None,
+    )
+    prices = {
+        "hot_utility_price": 300.0,
+        "cold_utility_price": 20.0,
+        "electricity_price": 800.0,
+    }
+
+    summary = heat_pump_targets._summary(
+        result, np.array([0.0, -120.0]), np.array([150.0, 0.0]), prices
+    )
+
+    assert summary.heat_delivered == pytest.approx(100.0)
+    assert summary.condenser_duties == pytest.approx((60.0, 40.0))
+    assert summary.evaporator_duties == pytest.approx((70.0,))
+    # 70 kW of evaporator heat, 10 kW of it from air.
+    assert summary.process_heat_absorbed == pytest.approx(60.0)
