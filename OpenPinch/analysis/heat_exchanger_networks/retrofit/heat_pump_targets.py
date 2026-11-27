@@ -52,13 +52,19 @@ def _relieved_price(
 
     A condenser level at ``T`` reaches the part of a heater's shifted range
     below ``T - HPR_DT_CONT``; an evaporator at ``T``, the part of a
-    cooler's above ``T + HPR_DT_CONT``. ``None`` when it reaches none,
-    which prices it at the side's blend.
+    cooler's above ``T + HPR_DT_CONT``. The ranges are shifted as the
+    target saw them: by each stream's contribution times
+    ``dt_cont_multiplier``, or not at all with an ``approach``, which is
+    then the heat pump's own. ``None`` when it reaches none, which prices it
+    at the side's blend.
     """
 
     hot = side == "hot"
     config = problem.master_zone.config
-    approach = float(config.hpr.dt_cont)
+    if approach is None:
+        approach = float(config.hpr.dt_cont)
+    else:
+        approach, dt_cont_multiplier = float(approach), 0.0
     arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
     costs = arrays.arrays["hu_cost_period" if hot else "cu_cost_period"][0]
     stage = (
@@ -102,14 +108,22 @@ def _relieved_price(
     return cost / taken if taken > 0.0 else None
 
 
-def _relieved_prices(problem, network, result) -> dict:
-    """``RetrofitHeatPumpTarget``'s relieved prices for ``result``; none
-    for no result."""
+def _relieved_prices(
+    problem, network, result, *, dt_cont_multiplier: float = 1.0, approach=None
+) -> dict:
+    """``RetrofitHeatPumpTarget``'s relieved prices for ``result``, on the
+    coolers and heaters shifted as the target saw them; none for no
+    result."""
     if result is None:
         return {}
+    shifts = {"dt_cont_multiplier": dt_cont_multiplier, "approach": approach}
     return {
-        "relieved_heat_price": _relieved_price(problem, network, result, "hot"),
-        "relieved_cooling_price": _relieved_price(problem, network, result, "cold"),
+        "relieved_heat_price": _relieved_price(
+            problem, network, result, "hot", **shifts
+        ),
+        "relieved_cooling_price": _relieved_price(
+            problem, network, result, "cold", **shifts
+        ),
     }
 
 
@@ -254,7 +268,16 @@ def as_piped_heat_pump(
         approach=approach,
     )
     # Sized on what it saves: solved again at the utilities it relieves.
-    sized = _sized_at(prices, _relieved_prices(problem, network, result))
+    sized = _sized_at(
+        prices,
+        _relieved_prices(
+            problem,
+            network,
+            result,
+            dt_cont_multiplier=dt_cont_multiplier,
+            approach=approach,
+        ),
+    )
     if sized is prices:
         return result
     return _profile_target(

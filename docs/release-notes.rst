@@ -244,8 +244,10 @@ Heat pumps and refrigeration
   (``RetrofitHeatPumpTarget.relieved_heat_price`` and
   ``relieved_cooling_price``); the machine is solved again at those
   prices, in ``retrofit_heat_pumps`` and in ``design.retrofit``'s heat
-  pump step. The ideal target and a shared design over several periods
-  keep the blends.
+  pump step. On that case the as-piped target is now a 720 kW machine
+  (it was 1,000 kW) and its reported saving, 95,096 $/y, is what the
+  heater it serves gives. The ideal target and a shared design over
+  several periods keep the blends.
 - A parallel Carnot heat pump target gives its colder machines all the
   source heat above them. Each evaporator's available heat is the source
   heat between it and the evaporator above, and the cycle took the hotter
