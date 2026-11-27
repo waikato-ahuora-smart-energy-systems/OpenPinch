@@ -973,7 +973,11 @@ class _DesignAccessor:
 
         # Levels chosen by price (the lowest cost) and held at their
         # targets: evolution starts from both. A process whose design fails
-        # one way takes the other way's networks for it.
+        # one way takes the other way's networks for it, with a warning.
+        ways = {
+            "price": "with levels chosen by price",
+            "temperature": "with its levels held at their targets",
+        }
         priced, held = {}, {}
         for name in processes:
             failure = None
@@ -986,9 +990,19 @@ class _DesignAccessor:
                 ):
                     raise
                 except (ValueError, RuntimeError) as exc:
-                    failure = exc
+                    failure = (placement, exc)
             if name not in priced and name not in held:
-                raise failure
+                raise failure[1]
+            if failure is not None:
+                failed, exc = failure
+                other = "temperature" if failed == "price" else "price"
+                warnings.warn(
+                    f"The design of process {name} {ways[failed]} failed "
+                    f"({exc}); its design {ways[other]} stands in for it, "
+                    "and the site network may cost more.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             priced.setdefault(name, held.get(name))
             held.setdefault(name, priced[name])
         seeds = site_seeds(priced, level_held=held)
@@ -1817,6 +1831,37 @@ class _DesignAccessor:
         )
         # The call's period, as an argument or in its options.
         self._refuse_period_scope(runtime.get("period_id"), "network_evolution")
+        # A site seed records its processes (``site_processes``) and is
+        # evolved within each; a site network does not, and is pooled. One
+        # network, or the JSON of one, is a seed as a sequence's item is.
+        from ....domain.heat_exchanger_network import HeatExchangerNetwork
+
+        if isinstance(initial_networks, HeatExchangerNetwork | Mapping):
+            seeds = (initial_networks,)
+        else:
+            seeds = tuple(initial_networks or ())
+
+        def metadata(seed) -> Mapping:
+            found = (
+                seed.get("source_metadata")
+                if isinstance(seed, Mapping)
+                else getattr(seed, "source_metadata", None)
+            )
+            return found or {}
+
+        pooled = not seeds or any(
+            not metadata(seed).get("site_processes") for seed in seeds
+        )
+        if pooled and len(self._process_zones()) > 1:
+            warnings.warn(
+                "network_evolution() pools the streams of every process zone, "
+                "so it allows any inter-process match with no piping cost and "
+                "does not hold each process's utility levels, even when it is "
+                "given a site network. Use "
+                "design.total_site_heat_exchanger_network() to design the site.",
+                UserWarning,
+                stacklevel=2,
+            )
         return self._run(
             heat_exchanger_network_evolution_method_service,
             surface="network_evolution",
