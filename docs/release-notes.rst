@@ -352,6 +352,12 @@ Heat pumps and refrigeration
   water cascade on ``basic_pinch`` at the default budget gave 266,204 to
   281,255 $/y over seeds 0 to 2 and now gives 267,803 to 268,454. A search
   takes longer (about 450 to 580 s against 230 to 510 s on that case).
+- A heat pump target over several periods with one shared design reports
+  the capital of the machine installed for every period, not its selected
+  period's own sizing, and its total annualised cost is that period's
+  operation plus the installed capital. On the reviewer's three-period
+  vapour compression case the base period reported 238,470 $ of capital
+  where the installed machine costs 374,537 $.
 - A heat pump target charges heat rejected to ambient air at the cooling
   water price (``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE``), as any
   heat rejected to ambient is; air as a heat source stays free. The Carnot
