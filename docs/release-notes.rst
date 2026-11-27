@@ -346,6 +346,12 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A vapour compression cascade heat pump also searches from its warm start
+  with all the heat in each condenser in turn. The cheapest design often
+  uses one condenser, which the search found for some seeds only: a 2x1
+  water cascade on ``basic_pinch`` at the default budget gave 266,204 to
+  281,255 $/y over seeds 0 to 2 and now gives 267,803 to 268,454. A search
+  takes longer (about 450 to 580 s against 230 to 510 s on that case).
 - A heat pump target charges heat rejected to ambient air at the cooling
   water price (``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE``), as any
   heat rejected to ambient is; air as a heat source stays free. The Carnot
