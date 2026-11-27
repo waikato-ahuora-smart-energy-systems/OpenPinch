@@ -14,6 +14,13 @@ Heat exchanger networks
   mean over the periods, weighted by each period's share of the year: the
   crude preheat train's hot utility is 792.3 kW (its three periods at 0.2,
   0.6 and 0.2). ``views()`` still gives each period's own.
+- A small stream's exchangers are kept beside a large stream's.
+  ``design.optimise_duties``, the multiperiod fit and every other use of
+  the fixed-structure model took an exchanger with a duty under 1e-4 of
+  the largest stream load as idle, so beside a 50,000 kW stream a 3 kW
+  stream's heater and cooler were removed and the solve failed ("no
+  exchanger serves: P.Csmall"). An exchanger is now idle under 1e-4 of the
+  smaller of its own streams' loads.
 - Network evolution runs again on a case with a segmented stream. Since
   0.10.0 its check of the approach inside a match looked each solved
   branch outlet up on the stream's profile, and Ipopt returns an outlet

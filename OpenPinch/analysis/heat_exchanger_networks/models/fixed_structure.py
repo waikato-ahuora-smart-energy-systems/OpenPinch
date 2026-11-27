@@ -1639,11 +1639,19 @@ def _required_area(duty: float, coefficient: float, theta_1, theta_2) -> float:
     return duty / (coefficient * lmtd)
 
 
+def _activity_floor(owner, *loads: float) -> float:
+    """The duty (kW) under which an exchanger between streams of ``loads``
+    is idle: 1e-4 of the smaller load, never under the model's tolerance. A
+    floor on the largest stream of the problem took a small stream's
+    exchangers beside a large one for idle (5 kW beside 50,000 kW)."""
+    smallest = min((abs(float(load)) for load in loads), default=0.0)
+    return max(float(owner.tol), 1e-4 * smallest)
+
+
 def post_process_fixed_structure(owner) -> None:
     """Read the solution into plain exchanger results and cost totals."""
 
     value = _numeric
-    tolerance = owner.duty_tolerance
     spec = owner.spec
     period_ids = [str(p) for p in owner.period_ids]
 
@@ -1654,7 +1662,9 @@ def post_process_fixed_structure(owner) -> None:
             hot = owner.hot_profiles[n][match.hot]
             cold = owner.cold_profiles[n][match.cold]
             duty = value(owner.q_r[n][r])
-            active = duty > tolerance
+            active = duty > _activity_floor(
+                owner, owner.hot_load[n][match.hot], owner.cold_load[n][match.cold]
+            )
             theta_1, theta_2 = (value(t) for t in owner.theta_r[n][r])
             x = value(owner.x[n][r])
             y = value(owner.y[n][r])
@@ -1716,7 +1726,7 @@ def post_process_fixed_structure(owner) -> None:
             profile = stream_profile(owner, n, match)
             own = utility_profile(owner, n, match)
             duty = value(owner.q_u[n][e])
-            active = duty > tolerance
+            active = duty > _activity_floor(owner, profile.total)
             theta_1, theta_2 = (value(t) for t in owner.theta_u[n][e])
             stream_in = value(owner.utility_in[n][e])
             stream_out = value(owner.utility_out[n][e])
