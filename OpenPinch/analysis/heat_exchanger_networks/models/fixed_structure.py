@@ -1929,7 +1929,27 @@ def _solved_utility_cost(owner, n: int, e: int, result: ExchangerResult) -> floa
     return fraction * own.cost(outlet, smooth=False)
 
 
+def _at_solver_heat(curve, side: str, temperature: float) -> float:
+    """The temperature at which ``curve``'s exact profile holds the heat the
+    solver's rounded kinks give ``temperature``.
+
+    Slices are cut on the exact profile; an inlet just past a kink holds a
+    little more heat there than the solver saw, and the solved duty would
+    overrun the profile (review finding 27).
+    """
+    import numpy as np
+
+    profile = ThermalProfile.from_piecewise(side, curve)
+    if not profile.segmented:
+        return temperature
+    # An array is rounded as a solver expression is; a number is exact.
+    heat = float(profile.heat(np.array([temperature]))[0])
+    return profile.temperature_at(heat)
+
+
 def _slices(hot_curve, cold_curve, duty, hot_inlet, cold_inlet, period):
+    hot_inlet = _at_solver_heat(hot_curve, "hot", hot_inlet)
+    cold_inlet = _at_solver_heat(cold_curve, "cold", cold_inlet)
     return duty_aligned_area_contributions(
         hot_curve,
         cold_curve,
