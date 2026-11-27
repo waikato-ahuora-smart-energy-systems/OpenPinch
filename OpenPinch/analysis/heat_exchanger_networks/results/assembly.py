@@ -265,7 +265,7 @@ def demote_infeasible_outcomes(
             )
             continue
         failures = (
-            verify_network_feasibility(outcome.network)
+            verify_network_feasibility(outcome.network, warn_without_stream_data=False)
             if outcome.status == "success"
             else ()
         )

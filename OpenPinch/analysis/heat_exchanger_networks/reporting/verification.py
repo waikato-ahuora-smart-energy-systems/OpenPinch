@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from collections.abc import Iterable
 
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -43,7 +44,9 @@ def verify_synthesis_result(
         )
     failures.extend(
         f"accepted network infeasible: {reason}"
-        for reason in verify_network_feasibility(result.network)
+        for reason in verify_network_feasibility(
+            result.network, warn_without_stream_data=False
+        )
     )
     for outcome in result.ranked_networks:
         if outcome.status == "success" and outcome.network is None:
@@ -53,13 +56,17 @@ def verify_synthesis_result(
         if outcome.status == "success" and outcome.network is not None:
             failures.extend(
                 f"successful task {outcome.task.task_id} infeasible: {reason}"
-                for reason in verify_network_feasibility(outcome.network)
+                for reason in verify_network_feasibility(
+                    outcome.network, warn_without_stream_data=False
+                )
             )
     return tuple(failures)
 
 
 def verify_network_feasibility(
     network: HeatExchangerNetwork | None,
+    *,
+    warn_without_stream_data: bool = True,
 ) -> tuple[str, ...]:
     """Return feasibility failures for one extracted HEN candidate.
 
@@ -76,6 +83,8 @@ def verify_network_feasibility(
 
     if network is None:
         return ("network output is missing",)
+    if warn_without_stream_data:
+        _warn_without_stream_data(network)
 
     failures: list[str] = []
     period_ids = network.period_ids
@@ -97,10 +106,33 @@ def verify_network_feasibility(
     return tuple(failures)
 
 
+_STREAM_DATA_KEYS = (
+    "hot_stream_total_duties",
+    "cold_stream_total_duties",
+    "hot_stream_total_duties_by_period",
+    "cold_stream_total_duties_by_period",
+)
+
+
+def _warn_without_stream_data(network: HeatExchangerNetwork) -> None:
+    """Warn when ``network`` carries no stream data for the checks that
+    compare against it: a network read from JSON keeps none."""
+    metadata = network.source_metadata or {}
+    if network.exchangers and not any(metadata.get(k) for k in _STREAM_DATA_KEYS):
+        warnings.warn(
+            "the network carries no stream data (a network read from JSON "
+            "keeps none), so its stream heat balances, approaches and areas "
+            "are not checked; rate it on its problem with "
+            "design.optimise_duties to check it.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def is_network_feasible(network: HeatExchangerNetwork | None) -> bool:
     """Return whether one extracted HEN candidate passes feasibility checks."""
 
-    return not verify_network_feasibility(network)
+    return not verify_network_feasibility(network, warn_without_stream_data=False)
 
 
 def _check_summary_totals(network: HeatExchangerNetwork) -> list[str]:
