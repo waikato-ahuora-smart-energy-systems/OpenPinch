@@ -209,8 +209,12 @@ class HeatExchangerNetworkDesignView:
         result: "HeatExchangerNetworkSynthesisResult",
         *,
         utility_names: Sequence[str] | None = None,
+        period_weights: Mapping[str, float] | None = None,
     ) -> None:
         self._result = result
+        # Each period's share of the year, by period id, for the totals of a
+        # design over several periods; equal shares when not given.
+        self._period_weights = dict(period_weights or {})
         # The problem's utilities as the network names them ("Hot Utility.HPS"),
         # so ``utility`` can resolve a utility's own name and reject others.
         self._utility_names = None if utility_names is None else tuple(utility_names)
@@ -309,19 +313,33 @@ class HeatExchangerNetworkDesignView:
     def total_heat_recovery(self) -> float:
         from ....domain.enums import HeatExchangerKind
 
-        return self.selected_network.total_duty(kind=HeatExchangerKind.RECOVERY)
+        return self._total_duty(HeatExchangerKind.RECOVERY)
 
     @property
     def total_hot_utility(self) -> float:
         from ....domain.enums import HeatExchangerKind
 
-        return self.selected_network.total_duty(kind=HeatExchangerKind.HOT_UTILITY)
+        return self._total_duty(HeatExchangerKind.HOT_UTILITY)
 
     @property
     def total_cold_utility(self) -> float:
         from ....domain.enums import HeatExchangerKind
 
-        return self.selected_network.total_duty(kind=HeatExchangerKind.COLD_UTILITY)
+        return self._total_duty(HeatExchangerKind.COLD_UTILITY)
+
+    def _total_duty(self, kind) -> float:
+        """The selected network's duty of ``kind`` (kW): over several
+        periods, the mean by each period's share of the year."""
+        network = self.selected_network
+        periods = network.period_ids
+        if len(periods) <= 1:
+            return network.total_duty(kind=kind)
+        weights = [float(self._period_weights.get(p, 1.0)) for p in periods]
+        total = sum(weights)
+        return sum(
+            w * network.total_duty(kind=kind, period_id=p)
+            for w, p in zip(weights, periods)
+        ) / (total if total > 0.0 else 1.0)
 
     def _network_utility_name(self, name: str) -> str:
         """The network's stream name for ``name``, a utility or stream name."""
@@ -469,9 +487,15 @@ class _DesignAccessor:
                 )
                 for utility in utilities
             ],
+            period_weights=self._period_weights(),
         )
         commit_problem(self._problem, isolated)
         return view
+
+    def _period_weights(self) -> dict[str, float]:
+        """Each period's share of the year, by period id."""
+        root = self._problem._require_prepared_root_zone()
+        return dict(zip(self._problem.period_ids, root.config.problem.period_weights))
 
     def heat_exchanger_network(
         self,
@@ -1056,6 +1080,7 @@ class _DesignAccessor:
                 )
                 for utility in utilities
             ],
+            period_weights=self._period_weights(),
         )
 
     def _process_zones(self) -> list[str]:

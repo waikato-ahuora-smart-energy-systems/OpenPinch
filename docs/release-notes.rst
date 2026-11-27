@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A multiperiod design's ``total_heat_recovery``, ``total_hot_utility``
+  and ``total_cold_utility`` are the year's. On every design over several
+  periods they raised "period_id is required when a network has multiple
+  period states", though the properties take no period. They are now the
+  mean over the periods, weighted by each period's share of the year: the
+  crude preheat train's hot utility is 792.3 kW (its three periods at 0.2,
+  0.6 and 0.2). ``views()`` still gives each period's own.
 - Network evolution runs again on a case with a segmented stream. Since
   0.10.0 its check of the approach inside a match looked each solved
   branch outlet up on the stream's profile, and Ipopt returns an outlet
