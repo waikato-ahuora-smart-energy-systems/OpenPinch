@@ -214,7 +214,8 @@ finished by the cheapest utility that reaches its target. In
   the levels its utility targets give, so nothing can be traded: when that
   network needs a forbidden pair the run raises ``ValueError`` naming it,
   and the way round is to change what the targets may use (a utility's
-  maximum heat flow, say). Retrofit does not read the list.
+  maximum heat flow, say). Retrofit does not read the list, and warns
+  when it is set: check the designs it returns against it.
 
 Named Advanced Methods
 ----------------------

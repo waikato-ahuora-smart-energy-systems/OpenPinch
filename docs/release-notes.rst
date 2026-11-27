@@ -352,6 +352,10 @@ Heat pumps and refrigeration
   retrofit selects a 160 kW machine at a COP of 3.0 netting 9,952 $/y,
   where it selected none (its one heat pump design lost 1,836 $/y, and
   the full-size step was left out).
+- ``design.retrofit`` warns when ``HENS_FORBIDDEN_MATCHES`` is set. The
+  retrofit search does not read the list, so a new match or a heat pump
+  step may pair streams it names; only one sentence in another section of
+  the guide said so.
 
 0.10.0 (2026-11-25)
 -------------------

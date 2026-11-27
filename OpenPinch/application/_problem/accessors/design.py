@@ -2064,6 +2064,14 @@ class _DesignAccessor:
         root = isolated._build_execution_master_zone()
         stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
         with temporary_zone_configuration(root, configuration):
+            if isolated.master_zone.config.hens.forbidden_matches:
+                warnings.warn(
+                    "HENS_FORBIDDEN_MATCHES is not applied by retrofit: a new "
+                    "match or a heat pump step may pair streams it names. "
+                    "Check the designs returned against it.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             unit_cost = (
                 isolated.master_zone.config.costing.hx_unit_cost
                 if new_unit_cost is None
