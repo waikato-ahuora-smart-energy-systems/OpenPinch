@@ -95,7 +95,8 @@ def test_each_counts_placed_levels_reach_its_design():
     """The design for a count sees the site's streams with that count's
     placed levels. Each level serves both heating and cooling: its hot and
     cold utility share its name, so the site accounts it as one main. The
-    steam-main site's placed levels lie apart and need no fallback."""
+    steam-main site's placed levels lie apart and need no fallback; beside
+    them the case keeps its own cooling water, which rejects to ambient."""
     problem = _steam_main_site()
     seen = {}
 
@@ -112,7 +113,7 @@ def test_each_counts_placed_levels_reach_its_design():
         assert sorted(s["name"] for s in source["streams"]) == streams
         isothermal, sensible = site_levels.level_split(problem, count)
         placed = {(u["name"], u["type"]) for u in source["utilities"]}
-        assert placed == {
+        assert placed == {("CW", "Cold")} | {
             (f"{kind}_{level}", side)
             for side in ("Hot", "Cold")
             for kind, levels in (("iso", isothermal), ("sensible", sensible))
@@ -162,6 +163,95 @@ def test_a_count_cools_on_the_cases_own_utility_where_placement_fell_back():
     assert min(u["t_supply"]["value"] for u in utilities) == 20.0
 
 
+def test_a_placed_case_keeps_the_utility_that_rejects_to_ambient(monkeypatch):
+    """Every rejected heat ends at ambient (user rule, 2026-11-27). When the
+    placed levels need no fallback cooler, the case dropped its cooling
+    water, and a placed steam main became the coldest sink: on the
+    reviewer's three-level steam main the site surplus was dumped from a
+    main priced as LP steam, 41,432 against 21,348 $/y at two levels
+    (review finding 15). The placement is stubbed: two placed mains."""
+    from OpenPinch.application._problem.accessors import target
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    problem = _site()
+    source = problem.to_problem_json()
+    source["utilities"] = [
+        _utility(f"{side}_iso_{level}", kind, t, t + step, 60.0)
+        for level, t in ((1, 180.0), (2, 100.0))
+        for side, kind, step in (("hot", "Hot", -0.01), ("cold", "Cold", 0.01))
+    ]
+    placed = PinchProblem(source)
+    monkeypatch.setattr(
+        target._TargetAccessor, "utility_placement", lambda self, **_: placed
+    )
+    monkeypatch.setattr(site_levels, "_fallback_utilities", lambda _placed: {})
+
+    case = site_levels.placed_case(problem, 2)
+
+    (water,) = (u for u in problem.to_problem_json()["utilities"] if u["name"] == "CW")
+    assert water in case.to_problem_json()["utilities"]
+
+
+def test_a_placed_case_keeps_each_periods_ambient_sink(monkeypatch):
+    """Cooling water is at 20 C in the first period and 10 C (below the
+    15 C ambient) in the second, where river water at 25 C rejects to
+    ambient instead. The case keeps both (Codex review of #553)."""
+    from OpenPinch.application._problem.accessors import target
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    source = _site(periods=True).to_problem_json()
+    water = _utility("CW", "Cold", 20.0, 25.0, 5.0)
+    water["t_supply"] = {"values": [20.0, 10.0], "unit": "degC"}
+    water["t_target"] = {"values": [25.0, 15.0], "unit": "degC"}
+    others = [u for u in source["utilities"] if u["name"] != "CW"]
+    source["utilities"] = [*others, water, _utility("RW", "Cold", 25.0, 30.0, 6.0)]
+    problem = PinchProblem(source)
+    placed_source = problem.to_problem_json()
+    placed_source["utilities"] = [
+        _utility(f"{side}_iso_{level}", kind, t, t + step, 60.0)
+        for level, t in ((1, 180.0), (2, 100.0))
+        for side, kind, step in (("hot", "Hot", -0.01), ("cold", "Cold", 0.01))
+    ]
+    placed = PinchProblem(placed_source)
+    monkeypatch.setattr(
+        target._TargetAccessor, "utility_placement", lambda self, **_: placed
+    )
+    monkeypatch.setattr(site_levels, "_fallback_utilities", lambda _placed: {})
+
+    case = site_levels.placed_case(problem, 2)
+
+    names = {u["name"] for u in case.to_problem_json()["utilities"]}
+
+    assert {"CW", "RW"} <= names
+
+
+def test_an_ambient_sink_named_as_a_placed_level_is_refused(monkeypatch):
+    """The case's cooling water is called iso_1, the name the first placed
+    main takes: the placed case took the main for it and dropped the cooling
+    water (Codex review of #553). It is refused, naming the clash."""
+    from OpenPinch.application._problem.accessors import target
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["name"] = "iso_1"
+    problem = PinchProblem(source)
+    placed_source = problem.to_problem_json()
+    placed_source["utilities"] = [
+        _utility(f"{side}_iso_1", kind, 180.0, 180.0 + step, 60.0)
+        for side, kind, step in (("hot", "Hot", -0.01), ("cold", "Cold", 0.01))
+    ]
+    placed = PinchProblem(placed_source)
+    monkeypatch.setattr(
+        target._TargetAccessor, "utility_placement", lambda self, **_: placed
+    )
+    monkeypatch.setattr(site_levels, "_fallback_utilities", lambda _placed: {})
+
+    with pytest.raises(ValueError, match="iso_1"):
+        site_levels.placed_case(problem, 2)
+
+
 def test_a_count_heats_on_the_cases_own_utility_where_placement_fell_back():
     """With three levels, placement heats above them on its fallback HU
     at 300 C; the placed case takes the case's hottest utility, HPS."""
@@ -179,13 +269,16 @@ def test_a_count_heats_on_the_cases_own_utility_where_placement_fell_back():
 def test_placed_levels_closer_than_the_minimum_gap_are_one_level(count):
     """Placement puts the unit site's levels within 0.3 K of each other
     near 140 C (or 120 C): one main in effect. The case keeps one of them,
-    so the site's levels lie at least the minimum gap apart."""
+    so the site's levels lie at least the minimum gap apart. Beside it the
+    case keeps its own cooling water (it rejects to ambient) and any
+    stand-in for a fallback."""
     case = site_levels.placed_case(_site(), count, placement=SHORT_PLACEMENT)
 
     levels = _site_levels(case)
     temperatures = sorted(level.t_high[0] for level in levels)
 
-    assert len(levels) == 2
+    placed = [level for level in levels if level.name.startswith(("iso_", "sens"))]
+    assert len(placed) == 1
     assert all(
         above - below >= site_levels.MINIMUM_LEVEL_GAP
         for below, above in zip(temperatures, temperatures[1:])
