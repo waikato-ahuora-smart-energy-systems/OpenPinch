@@ -631,6 +631,7 @@ def evaluate_vapour_hpr_result(
                 machines, process_areas=(0.0, 0.0, 0.0, 0.0), args=args
             )
         ),
+        hpr_machine_components=components,
         hpr_hot_utility_annualized_capital_cost=(
             cost_accounting.hpr_hot_utility_annualized_capital_cost
         ),

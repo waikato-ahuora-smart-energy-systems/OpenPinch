@@ -17,7 +17,7 @@ ammonia heat pump, costs the IEA HPT Annex 68 level for 1 MW.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -227,6 +227,27 @@ def matched_area(
         dtype=float,
     )
     return float(np.sum(duty * 1000.0 / (u * compute_LMTD_from_dts(dt1, dt2))))
+
+
+def installed_machine(periods: Sequence[MachineComponents]) -> MachineComponents:
+    """Return the machine installed for ``periods``: each compressor's peak
+    volume flow and shaft power and each exchanger's peak area.
+
+    The periods' machines have the same components in the same order.
+    """
+    compressors = tuple(
+        CompressorDuty(
+            stages[0].fluid,
+            max(stage.volume_flow for stage in stages),
+            max(stage.shaft_power for stage in stages),
+        )
+        for stages in zip(*(period.compressors for period in periods), strict=True)
+    )
+    areas = tuple(
+        max(slot)
+        for slot in zip(*(period.exchanger_areas for period in periods), strict=True)
+    )
+    return MachineComponents(compressors=compressors, exchanger_areas=areas)
 
 
 def installed_capital(machine: MachineComponents) -> float:

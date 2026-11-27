@@ -51,6 +51,7 @@ from ...optimisation.models import (
 )
 from ...optimisation.service import run_multistart_minimisation
 from .common._shared.streams import get_ambient_air_stream
+from .common.capital import installed_capital, installed_machine
 from .cycles.registry import family_handlers
 
 HPRObjective = Callable[..., HPRBackendResult]
@@ -1015,7 +1016,9 @@ def aggregate_hpr_period_results(
         if maximum is not None:
             updates[field] = maximum
 
-    machine_peaks = _peak_machine_capital(ordered)
+    machine_peaks = _installed_machine_capital(ordered) or _peak_machine_capital(
+        ordered
+    )
     if machine_peaks is not None:
         machine_capital, machine_annualized_capital = machine_peaks
         updates["hpr_machine_capital_costs"] = machine_capital
@@ -1311,7 +1314,9 @@ def _shared_candidate_objective(
         reducer="weighted",
         share=loaded_share,
     )
-    machine_peaks = _peak_machine_capital(results)
+    machine_peaks = _installed_machine_capital(results) or _peak_machine_capital(
+        results
+    )
     annualized_capital = (
         Value(sum(machine_peaks[1]), "$/y")
         if machine_peaks is not None
@@ -1329,6 +1334,41 @@ def _shared_candidate_objective(
         + _annual_cost_magnitude(annualized_capital)
         + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
     )
+
+
+def _installed_machine_capital(
+    results: list[HPRBackendResult],
+) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+    """Price each machine installed for every period, component by component.
+
+    Each compressor takes its peak volume flow and shaft power and each
+    exchanger its peak area, whichever periods they peak in. The annualised
+    capital takes the periods' own ratio of annualised to installed capital.
+    Returns ``None`` when a result lacks its machines' components or the
+    machine counts differ.
+    """
+    components = [result.hpr_machine_components for result in results]
+    if any(not machines for machines in components):
+        return None
+    if len({len(machines) for machines in components}) != 1:
+        return None
+    capital, annualized = [], []
+    for index, periods in enumerate(zip(*components, strict=True)):
+        installed = installed_capital(installed_machine(periods))
+        ratio = next(
+            (
+                result.hpr_machine_annualized_capital_costs[index]
+                / result.hpr_machine_capital_costs[index]
+                for result in results
+                if result.hpr_machine_capital_costs
+                and result.hpr_machine_annualized_capital_costs
+                and result.hpr_machine_capital_costs[index] > 0.0
+            ),
+            0.0,
+        )
+        capital.append(float(installed))
+        annualized.append(float(installed * ratio))
+    return tuple(capital), tuple(annualized)
 
 
 def _peak_machine_capital(
