@@ -7,6 +7,11 @@ Unreleased
 Utility costs
 ~~~~~~~~~~~~~
 
+- Every result's provenance names the utility taken to reject heat to
+  ambient and its price, per period (``AMBIENT_SINK``). A warning says when
+  no cold utility is at or above ``ENV_TEMPERATURE`` and the warmest is
+  assumed, when a capped sink leaves the default ``CU`` to set the price at
+  the margin, and when a credit on steam raising is replaced.
 - Only net heating and cooling are charged, as in Total Site targeting.
   Every heat a cold utility takes ends at ambient, so it is charged at the
   price of the utility that rejects to ambient: the coldest cold utility

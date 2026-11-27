@@ -262,6 +262,14 @@ takes and that work, the work per unit of heat being its price over
 ``COSTING_HPR_ELE_PRICE``. The prices are applied per period, and the input
 ``price`` is kept as given.
 
+Every result's provenance names the utility taken to set the cooling price
+and that price, period by period, in
+``result.provenance.effective_settings["AMBIENT_SINK"]``. A warning says when
+the choice rests on an assumption: no cold utility at or above
+``ENV_TEMPERATURE`` (set it to your site's ambient), a capped sink whose
+excess leaves through the default ``CU``, or a negative price on steam
+raising that is no longer paid as a credit.
+
 Interpretation
 --------------
 

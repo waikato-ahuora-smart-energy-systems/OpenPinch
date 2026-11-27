@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from copy import deepcopy
 from typing import List, Sequence, Tuple
@@ -157,6 +158,9 @@ def _price_rejection_at_ambient(
         return float(converted.value)
 
     priced: dict[int, list[float]] = {id(u): [] for u in utilities}
+    notes: list[str] = []
+    for u in utilities:
+        setattr(u, _AMBIENT_SINK, {})
     for n in range(periods):
         supply = {id(u): at(u.supply_temperature, "degC", n) for u in utilities}
         own = {id(u): at(u.price, "$/MW/h", n) for u in utilities}
@@ -177,7 +181,28 @@ def _price_rejection_at_ambient(
             if backup is not None and (rejector is None or _capped(rejector, n))
             else rejector
         )
+        # Only where the assumed one sets the price and prices another.
+        if (
+            rejector is not None
+            and not above
+            and marginal is rejector
+            and len(utilities) > 1
+        ):
+            notes.append(
+                f"No cold utility is at or above ENV_TEMPERATURE ({t_env:g} C), "
+                f"so {rejector.name} ({supply[id(rejector)]:g} C), the warmest, "
+                "is taken to reject heat to ambient and sets the cooling price; "
+                "set ENV_TEMPERATURE if it is refrigeration."
+            )
         ambient = own[id(marginal)]
+        getattr(marginal, _AMBIENT_SINK).update({n: ambient})
+        if rejector is not None and marginal is not rejector:
+            notes.append(
+                f"{rejector.name} rejects heat to ambient but is capped, so heat "
+                f"beyond its cap leaves through the default {marginal.name}, "
+                f"whose price ({ambient:g} $/MWh) is the cooling price at the "
+                "margin."
+            )
         for u in utilities:
             if u is rejector or u is marginal:
                 priced[id(u)].append(own[id(u)])
@@ -187,6 +212,15 @@ def _price_rejection_at_ambient(
                 priced[id(u)].append(own[id(u)] + ambient * (1.0 + work))
             else:
                 priced[id(u)].append(ambient)
+                if own[id(u)] < 0.0:
+                    notes.append(
+                        f"{u.name}'s price of {own[id(u)]:g} $/MWh is a credit "
+                        "for the heat it takes; only net cooling is charged, so "
+                        f"it costs the cooling price ({ambient:g} $/MWh): steam "
+                        "raised is worth something only where it is used."
+                    )
+    for note in dict.fromkeys(notes):
+        warnings.warn(note, UserWarning, stacklevel=2)
     for u in utilities:
         costs = priced[id(u)]
         own = [at(u.price, "$/MW/h", n) for n in range(periods)]
@@ -198,6 +232,17 @@ def _price_rejection_at_ambient(
 
 
 _INPUT_PRICE = "_input_price"
+_AMBIENT_SINK = "_ambient_sink"
+
+
+def ambient_sinks(cold_utilities) -> dict[int, dict]:
+    """The prepared cold utility whose price is the ambient price in each
+    period (by period index), with that price ($/MWh)."""
+    found: dict[int, dict] = {}
+    for utility in cold_utilities:
+        for n, price in getattr(utility, _AMBIENT_SINK, {}).items():
+            found[n] = {"utility": utility.name, "price": float(price)}
+    return found
 
 
 def input_price(utility: Stream) -> Value | None:
