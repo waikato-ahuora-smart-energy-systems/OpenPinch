@@ -1706,8 +1706,9 @@ class _DesignAccessor:
 
         The step minimises hot utility (the utilities' cost where a side has
         a choice of utility), not total annual cost: its network can cost
-        more than its seed. Follow it with ``network_evolution`` for a
-        cost-optimal network, as the full workflow does.
+        more than its seed. Follow it with ``network_evolution``, which
+        searches for cheaper networks by total annual cost, as the full
+        workflow does.
         """
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_thermal_derivative_method_service,
