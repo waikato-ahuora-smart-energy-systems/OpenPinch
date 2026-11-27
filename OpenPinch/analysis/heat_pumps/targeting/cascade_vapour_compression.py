@@ -117,7 +117,7 @@ def optimise_cascade_heat_pump_placement(
     )
     return solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
-        x0_ls=x0_ls,
+        x0_ls=_with_one_condenser_starts(x0_ls, args),
         bnds=bnds,
         args=args,
     )
@@ -254,6 +254,40 @@ def _get_cascade_hp_opt_setup(
             np.asarray(init_cool, dtype=float)[:n_cool], state.Q_cool_available
         )
     return clip_to_bounds(layout.pack(**pack_kwargs), bnds), bnds
+
+
+def _with_one_condenser_starts(
+    x0: np.ndarray | None,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray | None:
+    """The warm start, then the warm start with all the heat in each
+    condenser in turn; a heat pump with one condenser keeps its one start.
+
+    The cheapest cascade often uses one condenser, which a search from the
+    Carnot warm start found for some seeds only (review finding 23).
+    """
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    n_heat, n_cool = _cascade_process_control_counts(
+        n_cond=int(args.n_cond),
+        n_evap=int(args.n_evap),
+        is_heat_pumping=is_heat_pumping,
+    )
+    if x0 is None or not is_heat_pumping or n_heat < 2:
+        return x0
+    split = HPRoptVectorLayout(
+        n_cond=int(args.n_cond),
+        n_evap=int(args.n_evap),
+        n_subcool=int(args.n_cond),
+        n_heat_split=n_heat,
+        n_cool_split=n_cool,
+        n_ihx=int(args.n_cond) + int(args.n_evap) - 1,
+    ).heat_split_slice
+    starts = [np.asarray(x0, dtype=float)]
+    for condenser in range(n_heat):
+        start = starts[0].copy()
+        start[split] = np.eye(n_heat)[condenser]
+        starts.append(start)
+    return np.vstack(starts)
 
 
 def _parse_cascade_hp_state_variables(

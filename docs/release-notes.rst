@@ -346,6 +346,12 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A vapour compression cascade heat pump also searches from its warm start
+  with all the heat in each condenser in turn. The cheapest design often
+  uses one condenser, which the search found for some seeds only: a 2x1
+  water cascade on ``basic_pinch`` at the default budget gave 266,204 to
+  281,255 $/y over seeds 0 to 2 and now gives 267,803 to 268,454. A search
+  takes longer (about 450 to 580 s against 230 to 510 s on that case).
 - A heat pump target over several periods with one shared design reports
   the capital of the machine installed for every period, not its selected
   period's own sizing, and its total annualised cost is that period's
