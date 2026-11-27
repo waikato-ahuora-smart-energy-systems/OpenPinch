@@ -342,6 +342,18 @@ Heat pumps and refrigeration
   duty is now no stream. On a two-period case of one heater and one
   cooler the step is taken: steam falls from 1,080 kW to none and the
   retrofit nets 295,313 $/y, where it returned the existing network.
+- A retrofit's ``min_approach_temperature`` reaches its heat pump.
+  ``design.retrofit(heat_pump_cycle=..., min_approach_temperature=...)``
+  holds every match to the approach, but targeted its heat pump on the
+  streams' contributions: levels 6 K from a cooler and a heater on a
+  two-stream case where the retrofit asked for 10 K, so the machine
+  could not be matched as targeted. The heat pump is now targeted the
+  whole approach off the coolers and heaters, the air's and the process
+  streams' own contributions left out, and its exchangers are sized at
+  the approach. On that case at 10 K the retrofit selects a 132 kW
+  machine at a COP of 3.1 netting 9,222 $/y, where it selected none (its
+  one heat pump design lost 1,836 $/y, and the full-size step was left
+  out).
 
 0.10.0 (2026-11-25)
 -------------------

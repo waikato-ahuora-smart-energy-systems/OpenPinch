@@ -243,6 +243,9 @@ def heat_pump_step(
         cycle=settings.heat_pump_cycle,
         # The coolers and heaters shifted as the retrofit's model holds them.
         dt_cont_multiplier=settings.dt_cont_multiplier,
+        # A given approach replaces the contributions for every match, the
+        # heat pump's among them.
+        approach=getattr(settings, "approach", None),
     )
     if solved is None:
         # The heaters carry no load: no heat pump to add.

@@ -88,6 +88,7 @@ def as_piped_heat_pump(
     load_fraction=None,
     cycle: str | None = None,
     dt_cont_multiplier: float = 1.0,
+    approach: float | None = None,
 ):
     """The as-piped heat pump target of ``network`` as the heat pump
     service solved it (``HeatPumpTargetOutputs``), with its condenser
@@ -108,6 +109,11 @@ def as_piped_heat_pump(
     ``period_outputs`` hold each period's streams and work. The prices are
     the first period's."""
 
+    if approach is not None:
+        # The retrofit holds every match to the approach in place of the
+        # streams' contributions: the coolers and heaters are taken as
+        # they are and the heat pump stands the whole approach off them.
+        dt_cont_multiplier = 0.0
     if len(problem.period_ids) > 1:
         return compute_shared_profile_heat_pump_target(
             profiles=as_piped_period_profiles(
@@ -119,7 +125,11 @@ def as_piped_heat_pump(
                 for period, index in problem.period_ids.items()
             },
             config=_target_config(
-                problem, _network_prices(problem, network), load_fraction, cycle
+                problem,
+                _network_prices(problem, network),
+                load_fraction,
+                cycle,
+                approach,
             ),
             args=args,
         )
@@ -130,6 +140,7 @@ def as_piped_heat_pump(
         args,
         load_fraction=load_fraction,
         cycle=cycle,
+        approach=approach,
     )
 
 
@@ -156,32 +167,49 @@ def _network_prices(problem, network: HeatExchangerNetwork) -> dict:
 
 
 def _profile_target(
-    problem, profile, prices: dict, args, load_fraction=None, cycle=None
+    problem,
+    profile,
+    prices: dict,
+    args,
+    load_fraction=None,
+    cycle=None,
+    approach=None,
 ):
     """The heat pump service's result on ``profile`` (shifted temperatures,
     source and sink) at ``prices``, in the first period, whose states the
     as-piped profiles and prices take. ``load_fraction`` caps the load at
-    that share of the sink's, and ``cycle`` sets the cycle model, on a copy
-    of the configuration."""
+    that share of the sink's, ``cycle`` sets the cycle model and
+    ``approach`` the heat pump's own contribution, on a copy of the
+    configuration."""
 
     T_vals, H_hot, H_cold = profile
     return compute_profile_heat_pump_target(
         T_vals=T_vals,
         H_hot=H_hot,
         H_cold=H_cold,
-        config=_target_config(problem, prices, load_fraction, cycle),
+        config=_target_config(problem, prices, load_fraction, cycle, approach),
         args=args,
         period_id=min(problem.period_ids.items(), key=lambda item: item[1])[0],
         period_idx=0,
     )
 
 
-def _target_config(problem, prices: dict, load_fraction=None, cycle=None):
+def _target_config(
+    problem, prices: dict, load_fraction=None, cycle=None, approach=None
+):
     """The master zone's configuration at ``prices``, its load capped at
-    ``load_fraction`` of the sink's and its cycle model ``cycle``, as
-    copies."""
+    ``load_fraction`` of the sink's, its cycle model ``cycle`` and the heat
+    pump's own contribution ``approach`` (K), as copies."""
 
     config = _at_network_prices(problem.master_zone.config, prices)
+    if approach is not None:
+        # The approach replaces every contribution: the heat pump's own, the
+        # air's (added where it meets air) and the process streams' (added
+        # back where it sizes a process exchanger on shifted profiles).
+        config = deepcopy(config)
+        config.update_values(
+            HPR_DT_CONT=float(approach), HPR_DT_ENV_CONT=0.0, THERMAL_DT_CONT=0.0
+        )
     if load_fraction is not None and not 0.0 <= float(load_fraction) <= 1.0:
         # update_values does not check the field's bounds; NaN fails here.
         raise ValueError(
