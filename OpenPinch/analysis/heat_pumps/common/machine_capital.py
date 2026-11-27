@@ -145,6 +145,10 @@ def machine_components(
     condenser, evaporator, air cooler and air heater areas of
     :func:`process_side_areas`; the condensing side's are shared between
     machines by their process heating, the evaporating side's by their cooling.
+    The areas keep fixed places, 0 for an exchanger idle in this solution, so
+    the same machine's components line up across periods: each stage's IHX
+    and cascade exchanger, then the condenser, air cooler, evaporator and air
+    heater.
     """
     condenser_area, evaporator_area, air_cooler_area, air_heater_area = process_areas
     heat = [sum(_process_heat(stage) for stage in stages) for stages in machines]
@@ -153,16 +157,18 @@ def machine_components(
     result = []
     for stages, Q_heat, Q_cool in zip(machines, heat, cool, strict=True):
         areas = [area for stage in stages for area in _internal_areas(stage, args)]
-        if total_heat > tol:
-            areas.append(condenser_area * Q_heat / total_heat)
-            areas.append(air_cooler_area * Q_heat / total_heat)
-        if total_cool > tol:
-            areas.append(evaporator_area * Q_cool / total_cool)
-            areas.append(air_heater_area * Q_cool / total_cool)
+        heat_share = Q_heat / total_heat if total_heat > tol else 0.0
+        cool_share = Q_cool / total_cool if total_cool > tol else 0.0
+        areas += [
+            condenser_area * heat_share,
+            air_cooler_area * heat_share,
+            evaporator_area * cool_share,
+            air_heater_area * cool_share,
+        ]
         result.append(
             MachineComponents(
                 compressors=tuple(_compressor(stage) for stage in stages),
-                exchanger_areas=tuple(area for area in areas if area > 0.0),
+                exchanger_areas=tuple(areas),
             )
         )
     return tuple(result)
@@ -367,18 +373,19 @@ def _compressor(stage: Any) -> CompressorDuty:
 
 
 def _internal_areas(stage: Any, args: HeatPumpTargetInputs) -> list[float]:
-    """The IHX and the cascade exchanger this stage passes heat up through."""
-    areas = []
+    """The IHX and the cascade exchanger this stage passes heat up through,
+    in that order, each 0 where the stage has none."""
+    areas = [0.0, 0.0]
     ihx_duty = float(getattr(stage, "ihx_duty", 0.0) or 0.0)
     if ihx_duty > tol:
         lmtd = stage.ihx_lmtd
-        areas.append(
+        areas[0] = (
             ihx_duty * 1000.0 / (args.u_gas * lmtd) if lmtd > tol else float("inf")
         )
     cascade_heat = float(getattr(stage, "Q_cas_heat", 0.0) or 0.0)
     if cascade_heat > tol:
         dt = float(getattr(args, "dt_cascade_hx", 0.0))
-        areas.append(
+        areas[1] = (
             cascade_heat * 1000.0 / (args.u_two_phase * dt)
             if dt > tol
             else float("inf")

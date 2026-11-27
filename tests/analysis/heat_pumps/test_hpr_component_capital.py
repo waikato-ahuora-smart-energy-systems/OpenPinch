@@ -241,8 +241,9 @@ def test_a_cascade_machine_has_both_compressors_and_its_cascade_exchanger():
     )
     cascade_heat = cascade._subcycles[1].Q_cas_heat
     assert cascade_heat > 0.0
-    assert sorted(machine.exchanger_areas) == pytest.approx(
-        sorted([10.0, 20.0, cascade_heat * 1e3 / (2000.0 * 5.0)])
+    # Idle exchangers (no IHX here) keep their places at 0.
+    assert sorted(area for area in machine.exchanger_areas if area > 0.0) == (
+        pytest.approx(sorted([10.0, 20.0, cascade_heat * 1e3 / (2000.0 * 5.0)]))
     )
 
 
