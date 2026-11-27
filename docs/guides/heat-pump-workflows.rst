@@ -113,7 +113,9 @@ HPR utilities are priced relative to the HPR electricity price
 (``COSTING_HPR_ELE_PRICE``, default $100/MWh), not from utility stream prices:
 
 - External heating costs ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` (default 1.0).
-- Ambient air is free. It supplies and takes heat inside each HPR cascade, as
+- Ambient air supplies heat for free and takes heat at the cooling water
+  price: heat rejected to air ends at ambient, so it is charged as cooling
+  water is. It supplies and takes heat inside each HPR cascade, as
   far as its temperature allows: ``ENV_TEMPERATURE`` (default 15 °C) with a
   ``dt_cont`` of ``HPR_DT_ENV_CONT`` (default 10 K). Set
   ``HPR_AMBIENT_AIR_ENABLED`` to ``False`` when air is not available as a heat

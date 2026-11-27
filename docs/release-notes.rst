@@ -341,6 +341,13 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A heat pump target charges heat rejected to ambient air at the cooling
+  water price (``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE``), as any
+  heat rejected to ambient is; air as a heat source stays free. The Carnot
+  and vapour compression objectives left heat rejected to air free, so a
+  target could reject any surplus there at no cost. Designs and retrofits
+  that relied on it change: on ``basic_pinch`` a full-load Carnot target
+  now pays for the 733 kW it rejects to air.
 - A heat pump design's network counts the machine's electricity in its
   ``utility_cost``, as a retrofit's designs already did; its total annual
   cost is unchanged. Verification holds the total to the utilities, the

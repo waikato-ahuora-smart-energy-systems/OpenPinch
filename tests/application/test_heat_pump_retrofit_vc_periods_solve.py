@@ -31,7 +31,10 @@ def _two_periods() -> PinchProblem:
         source={
             "streams": [_stream("H1", 70.0, 35.0, 1500.0), heated],
             "utilities": [
-                _utility("HU", "Hot", 180.0, 179.0, 60.0),
+                # Steam dear enough that the machine pays: at 60 $/MWh it did
+                # only while heat rejected to air was free (charged at the
+                # cooling water price since 2026-11-27, review finding 20).
+                _utility("HU", "Hot", 180.0, 179.0, 90.0),
                 _utility("CU", "Cold", 20.0, 25.0, 5.0),
             ],
             "options": {
