@@ -163,6 +163,11 @@ class RetrofitHeatPumpTarget(BaseModel):
     cold_utility_price: float
     electricity_price: float
     total_annualized_cost: float | None = None
+    # The price of the heat delivered and of the process heat absorbed: the
+    # utilities the machine relieves, dearest first, where it relieves only
+    # some ($/kW/y); ``None`` prices them at the side's blend.
+    relieved_heat_price: float | None = None
+    relieved_cooling_price: float | None = None
 
     @property
     def hot_utility_after(self) -> float:
@@ -183,11 +188,24 @@ class RetrofitHeatPumpTarget(BaseModel):
 
     @property
     def operating_cost_after(self) -> float:
-        """The utility and electricity cost with the heat pump, $/y."""
+        """The utility and electricity cost with the heat pump, $/y: the
+        cost before, less the heat delivered and the process heat absorbed
+        at the prices of the utilities they relieve, plus the work."""
 
+        heat = (
+            self.hot_utility_price
+            if self.relieved_heat_price is None
+            else self.relieved_heat_price
+        )
+        cooling = (
+            self.cold_utility_price
+            if self.relieved_cooling_price is None
+            else self.relieved_cooling_price
+        )
         return (
-            self.hot_utility_after * self.hot_utility_price
-            + self.cold_utility_after * self.cold_utility_price
+            self.operating_cost_before
+            - self.heat_delivered * heat
+            - self.process_heat_absorbed * cooling
             + self.work * self.electricity_price
         )
 
