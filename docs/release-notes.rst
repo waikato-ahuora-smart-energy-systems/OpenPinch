@@ -14,6 +14,12 @@ Heat exchanger networks
   periods (0.5, 1 and 2 kW/m2/K) every evolved candidate was judged short
   of area by half and rejected, and a pinch design network was returned
   at 306,390 $/y. The evolved network is now kept, at 256,680 $/y.
+- Site level moves design again. A move's seed kept only the selected
+  network's recovery matches, so a stream that needs two staged heaters or
+  coolers between two matches had no stage for the second, and every move
+  failed, the unshifted baseline included (all 13 designs on two of three
+  small sites). The seed now keeps the network's staged heaters and
+  coolers, as a site seed does.
 - The guide and ``design.thermal_derivative``'s docstring now say what the
   thermal derivative step minimises: hot utility (the utilities' cost
   where a side has a choice), not total annual cost as the guide said. On
