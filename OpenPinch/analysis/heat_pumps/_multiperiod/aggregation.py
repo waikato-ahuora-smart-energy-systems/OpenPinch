@@ -98,7 +98,9 @@ def evaluate_multiperiod_candidate(
         weights,
         idle_weight=args.idle_period_weight,
     )
-    selected = period_outputs[str(selected_period_case(args).period_id)]
+    selected = _with_installed_capital(
+        period_outputs[str(selected_period_case(args).period_id)], weighted
+    )
     return selected.with_updates(
         obj=shared_objective,
         period_outputs=period_outputs,
@@ -107,6 +109,42 @@ def evaluate_multiperiod_candidate(
         period_ids=[str(case.period_id) for case in args.period_cases],
         period_weights=[float(case.weight) for case in args.period_cases],
     )
+
+
+_INSTALLED_CAPITAL_FIELDS = (
+    "hpr_capital_cost",
+    "hpr_annualized_capital_cost",
+    "hpr_hot_utility_annualized_capital_cost",
+    "hpr_refrigeration_annualized_capital_cost",
+    "hpr_utility_annualized_capital_cost",
+    "hpr_machine_capital_costs",
+    "hpr_machine_annualized_capital_costs",
+)
+
+
+def _with_installed_capital(
+    period: HPRBackendResult, weighted: HPRBackendResult
+) -> HPRBackendResult:
+    """``period`` with the capital of the machine installed for every period.
+
+    The period's operation stays its own; its capital is the shared design's
+    (``weighted``, sized for the peak), and its total annualised cost is its
+    operation plus that capital (review finding 19).
+    """
+    updates = {
+        field: getattr(weighted, field)
+        for field in _INSTALLED_CAPITAL_FIELDS
+        if getattr(weighted, field, None) is not None
+    }
+    operating = period.hpr_operating_cost
+    capital = updates.get("hpr_annualized_capital_cost")
+    if operating is not None and capital is not None:
+        total = operating + capital
+        utility_capital = updates.get("hpr_utility_annualized_capital_cost")
+        if utility_capital is not None:
+            total = total + utility_capital
+        updates["hpr_total_annualized_cost"] = total
+    return period.with_updates(**updates)
 
 
 def _set_stage_lift_floors(
