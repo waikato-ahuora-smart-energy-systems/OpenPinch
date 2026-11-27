@@ -1787,7 +1787,14 @@ class _DesignAccessor:
         period_id=None,
         **kwargs,
     ):
-        """Run seeded thermal derivative synthesis only."""
+        """Run seeded thermal derivative synthesis only.
+
+        The step minimises hot utility (the utilities' cost where a side has
+        a choice of utility), not total annual cost: its network can cost
+        more than its seed. Follow it with ``network_evolution``, which
+        searches for cheaper networks by total annual cost, as the full
+        workflow does.
+        """
         from ....analysis.heat_exchanger_networks.service import (
             heat_exchanger_network_thermal_derivative_method_service,
         )

@@ -18,6 +18,12 @@ Heat exchanger networks
   ``heat_exchanger_network`` does. A site network does not record its
   processes, so evolving it again matched streams across processes with no
   piping cost and did not hold each process's levels, with no warning.
+- The guide and ``design.thermal_derivative``'s docstring now say what the
+  thermal derivative step minimises: hot utility (the utilities' cost
+  where a side has a choice), not total annual cost as the guide said. On
+  its own it can return a network dearer than its seed (9 % on the
+  four-stream example); ``design.network_evolution`` then minimises cost,
+  as the full workflow does. No result changes.
 - The median design basis says which streams it leaves out. A stream that
   runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
   not in the basis case, and the fit can only add a heater or cooler at
