@@ -355,9 +355,9 @@ def _require_heat_pump_site_target(case, target) -> None:
     """Raise unless ``case`` targets as the utility heat pump ``target`` did.
 
     The case holds the heat pump as streams that the site's utility levels
-    serve. Its hot utility has to be what the target left, and its cold
-    utility what the target left plus the heat the target let ambient air
-    take, which the case does not hold. They differ when a level cannot
+    serve. Its hot and cold utility have to be what the target left; the
+    target's cold utility holds the heat it rejects to ambient air, which
+    the case does not hold either. They differ when a level cannot
     exchange with the heat pump as the target assumed; the case would then
     look complete and target wrongly. The check runs on a copy, so the
     case stays unsolved.
@@ -366,7 +366,7 @@ def _require_heat_pump_site_target(case, target) -> None:
     site = copy.target.indirect_heat_integration(zone=target.provenance.zone_address)
     wanted = (
         float(target.hot_utility_target),
-        float(target.cold_utility_target) + float(target.hpr_ambient_cold),
+        float(target.cold_utility_target),
     )
     found = (float(site.hot_utility_target), float(site.cold_utility_target))
     tolerance = 1e-6 * max(1.0, *wanted)

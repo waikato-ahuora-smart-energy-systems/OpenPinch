@@ -353,6 +353,14 @@ Heat pumps and refrigeration
   target could reject any surplus there at no cost. Designs and retrofits
   that relied on it change: on ``basic_pinch`` a full-load Carnot target
   now pays for the 733 kW it rejects to air.
+- A heat pump target reports heat rejected to ambient air as cold
+  utility. The air took it as a free process stream, so a target's cold
+  utility fell to zero with process cooling left (``basic_pinch``: 0 kW
+  reported with 513 kW left after the evaporator) and its row was on a
+  different basis from the target without a heat pump. The residual and
+  its utility placement now place that heat too, and the check that a
+  utility heat pump's case targets as its target did no longer adds
+  ``hpr_ambient_cold`` to the target's cold utility.
 - A heat pump design's network counts the machine's electricity in its
   ``utility_cost``, as a retrofit's designs already did; its total annual
   cost is unchanged. Verification holds the total to the utilities, the

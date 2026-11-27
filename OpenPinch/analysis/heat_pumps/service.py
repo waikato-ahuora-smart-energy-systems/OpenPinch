@@ -18,6 +18,7 @@ from ...domain.enums import (
 )
 from ...domain.hpr import HPRLoadSummary, HPRResidualData, HPRThermalSlice
 from ...domain.problem_table import ProblemTable
+from ...domain.stream_collection import StreamCollection
 from ...domain.targets import (
     DirectHeatPumpTarget,
     DirectRefrigerationTarget,
@@ -611,10 +612,12 @@ def _calc_hpr_cascade(
     # Ambient air addition to the process stream set
     base_col = ProblemTableLabel.H_NET_A if is_direct else ProblemTableLabel.H_NET_UT
     pt[ProblemTableLabel.H_NET_W_AIR] = pt[base_col]
-    if len(res.amb_streams) > 0:
+    # Air as a source of heat is free; heat rejected to air is left to the
+    # cold utilities, which charge rejection to ambient at its price.
+    if len(res.amb_streams.get_hot_streams()) > 0:
         pt_air = get_process_heat_cascade(
             hot_streams=res.amb_streams.get_hot_streams(),
-            cold_streams=res.amb_streams.get_cold_streams(),
+            cold_streams=StreamCollection(),
             is_shifted=is_T_vals_shifted,
             is_full_analysis=True,
             period_idx=period_idx,
@@ -706,8 +709,9 @@ def _hpr_numerical_records(
             if is_heat_pumping
             else base_target.cold_utility_target
         )
+    # Heat rejected to air is the residual's to place, as cold utility.
     hot = hot + res.hpr_hot_streams + res.amb_streams.get_hot_streams()
-    cold = cold + res.hpr_cold_streams + res.amb_streams.get_cold_streams()
+    cold = cold + res.hpr_cold_streams
     physical = get_process_heat_cascade(
         hot_streams=hot, cold_streams=cold, is_shifted=False, period_idx=period_idx
     )

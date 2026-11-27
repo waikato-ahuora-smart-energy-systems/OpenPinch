@@ -73,12 +73,14 @@ def _make_base_utility_collections(
             np.array([3.0, 3.0]),
             np.array([5.0, 0.0]),
         ),
+        # Heat rejected to air is left to the cold utilities (review finding
+        # 20, 2026-11-27), so the cascade is the process's own.
         (
             0.0,
             20.0,
             np.array([2.0, 2.0]),
-            np.array([7.0, 2.0]),
-            np.array([5.0, 0.0]),
+            np.array([3.0, 3.0]),
+            np.array([1.0, 1.0]),
         ),
         (
             0.0,
@@ -209,7 +211,7 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
     amb_streams = StreamCollection()
     amb_streams.add(
         Stream(
-            name="Air", supply_temperature=50.0, target_temperature=80.0, heat_flow=10.0
+            name="Air", supply_temperature=80.0, target_temperature=50.0, heat_flow=10.0
         )
     )
     res = SimpleNamespace(
@@ -285,8 +287,8 @@ def test_calc_hpr_cascade_aligns_air_profile_across_duplicate_temperatures(
     ambient.add(
         Stream(
             name="Air",
-            supply_temperature=60.0,
-            target_temperature=120.0,
+            supply_temperature=120.0,
+            target_temperature=60.0,
             heat_flow=10.0,
         )
     )
@@ -364,7 +366,7 @@ def test_calc_hpr_cascade_forwards_period_idx_to_nested_helpers(
     amb_streams = StreamCollection()
     amb_streams.add(
         Stream(
-            name="Air", supply_temperature=50.0, target_temperature=80.0, heat_flow=10.0
+            name="Air", supply_temperature=80.0, target_temperature=50.0, heat_flow=10.0
         )
     )
     res = SimpleNamespace(
@@ -1309,7 +1311,7 @@ def test_calc_hpr_cascade_propagates_helper_type_error_once(
     ambient_streams = StreamCollection()
     ambient_streams.add(
         Stream(
-            name="Air", supply_temperature=50.0, target_temperature=80.0, heat_flow=10.0
+            name="Air", supply_temperature=80.0, target_temperature=50.0, heat_flow=10.0
         )
     )
     pt = ProblemTable(
