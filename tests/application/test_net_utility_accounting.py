@@ -188,6 +188,18 @@ def test_a_lone_cold_utility_below_ambient_is_not_warned():
     assert not [w for w in caught if "ENV_TEMPERATURE" in str(w.message)]
 
 
+def test_a_capped_ambient_sink_is_warned():
+    """Cooling water capped at 50 kW leaves the default CU to set the price
+    of heat rejected beyond the cap; the user is told so."""
+    source = _problem().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["maximum_heat_flow"] = _quantity(50.0, "kW")
+
+    with pytest.warns(UserWarning, match=r"CW.*capped.*CU"):
+        PinchProblem(source)._require_prepared_root_zone()
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,

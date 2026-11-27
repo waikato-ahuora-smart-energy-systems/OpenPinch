@@ -191,6 +191,13 @@ def _price_rejection_at_ambient(
         )
         ambient = own[id(marginal)]
         getattr(marginal, _AMBIENT_SINK).update({n: ambient})
+        if rejector is not None and marginal is not rejector:
+            notes.append(
+                f"{rejector.name} rejects heat to ambient but is capped, so heat "
+                f"beyond its cap leaves through the default {marginal.name}, "
+                f"whose price ({ambient:g} $/MWh) is the cooling price at the "
+                "margin."
+            )
         for u in utilities:
             if u is rejector or u is marginal:
                 priced[id(u)].append(own[id(u)])
