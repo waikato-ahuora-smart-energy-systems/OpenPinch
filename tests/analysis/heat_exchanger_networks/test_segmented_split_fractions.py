@@ -89,3 +89,35 @@ def test_a_segmented_streams_branches_split_its_flow_by_duty():
         for e in network.exchangers
     }
     assert shares == pytest.approx({"Site.C1": 0.6, "Site.C2": 0.4})
+
+
+def test_a_siblings_negative_noise_does_not_lift_the_shares_above_one():
+    """A third match on H1 solved at -1e-4 kW is noise, clipped to 0 when
+    extracted; it must not lower the stage duty the shares are taken of
+    (Codex review of #554)."""
+    source = _problem().to_problem_json()
+    source["streams"].append({**source["streams"][2], "name": "C3"})
+    arrays = problem_to_solver_arrays(PinchProblem(source), 10.0)
+    solved = SimpleNamespace(
+        S=1,
+        Q_r=[[[60.0], [40.0], [-1e-4]]],
+        Q_r_by_period=[[[[60.0], [40.0], [-1e-4]]]],
+        z=[[[1.0], [1.0], [0.0]]],
+        z_allowed=[[[1], [1], [1]]],
+        Q_h=[0.0, 0.0, 0.0],
+        Q_c=[0.0],
+        z_hu=[0.0, 0.0, 0.0],
+        z_cu=[0.0],
+        T_h=[[473.15, 373.15]],
+        T_c=[[383.15, 323.15], [363.15, 323.15], [363.15, 363.15]],
+        T_h_by_period=[[[473.15, 373.15]]],
+        T_c_by_period=[[[383.15, 323.15], [363.15, 323.15], [363.15, 363.15]]],
+        area_r=[[[999.0], [999.0], [0.0]]],
+        f_h=[0.0],
+        f_c=[1.0, 1.0, 1.0],
+    )
+
+    network = extract_heat_exchanger_network(solved, arrays, run_id="noise")
+
+    shares = [e.period_states[0].source_split_fraction for e in network.exchangers]
+    assert sum(shares) <= 1.0 + 1e-12

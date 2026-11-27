@@ -485,7 +485,8 @@ def _stage_recovery_duty(
         cells = (row[stage] for row in duties[stream_index])
     else:
         cells = (by_cold[stream_index][stage] for by_cold in duties)
-    return sum(_optional_float(cell) or 0.0 for cell in cells)
+    # Negative solver noise is clipped to 0, as each match's duty is.
+    return sum(max(_optional_float(cell) or 0.0, 0.0) for cell in cells)
 
 
 def _recovery_split_fraction(
