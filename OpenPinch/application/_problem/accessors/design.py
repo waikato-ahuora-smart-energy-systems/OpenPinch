@@ -1566,13 +1566,29 @@ class _DesignAccessor:
                 RuntimeWarning,
                 stacklevel=3,
             )
-        # A stream that runs, but under the active share, is left out of the
-        # basis case: the fit can only add a heater or cooler at its end.
+        # A stream that runs in the year but is not in a basis case the
+        # design is made on is left out: the fit can only add a heater or
+        # cooler at its end. The designed cases are the dominant cluster's,
+        # or every cluster's with HENS_BASIS_CANDIDATES "all"; a stream's
+        # share is of the year, each cluster's share by its weight.
+        designed = (
+            range(len(basis.clusters))
+            if hens.basis_candidates == "all"
+            else (basis.basis_cluster,)
+        )
+        year = sum(cluster.weight for cluster in basis.clusters) or 1.0
+        runs: dict[tuple[str, str], float] = {}
+        for cluster, rows in zip(basis.clusters, basis.streams):
+            for row in rows:
+                key = (row.zone, row.name)
+                runs[key] = (
+                    runs.get(key, 0.0) + row.active_share * cluster.weight / year
+                )
         left_out = {
-            row.name: row.active_share
-            for rows in basis.streams
-            for row in rows
-            if not row.included and row.active_share > 0.0
+            key: runs[key]
+            for k in designed
+            for row in basis.streams[k]
+            if not row.included and runs[(key := (row.zone, row.name))] > 0.0
         }
         if left_out:
 
@@ -1584,8 +1600,8 @@ class _DesignAccessor:
                 f"{percent(float(hens.basis_active_share))} of the year "
                 "(HENS_BASIS_ACTIVE_SHARE): "
                 + ", ".join(
-                    f"{name} (runs {percent(share)})"
-                    for name, share in left_out.items()
+                    f"{name} in {zone} (runs {percent(share)} of the year)"
+                    for (zone, name), share in left_out.items()
                 )
                 + ". The design fits them with a heater or cooler at their "
                 "end only; design_basis='all' designs them in.",
