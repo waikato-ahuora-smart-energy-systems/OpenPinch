@@ -266,12 +266,13 @@ def _with_one_condenser_starts(
     The cheapest cascade often uses one condenser, which a search from the
     Carnot warm start found for some seeds only (review finding 23).
     """
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
     n_heat, n_cool = _cascade_process_control_counts(
         n_cond=int(args.n_cond),
         n_evap=int(args.n_evap),
-        is_heat_pumping=getattr(args, "is_heat_pumping", True),
+        is_heat_pumping=is_heat_pumping,
     )
-    if x0 is None or n_heat < 2:
+    if x0 is None or not is_heat_pumping or n_heat < 2:
         return x0
     split = HPRoptVectorLayout(
         n_cond=int(args.n_cond),

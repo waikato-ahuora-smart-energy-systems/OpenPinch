@@ -25,6 +25,44 @@ def _layout() -> hp_cascade.HPRoptVectorLayout:
     )
 
 
+def _starts(monkeypatch, args, seed) -> np.ndarray:
+    """The starting points ``optimise_cascade_heat_pump_placement`` searches
+    from, with ``seed`` as the Carnot warm start."""
+    monkeypatch.setattr(hp_cascade, "initialise_hpr_seed", lambda *_a, **_k: seed)
+    monkeypatch.setattr(hp_cascade, "preflight_coolprop_fluid_names", lambda *_a: None)
+    monkeypatch.setattr(
+        hp_cascade, "preflight_coolprop_hpr_targeting", lambda **_k: None
+    )
+    monkeypatch.setattr(
+        hp_cascade,
+        "validate_vapour_hp_refrigerant_ls",
+        lambda num_stages, args: ["R134A"] * num_stages,
+    )
+    captured = {}
+
+    def fake_solve_hpr_placement(*, f_obj, x0_ls, bnds, args):
+        captured["x0_ls"] = np.asarray(x0_ls, dtype=float)
+        return SimpleNamespace(success=True)
+
+    monkeypatch.setattr(hp_cascade, "solve_hpr_placement", fake_solve_hpr_placement)
+    hp_cascade.optimise_cascade_heat_pump_placement(args)
+    return captured["x0_ls"]
+
+
+def test_a_refrigerator_keeps_its_one_warm_start(monkeypatch):
+    args = _base_args(n_cond=3, n_evap=1, is_heat_pumping=False)
+    seed = SimpleNamespace(
+        T_cond=np.array([125.0, 100.0, 80.0]),
+        Q_cond=np.array([90.0, 70.0, 60.0]),
+        T_evap=np.array([35.0]),
+        Q_evap=np.array([150.0]),
+        Q_amb_hot=0.0,
+        Q_amb_cold=0.0,
+    )
+
+    assert _starts(monkeypatch, args, seed).ndim == 1
+
+
 def test_a_cascade_search_starts_from_each_condenser_alone(monkeypatch):
     args = _base_args(n_cond=2, n_evap=1)
     seed = SimpleNamespace(
