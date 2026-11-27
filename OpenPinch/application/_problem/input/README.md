@@ -29,6 +29,7 @@ import from here.
 ## Invariants
 - At least one stream is required (unless a `residual_basis` is given). [semantics.py:semantic_issues], [canonicalization.py:_validate_streams_passed_in]
 - The root zone of the tree cannot be a Utility Zone. [canonicalization.py:_validate_zone_tree_structure]
+- A zone's name has its dots written as dashes, with a `UserWarning` naming both, as a stream's zone label does when it is read (`adapters/io/records.py`): the names of a given zone tree and the project name that names the root. A problem named `Plant v1.2` has the root zone `Plant v1-2`, so its own JSON (`to_problem_json`) reads again; `project_name` itself is kept as given. A residual utility problem, prepared on its own path, names its zone the same way (`residual_utility.py:prepare_residual_problem`). [canonicalization.py:_zone_label] [canonicalization.py:_get_validated_zone_info]
 - Zone `dt_cont_multiplier` is finite and non-negative; a child inherits its parent's when unset. [canonicalization.py:_resolve_zone_dt_cont_multiplier]
 - Multipliers are applied before streams are built, because each stream takes its zone's multiplier and default utilities are placed from shifted temperatures. [construction.py:prepare_problem]
 - Streams are sorted by name before preparation; a stream without `dt_cont` takes `THERMAL_DT_CONT`. [construction.py:prepare_problem], [construction.py:_build_prepared_stream_collection]
