@@ -25,6 +25,10 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A segmented stream split between two matches in a stage reports its
+  split fractions. The model holds a segmented stream's heat capacity as
+  0, so its share of the stage was not computed and came back ``None``;
+  it is now each match's share of the stream's duty in the stage.
 - A site design with placed levels keeps the case's cooling water. Where
   the placed levels needed no fallback cooler, the placed case dropped the
   case's own cold utilities, so a placed steam main was the coldest sink
