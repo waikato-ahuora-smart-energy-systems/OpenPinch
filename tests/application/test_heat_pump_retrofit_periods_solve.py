@@ -59,4 +59,7 @@ def test_a_retrofit_of_two_periods_runs_its_heat_pump_in_each():
     ]
     # Each period's condensers deliver that period's duty.
     assert delivered[1] > delivered[0] + 50.0
-    assert all(state.duty < 1.0 for state in exchangers["E2"].period_states)
+    # The machine relieves E2 almost wholly. Since heat rejected to air is
+    # charged (decided 2026-11-27, review finding 20) the full-load machine
+    # leaves 4.9 kW of the peak on it (0.2 kW in base), under 1 kW before.
+    assert all(state.duty < 10.0 for state in exchangers["E2"].period_states)

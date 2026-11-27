@@ -73,7 +73,11 @@ def _best_by_size(steam_price: float) -> dict[float, float]:
 @pytest.mark.skipif(not _highs_available(), reason="needs highspy")
 @pytest.mark.parametrize(
     ("steam_price", "cheapest_first"),
-    [(30.0, [0.0]), (50.0, [1.0, 0.4, 0.0])],
+    # Since heat rejected to air is charged (decided 2026-11-27, review
+    # finding 20) a 0.4 machine also ranks behind none at 30 $/MWh, and no
+    # 0.4 network ranks at 50 $/MWh; cheap steam still favours no machine and
+    # dear steam the full one.
+    [(30.0, [0.0, 0.4]), (50.0, [1.0, 0.0])],
 )
 def test_sizes_rank_by_the_worth_of_the_steam_they_save(steam_price, cheapest_first):
     assert list(_best_by_size(steam_price)) == cheapest_first
