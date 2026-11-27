@@ -42,10 +42,13 @@ class LevelCountRun:
     message: str | None = None
     # The case the count was designed on, for level moves.
     case: Any = None
+    # The case's own (given) levels, compared with the placed counts.
+    given: bool = False
 
     def row(self) -> dict[str, Any]:
         """The run as a JSON-safe record."""
         return {
+            "levels": "given" if self.given else "placed",
             "count": self.count,
             "isothermal": self.isothermal,
             "sensible": self.sensible,
@@ -366,6 +369,32 @@ def run_level_counts(
     return tuple(runs)
 
 
+def given_levels_run(design: Callable[[], Any]) -> LevelCountRun:
+    """The case's own levels designed (``design()``) as a run of the sweep,
+    so the cheapest of the placed counts and the given levels is selected.
+    A missing synthesis solver or dependency is raised; any other failure is
+    recorded."""
+    from ..analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    given = {"count": 0, "isothermal": 0, "sensible": 0, "given": True}
+    try:
+        view = design()
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        raise
+    except (ValueError, RuntimeError) as exc:
+        return LevelCountRun(**given, status="failed", message=str(exc))
+    return LevelCountRun(
+        **given,
+        status="designed",
+        view=view,
+        total_annual_cost=site_cost(view.selected_network),
+        message="the case's given levels",
+    )
+
+
 def select_level_count(runs: Sequence[LevelCountRun]) -> LevelCountRun:
     """The designed count of least cost; the first such on a tie."""
     from ..analysis.heat_exchanger_networks.errors import WorkflowContractError
@@ -400,12 +429,14 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
     for run in runs:
         if run.status != "designed":
             continue
+        tag = (
+            {"site_levels": "given"}
+            if run.given
+            else {"utility_level_count": run.count}
+        )
         for outcome in ranked_networks(run.view.result):
             network = outcome.network.model_copy(
-                update={
-                    "summary_metrics": dict(outcome.network.summary_metrics)
-                    | {"utility_level_count": run.count}
-                }
+                update={"summary_metrics": dict(outcome.network.summary_metrics) | tag}
             )
             ranked.append(
                 outcome.model_copy(

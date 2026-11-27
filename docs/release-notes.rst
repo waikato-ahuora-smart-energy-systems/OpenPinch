@@ -25,6 +25,12 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site design with ``levels="placed"`` compares the placed levels with
+  the case's own. It returned the cheapest placed count even where the
+  given levels were cheaper: on the reviewer's three-process steam main,
+  placed levels at 20,665 $/y against 20,649 given. The given-levels design
+  now joins the sweep (its row has ``"levels": "given"``) and the cheapest
+  of all is selected.
 - ``verify_network_feasibility`` warns when a network carries no stream
   data to check against. A network read back from JSON keeps none, so its
   stream balances, approaches and areas were skipped and it was reported
