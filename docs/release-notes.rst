@@ -7,6 +7,14 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.optimise_duties`` with the ``cost`` or ``area`` objective
+  solves a network whose exchanger enters just past a segmented stream's
+  kink. The solver rounds each kink over 0.05 K, so an inlet a tenth of a
+  kelvin past one held a little more heat on the exact profile the area
+  slices are cut on than the solver saw, and the duty overran it ("Exchanger
+  duty exceeds an available parent segment profile"); on a two-segment case
+  five of nine duty optimisations raised. The slices now start where the
+  exact profile holds the solver's heat.
 - A multiperiod design's ``total_heat_recovery``, ``total_hot_utility``
   and ``total_cold_utility`` are the year's. On every design over several
   periods they raised "period_id is required when a network has multiple
