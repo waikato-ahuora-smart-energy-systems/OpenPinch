@@ -533,7 +533,8 @@ level-temperature moves. A move shifts one placed level by
 level would touch or pass another placed level or leave the range of the
 site's stream temperatures. Each process's level duties are re-targeted at
 the shifted level, and network evolution designs the site again from the
-current best network's recovery matches, with the call's width, depth and
+current best network's recovery matches and staged heaters and coolers,
+with the call's width, depth and
 options. A round tries every placed level both ways and adopts the cheapest
 move that lowers the site total annual cost; a move whose design fails is
 recorded and skipped. Each set of level positions is designed once: a move

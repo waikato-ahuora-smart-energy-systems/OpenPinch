@@ -7,6 +7,12 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- Site level moves design again. A move's seed kept only the selected
+  network's recovery matches, so a stream that needs two staged heaters or
+  coolers between two matches had no stage for the second, and every move
+  failed, the unshifted baseline included (all 13 designs on two of three
+  small sites). The seed now keeps the network's staged heaters and
+  coolers, as a site seed does.
 - A small stream's exchangers are kept beside a large stream's.
   ``design.optimise_duties``, the multiperiod fit and every other use of
   the fixed-structure model took an exchanger with a duty under 1e-4 of
