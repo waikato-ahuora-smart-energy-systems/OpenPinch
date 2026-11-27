@@ -381,6 +381,24 @@ def test_maximise_utility_duty_returns_zero_for_single_point_segment():
     )
 
 
+def test_a_level_a_rounding_below_its_demand_step_still_serves_it():
+    """Pulp mill after a utility-level heat pump (review finding 21): the
+    residual's LPS step ends 5.4e-8 K above the LPS level's target, so LPS
+    was judged too cold for it and its 15,995 kW went to HPS."""
+    duty = _maximise_utility_duty(
+        T_segment=np.array([153.525358, 153.425358, 138.525358, 138.425358, 136.6]),
+        H_segment=np.array(
+            [15998.923664, 15998.923664, 15998.923664, 4.381202, 4.381202]
+        ),
+        Ts=138.525357946545,
+        Tt=138.425357946545,
+        is_hot_ut=True,
+        Q_assigned=4.381202,
+    )
+
+    assert duty == pytest.approx(15994.542462)
+
+
 def test_sensible_hot_utility_duty_is_limited_by_interior_gcc_breakpoint():
     """Regression for the Process crossing observed in tutorial notebook 19."""
     temperatures = np.asarray([173.0, 168.0, 158.0, 97.0, 69.57, 62.96, 33.0])

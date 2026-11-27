@@ -14,6 +14,12 @@ Heat exchanger networks
   periods (0.5, 1 and 2 kW/m2/K) every evolved candidate was judged short
   of area by half and rejected, and a pinch design network was returned
   at 306,390 $/y. The evolved network is now kept, at 256,680 $/y.
+- The guide and ``design.thermal_derivative``'s docstring now say what the
+  thermal derivative step minimises: hot utility (the utilities' cost
+  where a side has a choice), not total annual cost as the guide said. On
+  its own it can return a network dearer than its seed (9 % on the
+  four-stream example); ``design.network_evolution`` then minimises cost,
+  as the full workflow does. No result changes.
 - The median design basis says which streams it leaves out. A stream that
   runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
   not in the basis case, and the fit can only add a heater or cooler at
@@ -246,6 +252,13 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- After a utility-level heat pump, each utility level keeps its share of
+  the residual. The residual's steps can lie a few hundred-millionths of a
+  kelvin off the levels' temperatures, and a hot utility whose target was
+  that far below its step was judged too cold for it: on the pulp mill at
+  a load fraction of 0.0625 the LPS level's 15,995 kW went to HPS (right
+  total, wrong split and cost). The check now has the 1e-6 K tolerance its
+  supply end has.
 - A heat pump design is sized on the prices its networks are ranked on.
   ``design.heat_exchanger_network(heat_pump=...)`` targeted the heat pump
   with heat priced at the electricity price (the default
