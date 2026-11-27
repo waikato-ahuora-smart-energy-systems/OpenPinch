@@ -264,6 +264,40 @@ def test_each_condenser_level_relieves_only_the_heaters_it_reaches(monkeypatch):
     assert asked[-1] == pytest.approx(0.22)
 
 
+def test_the_machine_is_solved_again_until_its_price_basis_agrees(monkeypatch):
+    # At the blend (0.3) the machine condenses at 175 degC and reaches some
+    # HPS heat (0.276); at that price it condenses at 116 and reaches LPS
+    # alone (0.2), a price it was not yet solved at.
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    asked = []
+
+    def target(**arguments):
+        ratio = arguments["config"].costing.hpr_price_ratio_heat_to_ele
+        asked.append(ratio)
+        return SimpleNamespace(
+            Q_cond=np.array([1000.0]),
+            Q_evap=np.array([800.0]),
+            Q_heat=None,
+            Q_cool=None,
+            Q_amb_hot=0.0,
+            w_net=200.0,
+            cop_h=5.0,
+            T_cond=np.array([175.0 if ratio > 0.29 else 116.0]),
+            T_evap=np.array([30.0]),
+            hpr_total_annualized_cost=None,
+        )
+
+    monkeypatch.setattr(heat_pump_targets, "compute_profile_heat_pump_target", target)
+    problem = _problem()
+
+    heat_pump_targets.as_piped_heat_pump(problem, _network(problem))
+
+    assert asked == pytest.approx([0.3, 0.276, 0.2])
+
+
 def test_at_a_given_approach_the_heaters_reach_is_taken_unshifted(monkeypatch):
     # A retrofit at min_approach_temperature 10 K targets the coolers and
     # heaters unshifted, with the heat pump 10 K off them. A condenser at

@@ -153,21 +153,41 @@ def _relieved_prices(
 _RELIEVED_PRICE_SHARE = 0.01
 
 
-def _sized_at(prices: dict, relieved: dict) -> dict:
-    """``prices`` with each side's price at the price of the utilities the
-    machine relieves, where that differs from the blend by more than
-    ``_RELIEVED_PRICE_SHARE``; ``prices`` itself when neither does."""
-    sized = dict(prices)
-    for key, blend in (
-        ("relieved_heat_price", "hot_utility_price"),
-        ("relieved_cooling_price", "cold_utility_price"),
-    ):
-        price = relieved.get(key)
-        if price is not None and abs(price - prices[blend]) > (
-            _RELIEVED_PRICE_SHARE * abs(prices[blend])
+# Re-solves at the relieved prices at most, after the solve at the blends.
+_RELIEVED_PRICE_PASSES = 3
+
+
+def _sized_on_relief(prices: dict, solve, relieve):
+    """``solve(prices)``, solved again at the prices of the utilities the
+    machine relieves (``relieve(result)``) until those agree with the prices
+    it was solved at to ``_RELIEVED_PRICE_SHARE``, at most
+    ``_RELIEVED_PRICE_PASSES`` times. Returns the last result and what it
+    relieves."""
+
+    def agree(a: float, b: float) -> bool:
+        return abs(a - b) <= _RELIEVED_PRICE_SHARE * abs(b)
+
+    basis = prices
+    result = solve(basis)
+    relieved = relieve(result)
+    for _pass in range(_RELIEVED_PRICE_PASSES):
+        # A side the machine relieves nothing on keeps its blend.
+        nxt = prices | {
+            blend: relieved[key]
+            for key, blend in (
+                ("relieved_heat_price", "hot_utility_price"),
+                ("relieved_cooling_price", "cold_utility_price"),
+            )
+            if relieved.get(key) is not None
+        }
+        if all(
+            agree(nxt[k], basis[k]) for k in ("hot_utility_price", "cold_utility_price")
         ):
-            sized[blend] = price
-    return sized if sized != prices else prices
+            break
+        basis = nxt
+        result = solve(basis)
+        relieved = relieve(result)
+    return result, relieved
 
 
 def retrofit_heat_pumps(
@@ -201,22 +221,16 @@ def retrofit_heat_pumps(
         "as_piped": as_piped_profiles(problem, network),
     }
     prices = _network_prices(problem, network)
-    results = {
-        name: _profile_target(problem, profile, prices, args)
-        for name, profile in profiles.items()
-    }
+    # The ideal's heat could go anywhere a new design puts it: the blends.
+    results = {"ideal": _profile_target(problem, profiles["ideal"], prices, args)}
     # The as-piped heat pump relieves only the network's own heaters and
-    # coolers it can reach: its saving is priced at those, the dearest
-    # first. The ideal's heat could go anywhere a new design puts it.
-    relieved = _relieved_prices(problem, network, results["as_piped"])
-    sized = _sized_at(prices, relieved)
-    if sized != prices:
-        # The machine is sized on what it saves: solved again at the
-        # utilities it relieves, and priced at what that one relieves.
-        results["as_piped"] = _profile_target(
-            problem, profiles["as_piped"], sized, args
-        )
-        relieved = _relieved_prices(problem, network, results["as_piped"])
+    # coolers it can reach: it is sized on what it saves there, solved again
+    # at the utilities it relieves, and priced at what that one relieves.
+    results["as_piped"], relieved = _sized_on_relief(
+        prices,
+        lambda basis: _profile_target(problem, profiles["as_piped"], basis, args),
+        lambda result: _relieved_prices(problem, network, result),
+    )
     return RetrofitHeatPumpTargets(
         ideal=_summary(results["ideal"], *profiles["ideal"][1:], prices),
         as_piped=_summary(
@@ -279,20 +293,19 @@ def as_piped_heat_pump(
             args=args,
         )
     profile = as_piped_profiles(problem, network, dt_cont_multiplier=dt_cont_multiplier)
-    prices = _network_prices(problem, network)
-    result = _profile_target(
-        problem,
-        profile,
-        prices,
-        args,
-        load_fraction=load_fraction,
-        cycle=cycle,
-        approach=approach,
-    )
     # Sized on what it saves: solved again at the utilities it relieves.
-    sized = _sized_at(
-        prices,
-        _relieved_prices(
+    result, _relieved = _sized_on_relief(
+        _network_prices(problem, network),
+        lambda prices: _profile_target(
+            problem,
+            profile,
+            prices,
+            args,
+            load_fraction=load_fraction,
+            cycle=cycle,
+            approach=approach,
+        ),
+        lambda result: _relieved_prices(
             problem,
             network,
             result,
@@ -300,17 +313,7 @@ def as_piped_heat_pump(
             approach=approach,
         ),
     )
-    if sized is prices:
-        return result
-    return _profile_target(
-        problem,
-        profile,
-        sized,
-        args,
-        load_fraction=load_fraction,
-        cycle=cycle,
-        approach=approach,
-    )
+    return result
 
 
 # The cycle model a retrofit heat pump's cycle name solves.
