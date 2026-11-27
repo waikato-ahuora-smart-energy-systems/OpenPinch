@@ -1832,11 +1832,25 @@ class _DesignAccessor:
         # The call's period, as an argument or in its options.
         self._refuse_period_scope(runtime.get("period_id"), "network_evolution")
         # A site seed records its processes (``site_processes``) and is
-        # evolved within each; a site network does not, and is pooled.
-        seeds = tuple(initial_networks or ())
+        # evolved within each; a site network does not, and is pooled. One
+        # network, or the JSON of one, is a seed as a sequence's item is.
+        from ....domain.heat_exchanger_network import HeatExchangerNetwork
+
+        if isinstance(initial_networks, HeatExchangerNetwork | Mapping):
+            seeds = (initial_networks,)
+        else:
+            seeds = tuple(initial_networks or ())
+
+        def metadata(seed) -> Mapping:
+            found = (
+                seed.get("source_metadata")
+                if isinstance(seed, Mapping)
+                else getattr(seed, "source_metadata", None)
+            )
+            return found or {}
+
         pooled = not seeds or any(
-            not (getattr(seed, "source_metadata", None) or {}).get("site_processes")
-            for seed in seeds
+            not metadata(seed).get("site_processes") for seed in seeds
         )
         if pooled and len(self._process_zones()) > 1:
             warnings.warn(

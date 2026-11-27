@@ -53,3 +53,18 @@ def test_evolving_a_network_without_its_processes_warns_that_it_pools_them(
 
     with pytest.warns(UserWarning, match="pools the streams of every process"):
         site._site().design.network_evolution([network])
+
+
+def test_one_site_seed_passed_alone_is_not_taken_for_a_pooled_one(monkeypatch):
+    """``network_evolution`` takes one network as well as a sequence; one
+    site seed passed alone was iterated as its fields and warned."""
+    import warnings
+
+    monkeypatch.setattr(design._DesignAccessor, "_run", lambda self, *a, **k: None)
+    seed = _network([_recovery("Cooling.H1", "Cooling.C1", 1)]).model_copy(
+        update={"source_metadata": {"site_processes": {"Cooling": {}}}}
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        site._site().design.network_evolution(seed)
