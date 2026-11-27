@@ -157,12 +157,26 @@ def _price_rejection_at_ambient(
     for n in range(periods):
         supply = {id(u): at(u.supply_temperature, "degC", n) for u in utilities}
         own = {id(u): at(u.price, "$/MW/h", n) for u in utilities}
-        above = [u for u in utilities if supply[id(u)] >= t_env]
-        candidates = [u for u in above if not is_default_utility(u)] or above
-        rejector = min(candidates, key=lambda u: supply[id(u)], default=None)
-        ambient = 0.0 if rejector is None else own[id(rejector)]
+        given = [u for u in utilities if not is_default_utility(u)]
+        above = [u for u in given if supply[id(u)] >= t_env]
+        # With none above ambient, the warmest given cold utility is taken
+        # to reject to it (cooling water colder than the ambient given).
+        rejector = (
+            min(above, key=lambda u: supply[id(u)])
+            if above
+            else max(given, key=lambda u: supply[id(u)], default=None)
+        )
+        # Heat beyond a capped rejector, or with none, leaves through the
+        # default CU: its price is then the ambient price at the margin.
+        backup = next((u for u in utilities if is_default_utility(u)), None)
+        marginal = (
+            backup
+            if backup is not None and (rejector is None or _capped(rejector, n))
+            else rejector
+        )
+        ambient = own[id(marginal)]
         for u in utilities:
-            if u is rejector:
+            if u is rejector or u is marginal:
                 priced[id(u)].append(own[id(u)])
             elif supply[id(u)] < t_env:
                 # Refrigeration: its work, then its heat and work rejected.
@@ -177,6 +191,14 @@ def _price_rejection_at_ambient(
             # Its own price stands, segment by segment.
             continue
         u.price = Value(costs if periods > 1 else costs[0], unit="$/MW/h")
+
+
+def _capped(utility: Stream, n: int) -> bool:
+    """Whether ``utility`` has a finite maximum heat flow in period ``n``."""
+    if utility.maximum_heat_flow is None:
+        return False
+    cap = StreamCollection._value_at_idx(utility._maximum_heat_flow, n)
+    return bool(np.isfinite(cap))
 
 
 def _set_utilities_for_zone_and_subzones(

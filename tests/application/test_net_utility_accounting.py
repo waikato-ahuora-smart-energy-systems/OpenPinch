@@ -84,6 +84,48 @@ def test_refrigeration_costs_its_work_and_the_rejection_of_heat_and_work():
     assert cold["ChW"] == pytest.approx(25.0 + 5.0 * 1.25)
 
 
+def test_with_none_above_ambient_the_warmest_cold_utility_rejects_to_it():
+    """Water at 10 and 5 C reaches the process's cold end, so no default CU
+    is added and no cold utility is above ambient (15 C). The warmest is
+    taken as the one rejecting to ambient (cooling water as given, as in
+    ``basic_pinch``, whose only cold utility is at 10 C): it keeps its
+    price, and the colder one is refrigeration rejecting through it."""
+    problem = PinchProblem(
+        {
+            "streams": [_stream("H1", 200.0, 40.0, 160.0)],
+            "utilities": [
+                _utility("CW", "Cold", 10.0, 15.0, 4.0),
+                _utility("ChW", "Cold", 5.0, 10.0, 25.0),
+            ],
+            "options": {"ENV_TEMPERATURE": 15.0, "COSTING_HPR_ELE_PRICE": 100.0},
+        }
+    )
+
+    cold = _prices(problem._require_prepared_root_zone().cold_utilities)
+
+    assert set(cold) == {"CW", "ChW"}
+    assert cold["CW"] == pytest.approx(4.0)
+    assert cold["ChW"] == pytest.approx(25.0 + 4.0 * 1.25)
+
+
+def test_a_capped_rejector_leaves_the_marginal_price_to_the_default_utility():
+    """Cooling water is capped at 50 kW, so a default CU is added for the
+    rest. Heat beyond the cap ends at ambient through the default CU, so its
+    price, not cooling water's, is what other cold utilities cost; cooling
+    water keeps its own (Codex review of #552)."""
+    source = _problem().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["maximum_heat_flow"] = _quantity(50.0, "kW")
+    problem = PinchProblem(source)
+
+    cold = _prices(problem._require_prepared_root_zone().cold_utilities)
+
+    assert cold["CW"] == pytest.approx(5.0)
+    assert cold["CU"] == pytest.approx(100.0)
+    assert cold["LPS"] == pytest.approx(100.0)
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,
