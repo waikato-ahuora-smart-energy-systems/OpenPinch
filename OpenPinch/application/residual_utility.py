@@ -137,18 +137,24 @@ def prepare_residual_problem(input_data, project_name):
     from ..domain.configuration import Configuration
     from ..domain.enums import ZoneType
     from ..domain.zone import Zone
+    from ._problem.input.canonicalization import _zone_label
     from ._problem.input.utilities import _get_hot_and_cold_utilities
 
     data = input_data.residual_basis.data
+    # A zone's dots become dashes, as on every other problem's root.
+    project = _zone_label(project_name)
+    name = (
+        _zone_label(input_data.zone_tree.name)
+        if input_data.zone_tree is not None
+        else project
+    )
     config = Configuration(
         options=input_data.options or {},
-        top_zone_name=project_name,
+        top_zone_name=project,
         top_zone_identifier=ZoneType.P.value,
     )
     zone = Zone(
-        name=input_data.zone_tree.name
-        if input_data.zone_tree is not None
-        else project_name,
+        name=name,
         type=ZoneType.P.value,
         config=config,
     )

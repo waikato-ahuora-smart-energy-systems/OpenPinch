@@ -584,6 +584,30 @@ def test_the_as_piped_target_stands_off_by_a_given_approach(monkeypatch):
     assert seen["config"].hpr.dt_cont == 10.0
 
 
+def test_a_given_approach_replaces_the_air_and_process_contributions(monkeypatch):
+    """The heat pump service adds the air's own contribution
+    (``HPR_DT_ENV_CONT``) to its approach where it meets air, and the
+    process streams' (``THERMAL_DT_CONT``) where it sizes a process
+    exchanger. A retrofit at a given approach holds those matches to the
+    approach alone: at 10 K the air was met at 20 K and the process at
+    15 K."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    seen = {}
+
+    def target(**arguments):
+        seen.update(arguments)
+
+    monkeypatch.setattr(heat_pump_targets, "compute_profile_heat_pump_target", target)
+
+    heat_pump_targets.as_piped_heat_pump(_problem(), _solved_network(), approach=10.0)
+
+    assert seen["config"].hpr.dt_env_cont == 0.0
+    assert seen["config"].thermal.dt_cont == 0.0
+
+
 def test_a_vapour_compression_target_reports_its_duties():
     """A vapour compression result carries its stages' heating and cooling
     as ``Q_heat`` and ``Q_cool``; ``Q_cond`` and ``Q_evap`` are a Carnot

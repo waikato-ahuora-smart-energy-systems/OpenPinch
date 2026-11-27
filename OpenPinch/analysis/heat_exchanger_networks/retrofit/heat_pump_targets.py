@@ -203,8 +203,13 @@ def _target_config(
 
     config = _at_network_prices(problem.master_zone.config, prices)
     if approach is not None:
+        # The approach replaces every contribution: the heat pump's own, the
+        # air's (added where it meets air) and the process streams' (added
+        # back where it sizes a process exchanger on shifted profiles).
         config = deepcopy(config)
-        config.update_values(HPR_DT_CONT=float(approach))
+        config.update_values(
+            HPR_DT_CONT=float(approach), HPR_DT_ENV_CONT=0.0, THERMAL_DT_CONT=0.0
+        )
     if load_fraction is not None and not 0.0 <= float(load_fraction) <= 1.0:
         # update_values does not check the field's bounds; NaN fails here.
         raise ValueError(
