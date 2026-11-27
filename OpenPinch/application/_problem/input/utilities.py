@@ -173,14 +173,6 @@ def _price_rejection_at_ambient(
             if above
             else max(given, key=lambda u: supply[id(u)], default=None)
         )
-        # Only where it prices another cold utility: alone it keeps its own.
-        if rejector is not None and not above and len(utilities) > 1:
-            notes.append(
-                f"No cold utility is at or above ENV_TEMPERATURE ({t_env:g} C), "
-                f"so {rejector.name} ({supply[id(rejector)]:g} C), the warmest, "
-                "is taken to reject heat to ambient and sets the cooling price; "
-                "set ENV_TEMPERATURE if it is refrigeration."
-            )
         # Heat beyond a capped rejector, or with none, leaves through the
         # default CU: its price is then the ambient price at the margin.
         backup = next((u for u in utilities if is_default_utility(u)), None)
@@ -189,6 +181,19 @@ def _price_rejection_at_ambient(
             if backup is not None and (rejector is None or _capped(rejector, n))
             else rejector
         )
+        # Only where the assumed one sets the price and prices another.
+        if (
+            rejector is not None
+            and not above
+            and marginal is rejector
+            and len(utilities) > 1
+        ):
+            notes.append(
+                f"No cold utility is at or above ENV_TEMPERATURE ({t_env:g} C), "
+                f"so {rejector.name} ({supply[id(rejector)]:g} C), the warmest, "
+                "is taken to reject heat to ambient and sets the cooling price; "
+                "set ENV_TEMPERATURE if it is refrigeration."
+            )
         ambient = own[id(marginal)]
         getattr(marginal, _AMBIENT_SINK).update({n: ambient})
         if rejector is not None and marginal is not rejector:

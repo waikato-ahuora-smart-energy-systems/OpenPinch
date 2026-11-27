@@ -188,6 +188,30 @@ def test_a_lone_cold_utility_below_ambient_is_not_warned():
     assert not [w for w in caught if "ENV_TEMPERATURE" in str(w.message)]
 
 
+def test_a_capped_lone_utility_below_ambient_is_not_taken_as_the_sink():
+    """Cooling water at 10 C, capped, is the only cold utility given, so a
+    default CU is added and sets the price at the margin. The warning that
+    the warmest given utility was assumed named the water, which sets no
+    price there (Codex review of #559)."""
+    import warnings
+
+    water = {
+        **_utility("CW", "Cold", 10.0, 15.0, 4.0),
+        "maximum_heat_flow": _quantity(50.0, "kW"),
+    }
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        PinchProblem(
+            {
+                "streams": [_stream("H1", 200.0, 40.0, 160.0)],
+                "utilities": [water],
+                "options": {"ENV_TEMPERATURE": 15.0},
+            }
+        )._require_prepared_root_zone()
+
+    assert not [w for w in caught if "ENV_TEMPERATURE" in str(w.message)]
+
+
 def test_a_capped_ambient_sink_is_warned():
     """Cooling water capped at 50 kW leaves the default CU to set the price
     of heat rejected beyond the cap; the user is told so."""
