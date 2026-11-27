@@ -927,16 +927,23 @@ class _DesignAccessor:
         )
         # The case's own levels are a candidate too; their design is the
         # problem's own, kept as its design only if it wins.
-        results = self._problem._results
-        previous = None if results is None else results.design
+        before = self._problem._results
+        previous = None if before is None else before.design
         runs = (
             *runs,
             given_levels_run(
                 lambda: self._site_design(width=width, depth=depth, options=options)
             ),
         )
-        if results is not None and not select_level_count(runs).given:
-            results.design = previous
+        # The given design may have made the problem's results.
+        results = self._problem._results
+        if results is not None:
+            winner = select_level_count(runs)
+            # The sweep's result gathers every count's networks; the cache
+            # keeps the given design as designed, or the previous one.
+            results.design = (
+                winner.view.result.model_copy(deep=True) if winner.given else previous
+            )
         return level_sweep_view(
             self._problem,
             runs,

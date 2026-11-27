@@ -470,6 +470,53 @@ def test_placed_levels_are_compared_with_the_cases_given_levels(monkeypatch):
     assert selected.total_annual_cost == 20_649.0
 
 
+def test_a_winning_given_design_is_cached_without_the_sweeps_networks(monkeypatch):
+    """The sweep's result ranks every count's networks, placed ones naming
+    utilities the problem lacks. When the given levels win, the problem's
+    cached design was that same result, so a later method seeding from the
+    cache took placed networks (Codex review of #558). The cache keeps the
+    given design as it was."""
+    from OpenPinch.application import site_level_moves
+    from OpenPinch.application._problem.accessors import design
+
+    class _Result(SimpleNamespace):
+        def model_copy(self, *, deep=False):
+            return _Result(**vars(self))
+
+    placed = site_levels.LevelCountRun(
+        count=2,
+        isothermal=2,
+        sensible=0,
+        status="designed",
+        view=_designed(21_348.0),
+        total_annual_cost=21_348.0,
+    )
+
+    def given_design(self, **_):
+        view = _designed(20_649.0)
+        view.result = _Result(ranked_networks=("given",))
+        self._problem._results = SimpleNamespace(design=view.result)
+        return view
+
+    def sweep_view(problem, runs, *, settings):
+        view = site_levels.select_level_count(runs).view
+        view.result.ranked_networks = ("given", "placed")
+        return view
+
+    monkeypatch.setattr(site_levels, "run_level_counts", lambda *a, **k: (placed,))
+    monkeypatch.setattr(
+        site_level_moves, "refine_selected", lambda runs, **_: (runs, [])
+    )
+    monkeypatch.setattr(design._DesignAccessor, "_site_design", given_design)
+    monkeypatch.setattr(site_levels, "level_sweep_view", sweep_view)
+    problem = _site()
+
+    view = problem.design.total_site_heat_exchanger_network(levels="placed")
+
+    assert view.result.ranked_networks == ("given", "placed")
+    assert problem._results.design.ranked_networks == ("given",)
+
+
 def test_placed_levels_sweep_the_configured_counts(monkeypatch):
     seen = {}
 
