@@ -36,6 +36,104 @@ from .search import RetrofitSettings, run_retrofit_search
 _KELVIN = 273.15
 
 
+def _relieved_price(
+    problem,
+    network,
+    result,
+    side: str,
+    *,
+    dt_cont_multiplier: float = 1.0,
+    approach=None,
+) -> float | None:
+    """The price ($/kW/y) of the utility the as-piped heat pump ``result``
+    relieves on ``side``: ``"hot"``, the heaters its condensers reach,
+    ``"cold"``, the coolers its evaporators reach, the dearest relieved
+    first, as far as its heat delivered (or process heat absorbed) goes.
+
+    A condenser level at ``T`` reaches the part of a heater's shifted range
+    below ``T - HPR_DT_CONT``; an evaporator at ``T``, the part of a
+    cooler's above ``T + HPR_DT_CONT``. ``None`` when it reaches none,
+    which prices it at the side's blend.
+    """
+
+    hot = side == "hot"
+    config = problem.master_zone.config
+    approach = float(config.hpr.dt_cont)
+    arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
+    costs = arrays.arrays["hu_cost_period" if hot else "cu_cost_period"][0]
+    stage = (
+        (result.Q_heat if result.Q_cond is None else result.Q_cond)
+        if hot
+        else (result.Q_cool if result.Q_evap is None else result.Q_evap)
+    )
+    duties = np.atleast_1d(np.asarray(stage, dtype=float))
+    levels = np.atleast_1d(
+        np.asarray(result.T_cond if hot else result.T_evap, dtype=float)
+    )
+    running = [
+        float(t) for t, q in zip(levels, np.resize(duties, levels.shape)) if q > 0.0
+    ] or [float(t) for t in levels]
+    if not running:
+        return None
+    limit = max(running) - approach if hot else min(running) + approach
+    amount = float(duties.sum()) - (0.0 if hot else float(result.Q_amb_hot))
+    sources, sinks = _as_piped_segments(problem, network, 0, dt_cont_multiplier)
+    by_id = {str(e.exchanger_id): e for e in network.exchangers}
+    reachable = []
+    for _key, segment in (sinks if hot else sources).items():
+        exchanger = by_id.get(segment.name)
+        index = None if exchanger is None else _utility_index(arrays, exchanger, side)
+        if index is None:
+            continue
+        lo = float(segment.shifted_minimum_temperature.value)
+        hi = float(segment.shifted_maximum_temperature.value)
+        if hi - lo <= 0.0:
+            share = 1.0 if (lo <= limit if hot else hi >= limit) else 0.0
+        else:
+            share = (limit - lo) / (hi - lo) if hot else (hi - limit) / (hi - lo)
+        duty = min(max(share, 0.0), 1.0) * float(segment.heat_flow.value)
+        if duty > 0.0:
+            reachable.append((float(costs[index]), duty))
+    taken, cost = 0.0, 0.0
+    for price, duty in sorted(reachable, reverse=True):
+        part = min(duty, max(amount - taken, 0.0))
+        taken += part
+        cost += part * price
+    return cost / taken if taken > 0.0 else None
+
+
+def _relieved_prices(problem, network, result) -> dict:
+    """``RetrofitHeatPumpTarget``'s relieved prices for ``result``; none
+    for no result."""
+    if result is None:
+        return {}
+    return {
+        "relieved_heat_price": _relieved_price(problem, network, result, "hot"),
+        "relieved_cooling_price": _relieved_price(problem, network, result, "cold"),
+    }
+
+
+# A relieved price within this share of the blend sizes the machine as is.
+_RELIEVED_PRICE_SHARE = 0.01
+
+
+def _sized_at(prices: dict, relieved: dict) -> dict:
+    """``prices`` with each side's price at the price of the utilities the
+    machine relieves, where that differs from the blend by more than
+    ``_RELIEVED_PRICE_SHARE``; ``prices`` itself when neither does."""
+    sized = dict(prices)
+    for key, blend in (
+        ("relieved_heat_price", "hot_utility_price"),
+        ("relieved_cooling_price", "cold_utility_price"),
+    ):
+        price = relieved.get(key)
+        if price is not None and abs(price - prices[blend]) > (
+            _RELIEVED_PRICE_SHARE * abs(prices[blend])
+        ):
+            sized[blend] = price
+    return sized if sized != prices else prices
+
+
 def retrofit_heat_pumps(
     problem, network: HeatExchangerNetwork, *, args: dict | None = None
 ) -> RetrofitHeatPumpTargets:
@@ -67,16 +165,27 @@ def retrofit_heat_pumps(
         "as_piped": as_piped_profiles(problem, network),
     }
     prices = _network_prices(problem, network)
+    results = {
+        name: _profile_target(problem, profile, prices, args)
+        for name, profile in profiles.items()
+    }
+    # The as-piped heat pump relieves only the network's own heaters and
+    # coolers it can reach: its saving is priced at those, the dearest
+    # first. The ideal's heat could go anywhere a new design puts it.
+    relieved = _relieved_prices(problem, network, results["as_piped"])
+    sized = _sized_at(prices, relieved)
+    if sized != prices:
+        # The machine is sized on what it saves: solved again at the
+        # utilities it relieves, and priced at what that one relieves.
+        results["as_piped"] = _profile_target(
+            problem, profiles["as_piped"], sized, args
+        )
+        relieved = _relieved_prices(problem, network, results["as_piped"])
     return RetrofitHeatPumpTargets(
-        **{
-            name: _summary(
-                _profile_target(problem, profile, prices, args),
-                profile[1],
-                profile[2],
-                prices,
-            )
-            for name, profile in profiles.items()
-        }
+        ideal=_summary(results["ideal"], *profiles["ideal"][1:], prices),
+        as_piped=_summary(
+            results["as_piped"], *profiles["as_piped"][1:], prices | relieved
+        ),
     )
 
 
@@ -133,10 +242,25 @@ def as_piped_heat_pump(
             ),
             args=args,
         )
+    profile = as_piped_profiles(problem, network, dt_cont_multiplier=dt_cont_multiplier)
+    prices = _network_prices(problem, network)
+    result = _profile_target(
+        problem,
+        profile,
+        prices,
+        args,
+        load_fraction=load_fraction,
+        cycle=cycle,
+        approach=approach,
+    )
+    # Sized on what it saves: solved again at the utilities it relieves.
+    sized = _sized_at(prices, _relieved_prices(problem, network, result))
+    if sized is prices:
+        return result
     return _profile_target(
         problem,
-        as_piped_profiles(problem, network, dt_cont_multiplier=dt_cont_multiplier),
-        _network_prices(problem, network),
+        profile,
+        sized,
         args,
         load_fraction=load_fraction,
         cycle=cycle,
@@ -256,25 +380,35 @@ def _at_network_prices(config, prices: dict):
     return priced
 
 
+def _utility_index(arrays, exchanger, side: str):
+    """The index of the utility ``exchanger`` (a heater for ``"hot"``, a
+    cooler for ``"cold"``) uses on the solver arrays' axis; ``None`` when
+    it is not there."""
+
+    hot = side == "hot"
+    axis = arrays.axis_maps["hot_utilities" if hot else "cold_utilities"]
+    name = exchanger.source_stream if hot else exchanger.sink_stream
+    index = axis.get(name)
+    if index is None:
+        index = next(
+            (u for key, u in axis.items() if key.rsplit(".", 1)[-1] == name), None
+        )
+    return index
+
+
 def _utility_price(arrays, network: HeatExchangerNetwork, side: str) -> float:
     """A side's utility price, $/kW/y: its heaters' (``"hot"``) or coolers'
     utilities weighted by their first-period duties; with none in use, the
     side's cheapest utility."""
 
     hot = side == "hot"
-    axis = arrays.axis_maps["hot_utilities" if hot else "cold_utilities"]
     costs = arrays.arrays["hu_cost_period" if hot else "cu_cost_period"][0]
     kind = HeatExchangerKind.HOT_UTILITY if hot else HeatExchangerKind.COLD_UTILITY
     duty: dict[str, float] = {}
     for exchanger in network.exchangers:
         if exchanger.kind != kind:
             continue
-        name = exchanger.source_stream if hot else exchanger.sink_stream
-        index = axis.get(name)
-        if index is None:
-            index = next(
-                (u for key, u in axis.items() if key.rsplit(".", 1)[-1] == name), None
-            )
+        index = _utility_index(arrays, exchanger, side)
         if index is None:
             continue
         duty[index] = duty.get(index, 0.0) + max(

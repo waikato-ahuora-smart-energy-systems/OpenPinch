@@ -232,6 +232,20 @@ Heat pumps and refrigeration
   pinch case no heat pump pays at those prices: the design says so
   instead of returning 22 heat pump networks, the cheapest of them
   409,423 $/y against 238,776 without one.
+- A retrofit's heat pump is priced and sized at the utilities it relieves.
+  ``design.retrofit_heat_pumps`` priced the as-piped heat pump's saving
+  at the duty-weighted blend of all the network's heaters (and coolers),
+  and sized the machine at that blend; a machine that can reach only the
+  cheaper heaters was credited at the dearer ones too (175,197 $/y
+  reported where the heater it serves gives 95,197, on a case with
+  heaters on 20 and 40 $/MWh steam). The heat it delivers is now priced
+  at the heaters its condensers can reach, the dearest relieved first,
+  and its cooling at the coolers its evaporators reach
+  (``RetrofitHeatPumpTarget.relieved_heat_price`` and
+  ``relieved_cooling_price``); the machine is solved again at those
+  prices, in ``retrofit_heat_pumps`` and in ``design.retrofit``'s heat
+  pump step. The ideal target and a shared design over several periods
+  keep the blends.
 - A parallel Carnot heat pump target gives its colder machines all the
   source heat above them. Each evaporator's available heat is the source
   heat between it and the evaporator above, and the cycle took the hotter
