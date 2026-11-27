@@ -14,6 +14,14 @@ Heat exchanger networks
   periods (0.5, 1 and 2 kW/m2/K) every evolved candidate was judged short
   of area by half and rejected, and a pinch design network was returned
   at 306,390 $/y. The evolved network is now kept, at 256,680 $/y.
+- ``design.optimise_duties`` with the ``cost`` or ``area`` objective
+  solves a network whose exchanger enters just past a segmented stream's
+  kink. The solver rounds each kink over 0.05 K, so an inlet a tenth of a
+  kelvin past one held a little more heat on the exact profile the area
+  slices are cut on than the solver saw, and the duty overran it ("Exchanger
+  duty exceeds an available parent segment profile"); on a two-segment case
+  five of nine duty optimisations raised. The slices now start where the
+  exact profile holds the solver's heat.
 - Site level moves design again. A move's seed kept only the selected
   network's recovery matches, so a stream that needs two staged heaters or
   coolers between two matches had no stage for the second, and every move
