@@ -14,14 +14,19 @@ def network_with_heat_pumps(
     """``network`` with ``heat_pumps`` recorded on it and their annual cost
     (electricity and annualised capital) in its total.
 
-    The utility cost and the capital cost stay the network's own: its
-    utilities and its exchangers.
+    The utility cost includes the machines' electricity, a purchased
+    utility as a retrofit's designs count it; the capital cost stays the
+    network's own exchangers'.
     """
     machines = tuple(heat_pumps)
     added = sum(machine.annual_cost for machine in machines)
+    electricity = sum(machine.electricity_cost for machine in machines)
     total = network.total_annual_cost
     if total is not None:
         total += added
+    utility = network.utility_cost
+    if utility is not None:
+        utility += electricity
     metrics = dict(network.summary_metrics)
     site = metrics.get("site_total_annual_cost")
     if site is not None:
@@ -31,6 +36,7 @@ def network_with_heat_pumps(
         update={
             "heat_pumps": machines,
             "total_annual_cost": total,
+            "utility_cost": utility,
             "summary_metrics": metrics,
         }
     )

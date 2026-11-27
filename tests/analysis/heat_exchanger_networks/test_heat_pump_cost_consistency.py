@@ -1,9 +1,10 @@
 """A network's total annual cost includes its heat pumps.
 
 Verification holds a network's total to its parts. With a heat pump the
-parts are three: the utilities, the exchangers' capital, and the machine's
-electricity and annualised capital. A total without the machine's cost
-would rank a heat pump design as if its electricity were free.
+parts are three: the utilities (the machine's electricity included, decided
+2026-11-27), the exchangers' capital, and the machine's annualised capital.
+A total without the machine's cost would rank a heat pump design as if its
+electricity were free.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ HEAT_PUMP = NetworkHeatPump(
 def _network(total: float) -> HeatExchangerNetwork:
     return HeatExchangerNetwork(
         total_annual_cost=total,
-        utility_cost=42_600.0,
+        utility_cost=42_600.0 + 218_622.0,
         capital_cost=126_000.0,
         heat_pumps=(HEAT_PUMP,),
     )

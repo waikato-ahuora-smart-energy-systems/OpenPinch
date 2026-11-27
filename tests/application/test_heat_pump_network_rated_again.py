@@ -89,9 +89,9 @@ def test_a_rating_on_the_networks_own_case_keeps_the_machine(pumped):
 
 def test_a_retrofit_takes_the_networks_json_as_its_existing_network(pumped):
     """The existing network draws the utility it was designed to draw, and
-    the retrofit's network keeps the machine. The design's utility cost
-    includes the machine's electricity, as a retrofit's heat pump step
-    reports it; the network's own is its utilities'."""
+    the retrofit's network keeps the machine. The design's utility cost and
+    the network's both include the machine's electricity (decided
+    2026-11-27), as a retrofit's heat pump step reports it."""
     problem = PinchProblem(source=basic_source(), project_name="basic")
 
     result = problem.design.retrofit(
@@ -100,9 +100,7 @@ def test_a_retrofit_takes_the_networks_json_as_its_existing_network(pumped):
 
     existing = result.frontier[0]
     assert existing.network.utility_cost == pytest.approx(pumped.utility_cost, rel=1e-6)
-    assert existing.utility_cost == pytest.approx(
-        pumped.utility_cost + pumped.heat_pumps[0].electricity_cost, rel=1e-6
-    )
+    assert existing.utility_cost == pytest.approx(pumped.utility_cost, rel=1e-6)
     assert existing.network.heat_pumps == pumped.heat_pumps
 
 
