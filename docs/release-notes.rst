@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site whose processes recover no heat within themselves is designed.
+  Its processes are linked only through the site's utilities, so there is
+  nothing for the site evolution to refine, and
+  ``design.total_site_heat_exchanger_network`` raised "no process network
+  recovers heat". It now returns each process's network joined into one
+  site network and costed by the site utility balance, as when the site
+  evolution fails, with a warning.
 - A site design warns when a process's design fails one way.
   ``design.total_site_heat_exchanger_network`` designs each process with
   levels chosen by price and with its levels held at their targets; when
