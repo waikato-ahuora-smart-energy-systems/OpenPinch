@@ -200,7 +200,7 @@ def _recovery_period_state(
             stage_index + 1,
         )
     )
-    return HeatExchangerPeriodState(
+    state = HeatExchangerPeriodState(
         period_id=period_id,
         period_idx=period_idx,
         duty=duty,
@@ -250,6 +250,28 @@ def _recovery_period_state(
             duty,
             period_idx=period_idx,
         ),
+    )
+    # Over several periods the approach variables bind only where the area
+    # is sized; elsewhere the streams' own terminal differences are reported.
+    if hot_boundaries is not None and len(hot_boundaries) > 1:
+        return _at_terminal_approaches(state)
+    return state
+
+
+def _at_terminal_approaches(state: HeatExchangerPeriodState):
+    """``state`` with the approaches its streams pass at; an idle match, or
+    one without all four temperatures, keeps the model's."""
+    ends = (
+        state.source_inlet_temperature,
+        state.sink_outlet_temperature,
+        state.source_outlet_temperature,
+        state.sink_inlet_temperature,
+    )
+    if not state.active or any(value is None for value in ends):
+        return state
+    hot_in, cold_out, hot_out, cold_in = ends
+    return state.model_copy(
+        update={"approach_temperatures": (hot_in - cold_out, hot_out - cold_in)}
     )
 
 

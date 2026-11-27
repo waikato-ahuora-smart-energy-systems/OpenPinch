@@ -30,6 +30,11 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A multiperiod network reports each recovery match's approach
+  temperatures as the differences its streams pass at in that period. The
+  model's approach variables bind only where the area is sized, so in other
+  periods they could sit below the real differences (a dairy match on
+  ``design_basis="all"`` reported 6.30 K where its streams pass at 8.19 K).
 - A site design with ``levels="placed"`` compares the placed levels with
   the case's own. It returned the cheapest placed count even where the
   given levels were cheaper: on the reviewer's three-process steam main,
