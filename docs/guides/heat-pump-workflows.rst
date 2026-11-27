@@ -178,17 +178,19 @@ with ``COSTING_DISCOUNT_RATE`` and ``COSTING_SERVICE_LIFE``; set
 ``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` to ``False`` to leave it out of the
 objective.
 
-The default utilities the design still needs carry installed capital too:
+The default utilities the design still needs can carry installed capital too.
+It is left out unless ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` is set
+to ``True`` (the default is ``False``). With it on,
 ``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $750/kW of hot utility) and
-``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration),
-annualized the same way. A heat pump that displaces utility capacity is
-credited for it. Results report it as ``hpr_utility_annualized_capital_cost``,
-alongside ``hpr_annualized_capital_cost`` for the heat pump, and split it into
+``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration)
+are annualized the same way, and a heat pump that displaces utility capacity
+is credited for it. Results report it as
+``hpr_utility_annualized_capital_cost``, alongside
+``hpr_annualized_capital_cost`` for the heat pump, and split it into
 ``hpr_hot_utility_annualized_capital_cost`` and
 ``hpr_refrigeration_annualized_capital_cost``. Across periods each utility is
 sized for its own peak period, and the utility capital is the sum of those two
-peaks. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to ``False`` to
-leave it out.
+peaks.
 
 Heat pumps do not always pay, especially for high lifts. When the best valid
 design is no heat pump, targeting raises a typed "no beneficial heat pump"

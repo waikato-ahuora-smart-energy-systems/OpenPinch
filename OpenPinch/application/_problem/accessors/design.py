@@ -1980,11 +1980,12 @@ class _DesignAccessor:
         size. The plain search the step is joined with offers no heat pump
         of its own: the linked heat pump move it once offered was retired
         on 2026-11-24. The step is left out, with a ``UserWarning`` giving the
-        reason, on a problem with several periods, on one with process
-        components or a site of several process zones, when the target
-        finds no machine the cycle can model that pays, and when the
-        network cannot serve the machine's duties; it is not built when
-        ``max_modifications`` is 0.
+        reason, on a problem with process components or a site of several
+        process zones, when the target finds no machine the cycle can
+        model that pays, and when the network cannot serve the machine's
+        duties; it is not built when ``max_modifications`` is 0. On a
+        problem with several periods the machine is one shared design
+        over all of them.
 
         ``strategy`` "structure" (the default) makes one structural change
         per step: ``ceiling_candidates`` screened changes are ranked

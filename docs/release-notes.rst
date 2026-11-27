@@ -358,6 +358,12 @@ Heat pumps and refrigeration
   retrofit search does not read the list, so a new match or a heat pump
   step may pair streams it names; only one sentence in another section of
   the guide said so.
+- Two stale texts are corrected. The ``design.retrofit`` docstring said
+  its heat pump step is left out on a problem with several periods; it
+  runs there as one shared design. The heat pump guide read as if the
+  capital of the utilities a design still needs were counted by default;
+  ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` is ``False`` by
+  default.
 
 0.10.0 (2026-11-25)
 -------------------
