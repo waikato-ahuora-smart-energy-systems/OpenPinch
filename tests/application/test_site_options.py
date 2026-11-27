@@ -42,16 +42,17 @@ def _design(options):
 @pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
 def test_a_letdown_price_raises_the_site_cost_of_a_network_that_lets_down():
     """The level-held network holds Heating's 40 kW on LPS and Cooling's
-    40 kW on LPG: the site buys HPS (40 $/MWh) and lets it down to LPS (60),
-    and lets LPG down to cooling water rather than dump it (20). At
-    10 $/MWh both letdowns still pay, so the 80 kW let down costs
-    80 * 10 * 8300 / 1000 $/y more. A price of 0 is the default."""
+    40 kW on LPG: the site buys HPS (40 $/MWh) and lets it down to LPS (60).
+    Only net cooling is charged, so LPG dumped costs the cooling water price,
+    as letting it down to cooling water does. At 10 $/MWh the HPS letdown
+    still pays and LPG is dumped instead, so the 40 kW let down costs
+    40 * 10 * 8300 / 1000 $/y more. A price of 0 is the default."""
     default = _design({})
     free = _design({"HENS_SITE_LETDOWN_PRICE": 0.0})
     priced = _design({"HENS_SITE_LETDOWN_PRICE": 10.0})
 
     cost, letdown = _level_held(default)
-    assert letdown == pytest.approx(80.0, abs=1e-4)
+    assert letdown >= 40.0 - 1e-4
     assert _level_held(free)[0] == pytest.approx(cost, rel=1e-9)
     assert free.selected_network.summary_metrics[
         "site_total_annual_cost"
@@ -59,7 +60,7 @@ def test_a_letdown_price_raises_the_site_cost_of_a_network_that_lets_down():
         default.selected_network.summary_metrics["site_total_annual_cost"], rel=1e-9
     )
     assert _level_held(priced)[0] == pytest.approx(
-        cost + 80.0 * 10.0 * 8300.0 / 1000.0, rel=1e-6
+        cost + 40.0 * 10.0 * 8300.0 / 1000.0, rel=1e-6
     )
 
 

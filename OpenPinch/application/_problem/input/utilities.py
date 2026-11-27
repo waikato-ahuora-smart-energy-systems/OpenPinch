@@ -8,7 +8,7 @@ from typing import List, Sequence, Tuple
 
 import numpy as np
 
-from ....analysis.targeting.utilities import mark_default_utility
+from ....analysis.targeting.utilities import is_default_utility, mark_default_utility
 from ....contracts.input import UtilitySchema
 from ....contracts.units import standardise_input_value
 from ....domain._stream.value_state import resolve_period_weights
@@ -108,6 +108,7 @@ def _get_hot_and_cold_utilities(
         config=config,
         defaults=defaults,
     )
+    _price_rejection_at_ambient(cold_utilities, config)
     prepared = hot_utilities + cold_utilities
     period_ids = {
         str(period_id): index
@@ -120,6 +121,62 @@ def _get_hot_and_cold_utilities(
         num_periods=len(period_ids),
     )
     return prepared
+
+
+def _price_rejection_at_ambient(
+    cold_utilities: StreamCollection, config: Configuration
+) -> None:
+    """Price each cold utility for the heat it rejects to ambient.
+
+    Only net heating and cooling are charged: every rejected heat ends at
+    ambient. The coldest cold utility whose supply is not below
+    ``ENV_TEMPERATURE`` (the default CU only when there is none) rejects to
+    ambient, and its price is the ambient price. Any other cold utility
+    above ambient, steam raising included, costs that price. Refrigeration
+    (a supply below ambient) costs its own price for the work, plus the
+    ambient price on the heat it takes and that work, the work per unit of
+    heat being its price over ``COSTING_HPR_ELE_PRICE``. Each period is
+    priced on its own; the input prices are left as given.
+    """
+    utilities = list(cold_utilities)
+    if not utilities:
+        return
+    periods = max(1, len(config.problem.period_ids))
+    t_env = float(config.environment.temperature)
+    electricity = float(config.costing.hpr_ele_price)
+
+    def at(value: Value | None, unit: str, n: int) -> float:
+        if value is None:
+            return 0.0
+        converted = value.to(unit)
+        if getattr(converted, "num_periods", 1) > 1:
+            return float(converted[n].value)
+        return float(converted.value)
+
+    priced: dict[int, list[float]] = {id(u): [] for u in utilities}
+    for n in range(periods):
+        supply = {id(u): at(u.supply_temperature, "degC", n) for u in utilities}
+        own = {id(u): at(u.price, "$/MW/h", n) for u in utilities}
+        above = [u for u in utilities if supply[id(u)] >= t_env]
+        candidates = [u for u in above if not is_default_utility(u)] or above
+        rejector = min(candidates, key=lambda u: supply[id(u)], default=None)
+        ambient = 0.0 if rejector is None else own[id(rejector)]
+        for u in utilities:
+            if u is rejector:
+                priced[id(u)].append(own[id(u)])
+            elif supply[id(u)] < t_env:
+                # Refrigeration: its work, then its heat and work rejected.
+                work = own[id(u)] / electricity if electricity > 0.0 else 0.0
+                priced[id(u)].append(own[id(u)] + ambient * (1.0 + work))
+            else:
+                priced[id(u)].append(ambient)
+    for u in utilities:
+        costs = priced[id(u)]
+        own = [at(u.price, "$/MW/h", n) for n in range(periods)]
+        if np.allclose(costs, own, rtol=0.0, atol=1e-12):
+            # Its own price stands, segment by segment.
+            continue
+        u.price = Value(costs if periods > 1 else costs[0], unit="$/MW/h")
 
 
 def _set_utilities_for_zone_and_subzones(

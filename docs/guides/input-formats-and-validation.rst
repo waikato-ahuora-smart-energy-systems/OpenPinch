@@ -242,6 +242,24 @@ Here the first segment costs 20 per energy unit and the second inherits 40.
 Temperature--heat ``profile`` input deliberately accepts one parent/default
 price only; use explicit segments when interval prices differ.
 
+How utility prices are charged
+------------------------------
+
+Only net heating and cooling are charged, as in Total Site targeting. A hot
+utility costs its own price. Every heat a cold utility takes ends at
+ambient, so it is charged at the price of the utility that rejects to
+ambient: the coldest cold utility whose supply is not below
+``ENV_TEMPERATURE`` (15 degC by default), or the default ``CU`` when there is
+none. That utility keeps its own price, and any other cold utility above
+ambient costs the same: raising steam is not a cost in itself, and steam no
+one uses is vented or condensed on cooling water. Steam that another
+process uses saves its import, which the site utility balance of a total
+site design accounts for. A cold utility below ambient is refrigeration: it
+costs its own price for the work, plus the ambient price on the heat it
+takes and that work, the work per unit of heat being its price over
+``COSTING_HPR_ELE_PRICE``. The prices are applied per period, and the input
+``price`` is kept as given.
+
 Interpretation
 --------------
 
