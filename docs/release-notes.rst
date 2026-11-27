@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.retrofit`` takes ``zone``, as ``heat_exchanger_network`` does,
+  to retrofit one process of a site on its own case. A site network is
+  refused with the advice to use each process's own network, but a
+  process's network on the site problem failed, since the other processes'
+  streams had no exchanger ("no exchanger serves: B.HB, B.CB"). With
+  ``zone="A"`` the reviewer's two-process case retrofits process A for a
+  net benefit of 44,151 $/y.
 - A site design warns when a process's design fails one way.
   ``design.total_site_heat_exchanger_network`` designs each process with
   levels chosen by price and with its levels held at their targets; when
