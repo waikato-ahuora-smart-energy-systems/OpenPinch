@@ -100,8 +100,12 @@ def _oversize(
     excess = 0.0
     for machine, limit in zip(needed, installed, strict=True):
         pairs = [
-            (need.volume_flow, have.volume_flow)
+            pair
             for need, have in zip(machine.compressors, limit.compressors, strict=True)
+            for pair in (
+                (need.volume_flow, have.volume_flow),
+                (need.shaft_power, have.shaft_power),
+            )
         ] + list(zip(machine.exchanger_areas, limit.exchanger_areas, strict=True))
         for need, have in pairs:
             if need <= have:

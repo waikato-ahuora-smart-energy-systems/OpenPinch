@@ -128,3 +128,39 @@ def test_a_running_compressor_moves_at_least_its_turndown():
     assert flow <= 1e-3 * installed_flow or flow >= 0.9 * installed_flow * (
         1.0 - _SIZE_TOLERANCE
     )
+
+
+def test_a_running_compressor_needs_no_more_shaft_power_than_installed():
+    # The motor is sized for the compressor's peak shaft power, so a period
+    # runs within it as well as within the suction volume (Codex review on
+    # #566): at 70 % of the design's motor it ran the design's 0.58 kW.
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    args.max_multi_start = 1
+    args.search_budget = HPRSearchBudget(maximum_evaluations=200)
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    design_point = np.full(len(bounds), 0.4)
+    design = hp_cascade._compute_cascade_hp_system_obj(design_point, args)
+    (machine,) = design.hpr_machine_components
+    (compressor,) = machine.compressors
+    motor = 0.7 * compressor.shaft_power
+    smaller = (
+        dataclasses.replace(
+            machine, compressors=(dataclasses.replace(compressor, shaft_power=motor),)
+        ),
+    )
+
+    operated = operate_installed_machine(
+        smaller,
+        objective=hp_cascade._compute_cascade_hp_system_obj,
+        initial_points=design_point,
+        bounds=bounds,
+        args=args,
+    )
+
+    power = (
+        operated.hpr_machine_components[0].compressors[0].shaft_power
+        if operated.hpr_machine_components
+        else 0.0
+    )
+    assert power <= motor * (1.0 + _SIZE_TOLERANCE)
