@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
 from ..analysis.heat_exchanger_networks.errors import WorkflowContractError
 from ..analysis.heat_exchanger_networks.heat_pump_cost import (
     heat_pump_record,
@@ -35,6 +37,106 @@ class HeatPumpDesignCase:
     target: Any
     case: Any
     record: Any = None
+
+
+HEAT_PUMP_SNAP_K = 1e-4
+"""How far (K) a heat pump stream may start or end from a process
+temperature and be moved onto it."""
+
+
+def _process_temperatures(problem) -> list[np.ndarray]:
+    """The shifted temperatures (degC) the process streams of ``problem``,
+    and their segments, start or end at, in each period in order."""
+    root = problem._require_prepared_root_zone()
+    found: list[list[float]] = [[] for _ in range(max(1, len(problem.period_ids)))]
+    for group in (root.hot_streams, root.cold_streams):
+        for _key, stream in group.items():
+            for part in (stream, *(stream.segments if stream.has_segments else ())):
+                for value in (
+                    part.shifted_minimum_temperature,
+                    part.shifted_maximum_temperature,
+                ):
+                    each = np.atleast_1d(np.asarray(value.value, dtype=float))
+                    for period, temperatures in enumerate(found):
+                        # One value holds in every period.
+                        temperatures.append(float(each[period % each.size]))
+    return [np.unique(np.asarray(values, dtype=float)) for values in found]
+
+
+def _on_process_temperatures(case, process, *, approach: float):
+    """``case`` with its heat pump streams on the process temperatures
+    they lie beside.
+
+    A converged target puts a level at a kink of the composite curves, a
+    temperature a process stream starts or ends at, to the search's
+    tolerance: 1e-5 K under it on the basic pinch case. A condenser that
+    far under the temperature a cold stream ends at leaves that stream's
+    last 1e-5 K to the hot utility, a second pinch at the condenser, and
+    the case has no network. Each temperature of a condenser or evaporator
+    stream within ``HEAT_PUMP_SNAP_K`` of a shifted temperature of
+    ``process`` (the problem as the design sees it, without the heat pump)
+    is moved onto it; ``approach`` (K) is the heat pump's own contribution
+    there. The air's streams are left: they sit at the ambient temperature.
+    """
+
+    grids = _process_temperatures(process)
+    if not all(grid.size for grid in grids):
+        return case
+    source = case.to_problem_json()
+
+    def offset(temperature: float, sign: float, grid: np.ndarray) -> float | None:
+        """The move that puts ``temperature`` on the temperature of ``grid``
+        it lies beside (0 when it is on it); ``None`` when it lies beside
+        none."""
+        shifted = temperature + sign * approach
+        nearest = float(grid[np.argmin(np.abs(grid - shifted))])
+        return nearest - shifted if abs(nearest - shifted) <= HEAT_PUMP_SNAP_K else None
+
+    for record in source["streams"]:
+        role = (record.get("heat_pump") or {}).get("role")
+        if role not in ("condenser", "evaporator"):
+            continue
+        # A condenser is a hot stream, shifted down by its contribution; an
+        # evaporator a cold one, shifted up.
+        sign = -1.0 if role == "condenser" else 1.0
+        ends = [
+            (part, key)
+            for part in (record, *(record.get("segments") or ()))
+            for key in ("t_supply", "t_target")
+            if part.get(key) is not None
+        ]
+        if not ends:
+            continue
+        # The stream moves whole, each period by its own amount: the first
+        # of its temperatures that lies beside a process temperature sets
+        # the move. Moving one end of a 0.01 K stream alone would change the
+        # span the problem table reads its duty over.
+        periods = [
+            [float(v) for v in part[key].get("values", [part[key].get("value")])]
+            for part, key in ends
+        ]
+        # Each period against its own process temperatures; a stream given
+        # one value for every period, against those of every period.
+        own = (
+            grids
+            if len(periods[0]) == len(grids)
+            else [np.unique(np.concatenate(grids))] * len(periods[0])
+        )
+        moves = [
+            next(
+                (m for m in (offset(t, sign, grid) for t in each) if m is not None),
+                0.0,
+            )
+            for each, grid in zip(zip(*periods), own)
+        ]
+        for (part, key), values in zip(ends, periods):
+            placed = [t + move for t, move in zip(values, moves)]
+            part[key] = (
+                {**part[key], "values": placed}
+                if "values" in part[key]
+                else {**part[key], "value": placed[0]}
+            )
+    return type(case)(source, project_name=case.project_name)
 
 
 def _scaled(problem, multiplier: float):
@@ -130,6 +232,12 @@ def heat_pump_design_case(
         # The zone multiplier scales the heat pump's streams too.
         case = _case_with_heat_pump_streams(
             problem, target, dt_cont=approach, machine=machine
+        )
+        # A level the search left a hair off a process temperature goes on
+        # it: the design at this multiplier sees the heat pump's streams
+        # shifted by the approach the target stood them off by.
+        case = _on_process_temperatures(
+            case, scaled, approach=approach * zone_multiplier * multiplier
         )
         # The streams the case added go with the machine, so a network of
         # the case can be solved again from the problem and itself alone.

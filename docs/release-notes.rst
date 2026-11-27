@@ -276,6 +276,24 @@ Heat pumps and refrigeration
   The check is per period: a machine shared
   by several periods that draws on air in one and rejects to air in
   another is not caught.
+- A heat pump target that converged now gives a heat pump network. A
+  search that converges puts a level at a temperature a process stream
+  starts or ends at, to its own tolerance, and that small distance lost
+  the network two ways. Within 1e-6 K under the temperature, the problem
+  table merged the two and the heat pump's 0.01 K stream gained 1e-4 of
+  its duty (0.027 of 270 kW on a two-stream case), heat the case could
+  not place. From 1e-5 to 1e-4 K under it, the last sliver of the process
+  stream fell to the utility and made a second pinch at the condenser
+  that no pinch design closed. ``design.heat_exchanger_network`` with
+  ``heat_pump=`` then warned "No heat pump network at dt_cont multiplier
+  ..." and returned networks without one: on a two-stream case at
+  multipliers 0.75 and 1.5 and on the basic pinch case at 2.0, of the
+  four multipliers tried on each. The design now moves each condenser
+  and evaporator stream that starts or ends within 1e-4 K of a process
+  temperature onto it, whole, so its duty is kept. All eight now design.
+  A level beside no process temperature stays exactly where the target
+  put it, and a heat pump target from a search's first start (one
+  evaluation) was never that close and is unchanged.
 
 0.10.0 (2026-11-25)
 -------------------
