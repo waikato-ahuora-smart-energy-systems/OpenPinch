@@ -555,6 +555,35 @@ def test_a_target_is_priced_at_the_utilities_the_network_uses(monkeypatch):
     assert piped.hot_utility_price == pytest.approx(40.68 * scale)
 
 
+def test_the_as_piped_target_stands_off_by_a_given_approach(monkeypatch):
+    """A retrofit given ``min_approach_temperature`` holds every match to
+    that approach, in place of the streams' contributions. Its heat pump
+    was still targeted on the contributions (its levels 6 K from a cooler
+    and a heater where the retrofit asked for 10 K), so the machine could
+    not be matched as targeted and the step netted a loss. With an
+    approach the coolers and heaters are taken unshifted and the heat pump
+    stands the whole approach off them."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    seen = {}
+
+    def target(**arguments):
+        seen.update(arguments)
+
+    monkeypatch.setattr(heat_pump_targets, "compute_profile_heat_pump_target", target)
+    problem, network = _problem(), _solved_network()
+
+    heat_pump_targets.as_piped_heat_pump(problem, network, approach=10.0)
+
+    unshifted, _hot, _cold = heat_pump_targets.as_piped_profiles(
+        problem, network, dt_cont_multiplier=0.0
+    )
+    np.testing.assert_allclose(seen["T_vals"], unshifted)
+    assert seen["config"].hpr.dt_cont == 10.0
+
+
 def test_a_vapour_compression_target_reports_its_duties():
     """A vapour compression result carries its stages' heating and cooling
     as ``Q_heat`` and ``Q_cool``; ``Q_cond`` and ``Q_evap`` are a Carnot
