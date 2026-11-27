@@ -66,6 +66,23 @@ def test_a_multiperiod_designs_totals_are_weighted_by_period():
     assert view.total_cold_utility == pytest.approx(0.75 * 200.0)
 
 
+def test_one_weight_given_for_every_period_weighs_them_all():
+    # PROBLEM_PERIOD_WEIGHTS of one value holds for every period.
+    import json
+
+    from OpenPinch import PinchProblem
+    from OpenPinch.resources import read_sample_case
+
+    source = json.loads(read_sample_case("crude_preheat_train_multiperiod.json"))
+    source["options"]["PROBLEM_PERIOD_WEIGHTS"] = [0.25]
+    problem = PinchProblem(source, project_name="crude")
+
+    weights = problem.design._period_weights()
+
+    assert list(weights) == ["turndown", "base", "peak"]
+    assert len(set(weights.values())) == 1
+
+
 @pytest.mark.synthesis
 @pytest.mark.solver
 def test_a_designs_view_takes_the_problems_period_weights():

@@ -493,9 +493,13 @@ class _DesignAccessor:
         return view
 
     def _period_weights(self) -> dict[str, float]:
-        """Each period's share of the year, by period id."""
+        """Each period's share of the year, by period id, as the zone
+        resolved them (one weight given for every period holds for each)."""
         root = self._problem._require_prepared_root_zone()
-        return dict(zip(self._problem.period_ids, root.config.problem.period_weights))
+        return {
+            period: float(root.weights[index])
+            for period, index in self._problem.period_ids.items()
+        }
 
     def heat_exchanger_network(
         self,
