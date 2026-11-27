@@ -5,6 +5,7 @@ import math
 from ..analysis.targeting.residual import compute_residual_utility_target
 from ..domain.enums import TargetType
 from ..domain.hpr import HPRResidualSnapshot
+from ._problem.input.utilities import input_price
 from .hpr_selection import hpr_result_digest, validate_hpr_target
 
 
@@ -60,7 +61,8 @@ def create_hpr_residual_case(problem, *, base_target, project_name=None):
                 "heat_flow": 0.0,
                 "dt_cont": scalar(u.effective_delta_t_contribution),
                 "htc": scalar(u.heat_transfer_coefficient),
-                "price": scalar(u.price),
+                # As given: preparing the case prices it for rejection again.
+                "price": scalar(input_price(u)),
                 "active": u.is_active,
                 "maximum_heat_flow": maximum_duty(u.maximum_heat_flow),
                 "fluid_name": u.fluid_name,

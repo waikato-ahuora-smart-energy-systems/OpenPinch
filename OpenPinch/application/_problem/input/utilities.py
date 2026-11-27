@@ -8,7 +8,7 @@ from typing import List, Sequence, Tuple
 
 import numpy as np
 
-from ....analysis.targeting.utilities import mark_default_utility
+from ....analysis.targeting.utilities import is_default_utility, mark_default_utility
 from ....contracts.input import UtilitySchema
 from ....contracts.units import standardise_input_value
 from ....domain._stream.value_state import resolve_period_weights
@@ -108,6 +108,7 @@ def _get_hot_and_cold_utilities(
         config=config,
         defaults=defaults,
     )
+    _price_rejection_at_ambient(cold_utilities, config)
     prepared = hot_utilities + cold_utilities
     period_ids = {
         str(period_id): index
@@ -120,6 +121,96 @@ def _get_hot_and_cold_utilities(
         num_periods=len(period_ids),
     )
     return prepared
+
+
+def _price_rejection_at_ambient(
+    cold_utilities: StreamCollection, config: Configuration
+) -> None:
+    """Price each cold utility for the heat it rejects to ambient.
+
+    Only net heating and cooling are charged: every rejected heat ends at
+    ambient. The coldest given cold utility whose supply is not below
+    ``ENV_TEMPERATURE`` rejects to ambient (with none, the warmest given one:
+    cooling water colder than the ambient given). Its price is the ambient
+    price, unless it is capped or there is none, when heat beyond it leaves
+    through the default CU and the default CU's price is the ambient price
+    at the margin; both keep their own price. Any other cold utility above
+    ambient, steam raising included, costs the ambient price. Refrigeration
+    (a supply below ambient) costs its own price for the work, plus the
+    ambient price on the heat it takes and that work, the work per unit of
+    heat being its price over ``COSTING_HPR_ELE_PRICE``. Each period is
+    priced on its own; the input prices are left as given.
+    """
+    utilities = list(cold_utilities)
+    if not utilities:
+        return
+    periods = max(1, len(config.problem.period_ids))
+    t_env = float(config.environment.temperature)
+    electricity = float(config.costing.hpr_ele_price)
+
+    def at(value: Value | None, unit: str, n: int) -> float:
+        if value is None:
+            return 0.0
+        converted = value.to(unit)
+        if getattr(converted, "num_periods", 1) > 1:
+            return float(converted[n].value)
+        return float(converted.value)
+
+    priced: dict[int, list[float]] = {id(u): [] for u in utilities}
+    for n in range(periods):
+        supply = {id(u): at(u.supply_temperature, "degC", n) for u in utilities}
+        own = {id(u): at(u.price, "$/MW/h", n) for u in utilities}
+        given = [u for u in utilities if not is_default_utility(u)]
+        above = [u for u in given if supply[id(u)] >= t_env]
+        # With none above ambient, the warmest given cold utility is taken
+        # to reject to it (cooling water colder than the ambient given).
+        rejector = (
+            min(above, key=lambda u: supply[id(u)])
+            if above
+            else max(given, key=lambda u: supply[id(u)], default=None)
+        )
+        # Heat beyond a capped rejector, or with none, leaves through the
+        # default CU: its price is then the ambient price at the margin.
+        backup = next((u for u in utilities if is_default_utility(u)), None)
+        marginal = (
+            backup
+            if backup is not None and (rejector is None or _capped(rejector, n))
+            else rejector
+        )
+        ambient = own[id(marginal)]
+        for u in utilities:
+            if u is rejector or u is marginal:
+                priced[id(u)].append(own[id(u)])
+            elif supply[id(u)] < t_env:
+                # Refrigeration: its work, then its heat and work rejected.
+                work = own[id(u)] / electricity if electricity > 0.0 else 0.0
+                priced[id(u)].append(own[id(u)] + ambient * (1.0 + work))
+            else:
+                priced[id(u)].append(ambient)
+    for u in utilities:
+        costs = priced[id(u)]
+        own = [at(u.price, "$/MW/h", n) for n in range(periods)]
+        if np.allclose(costs, own, rtol=0.0, atol=1e-12):
+            # Its own price stands, segment by segment.
+            continue
+        setattr(u, _INPUT_PRICE, u.price)
+        u.price = Value(costs if periods > 1 else costs[0], unit="$/MW/h")
+
+
+_INPUT_PRICE = "_input_price"
+
+
+def input_price(utility: Stream) -> Value | None:
+    """A prepared utility's price as given, before any rejection charge."""
+    return getattr(utility, _INPUT_PRICE, utility.price)
+
+
+def _capped(utility: Stream, n: int) -> bool:
+    """Whether ``utility`` has a finite maximum heat flow in period ``n``."""
+    if utility.maximum_heat_flow is None:
+        return False
+    cap = StreamCollection._value_at_idx(utility._maximum_heat_flow, n)
+    return bool(np.isfinite(cap))
 
 
 def _set_utilities_for_zone_and_subzones(

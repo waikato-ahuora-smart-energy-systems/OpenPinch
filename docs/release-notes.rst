@@ -4,6 +4,24 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Utility costs
+~~~~~~~~~~~~~
+
+- Only net heating and cooling are charged, as in Total Site targeting.
+  Every heat a cold utility takes ends at ambient, so it is charged at the
+  price of the utility that rejects to ambient: the coldest cold utility
+  whose supply is not below ``ENV_TEMPERATURE`` (with none, the warmest),
+  or the default ``CU`` beyond a capped one. Any other cold utility above
+  ambient costs that price, so raising steam is no
+  longer charged at the steam price (a 60 kW hot-only process raising LP
+  steam priced at 30 $/MWh cost 14,940 $/y; it now costs 2,490 $/y, as on
+  cooling water), and a negative price on such a utility is no longer a
+  credit. Refrigeration (a cold utility below ambient) costs its own price
+  plus the ambient price on the heat it takes and its work, the work per
+  unit of heat being its price over ``COSTING_HPR_ELE_PRICE``. This applies
+  to targets, network designs and the site utility balance alike, so every
+  cost on a case with steam raising or refrigeration changes.
+
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
