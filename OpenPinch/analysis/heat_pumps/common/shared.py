@@ -413,7 +413,8 @@ def evaluate_carnot_hpr_result(
         work=float(w_net),
         Q_ext_heat=cond.Q_ext_top,
         Q_ext_cold=evap.Q_ext_bottom,
-        Q_cooling_water=evap.Q_cooling_water,
+        # Heat rejected to air ends at ambient: charged as cooling water.
+        Q_cooling_water=evap.Q_cooling_water + cond.Q_air_sink + evap.Q_air_sink,
         args=args,
         penalty_terms=[
             *_normalise_hpr_penalty_terms(penalty_terms),
