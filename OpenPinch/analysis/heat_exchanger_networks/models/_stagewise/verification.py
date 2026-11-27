@@ -50,7 +50,7 @@ def _check_network_feasibility(owner) -> tuple[str, ...]:
         method=getattr(owner, "framework", None),
         stage_count=getattr(owner, "S", None),
     )
-    return verify_network_feasibility(network)
+    return verify_network_feasibility(network, warn_without_stream_data=False)
 
 
 def _check_temperatures(

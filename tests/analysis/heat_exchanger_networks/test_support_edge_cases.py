@@ -334,7 +334,9 @@ def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Pat
 
 
 def test_result_building_and_seed_validation_edges(monkeypatch):
-    monkeypatch.setattr(assembly, "verify_network_feasibility", lambda _network: ())
+    monkeypatch.setattr(
+        assembly, "verify_network_feasibility", lambda _network, **_: ()
+    )
     # A success without a network is not admitted, so no network is accepted.
     with pytest.raises(WorkflowContractError, match="admitted no network"):
         assembly.build_synthesis_result(

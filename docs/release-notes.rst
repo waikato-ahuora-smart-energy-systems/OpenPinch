@@ -25,6 +25,12 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``verify_network_feasibility`` warns when a network carries no stream
+  data to check against. A network read back from JSON keeps none, so its
+  stream balances, approaches and areas were skipped and it was reported
+  feasible, even with a halved duty or a crossed approach. It is still not
+  failed; the warning says to rate it on its problem with
+  ``design.optimise_duties``.
 - A fitted multiperiod design's ``result.manifest`` describes the search
   the call asked for. It described the fit to every period instead: one
   network evolution task at the selected multiplier, with width and depth
