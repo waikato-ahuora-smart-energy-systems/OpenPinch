@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- The median design basis says which streams it leaves out. A stream that
+  runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
+  not in the basis case, and the fit can only add a heater or cooler at
+  its end: on the crude preheat train with the residue rundown running
+  only in the peak period the design cost 332,284 $/y against 308,263 on
+  ``design_basis="all"``, with no warning. A ``UserWarning`` now names
+  each such stream and the share of the year it runs.
 - Network evolution runs again on a case with a segmented stream. Since
   0.10.0 its check of the approach inside a match looked each solved
   branch outlet up on the stream's profile, and Ipopt returns an outlet

@@ -1566,6 +1566,32 @@ class _DesignAccessor:
                 RuntimeWarning,
                 stacklevel=3,
             )
+        # A stream that runs, but under the active share, is left out of the
+        # basis case: the fit can only add a heater or cooler at its end.
+        left_out = {
+            row.name: row.active_share
+            for rows in basis.streams
+            for row in rows
+            if not row.included and row.active_share > 0.0
+        }
+        if left_out:
+
+            def percent(share: float) -> str:
+                return f"{100.0 * share:.0f} %"
+
+            warnings.warn(
+                "the median design basis leaves out streams that run under "
+                f"{percent(float(hens.basis_active_share))} of the year "
+                "(HENS_BASIS_ACTIVE_SHARE): "
+                + ", ".join(
+                    f"{name} (runs {percent(share)})"
+                    for name, share in left_out.items()
+                )
+                + ". The design fits them with a heater or cooler at their "
+                "end only; design_basis='all' designs them in.",
+                UserWarning,
+                stacklevel=3,
+            )
         return basis, clusters
 
     def _with_prepared_heat_flows(self, source: dict) -> dict:
