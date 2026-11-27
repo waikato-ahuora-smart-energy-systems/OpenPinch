@@ -2614,10 +2614,21 @@ def _with_released_levels(view, levels, *, held: bool):
 
 def _free_machine_name(existing) -> str:
     """The name of a retrofit's own heat pump: ``HP``, or the first of
-    ``HP2``, ``HP3``, ... that no machine of ``existing`` holds."""
+    ``HP2``, ``HP3``, ... that no machine of ``existing`` holds and that
+    no stream of one starts with (``<name>_``): a machine labelled ``HP2``
+    can hold streams named ``HP_H1``, which a new ``HP`` would take."""
     held = {machine.machine for machine in existing.heat_pumps}
+    streams = [
+        record["name"]
+        for machine in existing.heat_pumps
+        for record in getattr(machine, "streams", ())
+    ]
+
+    def taken(name: str) -> bool:
+        return name in held or any(s.startswith(f"{name}_") for s in streams)
+
     number = 1
-    while (name := "HP" if number == 1 else f"HP{number}") in held:
+    while taken(name := "HP" if number == 1 else f"HP{number}"):
         number += 1
     return name
 
