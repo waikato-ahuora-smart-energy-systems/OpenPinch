@@ -164,3 +164,31 @@ def test_a_running_compressor_needs_no_more_shaft_power_than_installed():
         else 0.0
     )
     assert power <= motor * (1.0 + _SIZE_TOLERANCE)
+
+
+def test_an_operation_that_does_not_fit_is_no_operation():
+    # One evaluation (the design point) on half the design's condenser: the
+    # search's best still needs twice the area, so the period has no
+    # operation rather than one that breaks the machine (Codex review on
+    # #566).
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    args.max_multi_start = 1
+    args.search_budget = HPRSearchBudget(maximum_evaluations=1)
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    design_point = np.full(len(bounds), 0.4)
+    design = hp_cascade._compute_cascade_hp_system_obj(design_point, args)
+    (machine,) = design.hpr_machine_components
+    areas = list(machine.exchanger_areas)
+    areas[_CONDENSER] *= 0.5
+    smaller = (dataclasses.replace(machine, exchanger_areas=tuple(areas)),)
+
+    operated = operate_installed_machine(
+        smaller,
+        objective=hp_cascade._compute_cascade_hp_system_obj,
+        initial_points=design_point,
+        bounds=bounds,
+        args=args,
+    )
+
+    assert not operated.success

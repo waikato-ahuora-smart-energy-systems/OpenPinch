@@ -17,11 +17,18 @@ from ..common.capital import MachineComponents
 from ..common.shared import hpr_penalty_cost_scale
 from ..optimisation_adapter import evaluate_hpr_candidate, run_hpr_candidate_search
 
-__all__ = ["operate_installed_machine"]
+__all__ = ["DOES_NOT_FIT_REASON", "operate_installed_machine"]
+
+DOES_NOT_FIT_REASON = (
+    "No operation of the installed heat pump found in this period fits its "
+    "compressors, motors and exchangers, and its compressors' turndown."
+)
 
 # A component needing more than installed is priced, per unit of its
 # relative excess, at this many times the no-heat-pump cost of the service.
 _OVERSIZE_PENALTY = 10.0
+# The summed relative shortfall an operation may leave and still fit.
+_SHORTFALL_TOLERANCE = 1e-6
 
 
 def operate_installed_machine(
@@ -39,20 +46,20 @@ def operate_installed_machine(
     every component needing more than its installed size.
     """
     scale = hpr_penalty_cost_scale(args)
+    turndown = float(getattr(args, "turndown", 0.0) or 0.0)
+
+    def shortfall(result: HPRBackendResult) -> float:
+        needed = result.hpr_machine_components
+        return _oversize(needed, installed) + _turndown_gap(needed, installed, turndown)
 
     def operating(x, period_args, **kwargs) -> HPRBackendResult:
         result = objective(x, period_args, **kwargs)
         if not result.success or result.hpr_operating_cost is None:
             return result
-        excess = _oversize(result.hpr_machine_components, installed) + _turndown_gap(
-            result.hpr_machine_components,
-            installed,
-            float(getattr(period_args, "turndown", 0.0) or 0.0),
-        )
         return result.with_updates(
             obj=float(result.hpr_operating_cost.to("$/y").value)
             + float(result.feasibility_penalty)
-            + _OVERSIZE_PENALTY * scale * excess
+            + _OVERSIZE_PENALTY * scale * shortfall(result)
         )
 
     candidates = run_hpr_candidate_search(
@@ -62,7 +69,12 @@ def operate_installed_machine(
         args=args,
     )
     best = min(candidates, key=lambda candidate: candidate.objective)
-    return evaluate_hpr_candidate(objective=objective, point=best.point, args=args)
+    result = evaluate_hpr_candidate(objective=objective, point=best.point, args=args)
+    if result.success and shortfall(result) > _SHORTFALL_TOLERANCE:
+        # The penalty guides the search; an operation still outside the
+        # machine's sizes or turndown is none.
+        return HPRBackendResult.failure(reason=DOES_NOT_FIT_REASON)
+    return result
 
 
 def _turndown_gap(
