@@ -606,6 +606,9 @@ class HPRBackendResult(BaseModel):
     # Each machine without its process and air exchangers, installed ($):
     # compressors, motors and internal (cascade, IHX) exchangers.
     hpr_machine_internal_capital_costs: tuple[float, ...] | None = None
+    # Each machine's compressors and exchanger areas (``MachineComponents``),
+    # in fixed places, so a shared design is sized component by component.
+    hpr_machine_components: tuple[Any, ...] | None = None
     feasibility_penalty: float = 0.0
     Q_cooling_water: float = 0.0
     Q_refrigeration: float = 0.0

@@ -270,6 +270,20 @@ def test_a_heat_pumps_capital_is_its_components_installed_capital():
     )
 
 
+def test_a_heat_pump_result_records_its_machines_components():
+    # A shared multiperiod design sizes each component for its own peak.
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.4)
+
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args)
+
+    (machine,) = result.hpr_machine_components
+    assert result.hpr_machine_capital_costs == pytest.approx(
+        (installed_capital(machine),)
+    )
+
+
 def test_a_heat_pump_reports_its_capital_without_process_exchangers():
     # A retrofit that places the machine's process and air exchangers in the
     # network itself pays the machine for the rest: its compressors and
