@@ -231,7 +231,20 @@ def heat_pump_design_case(
     else:
         # The zone multiplier scales the heat pump's streams too.
         case = _case_with_heat_pump_streams(
-            problem, target, dt_cont=approach, machine=machine
+            problem,
+            target,
+            dt_cont=approach,
+            machine=machine,
+            # The target stood the evaporator the air's own contribution
+            # under the air, which no multiplier scales; the design scales
+            # every stream's, so the air is written over the multiplier.
+            # At a multiplier of 0 no contribution survives and it is
+            # written as it is.
+            ambient_scale=(
+                1.0 / (zone_multiplier * multiplier)
+                if zone_multiplier * multiplier > 0.0
+                else 1.0
+            ),
         )
         # A level the search left a hair off a process temperature goes on
         # it: the design at this multiplier sees the heat pump's streams

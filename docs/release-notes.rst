@@ -294,6 +294,16 @@ Heat pumps and refrigeration
   A level beside no process temperature stays exactly where the target
   put it, and a heat pump target from a search's first start (one
   evaluation) was never that close and is unchanged.
+- An air-source heat pump is designed at any ``dt_cont`` multiplier.
+  ``design.heat_exchanger_network(heat_pump=...)`` scaled the ambient
+  air's contribution (``HPR_DT_ENV_CONT``) by the multiplier, which the
+  heat pump target does not, so at a multiplier of 1.5 the design held
+  the evaporator 15 K under the air where the target had put it 10 K
+  under, and the case needed utility the heat pump had left at none (no
+  heat pump network at 0.75 or 1.5 on a case short of waste heat). The
+  air is now written so that it keeps its own contribution at the
+  design's multiplier, as a retrofit and ``with_heat_pump_streams``
+  already do.
 
 0.10.0 (2026-11-25)
 -------------------
