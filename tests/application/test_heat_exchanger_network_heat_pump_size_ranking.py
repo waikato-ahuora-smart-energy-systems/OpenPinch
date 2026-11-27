@@ -9,6 +9,11 @@ design is the one without a heat pump or the one at full load.
 The part-load size is the cheapest only between 37.35 and 37.46 $/MWh
 here, because a kW of heat pump costs almost the same at either size
 (310 against 311 $/y), so no price is tested inside that window.
+
+The heat pump is targeted at the steam's own price (since 2026-11-27,
+when it was the electricity price): at 30 $/MWh the target finds that no
+heat pump pays, so no heat pump size is designed at all and the design
+without one is the only one.
 """
 
 from __future__ import annotations
@@ -68,7 +73,7 @@ def _best_by_size(steam_price: float) -> dict[float, float]:
 @pytest.mark.skipif(not _highs_available(), reason="needs highspy")
 @pytest.mark.parametrize(
     ("steam_price", "cheapest_first"),
-    [(30.0, [0.0, 0.4, 1.0]), (50.0, [1.0, 0.4, 0.0])],
+    [(30.0, [0.0]), (50.0, [1.0, 0.4, 0.0])],
 )
 def test_sizes_rank_by_the_worth_of_the_steam_they_save(steam_price, cheapest_first):
     assert list(_best_by_size(steam_price)) == cheapest_first

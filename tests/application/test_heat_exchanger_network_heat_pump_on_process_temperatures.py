@@ -48,6 +48,9 @@ def test_a_converged_target_gives_a_heat_pump_network_at_a_multiplier_of_two():
             "levels": {"condensers": 1, "evaporators": 1},
             # One run of the search, which converges (4 s).
             "search": {"restarts": 1},
+            # Heat at the electricity price: at the steam's own price no
+            # heat pump pays on this case.
+            "options": {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0},
         },
         heat_pump_cost=200.0,
         dt_cont_multipliers=[2.0],

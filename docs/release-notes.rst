@@ -218,6 +218,20 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A heat pump design is sized on the prices its networks are ranked on.
+  ``design.heat_exchanger_network(heat_pump=...)`` targeted the heat pump
+  with heat priced at the electricity price (the default
+  ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` of 1.0) and ranked the networks
+  at the utilities' own prices, so it sized the machine as if any heat
+  pump paid. The target is now priced at the utilities the direct
+  integration target draws, weighted by their duties, over the
+  electricity price; a ratio set in the options is kept. On a
+  two-stream case with steam at 40 $/MWh and electricity at 100 $/MWh,
+  the machine is 137 kW at a COP of 4.2 instead of 240 kW at 2.9, and the
+  selected network costs 98,211 $/y instead of 104,169. On the basic
+  pinch case no heat pump pays at those prices: the design says so
+  instead of returning 22 heat pump networks, the cheapest of them
+  409,423 $/y against 238,776 without one.
 - A parallel Carnot heat pump target gives its colder machines all the
   source heat above them. Each evaporator's available heat is the source
   heat between it and the evaporator above, and the cycle took the hotter
