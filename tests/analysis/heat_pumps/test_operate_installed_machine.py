@@ -88,3 +88,43 @@ def test_a_smaller_condenser_fits_at_a_dearer_operation():
 
     assert _fits(operated, smaller)
     assert operated.hpr_operating_cost.value > design.hpr_operating_cost.value
+
+
+def test_a_running_compressor_moves_at_least_its_turndown():
+    # A compressor ten times the design's, turned down no further than 0.9
+    # of its volume flow: the period runs it at that or switches it off. It
+    # ran it at 0.62 of installed without the rule.
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    args.max_multi_start = 1
+    args.search_budget = HPRSearchBudget(maximum_evaluations=200)
+    args.turndown = 0.9
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    design_point = np.full(len(bounds), 0.4)
+    design = hp_cascade._compute_cascade_hp_system_obj(design_point, args)
+    (machine,) = design.hpr_machine_components
+    (compressor,) = machine.compressors
+    installed_flow = 10.0 * compressor.volume_flow
+    big = (
+        dataclasses.replace(
+            machine,
+            compressors=(dataclasses.replace(compressor, volume_flow=installed_flow),),
+        ),
+    )
+
+    operated = operate_installed_machine(
+        big,
+        objective=hp_cascade._compute_cascade_hp_system_obj,
+        initial_points=design_point,
+        bounds=bounds,
+        args=args,
+    )
+
+    flow = (
+        operated.hpr_machine_components[0].compressors[0].volume_flow
+        if operated.hpr_machine_components
+        else 0.0
+    )
+    assert flow <= 1e-3 * installed_flow or flow >= 0.9 * installed_flow * (
+        1.0 - _SIZE_TOLERANCE
+    )

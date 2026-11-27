@@ -44,7 +44,11 @@ def operate_installed_machine(
         result = objective(x, period_args, **kwargs)
         if not result.success or result.hpr_operating_cost is None:
             return result
-        excess = _oversize(result.hpr_machine_components, installed)
+        excess = _oversize(result.hpr_machine_components, installed) + _turndown_gap(
+            result.hpr_machine_components,
+            installed,
+            float(getattr(period_args, "turndown", 0.0) or 0.0),
+        )
         return result.with_updates(
             obj=float(result.hpr_operating_cost.to("$/y").value)
             + float(result.feasibility_penalty)
@@ -59,6 +63,31 @@ def operate_installed_machine(
     )
     best = min(candidates, key=lambda candidate: candidate.objective)
     return evaluate_hpr_candidate(objective=objective, point=best.point, args=args)
+
+
+def _turndown_gap(
+    needed: Sequence[MachineComponents] | None,
+    installed: Sequence[MachineComponents],
+    turndown: float,
+) -> float:
+    """How far running compressors sit inside their turndown, as shares of
+    their installed volume flow.
+
+    A compressor runs at no less than ``turndown`` of its installed volume
+    flow, or is off. The gap of each is its distance to the nearer of the
+    two, so switching a compressor off is never penalised.
+    """
+    if not needed or turndown <= 0.0:
+        return 0.0
+    gap = 0.0
+    for machine, limit in zip(needed, installed, strict=True):
+        for need, have in zip(machine.compressors, limit.compressors, strict=True):
+            if have.volume_flow <= 0.0:
+                continue
+            share = need.volume_flow / have.volume_flow
+            if 0.0 < share < turndown:
+                gap += min(share, turndown - share)
+    return float(gap)
 
 
 def _oversize(
