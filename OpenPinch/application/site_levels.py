@@ -145,45 +145,51 @@ def placed_case(
         if side == utility["type"].casefold() and name.startswith(_PLACED_KINDS):
             utility["name"] = name
     source["utilities"] = _distinct_levels(utilities) + _stand_ins(problem, fallbacks)
-    sink = _ambient_sink(problem)
-    if sink is not None and not any(
-        (u["name"], u["type"]) == (sink["name"], sink["type"])
-        for u in source["utilities"]
-    ):
-        source["utilities"].append(sink)
+    for sink in _ambient_sinks(problem):
+        if not any(
+            (u["name"], u["type"]) == (sink["name"], sink["type"])
+            for u in source["utilities"]
+        ):
+            source["utilities"].append(sink)
     return type(problem)(source, project_name=problem.project_name)
 
 
-def _ambient_sink(problem: "PinchProblem") -> dict | None:
-    """The case's own utility that rejects heat to ambient, as given.
+def _ambient_sinks(problem: "PinchProblem") -> list[dict]:
+    """The case's own utilities that reject heat to ambient, as given.
 
-    Every rejected heat ends at ambient, so a placed case keeps it whatever
-    the placed levels are: the coldest given cold utility whose supply is
-    not below ``ENV_TEMPERATURE`` (with none, the warmest), as the utility
-    pricing takes it (``_problem/input/utilities.py``), in the first period.
+    Every rejected heat ends at ambient, so a placed case keeps them whatever
+    the placed levels are: in each period, the coldest given cold utility
+    whose supply is not below ``ENV_TEMPERATURE`` (with none, the warmest),
+    as the utility pricing takes it (``_problem/input/utilities.py``).
     """
     from ..analysis.targeting.utilities import is_default_utility
 
     root = problem._require_prepared_root_zone()
     t_env = float(root.config.environment.temperature)
+    periods = max(1, len(problem.period_ids))
 
-    def supply(utility) -> float:
+    def supply(utility, n: int) -> float:
         value = utility.supply_temperature.to("degC")
-        return float(value[0].value if value.num_periods > 1 else value.value)
+        return float(value[n].value if value.num_periods > 1 else value.value)
 
     given = [u for u in root.cold_utilities if not is_default_utility(u)]
-    above = [u for u in given if supply(u) >= t_env]
-    chosen = min(above, key=supply) if above else max(given, key=supply, default=None)
-    if chosen is None:
-        return None
-    return next(
-        (
-            u
-            for u in problem.to_problem_json()["utilities"]
-            if u["name"] == chosen.name and u["type"] in ("Cold", "Both")
-        ),
-        None,
-    )
+    chosen: list[str] = []
+    for n in range(periods):
+        above = [u for u in given if supply(u, n) >= t_env]
+        pick = (
+            min(above, key=lambda u: supply(u, n))
+            if above
+            else max(given, key=lambda u: supply(u, n), default=None)
+        )
+        if pick is not None and pick.name not in chosen:
+            chosen.append(pick.name)
+    raw = problem.to_problem_json()["utilities"]
+    return [
+        u
+        for name in chosen
+        for u in raw
+        if u["name"] == name and u["type"] in ("Cold", "Both")
+    ]
 
 
 def _fallback_utilities(

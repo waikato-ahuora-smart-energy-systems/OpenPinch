@@ -192,6 +192,39 @@ def test_a_placed_case_keeps_the_utility_that_rejects_to_ambient(monkeypatch):
     assert water in case.to_problem_json()["utilities"]
 
 
+def test_a_placed_case_keeps_each_periods_ambient_sink(monkeypatch):
+    """Cooling water is at 20 C in the first period and 10 C (below the
+    15 C ambient) in the second, where river water at 25 C rejects to
+    ambient instead. The case keeps both (Codex review of #553)."""
+    from OpenPinch.application._problem.accessors import target
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    source = _site(periods=True).to_problem_json()
+    water = _utility("CW", "Cold", 20.0, 25.0, 5.0)
+    water["t_supply"] = {"values": [20.0, 10.0], "unit": "degC"}
+    water["t_target"] = {"values": [25.0, 15.0], "unit": "degC"}
+    others = [u for u in source["utilities"] if u["name"] != "CW"]
+    source["utilities"] = [*others, water, _utility("RW", "Cold", 25.0, 30.0, 6.0)]
+    problem = PinchProblem(source)
+    placed_source = problem.to_problem_json()
+    placed_source["utilities"] = [
+        _utility(f"{side}_iso_{level}", kind, t, t + step, 60.0)
+        for level, t in ((1, 180.0), (2, 100.0))
+        for side, kind, step in (("hot", "Hot", -0.01), ("cold", "Cold", 0.01))
+    ]
+    placed = PinchProblem(placed_source)
+    monkeypatch.setattr(
+        target._TargetAccessor, "utility_placement", lambda self, **_: placed
+    )
+    monkeypatch.setattr(site_levels, "_fallback_utilities", lambda _placed: {})
+
+    case = site_levels.placed_case(problem, 2)
+
+    names = {u["name"] for u in case.to_problem_json()["utilities"]}
+
+    assert {"CW", "RW"} <= names
+
+
 def test_a_count_heats_on_the_cases_own_utility_where_placement_fell_back():
     """With three levels, placement heats above them on its fallback HU
     at 300 C; the placed case takes the case's hottest utility, HPS."""
