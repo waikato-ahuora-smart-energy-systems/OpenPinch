@@ -973,7 +973,11 @@ class _DesignAccessor:
 
         # Levels chosen by price (the lowest cost) and held at their
         # targets: evolution starts from both. A process whose design fails
-        # one way takes the other way's networks for it.
+        # one way takes the other way's networks for it, with a warning.
+        ways = {
+            "price": "with levels chosen by price",
+            "temperature": "with its levels held at their targets",
+        }
         priced, held = {}, {}
         for name in processes:
             failure = None
@@ -986,9 +990,19 @@ class _DesignAccessor:
                 ):
                     raise
                 except (ValueError, RuntimeError) as exc:
-                    failure = exc
+                    failure = (placement, exc)
             if name not in priced and name not in held:
-                raise failure
+                raise failure[1]
+            if failure is not None:
+                failed, exc = failure
+                other = "temperature" if failed == "price" else "price"
+                warnings.warn(
+                    f"The design of process {name} {ways[failed]} failed "
+                    f"({exc}); its design {ways[other]} stands in for it, "
+                    "and the site network may cost more.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             priced.setdefault(name, held.get(name))
             held.setdefault(name, priced[name])
         seeds = site_seeds(priced, level_held=held)

@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site design warns when a process's design fails one way.
+  ``design.total_site_heat_exchanger_network`` designs each process with
+  levels chosen by price and with its levels held at their targets; when
+  one of the two raised, the other stood in for it silently, and on a
+  steam main case the site cost 25,015 against 20,581 $/y. A
+  ``UserWarning`` now names the process, the design that failed and its
+  error.
 - The median design basis says which streams it leaves out. A stream that
   runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
   not in the basis case, and the fit can only add a heater or cooler at
