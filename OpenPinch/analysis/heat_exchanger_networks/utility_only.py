@@ -181,6 +181,8 @@ def utility_only_network(problem: PreparedProblem) -> HeatExchangerNetwork:
         )
     period_ids, weights = _period_ids_and_weights(zone)
     costing = zone.config.costing
+    # Only an explicit "price": "auto" keeps targeting's levels here.
+    by_price = zone.config.hens.utility_placement == "price"
     price_scale, capital_scale = annual_cost_scales(costing)
 
     # states[(utility, stream)][n]: the exchanger's duty, slices and temperatures.
@@ -189,7 +191,7 @@ def utility_only_network(problem: PreparedProblem) -> HeatExchangerNetwork:
     load_by_period = []
     for n in range(len(period_ids)):
         pieces = [_pieces(key, stream, n) for key, stream, _ in streams]
-        levels = _level_duties(side, pieces, utilities, n)
+        levels = _level_duties(side, pieces, utilities, n, by_price=by_price)
         bands = _bands(side, pieces, utilities, levels, n)
         load_by_period.append(sum(levels))
         utility_cost_by_period.append(
@@ -332,8 +334,15 @@ def _composite(
     return temperatures, heat
 
 
-def _level_duties(side: _Side, pieces, utilities, n: int) -> list[float]:
-    """Each utility's duty in period ``n``, as targeting assigns it."""
+def _level_duties(
+    side: _Side, pieces, utilities, n: int, *, by_price: bool = False
+) -> list[float]:
+    """Each utility's duty in period ``n``, as targeting assigns it.
+
+    By price, the cheapest utility serves first (a default one last), each
+    as far as its level reaches: on one side alone each level can take all
+    the heat beyond it, so this is the cheapest assignment.
+    """
     levels = [
         _value(getattr(utility, name), "K", period_idx=n)
         for _, utility, _ in utilities
@@ -343,6 +352,18 @@ def _level_duties(side: _Side, pieces, utilities, n: int) -> list[float]:
     # Targeting reads each utility's level in the unit it is stored in.
     reference = utilities[0][1].shifted_maximum_temperature
     offset = float(reference[n]) - _value(reference, "K", period_idx=n)
+    order = (
+        sorted(
+            range(len(utilities)),
+            key=lambda u: (
+                is_default_utility(utilities[u][1]),
+                _value(utilities[u][1].price, "$/MW/h", period_idx=n),
+                _assignment_rank(side, utilities[u][1], n),
+            ),
+        )
+        if by_price
+        else None
+    )
     return list(
         _calculate_assigned_utility_duties(
             T_vals=temperatures + offset,
@@ -352,6 +373,7 @@ def _level_duties(side: _Side, pieces, utilities, n: int) -> list[float]:
             is_hot_ut=side.heating,
             is_real_temperatures=False,
             idx=n,
+            order=order,
         )
     )
 

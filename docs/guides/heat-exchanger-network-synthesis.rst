@@ -450,7 +450,10 @@ duty targeting gives it. ``"price"`` lets the pinch design choose the levels
 by utility cost, as an isolated process would. ``"auto"`` (the default) is
 ``"price"`` when the design covers one process zone, for example
 ``heat_exchanger_network(zone="Hospital[S]")`` or a problem of one process,
-and ``"temperature"`` when it covers more than one. A utility whose temperature slides,
+and ``"temperature"`` when it covers more than one. A process with only hot
+or only cold streams has heaters or coolers alone: with ``"price"`` they
+take the cheapest utility each stream can reach, and with ``"auto"`` or
+``"temperature"`` the levels targeting gives. A utility whose temperature slides,
 such as hot water from 90 to 70 C, is then, by temperature, run through slices in series, so
 one utility flow heats (or cools) several process streams in turn and
 reaches streams a single heater on its whole range could not.

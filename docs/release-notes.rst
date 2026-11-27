@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A process with only hot or only cold streams takes its utilities by
+  price under ``HENS_UTILITY_PLACEMENT: "price"``. Its network kept
+  targeting's levels, the least valuable first, whatever the option said,
+  so the priced seed of a site design cooled a hot-only process on LP
+  steam at 30 $/MWh rather than cooling water at 5 $/MWh (14,940 against
+  2,490 $/y of utility). ``"auto"`` still keeps targeting's levels for
+  such a network.
 - A site design warns when a process's design fails one way.
   ``design.total_site_heat_exchanger_network`` designs each process with
   levels chosen by price and with its levels held at their targets; when

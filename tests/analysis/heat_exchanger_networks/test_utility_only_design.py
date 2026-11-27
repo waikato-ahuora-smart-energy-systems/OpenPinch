@@ -228,6 +228,21 @@ def test_a_one_sided_zone_of_a_site_is_designed_at_its_targeted_levels():
     _assert_same_duties(_design_duties(network), expected)
 
 
+def test_price_placement_cools_a_hot_only_problem_on_the_cheapest_utility():
+    """``HENS_UTILITY_PLACEMENT: "price"`` was ignored: a one-sided network
+    took targeting's levels, the least valuable first (review finding 33).
+    CW at 5 $/MWh can take every hot stream's heat, so by price it takes
+    all of it, not MPS, LPS and HW at 30, 20 and 10 $/MWh."""
+    problem = _hot_only()
+    total = sum(_targets(problem).values())
+
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=0, options={"HENS_UTILITY_PLACEMENT": "price"}
+    ).selected_network
+
+    _assert_same_duties(_design_duties(network), {"CW": total})
+
+
 def _targets_of_zone(problem, zone):
     result = problem.target.direct_heat_integration(zone=zone)
     return {
