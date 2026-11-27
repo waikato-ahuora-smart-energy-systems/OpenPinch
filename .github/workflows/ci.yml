@@ -400,6 +400,24 @@ jobs:
               tests/application/test_utility_placement_batch.py
               tests/application/test_utility_placement_maximum_duties.py
               tests/application/test_total_site_profile_hierarchy.py
+          - shard: application-heat-pumps
+            # The heat pump application tests, about two thirds of the
+            # application tests' time in Pyodide: one shard of them ran past
+            # 20 minutes on a slow runner. A new heat pump file runs in
+            # application unless it is listed here and ignored there.
+            paths: >-
+              tests/application/test_hpr_change_audit.py
+              tests/application/test_hpr_compressor_model.py
+              tests/application/test_hpr_derived_case_api.py
+              tests/application/test_hpr_discovery.py
+              tests/application/test_hpr_fluid_set_runs.py
+              tests/application/test_hpr_gateway.py
+              tests/application/test_hpr_load_kinks.py
+              tests/application/test_hpr_load_kinks_api.py
+              tests/application/test_hpr_performance_map_accessor.py
+              tests/application/test_hpr_period_batch_boundaries.py
+              tests/application/test_hpr_refrigerant_screen.py
+              tests/application/test_hpr_residual_workflow.py
           - shard: application
             # test_coolprop_hpr_audit.py takes over 12 minutes in Pyodide;
             # the CPython test lanes cover it.
@@ -410,6 +428,18 @@ jobs:
               --ignore=tests/application/test_utility_placement_batch.py
               --ignore=tests/application/test_utility_placement_maximum_duties.py
               --ignore=tests/application/test_total_site_profile_hierarchy.py
+              --ignore=tests/application/test_hpr_change_audit.py
+              --ignore=tests/application/test_hpr_compressor_model.py
+              --ignore=tests/application/test_hpr_derived_case_api.py
+              --ignore=tests/application/test_hpr_discovery.py
+              --ignore=tests/application/test_hpr_fluid_set_runs.py
+              --ignore=tests/application/test_hpr_gateway.py
+              --ignore=tests/application/test_hpr_load_kinks.py
+              --ignore=tests/application/test_hpr_load_kinks_api.py
+              --ignore=tests/application/test_hpr_performance_map_accessor.py
+              --ignore=tests/application/test_hpr_period_batch_boundaries.py
+              --ignore=tests/application/test_hpr_refrigerant_screen.py
+              --ignore=tests/application/test_hpr_residual_workflow.py
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

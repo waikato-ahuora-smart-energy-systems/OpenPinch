@@ -195,6 +195,21 @@ def test_pyodide_heat_pump_shards_cover_the_directory_between_them():
     ]
 
 
+def test_pyodide_application_shards_split_the_heat_pump_tests_out():
+    # One shard of the application tests ran past its 20 minutes on a slow
+    # runner; the heat pump ones, about two thirds of the time, run apart.
+    matrix = workflow("ci.yml")["jobs"]["pyodide"]["strategy"]["matrix"]
+    shards = {row["shard"]: row["paths"].split() for row in matrix["include"]}
+    heat_pumps = sorted(
+        str(path.relative_to(REPOSITORY_ROOT))
+        for path in (REPOSITORY_ROOT / "tests/application").glob("test_hpr_*.py")
+    )
+
+    assert shards["application-heat-pumps"] == heat_pumps
+    application = shards["application"]
+    assert all(f"--ignore={path}" in application for path in heat_pumps)
+
+
 def test_pyodide_job_runs_the_runner_test_once_its_node_packages_are_installed():
     # The runner test skips without scripts/pyodide/node_modules, which only
     # the Pyodide job installs, so it runs there (on CPython, in one shard)
