@@ -173,7 +173,8 @@ def _price_rejection_at_ambient(
             if above
             else max(given, key=lambda u: supply[id(u)], default=None)
         )
-        if rejector is not None and not above:
+        # Only where it prices another cold utility: alone it keeps its own.
+        if rejector is not None and not above and len(utilities) > 1:
             notes.append(
                 f"No cold utility is at or above ENV_TEMPERATURE ({t_env:g} C), "
                 f"so {rejector.name} ({supply[id(rejector)]:g} C), the warmest, "

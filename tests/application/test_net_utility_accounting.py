@@ -175,6 +175,19 @@ def test_a_case_with_no_cold_utility_above_ambient_is_warned():
         )._require_prepared_root_zone()
 
 
+def test_a_lone_cold_utility_below_ambient_is_not_warned():
+    """``basic_pinch`` cools on one utility at 10 C, below the 15 C default
+    ambient. Alone it keeps its own price, so the assumption prices nothing
+    else and is not worth a warning on every use of the case."""
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        PinchProblem("basic_pinch.json")._require_prepared_root_zone()
+
+    assert not [w for w in caught if "ENV_TEMPERATURE" in str(w.message)]
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,
