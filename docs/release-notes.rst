@@ -232,6 +232,13 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- After a utility-level heat pump, each utility level keeps its share of
+  the residual. The residual's steps can lie a few hundred-millionths of a
+  kelvin off the levels' temperatures, and a hot utility whose target was
+  that far below its step was judged too cold for it: on the pulp mill at
+  a load fraction of 0.0625 the LPS level's 15,995 kW went to HPS (right
+  total, wrong split and cost). The check now has the 1e-6 K tolerance its
+  supply end has.
 - A heat pump design is sized on the prices its networks are ranked on.
   ``design.heat_exchanger_network(heat_pump=...)`` targeted the heat pump
   with heat priced at the electricity price (the default
