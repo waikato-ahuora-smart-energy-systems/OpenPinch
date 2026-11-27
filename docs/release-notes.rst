@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site whose processes recover no heat within themselves is designed.
+  Its processes are linked only through the site's utilities, so there is
+  nothing for the site evolution to refine, and
+  ``design.total_site_heat_exchanger_network`` raised "no process network
+  recovers heat". It now returns each process's network joined into one
+  site network and costed by the site utility balance, as when the site
+  evolution fails, with a warning.
 - ``design.retrofit`` takes ``zone``, as ``heat_exchanger_network`` does,
   to retrofit one process of a site on its own case. A site network is
   refused with the advice to use each process's own network, but a

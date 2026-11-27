@@ -18,6 +18,11 @@ from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..reporting.ranking import holds_utility_levels
 
 
+class NoSiteRecoveryError(ValueError):
+    """No process network recovers heat: the processes are linked only
+    through utilities, and there is no site network to evolve."""
+
+
 def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]]:
     """The duty per period of each utility a process's network holds.
 
@@ -71,7 +76,7 @@ def site_seeds(
 
     seeds = _from_each_choice(pools, level_held, _seed)
     if not any(_recovery(seed) for seed in seeds):
-        raise ValueError(
+        raise NoSiteRecoveryError(
             "no process network recovers heat, so there is no site network to "
             "evolve; design each process with heat_exchanger_network(zone=...)."
         )

@@ -1005,7 +1005,28 @@ class _DesignAccessor:
                 )
             priced.setdefault(name, held.get(name))
             held.setdefault(name, priced[name])
-        seeds = site_seeds(priced, level_held=held)
+        from ....analysis.heat_exchanger_networks.site.seeds import (
+            NoSiteRecoveryError,
+        )
+
+        try:
+            seeds = site_seeds(priced, level_held=held)
+        except NoSiteRecoveryError:
+            # Linked only through utilities: nothing for evolution to refine.
+            return self._joined_process_design(
+                priced,
+                held,
+                None,
+                templates,
+                configuration,
+                message=(
+                    "no process recovers heat within itself, so the site is "
+                    "linked only through its utilities and there is nothing "
+                    "for the site evolution to refine: each process's own "
+                    "network is returned, joined into one site network and "
+                    "costed by the site utility balance of their utility use."
+                ),
+            )
         try:
             return self.network_evolution(
                 seeds, options=options, width=width, depth=depth
@@ -1017,10 +1038,13 @@ class _DesignAccessor:
                 priced, held, failure, templates, configuration
             )
 
-    def _joined_process_design(self, priced, held, failure, templates, configuration):
-        """The site design when its evolution failed: each seed's process
-        networks joined into one site network, costed by the site utility
-        balance of their own utility use, with a warning."""
+    def _joined_process_design(
+        self, priced, held, failure, templates, configuration, *, message=None
+    ):
+        """The site design when its evolution failed, or ``message`` says
+        why there was none: each seed's process networks joined into one
+        site network, costed by the site utility balance of their own
+        utility use, with a warning."""
         from ....analysis.heat_exchanger_networks.execution.executor import (
             _site_letdown_price,
         )
@@ -1081,10 +1105,13 @@ class _DesignAccessor:
         if self._problem._results is not None:
             self._problem._results.design = result
         warnings.warn(
-            "the site evolution failed, so each process's own pinch design "
-            "network is returned, joined into one site network and costed by "
-            "the site utility balance of their utility use; nothing was "
-            f"refined across the site ({str(failure)[:300]}).",
+            message
+            or (
+                "the site evolution failed, so each process's own pinch design "
+                "network is returned, joined into one site network and costed "
+                "by the site utility balance of their utility use; nothing was "
+                f"refined across the site ({str(failure)[:300]})."
+            ),
             UserWarning,
             stacklevel=4,
         )

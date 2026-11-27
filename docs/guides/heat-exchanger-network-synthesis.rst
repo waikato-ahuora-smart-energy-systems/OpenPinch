@@ -487,6 +487,9 @@ heaters and coolers and costed by the site utility balance of what they use
 and raise. A warning says the site evolution failed and that nothing was
 refined across the site; such a network's ``method`` is
 ``"site_pinch_design"``.
+The same is returned, with its own warning, when no process recovers heat
+within itself: the processes are then linked only through the utilities,
+and there is nothing for the evolution to refine.
 
 A site network carries the site utility balance. On each utility level, use
 plus heat let down to lower levels plus heat dumped equals generation plus
