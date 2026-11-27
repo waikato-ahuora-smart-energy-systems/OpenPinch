@@ -580,7 +580,8 @@ def evaluate_vapour_hpr_result(
     cost_accounting = calc_simulated_hpr_annualized_costs(
         work=float(work),
         Q_ext_heat=Q_ext_heat,
-        Q_cooling_water=Q_cooling_water,
+        # Heat rejected to air ends at ambient: charged as cooling water.
+        Q_cooling_water=Q_cooling_water + Q_amb_cold,
         Q_refrigeration=Q_refrigeration,
         machine_capital=[installed_capital(machine) for machine in components],
         penalty_weight=penalty_weight,
