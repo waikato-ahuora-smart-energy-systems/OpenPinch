@@ -157,6 +157,8 @@ def _price_rejection_at_ambient(
         return float(converted.value)
 
     priced: dict[int, list[float]] = {id(u): [] for u in utilities}
+    for u in utilities:
+        setattr(u, _AMBIENT_SINK, {})
     for n in range(periods):
         supply = {id(u): at(u.supply_temperature, "degC", n) for u in utilities}
         own = {id(u): at(u.price, "$/MW/h", n) for u in utilities}
@@ -178,6 +180,7 @@ def _price_rejection_at_ambient(
             else rejector
         )
         ambient = own[id(marginal)]
+        getattr(marginal, _AMBIENT_SINK).update({n: ambient})
         for u in utilities:
             if u is rejector or u is marginal:
                 priced[id(u)].append(own[id(u)])
@@ -198,6 +201,17 @@ def _price_rejection_at_ambient(
 
 
 _INPUT_PRICE = "_input_price"
+_AMBIENT_SINK = "_ambient_sink"
+
+
+def ambient_sinks(cold_utilities) -> dict[int, dict]:
+    """The prepared cold utility whose price is the ambient price in each
+    period (by period index), with that price ($/MWh)."""
+    found: dict[int, dict] = {}
+    for utility in cold_utilities:
+        for n, price in getattr(utility, _AMBIENT_SINK, {}).items():
+            found[n] = {"utility": utility.name, "price": float(price)}
+    return found
 
 
 def input_price(utility: Stream) -> Value | None:

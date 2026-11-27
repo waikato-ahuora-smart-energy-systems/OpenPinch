@@ -148,6 +148,16 @@ def test_a_residual_case_keeps_the_input_prices():
     assert chw["price"]["value"] == pytest.approx(25.0)
 
 
+def test_a_targets_provenance_names_the_utility_that_sets_the_ambient_price():
+    """Nothing told a user which utility the costs took as rejecting heat to
+    ambient; every result's provenance now names it, period by period."""
+    target = _problem().target.direct_heat_integration()
+
+    sink = target.provenance.effective_settings["AMBIENT_SINK"]
+
+    assert sink == {"0": {"utility": "CW", "price": pytest.approx(5.0)}}
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,
