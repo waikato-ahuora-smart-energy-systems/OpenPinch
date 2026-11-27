@@ -331,10 +331,8 @@ Heat pumps and refrigeration
   out at every size with a warning to "rename the process stream". The
   added machine is now named ``HP2`` (the first of ``HP``, ``HP2``,
   ``HP3`` the network does not hold) and its streams after it
-  (``HP2_H1``, ``HP2_C1``). On the basic pinch case with a half-load
-  machine in the network and electricity at 20 $/MWh, the retrofit adds a
-  223 kW machine beside the 375 kW one, and the network reads again from
-  its JSON with both.
+  (``HP2_H1``, ``HP2_C1``). A network with both reads again from its
+  JSON.
 
 0.10.0 (2026-11-25)
 -------------------
