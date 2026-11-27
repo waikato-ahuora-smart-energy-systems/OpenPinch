@@ -1314,7 +1314,9 @@ def _shared_candidate_objective(
         reducer="weighted",
         share=loaded_share,
     )
-    machine_peaks = _peak_machine_capital(results)
+    machine_peaks = _installed_machine_capital(results) or _peak_machine_capital(
+        results
+    )
     annualized_capital = (
         Value(sum(machine_peaks[1]), "$/y")
         if machine_peaks is not None

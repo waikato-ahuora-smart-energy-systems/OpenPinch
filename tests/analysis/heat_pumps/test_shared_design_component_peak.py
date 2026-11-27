@@ -63,3 +63,23 @@ def test_the_shared_capital_is_each_components_peak():
     assert installed > max(installed_capital(base), installed_capital(peak))
     assert weighted.hpr_capital_cost.value == pytest.approx(installed)
     assert weighted.hpr_annualized_capital_cost.value == pytest.approx(0.1 * installed)
+
+
+def test_the_shared_search_objective_prices_the_installed_machine():
+    # The search ranks shared designs on the same installed machine it
+    # reports (Codex review on #565).
+    base = MachineComponents(
+        compressors=(CompressorDuty("Ammonia", 400.0, 140.0),),
+        exchanger_areas=(0.0, 0.0, 80.0, 0.0, 20.0, 0.0),
+    )
+    peak = MachineComponents(
+        compressors=(CompressorDuty("Ammonia", 250.0, 160.0),),
+        exchanger_areas=(0.0, 0.0, 50.0, 0.0, 90.0, 0.0),
+    )
+
+    _, objective = aggregate_hpr_period_results(
+        {"base": _period(base), "peak": _period(peak)}, [0.5, 0.5]
+    )
+
+    installed = installed_capital(installed_machine([base, peak]))
+    assert objective == pytest.approx(100.0 + 0.1 * installed)
