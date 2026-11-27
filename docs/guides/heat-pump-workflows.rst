@@ -326,9 +326,9 @@ site buys heat at and the evaporator's is heated from the level the site
 has heat to spare at, so the site's utility balance counts them as
 generation and use with no change to the design.
 
-Total site targeting of the new case gives the hot utility the heat pump
-target left, and its cold utility plus the heat the target let ambient
-air take (the air is not written into the case). On a site that imports
+Total site targeting of the new case gives the hot and cold utility the
+heat pump target left. The target's cold utility holds the heat it rejects
+to ambient air, which is not written into the case either. On a site that imports
 800 kW of steam at 180 degC and has 1000 kW to spare at 140 degC, a full
 load heat pump leaves 0.08 kW of import, and so does the case.
 

@@ -709,8 +709,9 @@ def _hpr_numerical_records(
             if is_heat_pumping
             else base_target.cold_utility_target
         )
+    # Heat rejected to air is the residual's to place, as cold utility.
     hot = hot + res.hpr_hot_streams + res.amb_streams.get_hot_streams()
-    cold = cold + res.hpr_cold_streams + res.amb_streams.get_cold_streams()
+    cold = cold + res.hpr_cold_streams
     physical = get_process_heat_cascade(
         hot_streams=hot, cold_streams=cold, is_shifted=False, period_idx=period_idx
     )

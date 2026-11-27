@@ -70,6 +70,7 @@ a docstring.
 
 ## Side Effects
 - Deep-copies the base target's problem table and mutates the copy with HPR, air and residual columns. [service.py:_compute_single_period_hpr_target] [service.py:_calc_hpr_cascade]
+- Ambient air enters a target's cascade (`H_NET_W_AIR`) and its residual composites (`HPRResidualData`) only as a source of heat; heat rejected to air is left to the cold utilities, so a target's cold utility holds it and `hpr_ambient_cold` reports how much of it went to air [service.py:_calc_hpr_cascade, _hpr_numerical_records].
 - Emits progress events for `hpr_targeting` through `domain.progress`. [optimisation_adapter.py:solve_hpr_placement] [optimisation_adapter.py:_CachedHPRScalarObjective]
 - Runs SciPy `minimize` (SLSQP) and the multistart optimiser from `OpenPinch/optimisation`; no worker processes are used by the HPR search. [optimisation_adapter.py:run_hpr_candidate_search]
 - CoolProp or TESPy simulations run in the handlers and cycles this module calls; TESPy is checked by `preflight_tespy_hpr_targeting`. [service.py:_get_hpr_targets]
