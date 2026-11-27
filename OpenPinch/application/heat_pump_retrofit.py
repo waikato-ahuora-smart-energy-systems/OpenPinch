@@ -170,14 +170,23 @@ def heat_pump_case(problem, solved, *, machine: str, dt_cont_multiplier: float =
     )
 
 
-def _carrying(streams) -> tuple:
-    """The streams of ``streams`` that carry duty."""
+LEVEL_DUTY_FLOOR = 1e-6
+"""The share of its side's duty under which a level's duty is round-off."""
 
-    return tuple(
-        stream
-        for _key, stream in streams.items()
-        if float(stream.heat_flow.value) > 0.0
-    )
+
+def _carrying(streams) -> tuple:
+    """The streams of ``streams`` that carry duty.
+
+    A search leaves a level it does not use at round-off, not at 0 (0.0003
+    of 1,500 kW): one that carries under ``LEVEL_DUTY_FLOOR`` of the
+    streams' duty together is no stream, as one at 0 is not.
+    """
+
+    duties = [
+        (stream, float(stream.heat_flow.value)) for _key, stream in streams.items()
+    ]
+    floor = LEVEL_DUTY_FLOOR * sum(max(duty, 0.0) for _stream, duty in duties)
+    return tuple(stream for stream, duty in duties if duty > floor)
 
 
 def _name_streams_for(solved, machine: str, taken) -> None:

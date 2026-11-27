@@ -335,6 +335,15 @@ Heat pumps and refrigeration
   machine in the network and electricity at 20 $/MWh, the retrofit adds a
   223 kW machine beside the 375 kW one, and the network reads again from
   its JSON with both.
+- A retrofit's heat pump step is no longer lost to a level at round-off.
+  A heat pump search leaves a level it does not use at a duty of
+  round-off, not 0 (a condenser at 0.0003 kW beside two of 760 and
+  740 kW). The step kept it as a stream, its match did nothing, and the
+  retrofit left the whole step out ("its coolers and heaters cannot
+  serve the machine's duties"). A level under a millionth of its side's
+  duty is now no stream. On a two-period case of one heater and one
+  cooler the step is taken: steam falls from 1,080 kW to none and the
+  retrofit nets 295,313 $/y, where it returned the existing network.
 
 0.10.0 (2026-11-25)
 -------------------
