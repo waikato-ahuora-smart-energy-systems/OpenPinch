@@ -2000,6 +2000,7 @@ class _DesignAccessor:
         options: Mapping[str, Any] | None = None,
         solver=None,
         solve_tolerance=None,
+        zone: "str | Zone | None" = None,
     ) -> "HeatExchangerNetworkRetrofitResult":
         """Find cost-effective modifications of an existing network.
 
@@ -2023,7 +2024,10 @@ class _DesignAccessor:
         (screened by the utility it could cut where it sits) or, optionally,
         a relocated exchanger, with the added area each structure needs
         sized in the same solve. Each step keeps the ``beam_width`` designs
-        with the best net annual benefit. When the existing network's
+        with the best net annual benefit. With ``zone``, a process of a site
+        is retrofitted on its own case, as ``heat_exchanger_network(zone=
+        ...)`` designs it: ``existing`` is that process's network, and the
+        other processes' streams are left out. When the existing network's
         streams span several process zones (a site's network given as this
         mapping), new matches and relocations join only streams of one
         process, and a ``UserWarning`` says the site utility balance is not
@@ -2176,6 +2180,45 @@ class _DesignAccessor:
         from ..targeting.execution import walk_zone_tree
         from ..targeting.state import commit_problem, snapshot_problem
 
+        if zone is not None:
+            target = self._problem._resolve_target_zone(zone)
+            if target.address != self._problem._require_prepared_root_zone().address:
+                from ...case_derivation import _zone_case
+
+                # One process of a site: its own network on its own case.
+                return _zone_case(self._problem, target).design.retrofit(
+                    existing,
+                    max_modifications=max_modifications,
+                    beam_width=beam_width,
+                    new_match_candidates=new_match_candidates,
+                    area_tolerance=area_tolerance,
+                    max_added_area_fraction=max_added_area_fraction,
+                    min_approach_temperature=min_approach_temperature,
+                    new_unit_cost=new_unit_cost,
+                    area_addition_cost=area_addition_cost,
+                    split_cost=split_cost,
+                    relocation_cost=relocation_cost,
+                    relocation_candidates=relocation_candidates,
+                    new_utility_units=new_utility_units,
+                    strategy=strategy,
+                    ceiling_candidates=ceiling_candidates,
+                    ceiling_relocations=ceiling_relocations,
+                    enhancement_factors=enhancement_factors,
+                    enhancement_cost=enhancement_cost,
+                    enhancement_area_cost=enhancement_area_cost,
+                    enhancement_pressure_drops=enhancement_pressure_drops,
+                    pressure_drop_allowances=pressure_drop_allowances,
+                    repiping_cost=repiping_cost,
+                    heat_pump_cycle=heat_pump_cycle,
+                    heat_pump_cost=heat_pump_cost,
+                    heat_pump_sizes=heat_pump_sizes,
+                    heat_pump_search=heat_pump_search,
+                    heat_recovery_loop_cost=heat_recovery_loop_cost,
+                    utility_switch_cost=utility_switch_cost,
+                    options=options,
+                    solver=solver,
+                    solve_tolerance=solve_tolerance,
+                )
         existing = self._network_argument(existing)
         _refuse_site_network(existing, "retrofit")
         # The approach the network records: the floor it was solved at, or

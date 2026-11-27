@@ -1037,6 +1037,10 @@ Heat pumps
    ``dt_cont`` with the zone's multiplier) plus ``HPR_DT_CONT`` (air by
    ``HPR_DT_ENV_CONT`` plus ``HPR_DT_CONT``).
 Sites and heat recovery loops
+   To retrofit one process of a site, pass its zone and that process's
+   own network: ``design.retrofit(existing, zone="Food Plant[S]")``
+   retrofits on the zone's own case, as ``heat_exchanger_network(zone=
+   ...)`` designs it. A designed site network is refused.
    When the existing network's streams span several process zones (a
    site's network given as a mapping), new matches and relocations join
    only streams of one process, and a ``UserWarning`` says the site utility
