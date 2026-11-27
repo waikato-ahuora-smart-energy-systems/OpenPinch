@@ -230,6 +230,40 @@ def test_the_retrofits_heat_pump_step_is_sized_at_the_utilities_it_relieves(
     assert asked == pytest.approx([0.3, 0.2])
 
 
+def test_each_condenser_level_relieves_only_the_heaters_it_reaches(monkeypatch):
+    # 100 kW at 175 degC reaches C2's bottom 19 K (380 kW, on HPS); 900 kW
+    # at 116 degC reaches C1 alone (LPS). Taken together at the hotter
+    # level's reach, 380 kW was priced at HPS (a ratio of 0.276); level by
+    # level, 100 kW is (0.22).
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    asked = []
+
+    def target(**arguments):
+        asked.append(arguments["config"].costing.hpr_price_ratio_heat_to_ele)
+        return SimpleNamespace(
+            Q_cond=np.array([100.0, 900.0]),
+            Q_evap=np.array([800.0]),
+            Q_heat=None,
+            Q_cool=None,
+            Q_amb_hot=0.0,
+            w_net=200.0,
+            cop_h=5.0,
+            T_cond=np.array([175.0, 116.0]),
+            T_evap=np.array([30.0]),
+            hpr_total_annualized_cost=None,
+        )
+
+    monkeypatch.setattr(heat_pump_targets, "compute_profile_heat_pump_target", target)
+    problem = _problem()
+
+    heat_pump_targets.as_piped_heat_pump(problem, _network(problem))
+
+    assert asked[-1] == pytest.approx(0.22)
+
+
 def test_at_a_given_approach_the_heaters_reach_is_taken_unshifted(monkeypatch):
     # A retrofit at min_approach_temperature 10 K targets the coolers and
     # heaters unshifted, with the heat pump 10 K off them. A condenser at

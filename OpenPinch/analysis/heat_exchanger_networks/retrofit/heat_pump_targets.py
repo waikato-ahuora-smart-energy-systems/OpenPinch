@@ -77,35 +77,57 @@ def _relieved_price(
         np.asarray(result.T_cond if hot else result.T_evap, dtype=float)
     )
     running = [
-        float(t) for t, q in zip(levels, np.resize(duties, levels.shape)) if q > 0.0
-    ] or [float(t) for t in levels]
-    if not running:
+        (float(t), float(q))
+        for t, q in zip(levels, np.resize(duties, levels.shape))
+        if q > 0.0
+    ]
+    total = sum(q for _t, q in running)
+    if total <= 0.0:
         return None
-    limit = max(running) - approach if hot else min(running) + approach
-    amount = float(duties.sum()) - (0.0 if hot else float(result.Q_amb_hot))
+    # The process part of each level's duty: evaporators draw the air's
+    # share pro rata.
+    process = (total - (0.0 if hot else float(result.Q_amb_hot))) / total
     sources, sinks = _as_piped_segments(problem, network, 0, dt_cont_multiplier)
     by_id = {str(e.exchanger_id): e for e in network.exchangers}
-    reachable = []
+    segments = []
     for _key, segment in (sinks if hot else sources).items():
         exchanger = by_id.get(segment.name)
         index = None if exchanger is None else _utility_index(arrays, exchanger, side)
-        if index is None:
-            continue
-        lo = float(segment.shifted_minimum_temperature.value)
-        hi = float(segment.shifted_maximum_temperature.value)
+        if index is not None:
+            segments.append(
+                (
+                    float(costs[index]),
+                    float(segment.shifted_minimum_temperature.value),
+                    float(segment.shifted_maximum_temperature.value),
+                    float(segment.heat_flow.value),
+                )
+            )
+
+    def reach(lo: float, hi: float, duty: float, limit: float) -> float:
+        """The duty of a segment a level at ``limit`` reaches: below it for
+        a condenser, above it for an evaporator."""
         if hi - lo <= 0.0:
             share = 1.0 if (lo <= limit if hot else hi >= limit) else 0.0
         else:
             share = (limit - lo) / (hi - lo) if hot else (hi - limit) / (hi - lo)
-        duty = min(max(share, 0.0), 1.0) * float(segment.heat_flow.value)
-        if duty > 0.0:
-            reachable.append((float(costs[index]), duty))
-    taken, cost = 0.0, 0.0
-    for price, duty in sorted(reachable, reverse=True):
-        part = min(duty, max(amount - taken, 0.0))
-        taken += part
-        cost += part * price
-    return cost / taken if taken > 0.0 else None
+        return min(max(share, 0.0), 1.0) * duty
+
+    # Each level relieves only what it reaches, the dearest first; the level
+    # that reaches least goes first (a colder condenser, a hotter
+    # evaporator), its reach a part of every other's.
+    taken = [0.0] * len(segments)
+    relieved = cost = 0.0
+    for temperature, duty in sorted(running, reverse=not hot):
+        limit = temperature - approach if hot else temperature + approach
+        need = duty * process
+        for i in sorted(range(len(segments)), key=lambda i: -segments[i][0]):
+            price, lo, hi, segment_duty = segments[i]
+            part = min(max(reach(lo, hi, segment_duty, limit) - taken[i], 0.0), need)
+            taken[i] += part
+            need -= part
+            relieved += part
+            cost += part * price
+    return cost / relieved if relieved > 0.0 else None
 
 
 def _relieved_prices(
