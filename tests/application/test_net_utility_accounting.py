@@ -126,6 +126,28 @@ def test_a_capped_rejector_leaves_the_marginal_price_to_the_default_utility():
     assert cold["LPS"] == pytest.approx(100.0)
 
 
+def test_a_residual_case_keeps_the_input_prices():
+    """A residual case is written from a target's prepared utilities. Their
+    prices include the rejection charge, and preparing the residual case
+    charged it again: chilled water at 25 $/MWh came back at 37.5 and grew
+    with each round trip (Codex review of #552)."""
+    source = PinchProblem("basic_pinch.json").to_problem_json()
+    source["utilities"].append(_utility("ChW", "Cold", 5.0, 10.0, 25.0))
+    problem = PinchProblem(source)
+    heat_pump = problem.target.carnot_heat_pump(
+        load_fraction=0.25,
+        condensers=1,
+        evaporators=1,
+        maximum_restarts=0,
+        maximum_evaluations=1,
+    )
+
+    residual = problem.residual_utility(base_target=heat_pump)
+
+    (chw,) = [u for u in residual.to_problem_json()["utilities"] if u["name"] == "ChW"]
+    assert chw["price"]["value"] == pytest.approx(25.0)
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,

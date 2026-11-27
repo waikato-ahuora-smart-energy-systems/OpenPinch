@@ -129,10 +129,13 @@ def _price_rejection_at_ambient(
     """Price each cold utility for the heat it rejects to ambient.
 
     Only net heating and cooling are charged: every rejected heat ends at
-    ambient. The coldest cold utility whose supply is not below
-    ``ENV_TEMPERATURE`` (the default CU only when there is none) rejects to
-    ambient, and its price is the ambient price. Any other cold utility
-    above ambient, steam raising included, costs that price. Refrigeration
+    ambient. The coldest given cold utility whose supply is not below
+    ``ENV_TEMPERATURE`` rejects to ambient (with none, the warmest given one:
+    cooling water colder than the ambient given). Its price is the ambient
+    price, unless it is capped or there is none, when heat beyond it leaves
+    through the default CU and the default CU's price is the ambient price
+    at the margin; both keep their own price. Any other cold utility above
+    ambient, steam raising included, costs the ambient price. Refrigeration
     (a supply below ambient) costs its own price for the work, plus the
     ambient price on the heat it takes and that work, the work per unit of
     heat being its price over ``COSTING_HPR_ELE_PRICE``. Each period is
@@ -190,7 +193,16 @@ def _price_rejection_at_ambient(
         if np.allclose(costs, own, rtol=0.0, atol=1e-12):
             # Its own price stands, segment by segment.
             continue
+        setattr(u, _INPUT_PRICE, u.price)
         u.price = Value(costs if periods > 1 else costs[0], unit="$/MW/h")
+
+
+_INPUT_PRICE = "_input_price"
+
+
+def input_price(utility: Stream) -> Value | None:
+    """A prepared utility's price as given, before any rejection charge."""
+    return getattr(utility, _INPUT_PRICE, utility.price)
 
 
 def _capped(utility: Stream, n: int) -> bool:

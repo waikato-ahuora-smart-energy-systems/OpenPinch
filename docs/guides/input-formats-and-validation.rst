@@ -249,8 +249,10 @@ Only net heating and cooling are charged, as in Total Site targeting. A hot
 utility costs its own price. Every heat a cold utility takes ends at
 ambient, so it is charged at the price of the utility that rejects to
 ambient: the coldest cold utility whose supply is not below
-``ENV_TEMPERATURE`` (15 degC by default), or the default ``CU`` when there is
-none. That utility keeps its own price, and any other cold utility above
+``ENV_TEMPERATURE`` (15 degC by default), or, with none, the warmest one
+(cooling water colder than the ambient given). When that utility has a
+``maximum_heat_flow``, heat beyond it leaves through the default ``CU``,
+whose price is then the price at the margin. These keep their own price, and any other cold utility above
 ambient costs the same: raising steam is not a cost in itself, and steam no
 one uses is vented or condensed on cooling water. Steam that another
 process uses saves its import, which the site utility balance of a total

@@ -154,11 +154,13 @@ def test_the_as_piped_saving_is_priced_at_the_utilities_it_relieves(monkeypatch)
     piped = heat_pump_targets.retrofit_heat_pumps(problem, _network(problem)).as_piped
 
     # The prices before are the heaters' and coolers' duty-weighted blends:
-    # (1000 x 20 + 1000 x 40) / 2000 and (1500 x 5 + 200 x 30) / 1700 $/MWh.
+    # (1000 x 20 + 1000 x 40) / 2000 and (1500 x 5 + 200 x 36.5) / 1700 $/MWh.
+    # Only net cooling is charged: ChW (2 C) is refrigeration rejecting through
+    # CW, at its 30 $/MWh plus CW's 5 on its heat and work, 5 x 1.3: 36.5.
     # The heat relieves LPS alone (C2 starts above the condenser) and the
     # cooling CW alone (H2 ends below the evaporator).
     lps = piped.hot_utility_price * 20.0 / 30.0
-    cw = piped.cold_utility_price * 5.0 / ((1500.0 * 5.0 + 200.0 * 30.0) / 1700.0)
+    cw = piped.cold_utility_price * 5.0 / ((1500.0 * 5.0 + 200.0 * 36.5) / 1700.0)
     saving = piped.operating_cost_before - piped.operating_cost_after
     assert saving == pytest.approx(
         1000.0 * lps + 800.0 * cw - 200.0 * piped.electricity_price
