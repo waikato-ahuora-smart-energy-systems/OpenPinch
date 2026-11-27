@@ -52,6 +52,21 @@ def test_the_heat_pump_is_targeted_at_the_drawn_utilities_prices(monkeypatch):
     )
 
 
+def test_the_designs_own_electricity_price_is_the_denominator(monkeypatch):
+    # A design called with options prices its networks with that call's
+    # costing group, which the case is given; the problem's stored one has
+    # electricity at 100 $/MWh, the design's at 200.
+    from copy import deepcopy
+
+    problem = levels_problem()
+    config = deepcopy(problem._require_prepared_root_zone().config)
+    config.update_values(COSTING_HPR_ELE_PRICE=200.0)
+
+    asked = _options_asked(monkeypatch, problem, costing=config.costing)
+
+    assert asked.get("COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE") == pytest.approx(0.2)
+
+
 def test_a_price_ratio_the_user_sets_is_kept(monkeypatch):
     asked = _options_asked(
         monkeypatch,
