@@ -13,6 +13,13 @@ Heat exchanger networks
   failed, the unshifted baseline included (all 13 designs on two of three
   small sites). The seed now keeps the network's staged heaters and
   coolers, as a site seed does.
+- The median design basis says which streams it leaves out. A stream that
+  runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
+  not in the basis case, and the fit can only add a heater or cooler at
+  its end: on the crude preheat train with the residue rundown running
+  only in the peak period the design cost 332,284 $/y against 308,263 on
+  ``design_basis="all"``, with no warning. A ``UserWarning`` now names
+  each such stream and the share of the year it runs.
 - A multiperiod design's ``total_heat_recovery``, ``total_hot_utility``
   and ``total_cold_utility`` are the year's. On every design over several
   periods they raised "period_id is required when a network has multiple
