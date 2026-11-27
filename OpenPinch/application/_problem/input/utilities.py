@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from copy import deepcopy
 from typing import List, Sequence, Tuple
@@ -157,6 +158,7 @@ def _price_rejection_at_ambient(
         return float(converted.value)
 
     priced: dict[int, list[float]] = {id(u): [] for u in utilities}
+    notes: list[str] = []
     for u in utilities:
         setattr(u, _AMBIENT_SINK, {})
     for n in range(periods):
@@ -171,6 +173,13 @@ def _price_rejection_at_ambient(
             if above
             else max(given, key=lambda u: supply[id(u)], default=None)
         )
+        if rejector is not None and not above:
+            notes.append(
+                f"No cold utility is at or above ENV_TEMPERATURE ({t_env:g} C), "
+                f"so {rejector.name} ({supply[id(rejector)]:g} C), the warmest, "
+                "is taken to reject heat to ambient and sets the cooling price; "
+                "set ENV_TEMPERATURE if it is refrigeration."
+            )
         # Heat beyond a capped rejector, or with none, leaves through the
         # default CU: its price is then the ambient price at the margin.
         backup = next((u for u in utilities if is_default_utility(u)), None)
@@ -190,6 +199,8 @@ def _price_rejection_at_ambient(
                 priced[id(u)].append(own[id(u)] + ambient * (1.0 + work))
             else:
                 priced[id(u)].append(ambient)
+    for note in dict.fromkeys(notes):
+        warnings.warn(note, UserWarning, stacklevel=2)
     for u in utilities:
         costs = priced[id(u)]
         own = [at(u.price, "$/MW/h", n) for n in range(periods)]

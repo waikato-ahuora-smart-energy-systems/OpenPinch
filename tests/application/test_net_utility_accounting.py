@@ -158,6 +158,23 @@ def test_a_targets_provenance_names_the_utility_that_sets_the_ambient_price():
     assert sink == {"0": {"utility": "CW", "price": pytest.approx(5.0)}}
 
 
+def test_a_case_with_no_cold_utility_above_ambient_is_warned():
+    """With none at or above ENV_TEMPERATURE, the warmest cold utility is
+    assumed to reject heat to ambient; the user is told which, and that
+    ENV_TEMPERATURE decides it."""
+    with pytest.warns(UserWarning, match=r"CW.*ENV_TEMPERATURE"):
+        PinchProblem(
+            {
+                "streams": [_stream("H1", 200.0, 40.0, 160.0)],
+                "utilities": [
+                    _utility("CW", "Cold", 10.0, 15.0, 4.0),
+                    _utility("ChW", "Cold", 5.0, 10.0, 25.0),
+                ],
+                "options": {"ENV_TEMPERATURE": 15.0},
+            }
+        )._require_prepared_root_zone()
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,
