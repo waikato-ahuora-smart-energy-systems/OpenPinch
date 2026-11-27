@@ -111,6 +111,12 @@ _STREAM_DATA_KEYS = (
     "cold_stream_total_duties",
     "hot_stream_total_duties_by_period",
     "cold_stream_total_duties_by_period",
+    # The older form the checks also read: heat capacity flowrates with
+    # supply and target temperatures.
+    "hot_stream_heat_capacity_flowrates",
+    "cold_stream_heat_capacity_flowrates",
+    "hot_stream_heat_capacity_flowrates_by_period",
+    "cold_stream_heat_capacity_flowrates_by_period",
 )
 
 

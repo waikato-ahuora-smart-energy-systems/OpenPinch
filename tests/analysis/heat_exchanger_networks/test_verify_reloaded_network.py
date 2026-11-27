@@ -31,6 +31,35 @@ def test_a_network_without_stream_data_is_verified_with_a_warning():
         verify_network_feasibility(network)
 
 
+def test_heat_capacity_flowrates_are_stream_data_too():
+    """The checks also read streams' heat capacity flowrates with their
+    supply and target temperatures; a network carrying those is checked and
+    does not warn (Codex review of #556)."""
+    import warnings
+
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("H1", "C1", 1)],
+        heaters=["C1"],
+        coolers=["H1"],
+        hot_utility="HU",
+        cold_utility="CU",
+    )
+    network = network.model_copy(
+        update={
+            "source_metadata": {
+                "hot_stream_heat_capacity_flowrates": [1.0],
+                "cold_stream_heat_capacity_flowrates": [1.0],
+            }
+        }
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        verify_network_feasibility(network)
+
+    assert not [w for w in caught if "no stream data" in str(w.message)]
+
+
 def test_a_designs_own_checks_do_not_warn_of_missing_stream_data():
     """A design verifies networks it built, some without stream data (a
     site's joined process networks); the warning is for a network read back
