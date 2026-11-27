@@ -7,6 +7,13 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A network designed on ``design_basis="all"`` is checked with each
+  period's own film coefficients. The stage-wise synthesis recorded only
+  the first period's, and verification sized every period with them: on
+  the crude preheat train with film coefficients rising over the three
+  periods (0.5, 1 and 2 kW/m2/K) every evolved candidate was judged short
+  of area by half and rejected, and a pinch design network was returned
+  at 306,390 $/y. The evolved network is now kept, at 256,680 $/y.
 - ``design.optimise_duties`` with the ``cost`` or ``area`` objective
   solves a network whose exchanger enters just past a segmented stream's
   kink. The solver rounds each kink over 0.05 K, so an inlet a tenth of a
