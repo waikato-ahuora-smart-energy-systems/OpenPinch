@@ -2103,6 +2103,8 @@ class _DesignAccessor:
                         else heat_pump_search
                     ),
                     sizes=tuple(float(size) for size in heat_pump_sizes),
+                    # A name no machine of the existing network holds.
+                    machine=_free_machine_name(existing),
                 )
             result = search(
                 isolated,
@@ -2608,6 +2610,16 @@ def _with_released_levels(view, levels, *, held: bool):
             name: list(duties) for name, duties in levels.items()
         }
     return view
+
+
+def _free_machine_name(existing) -> str:
+    """The name of a retrofit's own heat pump: ``HP``, or the first of
+    ``HP2``, ``HP3``, ... that no machine of ``existing`` holds."""
+    held = {machine.machine for machine in existing.heat_pumps}
+    number = 1
+    while (name := "HP" if number == 1 else f"HP{number}") in held:
+        number += 1
+    return name
 
 
 def _refuse_site_network(network, tool: str) -> None:

@@ -180,8 +180,42 @@ def _carrying(streams) -> tuple:
     )
 
 
+def _name_streams_for(solved, machine: str, taken) -> None:
+    """Rename the streams of the target ``solved`` after ``machine`` where
+    one of their names is among ``taken``, the stream names the problem
+    already holds.
+
+    Every heat pump target names its streams alike (``HP_H1``, ``HP_C1``,
+    ``AIR_H1``), so the step of a network that already holds a machine
+    would write streams the existing machine's already name. They become
+    ``<machine>_H1``, ``<machine>_C1`` and ``<machine>_AIR_H1``, in every
+    period's outputs too; with no clash the names stay.
+    """
+    streams = [
+        stream
+        for group in (solved.hpr_hot_streams, solved.hpr_cold_streams)
+        for _key, stream in group.items()
+    ]
+    streams += [stream for _key, stream in solved.amb_streams.items()]
+    for output in (getattr(solved, "period_outputs", None) or {}).values():
+        for group in ("hpr_hot_streams", "hpr_cold_streams"):
+            streams += [s for _key, s in ((output or {}).get(group) or {}).items()]
+    if not any(stream.name in taken for stream in streams):
+        return
+    for stream in streams:
+        if not stream.name.startswith(f"{machine}_"):
+            stream.name = f"{machine}_{stream.name.removeprefix('HP_')}"
+
+
 def heat_pump_step(
-    problem, base, settings, *, limits=None, machine: str = "HP", load_fraction=None
+    problem,
+    base,
+    settings,
+    *,
+    limits=None,
+    machine: str = "HP",
+    load_fraction=None,
+    taken=frozenset(),
 ):
     """The heat pump step a second retrofit search starts from, and the
     as-piped heat pump target it was built from.
@@ -204,6 +238,7 @@ def heat_pump_step(
     if solved is None:
         # The heaters carry no load: no heat pump to add.
         return None, None
+    _name_streams_for(solved, machine, taken)
     # A level the target left without duty is not a stream: it would need
     # a match it may not be able to have.
     condensers = _carrying(solved.hpr_hot_streams)
@@ -348,6 +383,13 @@ def retrofit_with_heat_pump(
         # The heat pump step is a modification.
         return base
     sized = []
+    # The names the existing network's machines hold for their streams:
+    # the step's streams take others.
+    taken = frozenset(
+        record["name"]
+        for held in getattr(existing, "heat_pumps", ())
+        for record in held.streams
+    )
     for size in sizes:
         # A target with no machine (none the cycle can model pays), a case
         # that refuses the streams (process components, several process
@@ -361,6 +403,7 @@ def retrofit_with_heat_pump(
                 limits=limits,
                 machine=machine,
                 load_fraction=size,
+                taken=taken,
             )
             if step is None:
                 continue

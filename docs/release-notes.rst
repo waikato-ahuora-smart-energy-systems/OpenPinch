@@ -324,6 +324,17 @@ Heat pumps and refrigeration
   for 268.1 kW of work. The duty tuples of a vapour compression target
   list its stages, which can be more than its condensing or evaporating
   temperatures, some at 0.
+- ``design.retrofit`` with ``heat_pump_cycle`` can add a heat pump to a
+  network that already holds one. The retrofit's heat pump step named
+  its streams as every heat pump target does (``HP_H1``, ``HP_C1``), the
+  names the existing machine's streams already hold, so the step was left
+  out at every size with a warning to "rename the process stream". The
+  added machine is now named ``HP2`` (the first of ``HP``, ``HP2``,
+  ``HP3`` the network does not hold) and its streams after it
+  (``HP2_H1``, ``HP2_C1``). On the basic pinch case with a half-load
+  machine in the network and electricity at 20 $/MWh, the retrofit adds a
+  223 kW machine beside the 375 kW one, and the network reads again from
+  its JSON with both.
 
 0.10.0 (2026-11-25)
 -------------------
