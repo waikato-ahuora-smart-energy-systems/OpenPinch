@@ -1321,6 +1321,8 @@ class _DesignAccessor:
             view.result.provenance = self._finalised_provenance(
                 view, fitted, origin, margin=margin
             )
+            # The search the call asked for, not the fit's or rating's.
+            view.result.manifest = origin["synthesis"].result.manifest
             view.result.ranked_networks = ranked
             select_network(view.result)
             self._problem._results.design = view.result

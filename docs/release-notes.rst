@@ -25,6 +25,10 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A fitted multiperiod design's ``result.manifest`` describes the search
+  the call asked for. It described the fit to every period instead: one
+  network evolution task at the selected multiplier, with width and depth
+  1, whatever the call's ``width`` and ``depth``.
 - A segmented stream split between two matches in a stage reports its
   split fractions. The model holds a segmented stream's heat capacity as
   0, so its share of the stage was not computed and came back ``None``;
