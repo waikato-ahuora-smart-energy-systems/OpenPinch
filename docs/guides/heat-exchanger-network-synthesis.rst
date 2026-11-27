@@ -117,12 +117,18 @@ an older approach-temperature grid, use multiplier = dTmin / (2 x
 The multipliers set the pinch design step: the energy targets the seed
 networks meet and the minimum approach of their exchangers, which for each
 match is ``max((dtcont_src + dtcont_snk) x m, 0.1 K)``: the sum of its two
-sides' contributions times the multiplier ``m``. The thermal derivative and
-network evolution steps that follow minimise total annual cost and choose
-each exchanger's approach from the cost settings, down to a share of that
-pinch design approach: ``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``.
-With cheap area, exchangers close toward that floor; with dear area, they
-open up and the network uses more utility than the target.
+sides' contributions times the multiplier ``m``. The thermal derivative
+step that follows minimises hot utility (the utilities' cost where a side
+has a choice of utility), letting each exchanger's approach close down to a
+share of that pinch design approach:
+``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``. Network evolution then
+minimises total annual cost and chooses each approach from the cost
+settings down to the same floor: with cheap area, exchangers close toward
+it; with dear area, they open up and the network uses more utility than
+the target. A thermal derivative network on its own, as
+``design.thermal_derivative()`` returns it, can therefore cost more than
+its seed (9 % more on the four-stream example): evolve it with
+``design.network_evolution()``.
 
 ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` is the share. It defaults to 0.25, so
 a match of two 5 K streams, held to 10 K in pinch design at a multiplier of
