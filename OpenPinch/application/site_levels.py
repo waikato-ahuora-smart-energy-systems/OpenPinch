@@ -146,11 +146,18 @@ def placed_case(
             utility["name"] = name
     source["utilities"] = _distinct_levels(utilities) + _stand_ins(problem, fallbacks)
     for sink in _ambient_sinks(problem):
-        if not any(
+        if sink in source["utilities"]:
+            continue
+        if any(
             (u["name"], u["type"]) == (sink["name"], sink["type"])
             for u in source["utilities"]
         ):
-            source["utilities"].append(sink)
+            raise ValueError(
+                f"the case's {sink['type'].casefold()} utility {sink['name']!r}, "
+                "which rejects heat to ambient, has the name of a placed level; "
+                "rename it to design with placed levels."
+            )
+        source["utilities"].append(sink)
     return type(problem)(source, project_name=problem.project_name)
 
 

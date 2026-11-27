@@ -225,6 +225,33 @@ def test_a_placed_case_keeps_each_periods_ambient_sink(monkeypatch):
     assert {"CW", "RW"} <= names
 
 
+def test_an_ambient_sink_named_as_a_placed_level_is_refused(monkeypatch):
+    """The case's cooling water is called iso_1, the name the first placed
+    main takes: the placed case took the main for it and dropped the cooling
+    water (Codex review of #553). It is refused, naming the clash."""
+    from OpenPinch.application._problem.accessors import target
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["name"] = "iso_1"
+    problem = PinchProblem(source)
+    placed_source = problem.to_problem_json()
+    placed_source["utilities"] = [
+        _utility(f"{side}_iso_1", kind, 180.0, 180.0 + step, 60.0)
+        for side, kind, step in (("hot", "Hot", -0.01), ("cold", "Cold", 0.01))
+    ]
+    placed = PinchProblem(placed_source)
+    monkeypatch.setattr(
+        target._TargetAccessor, "utility_placement", lambda self, **_: placed
+    )
+    monkeypatch.setattr(site_levels, "_fallback_utilities", lambda _placed: {})
+
+    with pytest.raises(ValueError, match="iso_1"):
+        site_levels.placed_case(problem, 2)
+
+
 def test_a_count_heats_on_the_cases_own_utility_where_placement_fell_back():
     """With three levels, placement heats above them on its fallback HU
     at 300 C; the placed case takes the case's hottest utility, HPS."""
