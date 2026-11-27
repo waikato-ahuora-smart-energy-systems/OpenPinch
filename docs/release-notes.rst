@@ -7,6 +7,12 @@ Unreleased
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- The guide and ``design.thermal_derivative``'s docstring now say what the
+  thermal derivative step minimises: hot utility (the utilities' cost
+  where a side has a choice), not total annual cost as the guide said. On
+  its own it can return a network dearer than its seed (9 % on the
+  four-stream example); ``design.network_evolution`` then minimises cost,
+  as the full workflow does. No result changes.
 - A small stream's exchangers are kept beside a large stream's.
   ``design.optimise_duties``, the multiperiod fit and every other use of
   the fixed-structure model took an exchanger with a duty under 1e-4 of
