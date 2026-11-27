@@ -36,3 +36,22 @@ def test_the_air_keeps_its_own_contribution_at_the_designs_multiplier(multiplier
     ]
     # HPR_DT_ENV_CONT is 10 K: what the design's multiplier must scale to.
     assert air["dt_cont"]["value"] * multiplier == pytest.approx(10.0)
+
+
+def test_at_a_multiplier_of_zero_the_air_is_written_as_it_is():
+    # No contribution survives a multiplier of 0, the air's among them, so
+    # there is nothing to write it over: the case is built as it was.
+    run = heat_pump_design_case(
+        _short_of_heat(),
+        0.0,
+        load={"fraction": 1.0},
+        levels={"condensers": 1, "evaporators": 1},
+        search={"restarts": 0, "evaluations": 1},
+    )
+
+    (air,) = [
+        record
+        for record in run.case.to_problem_json()["streams"]
+        if (record.get("heat_pump") or {}).get("role") == "ambient_source"
+    ]
+    assert air["dt_cont"]["value"] == 10.0
