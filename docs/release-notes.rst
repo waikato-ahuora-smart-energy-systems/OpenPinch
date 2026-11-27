@@ -348,10 +348,12 @@ Heat pumps and refrigeration
   streams' contributions: levels 6 K from a cooler and a heater on a
   two-stream case where the retrofit asked for 10 K, so the machine
   could not be matched as targeted. The heat pump is now targeted the
-  whole approach off the coolers and heaters. On that case at 10 K the
-  retrofit selects a 160 kW machine at a COP of 3.0 netting 9,952 $/y,
-  where it selected none (its one heat pump design lost 1,836 $/y, and
-  the full-size step was left out).
+  whole approach off the coolers and heaters, the air's and the process
+  streams' own contributions left out, and its exchangers are sized at
+  the approach. On that case at 10 K the retrofit selects a 132 kW
+  machine at a COP of 3.1 netting 9,222 $/y, where it selected none (its
+  one heat pump design lost 1,836 $/y, and the full-size step was left
+  out).
 - ``design.retrofit`` warns when ``HENS_FORBIDDEN_MATCHES`` is set. The
   retrofit search does not read the list, so a new match or a heat pump
   step may pair streams it names; only one sentence in another section of
