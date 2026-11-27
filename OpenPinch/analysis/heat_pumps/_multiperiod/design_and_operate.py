@@ -1,8 +1,10 @@
 """Design a shared heat pump once and operate it in each period.
 
 Design-and-operate for shared multiperiod designs (review finding 19,
-decided 2026-11-28). The search starts from each period solved alone, with
-the machine each component's peak, which every period's own operation fits.
+decided 2026-11-28). The installed machine starts as each period solved
+alone, each component at its peak, which every period's own operation
+fits. Each period then runs that machine at its cheapest operation within
+its sizes (``operate_installed_machine``).
 """
 
 from __future__ import annotations
@@ -16,12 +18,14 @@ from ....contracts.hpr import (
     HPRBackendResult,
     MultiPeriodHPRTargetInputs,
 )
+from ..common.capital import installed_machine
 from ..optimisation_adapter import (
     aggregate_hpr_period_results,
     evaluate_hpr_candidate,
     run_hpr_candidate_search,
 )
 from .aggregation import _with_installed_capital, selected_period_case
+from .operation import operate_installed_machine
 
 __all__ = ["design_and_operate"]
 
@@ -40,9 +44,20 @@ def design_and_operate(
     """
     cases = args.period_cases
     weights = np.asarray([case.weight for case in cases], dtype=float)
+    alone = [_solve_alone(f_obj, x0_ls, bnds, case.args) for case in cases]
+    machines = tuple(
+        installed_machine(periods)
+        for periods in zip(*(result.hpr_machine_components for _, result in alone))
+    )
     outputs = {
-        str(case.period_id): _solve_alone(f_obj, x0_ls, bnds, case.args)
-        for case in cases
+        str(case.period_id): operate_installed_machine(
+            machines,
+            objective=f_obj,
+            initial_points=_starts(point, x0_ls),
+            bounds=bnds,
+            args=case.args,
+        )
+        for case, (point, _) in zip(cases, alone, strict=True)
     }
     weighted, objective = aggregate_hpr_period_results(
         outputs, weights, idle_weight=args.idle_period_weight
@@ -59,12 +74,23 @@ def design_and_operate(
     )
 
 
-def _solve_alone(f_obj, x0_ls, bnds, args: HeatPumpTargetInputs) -> HPRBackendResult:
-    """One period's own best design."""
+def _solve_alone(
+    f_obj, x0_ls, bnds, args: HeatPumpTargetInputs
+) -> tuple[np.ndarray, HPRBackendResult]:
+    """One period's own best design and its point."""
     best = min(
         run_hpr_candidate_search(
             objective=f_obj, initial_points=x0_ls, bounds=bnds, args=args
         ),
         key=lambda candidate: candidate.objective,
     )
-    return evaluate_hpr_candidate(objective=f_obj, point=best.point, args=args)
+    point = np.asarray(best.point, dtype=float)
+    return point, evaluate_hpr_candidate(objective=f_obj, point=point, args=args)
+
+
+def _starts(own: np.ndarray, x0_ls) -> np.ndarray:
+    """A period's operation starts from its own design, then the warm starts."""
+    rows = [np.atleast_2d(own)]
+    if x0_ls is not None:
+        rows.append(np.atleast_2d(np.asarray(x0_ls, dtype=float)))
+    return np.vstack(rows)

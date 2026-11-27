@@ -113,3 +113,35 @@ def test_a_designed_and_operated_machine_is_never_dearer_than_periods_alone():
     weighted = result.weighted_output
     bound = _periods_alone_total(args, x0, bounds)
     assert float(weighted.hpr_total_annualized_cost.value) <= bound * (1.0 + 1e-6)
+
+
+def test_each_period_runs_the_installed_machine():
+    # The base period's own machine is smaller than the peak's; run on the
+    # installed machine it uses the spare area and costs less to run than
+    # its own design. Running its own design instead, the two costs are
+    # equal (4,805 $/y), which is what this test rules out.
+    args = _inputs()
+    x0, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+
+    result = design_and_operate(
+        f_obj=hp_cascade._compute_cascade_hp_system_obj,
+        x0_ls=x0,
+        bnds=bounds,
+        args=args,
+    )
+
+    base = args.period_cases[0].args
+    own = min(
+        run_hpr_candidate_search(
+            objective=hp_cascade._compute_cascade_hp_system_obj,
+            initial_points=x0,
+            bounds=bounds,
+            args=base,
+        ),
+        key=lambda candidate: candidate.objective,
+    )
+    own = evaluate_hpr_candidate(
+        objective=hp_cascade._compute_cascade_hp_system_obj, point=own.point, args=base
+    )
+    ran = result.period_outputs["base"]
+    assert ran.hpr_operating_cost.value < own.hpr_operating_cost.value
