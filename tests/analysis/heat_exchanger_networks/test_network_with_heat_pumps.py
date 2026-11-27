@@ -42,6 +42,9 @@ def test_the_networks_total_rises_by_the_heat_pumps_annual_cost():
 
     assert priced.heat_pumps == (HEAT_PUMP,)
     assert priced.total_annual_cost == pytest.approx(168_600.0 + 228_061.0)
-    assert (priced.utility_cost, priced.capital_cost) == (42_600.0, 126_000.0)
+    # The utility cost includes the machine's electricity, as a retrofit's
+    # designs do (decided 2026-11-27); the capital stays the exchangers'.
+    assert priced.utility_cost == pytest.approx(42_600.0 + 218_622.0)
+    assert priced.capital_cost == 126_000.0
     assert _check_cost_consistency(priced) == []
     assert designed.total_annual_cost == 168_600.0

@@ -144,7 +144,8 @@ def _check_cost_consistency(network: HeatExchangerNetwork) -> list[str]:
         or network.capital_cost is None
     ):
         return []
-    heat_pumps = sum(machine.annual_cost for machine in network.heat_pumps)
+    # A machine's electricity is in the utility cost; its capital is apart.
+    heat_pumps = sum(machine.annual_capital_cost for machine in network.heat_pumps)
     component_total = network.utility_cost + network.capital_cost + heat_pumps
     if _close(
         network.total_annual_cost,

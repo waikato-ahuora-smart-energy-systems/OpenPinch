@@ -324,6 +324,10 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A heat pump design's network counts the machine's electricity in its
+  ``utility_cost``, as a retrofit's designs already did; its total annual
+  cost is unchanged. Verification holds the total to the utilities, the
+  exchangers' capital and the machines' annualised capital.
 - After a utility-level heat pump, each utility level keeps its share of
   the residual. The residual's steps can lie a few hundred-millionths of a
   kelvin off the levels' temperatures, and a hot utility whose target was
