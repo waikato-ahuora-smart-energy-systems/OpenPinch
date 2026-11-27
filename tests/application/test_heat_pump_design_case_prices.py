@@ -67,6 +67,21 @@ def test_the_designs_own_electricity_price_is_the_denominator(monkeypatch):
     assert asked.get("COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE") == pytest.approx(0.2)
 
 
+def test_a_utilitys_price_is_weighted_by_the_duty_drawn_in_each_period():
+    # Two equally weighted periods: 100 kW drawn at 10 $/MWh, none at 100.
+    # Every MWh drawn costs 10; averaging the price apart gave 55.
+    from types import SimpleNamespace
+
+    from OpenPinch.application.heat_pump_design import _drawn_price
+    from OpenPinch.domain.value import Value
+
+    steam = SimpleNamespace(
+        price=Value([10.0, 100.0], "$/MWh"), heat_flow=Value([100.0, 0.0], "kW")
+    )
+
+    assert _drawn_price([steam], weights=(0.5, 0.5)) == pytest.approx(10.0)
+
+
 def test_a_price_ratio_the_user_sets_is_kept(monkeypatch):
     asked = _options_asked(
         monkeypatch,

@@ -145,26 +145,31 @@ _PRICE_RATIO_KEYS = {
 }
 
 
-def _drawn_price(utilities) -> float | None:
-    """The price ($/MWh) of ``utilities`` weighted by the duty each carries
-    (over every period, by each period's weight); with no duty, the
-    cheapest; with none, ``None``."""
-    priced = []
+def _drawn_price(utilities, weights=None) -> float | None:
+    """The price ($/MWh) of the heat ``utilities`` carry: each period's
+    price weighted by the duty drawn in it and the period's weight
+    (``weights``, equal when ``None``), over every utility and period; with
+    no duty drawn, the cheapest; with no utility, ``None``."""
+    cost = drawn = 0.0
+    cheapest = None
     for utility in utilities or ():
-        price = float(np.mean(np.atleast_1d(utility.price.to("$/MWh").value)))
-        flow = utility.heat_flow
-        duty = (
-            float(flow.weighted_mean.value)
-            if flow.num_periods > 1
-            else float(np.atleast_1d(flow.value)[0])
+        prices = np.atleast_1d(np.asarray(utility.price.to("$/MWh").value, float))
+        duties = np.atleast_1d(np.asarray(utility.heat_flow.value, float))
+        periods = max(prices.size, duties.size)
+        prices, duties = np.resize(prices, periods), np.resize(duties, periods)
+        each = (
+            np.full(periods, 1.0 / periods)
+            if weights is None or len(weights) != periods
+            else np.asarray(weights, float)
         )
-        priced.append((price, max(duty, 0.0)))
-    if not priced:
+        duties = np.maximum(duties, 0.0) * each
+        cost += float(np.sum(prices * duties))
+        drawn += float(np.sum(duties))
+        lowest = float(np.min(prices))
+        cheapest = lowest if cheapest is None else min(cheapest, lowest)
+    if cheapest is None:
         return None
-    total = sum(duty for _price, duty in priced)
-    if total <= 0.0:
-        return min(price for price, _duty in priced)
-    return sum(price * duty for price, duty in priced) / total
+    return cost / drawn if drawn > 0.0 else cheapest
 
 
 def _at_drawn_utility_prices(problem, scaled, options, costing=None):
@@ -190,7 +195,10 @@ def _at_drawn_utility_prices(problem, scaled, options, costing=None):
     for side, key in _PRICE_RATIO_KEYS.items():
         if key in named:
             continue
-        price = _drawn_price(getattr(direct, f"{side}_utilities", None))
+        price = _drawn_price(
+            getattr(direct, f"{side}_utilities", None),
+            weights=tuple(scaled.master_zone.config.problem.period_weights),
+        )
         if price is not None:
             out[key] = price / electricity
     return out
