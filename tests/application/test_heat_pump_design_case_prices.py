@@ -82,6 +82,22 @@ def test_a_utilitys_price_is_weighted_by_the_duty_drawn_in_each_period():
     assert _drawn_price([steam], weights=(0.5, 0.5)) == pytest.approx(10.0)
 
 
+def test_a_utility_credit_is_a_ratio_of_nothing(monkeypatch):
+    # A cold utility with a negative price (a credit, such as exported
+    # steam) gave a negative ratio, which the configuration refuses: the
+    # design raised. The heat pump's cooling is then worth nothing to it.
+    problem = levels_problem()
+    source = problem.to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["price"] = {"value": -5.0, "unit": "$/MWh"}
+    credited = type(problem)(source=source, project_name=problem.project_name)
+
+    asked = _options_asked(monkeypatch, credited)
+
+    assert asked.get("COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE") == 0.0
+
+
 def test_a_price_ratio_the_user_sets_is_kept(monkeypatch):
     asked = _options_asked(
         monkeypatch,

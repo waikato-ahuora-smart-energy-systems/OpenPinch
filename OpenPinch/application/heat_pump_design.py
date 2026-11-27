@@ -200,7 +200,9 @@ def _at_drawn_utility_prices(problem, scaled, options, costing=None):
             weights=tuple(scaled.master_zone.config.problem.period_weights),
         )
         if price is not None:
-            out[key] = price / electricity
+            # A credit (a negative price) makes the heat pump's heat or
+            # cooling on that side worth nothing to it, not a cost.
+            out[key] = max(price, 0.0) / electricity
     return out
 
 
