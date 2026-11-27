@@ -112,3 +112,104 @@ def test_a_condenser_a_hair_under_a_process_temperature_keeps_its_duty():
     # by the heat pump's work: the condenser's duty less the evaporator's.
     surplus = float(direct.cold_utility_target) - float(direct.hot_utility_target)
     assert surplus == pytest.approx(CONDENSER[1] - EVAPORATOR[1], abs=1e-6)
+
+
+def _quantity(value, unit="degC"):
+    key = "values" if isinstance(value, list) else "value"
+    return {key: value, "unit": unit}
+
+
+def _record(name, supply, target, duty=600.0, *, contribution=5.0, mark=None):
+    return {
+        "zone": "Site/P",
+        "name": name,
+        "t_supply": _quantity(supply),
+        "t_target": _quantity(target),
+        "heat_flow": _quantity(duty, "kW"),
+        "dt_cont": _quantity(contribution, "delta_degC"),
+        "htc": _quantity(1.0, "kW/m^2/delta_degC"),
+        "heat_pump": mark,
+    }
+
+
+def _plant(*streams, periods=None):
+    """H1 from 90 to 30 degC and the cold streams given, with steam and
+    cooling water; ``periods`` names the periods of a problem with several."""
+    utilities = [
+        {
+            "name": name,
+            "type": kind,
+            "t_supply": _quantity(supply),
+            "t_target": _quantity(target),
+            "dt_cont": _quantity(2.5, "delta_degC"),
+            "price": _quantity(price, "$/MWh"),
+            "htc": _quantity(1.0, "kW/m^2/delta_degC"),
+            "heat_flow": None,
+        }
+        for name, kind, supply, target, price in (
+            ("HPS", "Hot", 250.0, 249.9, 40.0),
+            ("CW", "Cold", 10.0, 15.0, 5.0),
+        )
+    ]
+    options = {"THERMAL_DT_CONT": 5.0}
+    if periods:
+        options |= {
+            "PROBLEM_PERIOD_IDS": list(periods),
+            "PROBLEM_PERIOD_WEIGHTS": [1.0 / len(periods)] * len(periods),
+        }
+    return PinchProblem(
+        source={
+            "streams": [_record("H1", 90.0, 30.0), *streams],
+            "utilities": utilities,
+            "options": options,
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "P", "type": "Process Zone"}],
+            },
+        }
+    )
+
+
+_CONDENSER = {"machine": "HP", "role": "condenser", "placement": "process"}
+
+
+def test_a_stream_already_on_a_process_temperature_is_not_moved_off_it():
+    # At a multiplier of 1.5 C1 ends at 127.5 degC shifted and C2 at
+    # 127.49005. The condenser starts on the first, its own 1.5 K above,
+    # and ends 5e-5 K from the second: the end must not pull the stream
+    # off the temperature its start is on.
+    cold = (_record("C1", 20.0, 120.0), _record("C2", 20.0, 119.99005))
+    condenser = _record(
+        "HP_H1", 129.0, 128.99, 270.0, contribution=1.0, mark=_CONDENSER
+    )
+    case = _plant(*cold, condenser)
+
+    moved = _on_process_temperatures(case, _scaled(_plant(*cold), 1.5), approach=1.5)
+
+    (record,) = [r for r in moved.to_problem_json()["streams"] if r["name"] == "HP_H1"]
+    assert record["t_supply"]["value"] == 129.0
+
+
+def test_each_period_is_moved_onto_its_own_process_temperatures():
+    # C1 ends at 120 degC in the first period and 122.5 in the second:
+    # 127.5 and 130 degC shifted at a multiplier of 1.5. A condenser 1e-5 K
+    # under 129 degC is beside a process temperature in the first period
+    # only; in the second it is a level of its own and stays as given.
+    cold = _record("C1", 20.0, [120.0, 122.5])
+    condenser = _record(
+        "HP_H1",
+        [128.99999, 128.99999],
+        [128.98999, 128.98999],
+        [270.0, 270.0],
+        contribution=1.0,
+        mark=_CONDENSER,
+    )
+    periods = ("first", "second")
+    case = _plant(cold, condenser, periods=periods)
+    process = _scaled(_plant(cold, periods=periods), 1.5)
+
+    moved = _on_process_temperatures(case, process, approach=1.5)
+
+    (record,) = [r for r in moved.to_problem_json()["streams"] if r["name"] == "HP_H1"]
+    assert record["t_supply"]["values"] == pytest.approx([129.0, 128.99999], abs=1e-9)

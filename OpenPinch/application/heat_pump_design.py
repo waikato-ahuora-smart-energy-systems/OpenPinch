@@ -44,11 +44,11 @@ HEAT_PUMP_SNAP_K = 1e-4
 temperature and be moved onto it."""
 
 
-def _process_temperatures(problem) -> np.ndarray:
-    """Every shifted temperature (degC) a process stream of ``problem``, or
-    a segment of one, starts or ends at, in any period."""
+def _process_temperatures(problem) -> list[np.ndarray]:
+    """The shifted temperatures (degC) the process streams of ``problem``,
+    and their segments, start or end at, in each period in order."""
     root = problem._require_prepared_root_zone()
-    found = []
+    found: list[list[float]] = [[] for _ in range(max(1, len(problem.period_ids)))]
     for group in (root.hot_streams, root.cold_streams):
         for _key, stream in group.items():
             for part in (stream, *(stream.segments if stream.has_segments else ())):
@@ -56,8 +56,11 @@ def _process_temperatures(problem) -> np.ndarray:
                     part.shifted_minimum_temperature,
                     part.shifted_maximum_temperature,
                 ):
-                    found.extend(np.atleast_1d(np.asarray(value.value, dtype=float)))
-    return np.unique(np.asarray(found, dtype=float))
+                    each = np.atleast_1d(np.asarray(value.value, dtype=float))
+                    for period, temperatures in enumerate(found):
+                        # One value holds in every period.
+                        temperatures.append(float(each[period % each.size]))
+    return [np.unique(np.asarray(values, dtype=float)) for values in found]
 
 
 def _on_process_temperatures(case, process, *, approach: float):
@@ -76,17 +79,18 @@ def _on_process_temperatures(case, process, *, approach: float):
     there. The air's streams are left: they sit at the ambient temperature.
     """
 
-    grid = _process_temperatures(process)
-    if not grid.size:
+    grids = _process_temperatures(process)
+    if not all(grid.size for grid in grids):
         return case
     source = case.to_problem_json()
 
-    def offset(temperature: float, sign: float) -> float:
-        """The move that puts ``temperature`` on the process temperature it
-        lies beside; 0 when it lies beside none."""
+    def offset(temperature: float, sign: float, grid: np.ndarray) -> float | None:
+        """The move that puts ``temperature`` on the temperature of ``grid``
+        it lies beside (0 when it is on it); ``None`` when it lies beside
+        none."""
         shifted = temperature + sign * approach
         nearest = float(grid[np.argmin(np.abs(grid - shifted))])
-        return nearest - shifted if abs(nearest - shifted) <= HEAT_PUMP_SNAP_K else 0.0
+        return nearest - shifted if abs(nearest - shifted) <= HEAT_PUMP_SNAP_K else None
 
     for record in source["streams"]:
         role = (record.get("heat_pump") or {}).get("role")
@@ -111,9 +115,19 @@ def _on_process_temperatures(case, process, *, approach: float):
             [float(v) for v in part[key].get("values", [part[key].get("value")])]
             for part, key in ends
         ]
+        # Each period against its own process temperatures; a stream given
+        # one value for every period, against those of every period.
+        own = (
+            grids
+            if len(periods[0]) == len(grids)
+            else [np.unique(np.concatenate(grids))] * len(periods[0])
+        )
         moves = [
-            next((m for m in (offset(t, sign) for t in each) if m), 0.0)
-            for each in zip(*periods)
+            next(
+                (m for m in (offset(t, sign, grid) for t in each) if m is not None),
+                0.0,
+            )
+            for each, grid in zip(zip(*periods), own)
         ]
         for (part, key), values in zip(ends, periods):
             placed = [t + move for t, move in zip(values, moves)]
