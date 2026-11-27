@@ -964,7 +964,7 @@ def test_executor_reports_verification_failure_instead_of_success(
 def test_verify_solution_checks_each_exchanger_against_its_own_approach(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(duty_module, "verify_network_feasibility", lambda _n: ())
+    monkeypatch.setattr(duty_module, "verify_network_feasibility", lambda _n, **_: ())
 
     def result(approach):
         period = fixed_model.ExchangerPeriodResult(

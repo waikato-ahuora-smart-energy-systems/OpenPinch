@@ -823,7 +823,12 @@ class _DesignAccessor:
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected
-        from ...site_levels import level_sweep_view, run_level_counts
+        from ...site_levels import (
+            given_levels_run,
+            level_sweep_view,
+            run_level_counts,
+            select_level_count,
+        )
 
         processes = self._process_zones()
         if len(processes) < 2:
@@ -920,6 +925,25 @@ class _DesignAccessor:
             step_min=hens.site_level_step_min,
             expired=None if deadline is None else expired,
         )
+        # The case's own levels are a candidate too; their design is the
+        # problem's own, kept as its design only if it wins.
+        before = self._problem._results
+        previous = None if before is None else before.design
+        runs = (
+            *runs,
+            given_levels_run(
+                lambda: self._site_design(width=width, depth=depth, options=options)
+            ),
+        )
+        # The given design may have made the problem's results.
+        results = self._problem._results
+        if results is not None:
+            winner = select_level_count(runs)
+            # The sweep's result gathers every count's networks; the cache
+            # keeps the given design as designed, or the previous one.
+            results.design = (
+                winner.view.result.model_copy(deep=True) if winner.given else previous
+            )
         return level_sweep_view(
             self._problem,
             runs,

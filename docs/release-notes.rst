@@ -25,6 +25,18 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site design with ``levels="placed"`` compares the placed levels with
+  the case's own. It returned the cheapest placed count even where the
+  given levels were cheaper: on the reviewer's three-process steam main,
+  placed levels at 20,665 $/y against 20,649 given. The given-levels design
+  now joins the sweep (its row has ``"levels": "given"``) and the cheapest
+  of all is selected.
+- ``verify_network_feasibility`` warns when a network carries no stream
+  data to check against. A network read back from JSON keeps none, so its
+  stream balances, approaches and areas were skipped and it was reported
+  feasible, even with a halved duty or a crossed approach. It is still not
+  failed; the warning says to rate it on its problem with
+  ``design.optimise_duties``.
 - A fitted multiperiod design's ``result.manifest`` describes the search
   the call asked for. It described the fit to every period instead: one
   network evolution task at the selected multiplier, with width and depth
@@ -324,6 +336,10 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A heat pump design's network counts the machine's electricity in its
+  ``utility_cost``, as a retrofit's designs already did; its total annual
+  cost is unchanged. Verification holds the total to the utilities, the
+  exchangers' capital and the machines' annualised capital.
 - After a utility-level heat pump, each utility level keeps its share of
   the residual. The residual's steps can lie a few hundred-millionths of a
   kelvin off the levels' temperatures, and a hot utility whose target was

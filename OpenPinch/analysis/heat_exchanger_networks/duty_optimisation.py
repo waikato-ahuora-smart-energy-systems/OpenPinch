@@ -811,7 +811,7 @@ def verify_solution(
                     f"{approach:.6g} is below its required approach "
                     f"{required:.6g} in period {n}"
                 )
-    failures.extend(verify_network_feasibility(network))
+    failures.extend(verify_network_feasibility(network, warn_without_stream_data=False))
     return tuple(failures)
 
 

@@ -428,9 +428,10 @@ electricity cost, compressor capital) and its total annual cost is
      + work x COSTING_HPR_ELE_PRICE x COSTING_ANNUAL_OP_TIME
      + annualised (heat_pump_cost x condenser capacity)
 
-``utility_cost`` and ``capital_cost`` stay the network's own utilities
-and exchangers; the condenser and the evaporator are exchangers of the
-network and are priced there. ``heat_pump_cost`` prices the compressor
+``utility_cost`` holds the network's utilities and the machine's
+electricity, and ``capital_cost`` the network's own exchangers; the
+condenser and the evaporator are exchangers of the network and are priced
+there. ``heat_pump_cost`` prices the compressor
 and its motor for every cycle for now; left at 0 the design warns that the
 compressor is free.
 

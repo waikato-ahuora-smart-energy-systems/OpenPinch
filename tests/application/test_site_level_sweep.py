@@ -433,6 +433,90 @@ def test_given_levels_are_the_default_and_design_with_the_cases_utilities(
     assert calls == [problem]
 
 
+def test_placed_levels_are_compared_with_the_cases_given_levels(monkeypatch):
+    """The sweep returned its cheapest placed count even where the case's
+    own levels were cheaper: placed 21,348 $/y against given 20,649 on the
+    reviewer's steam main (review finding 15; decided 2026-11-27). The given
+    levels' design now joins the sweep. The designs are stubbed."""
+    from OpenPinch.application import site_level_moves
+    from OpenPinch.application._problem.accessors import design
+
+    placed = site_levels.LevelCountRun(
+        count=2,
+        isothermal=2,
+        sensible=0,
+        status="designed",
+        view=_designed(21_348.0),
+        total_annual_cost=21_348.0,
+    )
+    monkeypatch.setattr(site_levels, "run_level_counts", lambda *a, **k: (placed,))
+    monkeypatch.setattr(
+        site_level_moves, "refine_selected", lambda runs, **_: (runs, [])
+    )
+    monkeypatch.setattr(
+        design._DesignAccessor, "_site_design", lambda self, **_: _designed(20_649.0)
+    )
+    captured = {}
+    monkeypatch.setattr(
+        site_levels,
+        "level_sweep_view",
+        lambda problem, runs, *, settings: captured.setdefault("runs", runs),
+    )
+
+    _site().design.total_site_heat_exchanger_network(levels="placed")
+
+    selected = site_levels.select_level_count(captured["runs"])
+    assert selected.given
+    assert selected.total_annual_cost == 20_649.0
+
+
+def test_a_winning_given_design_is_cached_without_the_sweeps_networks(monkeypatch):
+    """The sweep's result ranks every count's networks, placed ones naming
+    utilities the problem lacks. When the given levels win, the problem's
+    cached design was that same result, so a later method seeding from the
+    cache took placed networks (Codex review of #558). The cache keeps the
+    given design as it was."""
+    from OpenPinch.application import site_level_moves
+    from OpenPinch.application._problem.accessors import design
+
+    class _Result(SimpleNamespace):
+        def model_copy(self, *, deep=False):
+            return _Result(**vars(self))
+
+    placed = site_levels.LevelCountRun(
+        count=2,
+        isothermal=2,
+        sensible=0,
+        status="designed",
+        view=_designed(21_348.0),
+        total_annual_cost=21_348.0,
+    )
+
+    def given_design(self, **_):
+        view = _designed(20_649.0)
+        view.result = _Result(ranked_networks=("given",))
+        self._problem._results = SimpleNamespace(design=view.result)
+        return view
+
+    def sweep_view(problem, runs, *, settings):
+        view = site_levels.select_level_count(runs).view
+        view.result.ranked_networks = ("given", "placed")
+        return view
+
+    monkeypatch.setattr(site_levels, "run_level_counts", lambda *a, **k: (placed,))
+    monkeypatch.setattr(
+        site_level_moves, "refine_selected", lambda runs, **_: (runs, [])
+    )
+    monkeypatch.setattr(design._DesignAccessor, "_site_design", given_design)
+    monkeypatch.setattr(site_levels, "level_sweep_view", sweep_view)
+    problem = _site()
+
+    view = problem.design.total_site_heat_exchanger_network(levels="placed")
+
+    assert view.result.ranked_networks == ("given", "placed")
+    assert problem._results.design.ranked_networks == ("given",)
+
+
 def test_placed_levels_sweep_the_configured_counts(monkeypatch):
     seen = {}
 
@@ -525,7 +609,10 @@ def test_a_placed_site_network_is_the_cheapest_over_the_counts():
     )
 
     sweep = view.result.provenance.effective_settings["HENS_SITE_LEVEL_SWEEP"]
-    assert [row["count"] for row in sweep] == [2, 3]
+    # The placed counts, then the case's given levels (decided 2026-11-27).
+    placed_rows = [row for row in sweep if row["levels"] == "placed"]
+    assert [row["count"] for row in placed_rows] == [2, 3]
+    assert [row["levels"] for row in sweep] == ["placed", "placed", "given"]
     designed = [row for row in sweep if row["status"] == "designed"]
     assert designed
     best = min(row["total_annual_cost"] for row in designed)
@@ -534,8 +621,11 @@ def test_a_placed_site_network_is_the_cheapest_over_the_counts():
     by_count = {
         outcome.network.summary_metrics["utility_level_count"]: outcome.network
         for outcome in view.result.ranked_networks
+        if "utility_level_count" in outcome.network.summary_metrics
     }
-    assert sorted(by_count) == sorted(row["count"] for row in designed)
+    assert sorted(by_count) == sorted(
+        row["count"] for row in placed_rows if row["status"] == "designed"
+    )
     for count, counted in by_count.items():
         placed = (
             {f"iso_{level}" for level in range(1, count + 1)}
@@ -569,7 +659,8 @@ def test_the_steam_main_site_designs_with_placed_levels():
     )
 
     sweep = view.result.provenance.effective_settings["HENS_SITE_LEVEL_SWEEP"]
-    assert [row["status"] for row in sweep] == ["designed", "designed"]
+    placed = [row["status"] for row in sweep if row["levels"] == "placed"]
+    assert placed == ["designed", "designed"]
 
 
 class _Outcome(SimpleNamespace):
