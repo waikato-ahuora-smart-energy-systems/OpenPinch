@@ -25,6 +25,13 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site design with placed levels keeps the case's cooling water. Where
+  the placed levels needed no fallback cooler, the placed case dropped the
+  case's own cold utilities, so a placed steam main was the coldest sink
+  and the site surplus was dumped from it at the steam price: the
+  reviewer's three-level steam main cost 41,432 $/y against 21,348 at two
+  levels. A placed case now always keeps the utility that rejects heat to
+  ambient, and the three-level case costs 20,665 $/y.
 - A site whose processes recover no heat within themselves is designed.
   Its processes are linked only through the site's utilities, so there is
   nothing for the site evolution to refine, and

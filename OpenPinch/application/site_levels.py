@@ -120,7 +120,9 @@ def placed_case(
     that utility of its own instead, at its own temperatures and price; a
     side with none raises ``NoFeasiblePlacementError``. A placed level
     whose supply and target both lie within ``MINIMUM_LEVEL_GAP`` of an
-    earlier one's is dropped: the two are one main.
+    earlier one's is dropped: the two are one main. The case always keeps
+    its own utility that rejects heat to ambient (``_ambient_sink``), since
+    every rejected heat ends there.
     """
     from .case_derivation import with_utilities_from
 
@@ -143,7 +145,45 @@ def placed_case(
         if side == utility["type"].casefold() and name.startswith(_PLACED_KINDS):
             utility["name"] = name
     source["utilities"] = _distinct_levels(utilities) + _stand_ins(problem, fallbacks)
+    sink = _ambient_sink(problem)
+    if sink is not None and not any(
+        (u["name"], u["type"]) == (sink["name"], sink["type"])
+        for u in source["utilities"]
+    ):
+        source["utilities"].append(sink)
     return type(problem)(source, project_name=problem.project_name)
+
+
+def _ambient_sink(problem: "PinchProblem") -> dict | None:
+    """The case's own utility that rejects heat to ambient, as given.
+
+    Every rejected heat ends at ambient, so a placed case keeps it whatever
+    the placed levels are: the coldest given cold utility whose supply is
+    not below ``ENV_TEMPERATURE`` (with none, the warmest), as the utility
+    pricing takes it (``_problem/input/utilities.py``), in the first period.
+    """
+    from ..analysis.targeting.utilities import is_default_utility
+
+    root = problem._require_prepared_root_zone()
+    t_env = float(root.config.environment.temperature)
+
+    def supply(utility) -> float:
+        value = utility.supply_temperature.to("degC")
+        return float(value[0].value if value.num_periods > 1 else value.value)
+
+    given = [u for u in root.cold_utilities if not is_default_utility(u)]
+    above = [u for u in given if supply(u) >= t_env]
+    chosen = min(above, key=supply) if above else max(given, key=supply, default=None)
+    if chosen is None:
+        return None
+    return next(
+        (
+            u
+            for u in problem.to_problem_json()["utilities"]
+            if u["name"] == chosen.name and u["type"] in ("Cold", "Both")
+        ),
+        None,
+    )
 
 
 def _fallback_utilities(
