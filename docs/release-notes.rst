@@ -14,6 +14,10 @@ Heat exchanger networks
   steam main case the site cost 25,015 against 20,581 $/y. A
   ``UserWarning`` now names the process, the design that failed and its
   error.
+- ``design.network_evolution`` warns when it pools a site's processes, as
+  ``heat_exchanger_network`` does. A site network does not record its
+  processes, so evolving it again matched streams across processes with no
+  piping cost and did not hold each process's levels, with no warning.
 - The median design basis says which streams it leaves out. A stream that
   runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
   not in the basis case, and the fit can only add a heater or cooler at

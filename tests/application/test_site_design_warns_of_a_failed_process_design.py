@@ -40,3 +40,16 @@ def test_a_process_whose_level_held_design_fails_is_named(monkeypatch):
     assert "held at their targets" in message
     assert "no network holds the levels" in message
     assert "chosen by price" in message
+
+
+def test_evolving_a_network_without_its_processes_warns_that_it_pools_them(
+    monkeypatch,
+):
+    """A site network keeps no record of its processes, so evolving it again
+    pooled the site's streams, with a match across processes and no word
+    (review finding 33)."""
+    monkeypatch.setattr(design._DesignAccessor, "_run", lambda self, *a, **k: None)
+    network = _network([_recovery("Cooling.H1", "Heating.C1", 1)])
+
+    with pytest.warns(UserWarning, match="pools the streams of every process"):
+        site._site().design.network_evolution([network])

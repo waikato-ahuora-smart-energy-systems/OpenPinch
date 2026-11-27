@@ -1824,6 +1824,23 @@ class _DesignAccessor:
         )
         # The call's period, as an argument or in its options.
         self._refuse_period_scope(runtime.get("period_id"), "network_evolution")
+        # A site seed records its processes (``site_processes``) and is
+        # evolved within each; a site network does not, and is pooled.
+        seeds = tuple(initial_networks or ())
+        pooled = not seeds or any(
+            not (getattr(seed, "source_metadata", None) or {}).get("site_processes")
+            for seed in seeds
+        )
+        if pooled and len(self._process_zones()) > 1:
+            warnings.warn(
+                "network_evolution() pools the streams of every process zone, "
+                "so it allows any inter-process match with no piping cost and "
+                "does not hold each process's utility levels, even when it is "
+                "given a site network. Use "
+                "design.total_site_heat_exchanger_network() to design the site.",
+                UserWarning,
+                stacklevel=2,
+            )
         return self._run(
             heat_exchanger_network_evolution_method_service,
             surface="network_evolution",
