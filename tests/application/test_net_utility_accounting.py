@@ -148,6 +148,93 @@ def test_a_residual_case_keeps_the_input_prices():
     assert chw["price"]["value"] == pytest.approx(25.0)
 
 
+def test_a_targets_provenance_names_the_utility_that_sets_the_ambient_price():
+    """Nothing told a user which utility the costs took as rejecting heat to
+    ambient; every result's provenance now names it, period by period."""
+    target = _problem().target.direct_heat_integration()
+
+    sink = target.provenance.effective_settings["AMBIENT_SINK"]
+
+    assert sink == {"0": {"utility": "CW", "price": pytest.approx(5.0)}}
+
+
+def test_a_case_with_no_cold_utility_above_ambient_is_warned():
+    """With none at or above ENV_TEMPERATURE, the warmest cold utility is
+    assumed to reject heat to ambient; the user is told which, and that
+    ENV_TEMPERATURE decides it."""
+    with pytest.warns(UserWarning, match=r"CW.*ENV_TEMPERATURE"):
+        PinchProblem(
+            {
+                "streams": [_stream("H1", 200.0, 40.0, 160.0)],
+                "utilities": [
+                    _utility("CW", "Cold", 10.0, 15.0, 4.0),
+                    _utility("ChW", "Cold", 5.0, 10.0, 25.0),
+                ],
+                "options": {"ENV_TEMPERATURE": 15.0},
+            }
+        )._require_prepared_root_zone()
+
+
+def test_a_lone_cold_utility_below_ambient_is_not_warned():
+    """``basic_pinch`` cools on one utility at 10 C, below the 15 C default
+    ambient. Alone it keeps its own price, so the assumption prices nothing
+    else and is not worth a warning on every use of the case."""
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        PinchProblem("basic_pinch.json")._require_prepared_root_zone()
+
+    assert not [w for w in caught if "ENV_TEMPERATURE" in str(w.message)]
+
+
+def test_a_capped_lone_utility_below_ambient_is_not_taken_as_the_sink():
+    """Cooling water at 10 C, capped, is the only cold utility given, so a
+    default CU is added and sets the price at the margin. The warning that
+    the warmest given utility was assumed named the water, which sets no
+    price there (Codex review of #559)."""
+    import warnings
+
+    water = {
+        **_utility("CW", "Cold", 10.0, 15.0, 4.0),
+        "maximum_heat_flow": _quantity(50.0, "kW"),
+    }
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        PinchProblem(
+            {
+                "streams": [_stream("H1", 200.0, 40.0, 160.0)],
+                "utilities": [water],
+                "options": {"ENV_TEMPERATURE": 15.0},
+            }
+        )._require_prepared_root_zone()
+
+    assert not [w for w in caught if "ENV_TEMPERATURE" in str(w.message)]
+
+
+def test_a_capped_ambient_sink_is_warned():
+    """Cooling water capped at 50 kW leaves the default CU to set the price
+    of heat rejected beyond the cap; the user is told so."""
+    source = _problem().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["maximum_heat_flow"] = _quantity(50.0, "kW")
+
+    with pytest.warns(UserWarning, match=r"CW.*capped.*CU"):
+        PinchProblem(source)._require_prepared_root_zone()
+
+
+def test_a_credit_on_steam_raising_that_is_replaced_is_warned():
+    """A negative price on steam raising was a credit; it is now replaced by
+    the ambient price (steam raised is worth something only where it is
+    used), and the user is told."""
+    source = _problem().to_problem_json()
+    source["utilities"].append(_utility("LPG", "Cold", 120.0, 120.1, -10.0))
+
+    with pytest.warns(UserWarning, match=r"LPG.*-10.*credit"):
+        PinchProblem(source)._require_prepared_root_zone()
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,

@@ -60,13 +60,26 @@ def input_fingerprint(problem) -> str:
 def make_provenance(
     problem, method_id, zone, *, period_ids, settings=None, prerequisites=()
 ) -> AnalysisProvenance:
+    from ..input.utilities import ambient_sinks
+
+    settings = dict(settings or zone.config._values)
+    # The utility the costs took as rejecting heat to ambient, per period.
+    sinks = ambient_sinks(zone.cold_utilities)
+    indices = problem.period_ids
+    named = {
+        str(period): sinks[indices[period]]
+        for period in period_ids
+        if indices.get(period) in sinks
+    }
+    if named:
+        settings["AMBIENT_SINK"] = named
     return AnalysisProvenance(
         owner_id=problem._analysis_owner_id,
         method_id=method_id,
         zone_address=zone.address,
         period_ids=tuple(period_ids),
         input_fingerprint=input_fingerprint(problem),
-        effective_settings_json=canonical_json(settings or zone.config._values),
+        effective_settings_json=canonical_json(settings),
         prerequisite_ids=tuple(prerequisites),
     )
 
