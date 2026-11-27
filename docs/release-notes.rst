@@ -346,6 +346,12 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A shared multiperiod heat pump design installs each machine component by
+  component: each compressor at its peak volume flow and shaft power and
+  each exchanger at its peak area, whichever periods they peak in. It took
+  each machine's most expensive period, which priced a compressor peaking
+  in one period and an exchanger peaking in another at the smaller machine.
+  This is the first step of design-and-operate for shared designs.
 - A vapour compression cascade heat pump also searches from its warm start
   with all the heat in each condenser in turn. The cheapest design often
   uses one condenser, which the search found for some seeds only: a 2x1
