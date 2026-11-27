@@ -532,6 +532,12 @@ count with its status (``designed``, ``infeasible``, ``failed`` or ``not
 run``), its split and its cost. ``HENS_SITE_LEVEL_EARLY_STOP: true`` ends the
 sweep once two designed counts in a row cost more than the cheapest before
 them.
+After the counts (and their level moves), the site is also designed with
+the case's own levels, as ``levels="given"`` designs it, and that design is a
+candidate too: the cheapest of the placed counts and the given levels is
+selected. Its networks are tagged ``summary_metrics["site_levels"] ==
+"given"``, its sweep row has ``"levels": "given"``, and it stays the problem's
+design only when it is selected.
 
 A placed level is a main: its hot and cold utility share one name
 (``iso_1``, ``sensible_1``), so site utility accounting credits steam raised

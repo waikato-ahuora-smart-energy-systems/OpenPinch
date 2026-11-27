@@ -823,7 +823,12 @@ class _DesignAccessor:
         """
         from ....domain.configuration_fields import _site_level_counts
         from ...site_level_moves import move_seed, refine_selected
-        from ...site_levels import level_sweep_view, run_level_counts
+        from ...site_levels import (
+            given_levels_run,
+            level_sweep_view,
+            run_level_counts,
+            select_level_count,
+        )
 
         processes = self._process_zones()
         if len(processes) < 2:
@@ -920,6 +925,18 @@ class _DesignAccessor:
             step_min=hens.site_level_step_min,
             expired=None if deadline is None else expired,
         )
+        # The case's own levels are a candidate too; their design is the
+        # problem's own, kept as its design only if it wins.
+        results = self._problem._results
+        previous = None if results is None else results.design
+        runs = (
+            *runs,
+            given_levels_run(
+                lambda: self._site_design(width=width, depth=depth, options=options)
+            ),
+        )
+        if results is not None and not select_level_count(runs).given:
+            results.design = previous
         return level_sweep_view(
             self._problem,
             runs,

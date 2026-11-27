@@ -25,6 +25,12 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- A site design with ``levels="placed"`` compares the placed levels with
+  the case's own. It returned the cheapest placed count even where the
+  given levels were cheaper: on the reviewer's three-process steam main,
+  placed levels at 20,665 $/y against 20,649 given. The given-levels design
+  now joins the sweep (its row has ``"levels": "given"``) and the cheapest
+  of all is selected.
 - A fitted multiperiod design's ``result.manifest`` describes the search
   the call asked for. It described the fit to every period instead: one
   network evolution task at the selected multiplier, with width and depth
