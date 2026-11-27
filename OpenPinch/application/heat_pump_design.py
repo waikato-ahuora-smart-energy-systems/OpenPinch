@@ -139,6 +139,73 @@ def _on_process_temperatures(case, process, *, approach: float):
     return type(case)(source, project_name=case.project_name)
 
 
+_PRICE_RATIO_KEYS = {
+    "hot": "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE",
+    "cold": "COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE",
+}
+
+
+def _drawn_price(utilities, weights=None) -> float | None:
+    """The price ($/MWh) of the heat ``utilities`` carry: each period's
+    price weighted by the duty drawn in it and the period's weight
+    (``weights``, equal when ``None``), over every utility and period; with
+    no duty drawn, the cheapest; with no utility, ``None``."""
+    cost = drawn = 0.0
+    cheapest = None
+    for utility in utilities or ():
+        prices = np.atleast_1d(np.asarray(utility.price.to("$/MWh").value, float))
+        duties = np.atleast_1d(np.asarray(utility.heat_flow.value, float))
+        periods = max(prices.size, duties.size)
+        prices, duties = np.resize(prices, periods), np.resize(duties, periods)
+        each = (
+            np.full(periods, 1.0 / periods)
+            if weights is None or len(weights) != periods
+            else np.asarray(weights, float)
+        )
+        duties = np.maximum(duties, 0.0) * each
+        cost += float(np.sum(prices * duties))
+        drawn += float(np.sum(duties))
+        lowest = float(np.min(prices))
+        cheapest = lowest if cheapest is None else min(cheapest, lowest)
+    if cheapest is None:
+        return None
+    return cost / drawn if drawn > 0.0 else cheapest
+
+
+def _at_drawn_utility_prices(problem, scaled, options, costing=None):
+    """``options`` with the heat pump's price ratios at the utilities the
+    direct integration target of ``scaled`` draws.
+
+    The heat pump target prices heat and cooling as ratios of the
+    electricity price (``COSTING_HPR_PRICE_RATIO_*``, heat at the
+    electricity price by default); the design ranks its networks at the
+    utilities' own prices. Each side's ratio is its drawn utilities' price,
+    weighted by their duties, over the electricity price of ``costing``, the
+    design's own costing group (the problem's when ``None``). A ratio the
+    call's ``options`` or the problem's own options name is kept, as is
+    every ratio when electricity has no price.
+    """
+    costing = scaled.master_zone.config.costing if costing is None else costing
+    electricity = float(costing.hpr_ele_price)
+    if electricity <= 0.0:
+        return options
+    named = set(options or {}) | set((problem.to_problem_json().get("options") or {}))
+    direct = scaled.target.direct_heat_integration()
+    out = dict(options or {})
+    for side, key in _PRICE_RATIO_KEYS.items():
+        if key in named:
+            continue
+        price = _drawn_price(
+            getattr(direct, f"{side}_utilities", None),
+            weights=tuple(scaled.master_zone.config.problem.period_weights),
+        )
+        if price is not None:
+            # A credit (a negative price) makes the heat pump's heat or
+            # cooling on that side worth nothing to it, not a cost.
+            out[key] = max(price, 0.0) / electricity
+    return out
+
+
 def _scaled(problem, multiplier: float):
     """A copy of ``problem`` as a design at ``multiplier`` sees it: its root
     zone multiplier scaled, and so every stream's and utility's contribution."""
@@ -189,6 +256,8 @@ def heat_pump_design_case(
         # One machine over every period, as the network is one network:
         # the only target that holds the heat pump's streams in each period.
         options = dict(options or {}) | {"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True}
+    # The heat pump is sized on the prices the networks are ranked on.
+    options = _at_drawn_utility_prices(problem, scaled, options, costing)
     target = scaled.target.heat_pump_and_refrigeration(
         cycle,
         duty="heat_pump",

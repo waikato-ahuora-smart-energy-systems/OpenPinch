@@ -409,6 +409,15 @@ contribution (``HPR_DT_CONT`` included) at that multiplier, because a
 design at 0.75 sees every stream at 0.75 of its contribution and a heat
 pump targeted at 1.0 would sit at the wrong levels there.
 
+The target is priced as the networks are ranked: heat and cooling at the
+utilities the direct integration target draws, weighted by their duties,
+over ``COSTING_HPR_ELE_PRICE``, in place of the default
+``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` of 1.0. A heat pump that cannot
+beat the steam it saves at the steam's own price is not designed at all.
+To size it on other prices, set ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE``
+(or the cooling ratio) in the problem's options or in ``heat_pump``'s
+``options``; a ratio set there is kept.
+
 Each network designed around the heat pump's streams carries a
 ``NetworkHeatPump`` in ``network.heat_pumps`` (duties, work, COP,
 electricity cost, compressor capital) and its total annual cost is
