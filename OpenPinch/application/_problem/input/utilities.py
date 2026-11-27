@@ -207,6 +207,13 @@ def _price_rejection_at_ambient(
                 priced[id(u)].append(own[id(u)] + ambient * (1.0 + work))
             else:
                 priced[id(u)].append(ambient)
+                if own[id(u)] < 0.0:
+                    notes.append(
+                        f"{u.name}'s price of {own[id(u)]:g} $/MWh is a credit "
+                        "for the heat it takes; only net cooling is charged, so "
+                        f"it costs the cooling price ({ambient:g} $/MWh): steam "
+                        "raised is worth something only where it is used."
+                    )
     for note in dict.fromkeys(notes):
         warnings.warn(note, UserWarning, stacklevel=2)
     for u in utilities:

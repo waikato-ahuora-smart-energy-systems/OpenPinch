@@ -200,6 +200,17 @@ def test_a_capped_ambient_sink_is_warned():
         PinchProblem(source)._require_prepared_root_zone()
 
 
+def test_a_credit_on_steam_raising_that_is_replaced_is_warned():
+    """A negative price on steam raising was a credit; it is now replaced by
+    the ambient price (steam raised is worth something only where it is
+    used), and the user is told."""
+    source = _problem().to_problem_json()
+    source["utilities"].append(_utility("LPG", "Cold", 120.0, 120.1, -10.0))
+
+    with pytest.warns(UserWarning, match=r"LPG.*-10.*credit"):
+        PinchProblem(source)._require_prepared_root_zone()
+
+
 def test_the_ambient_rejector_keeps_its_own_segment_prices():
     from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
         _segmented_problem,
