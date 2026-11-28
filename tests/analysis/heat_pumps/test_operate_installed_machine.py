@@ -205,3 +205,20 @@ def test_a_running_stage_holds_its_pressure_ratio_turndown():
         else 0.0
     )
     assert ratio == 0.0 or ratio >= 0.9 * design_ratio * (1.0 - _SIZE_TOLERANCE)
+
+
+def test_the_best_operation_that_fits_is_taken():
+    # A condenser 0.1 % short of the design's: the design point ranks first
+    # on its small penalty but does not fit, the low-duty point does. The
+    # period was left without the machine, as the turndown period of the
+    # reviewer's three-period case was though its own design fitted.
+    args, bounds, design_point, design = _case(evaluations=_SMALL_SEARCH)
+    (machine,) = design.hpr_machine_components
+    areas = list(machine.exchanger_areas)
+    areas[_CONDENSER] *= 0.999
+    smaller = (dataclasses.replace(machine, exchanger_areas=tuple(areas)),)
+
+    operated = _operate(smaller, args, bounds, _with_low_duty(design_point))
+
+    assert operated.success
+    assert _fits(operated, smaller)
