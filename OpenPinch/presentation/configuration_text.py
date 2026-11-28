@@ -794,6 +794,14 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "below it the compressor is off."
         ),
     ),
+    "HPR_TURNDOWN_PRESSURE_RATIO": FieldText(
+        "HPR turndown pressure ratio share", None,
+        (
+            "On a heat pump installed for several periods, a running compressor "
+            "keeps at least this share of its design pressure ratio (its "
+            "highest in any period)."
+        ),
+    ),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": FieldText(
         "Shared multiperiod HPR design", None,
         (

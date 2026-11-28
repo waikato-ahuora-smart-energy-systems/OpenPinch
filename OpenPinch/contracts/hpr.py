@@ -318,6 +318,9 @@ class HeatPumpTargetInputs(BaseModel):
     # An installed machine's running compressors move at least this share of
     # their installed suction volume flow, or are off.
     turndown_duty: float = 0.0
+    # An installed machine's running stages keep at least this share of their
+    # design (installed) pressure ratio.
+    turndown_pressure_ratio: float = 0.0
     # Capital costing: overall heat transfer coefficients (W/m2K) by the heat
     # pump side's phase, the ambient air side's (in series with the heat pump
     # side's), and the process streams' own approach (K).

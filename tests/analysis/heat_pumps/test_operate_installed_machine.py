@@ -177,3 +177,31 @@ def test_an_operation_that_does_not_fit_is_no_operation():
     operated = _operate(smaller, args, bounds, design_point)
 
     assert not operated.success
+
+
+def test_a_running_stage_holds_its_pressure_ratio_turndown():
+    # A compressor designed for five times the design point's pressure
+    # ratio, turned down no further than 0.9 of it
+    # (HPR_TURNDOWN_PRESSURE_RATIO): the period runs it at that or not at
+    # all. Without the rule it ran at the design point's ratio, 1.39.
+    args, bounds, design_point, design = _case(
+        evaluations=_SMALL_SEARCH, HPR_TURNDOWN_PRESSURE_RATIO=0.9
+    )
+    (machine,) = design.hpr_machine_components
+    (compressor,) = machine.compressors
+    design_ratio = 5.0 * compressor.pressure_ratio
+    lifted = (
+        dataclasses.replace(
+            machine,
+            compressors=(dataclasses.replace(compressor, pressure_ratio=design_ratio),),
+        ),
+    )
+
+    operated = _operate(lifted, args, bounds, _with_low_duty(design_point))
+
+    ratio = (
+        operated.hpr_machine_components[0].compressors[0].pressure_ratio
+        if operated.hpr_machine_components
+        else 0.0
+    )
+    assert ratio == 0.0 or ratio >= 0.9 * design_ratio * (1.0 - _SIZE_TOLERANCE)

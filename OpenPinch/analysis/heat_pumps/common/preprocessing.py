@@ -133,6 +133,7 @@ def construct_HPRTargetInputs(
         enforce_heating_duty=hpr.enforce_heating_duty,
         turndown=hpr.turndown,
         turndown_duty=hpr.turndown_duty,
+        turndown_pressure_ratio=hpr.turndown_pressure_ratio,
         u_two_phase=hpr.u_two_phase,
         u_liquid=hpr.u_liquid,
         u_gas=hpr.u_gas,
