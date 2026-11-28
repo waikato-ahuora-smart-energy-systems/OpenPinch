@@ -59,3 +59,16 @@ def test_a_site_networks_json_keeps_its_balance_and_level_targets():
         network.source_metadata["site_utility_balance"].model_dump(mode="json")
     )
     assert back.source_metadata["utility_level_targets"] == {"HPS": [100.0]}
+
+
+def test_a_site_seeds_json_keeps_its_process_duties():
+    # A site seed records each process's duties by utility; network
+    # evolution evolves it within each process, and pools it without them.
+    processes = {"Heating/": {"HPS": [100.0]}, "Cooling/": {"CW": [80.0]}}
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[], heaters=["C1"], coolers=["H1"], hot_utility="HU", cold_utility="CU"
+    ).model_copy(update={"source_metadata": {"site_processes": processes}})
+
+    back = HeatExchangerNetwork.model_validate_json(network.model_dump_json())
+
+    assert back.source_metadata["site_processes"] == processes

@@ -135,7 +135,7 @@ class NetworkHeatPump(BaseModel):
 
 
 # The site entries of a network's source metadata its JSON keeps.
-_SITE_ENTRIES = ("site_utility_balance", "utility_level_targets")
+_SITE_ENTRIES = ("site_utility_balance", "utility_level_targets", "site_processes")
 
 
 def _json_form(value: Any) -> Any:
