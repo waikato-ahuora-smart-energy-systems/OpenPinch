@@ -26,6 +26,7 @@ from OpenPinch.analysis.heat_pumps._multiperiod.operation import (
 )
 from OpenPinch.analysis.heat_pumps.common.layout import HPRoptVectorLayout
 from OpenPinch.contracts.hpr import HPRSearchBudget
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 
 from .test_hpr_component_capital import _target_inputs
 
@@ -205,3 +206,47 @@ def test_a_running_stage_holds_its_pressure_ratio_turndown():
         else 0.0
     )
     assert ratio == 0.0 or ratio >= 0.9 * design_ratio * (1.0 - _SIZE_TOLERANCE)
+
+
+def test_the_best_operation_that_fits_is_taken():
+    # A condenser 0.1 % short of the design's: the design point ranks first
+    # on its small penalty but does not fit, the low-duty point does. The
+    # period was left without the machine, as the turndown period of the
+    # reviewer's three-period case was though its own design fitted.
+    args, bounds, design_point, design = _case(evaluations=_SMALL_SEARCH)
+    (machine,) = design.hpr_machine_components
+    areas = list(machine.exchanger_areas)
+    areas[_CONDENSER] *= 0.999
+    smaller = (dataclasses.replace(machine, exchanger_areas=tuple(areas)),)
+
+    operated = _operate(smaller, args, bounds, _with_low_duty(design_point))
+
+    assert operated.success
+    assert _fits(operated, smaller)
+
+
+def _always_penalised(x, args, **kwargs):
+    """The cycle objective with every solved point outside a cycle limit."""
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args, **kwargs)
+    if not result.success:
+        return result
+    return result.with_updates(feasibility_penalty=1e6, obj=result.obj + 1e6)
+
+
+def test_an_operation_outside_the_cycle_limits_is_no_operation():
+    # Every candidate breaks a cycle limit: the period has no operation. The
+    # VC+MVR crude preheat target took such operations and was then refused
+    # whole for their penalty.
+    args, bounds, design_point, design = _case(evaluations=_SMALL_SEARCH)
+    # Carnot designs are exempt from the penalty check; these are cycles.
+    args.hpr_type = HeatPumpAndRefrigerationCycle.CascadeVapourComp.value
+
+    operated = operate_installed_machine(
+        design.hpr_machine_components,
+        objective=_always_penalised,
+        initial_points=_with_low_duty(design_point),
+        bounds=bounds,
+        args=args,
+    )
+
+    assert not operated.success

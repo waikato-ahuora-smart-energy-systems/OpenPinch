@@ -508,18 +508,17 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
         lambda **_kwargs: None,
     )
 
-    def fake_solve_hpr_multiperiod_placement(*, f_obj, x0_ls, bnds, args, stage_lifts):
+    def fake_solve(*, f_obj, x0_ls, bnds, args, stage_lifts=None, idle_point=None):
         captured["period_ids"] = [case.period_id for case in args.period_cases]
         captured["hpr_type"] = args.hpr_type
         captured["has_bounds"] = bool(bnds)
         captured["has_initial_candidate"] = x0_ls is not None
         return _backend_result(obj=1.0, utility_tot=2.0, period_idx=0)
 
-    monkeypatch.setattr(
-        hp_execution,
-        "solve_hpr_multiperiod_placement",
-        fake_solve_hpr_multiperiod_placement,
-    )
+    # Carnot cycles search the shared vector; vapour compression cycles are
+    # designed and operated.
+    monkeypatch.setattr(hp_execution, "solve_hpr_multiperiod_placement", fake_solve)
+    monkeypatch.setattr(hp_execution, "solve_design_and_operate", fake_solve)
 
     result = hp_execution.get_multiperiod_hpr_targets(
         period_cases=cases,
@@ -1174,7 +1173,9 @@ def test_a_carnot_setup_has_no_stage_lifts():
     assert stage_lifts is None
 
 
-def test_the_shared_design_search_gets_the_setups_stage_lifts(monkeypatch):
+def test_a_vapour_compression_shared_target_is_designed_and_operated(monkeypatch):
+    # A setup with stage lifts is a vapour compression cycle: one installed
+    # machine, operated per period (review finding 19), not the shared vector.
     def lifts(x, args):
         return np.zeros(1)
 
@@ -1204,14 +1205,19 @@ def test_the_shared_design_search_gets_the_setups_stage_lifts(monkeypatch):
         seen.update(kwargs)
         raise RuntimeError("stop")
 
-    monkeypatch.setattr(hp_execution, "solve_hpr_multiperiod_placement", solve)
+    monkeypatch.setattr(hp_execution, "solve_design_and_operate", solve)
+    monkeypatch.setattr(
+        hp_execution,
+        "solve_hpr_multiperiod_placement",
+        lambda **_kwargs: pytest.fail("vapour compression searched the shared vector"),
+    )
 
     with pytest.raises(RuntimeError, match="stop"):
         hp_execution.get_multiperiod_hpr_targets(
             period_cases=[case], selected_period_id="p0", selected_period_idx=0
         )
 
-    assert seen["stage_lifts"] is lifts
+    assert seen["bnds"] == [(0.0, 1.0)]
 
 
 def _vapour_period_args(*, weights, selected="p0", **overrides):

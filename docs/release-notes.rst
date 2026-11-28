@@ -346,15 +346,26 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A vapour compression heat pump shared by several periods
+  (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) is one installed machine,
+  designed once and operated in each period. Each period is solved alone;
+  the machine is each component at its peak; each period then runs it at its
+  cheapest operation within its sizes and the two turndowns, or without it
+  where none fits. It searched one design vector decoded in every period,
+  which tied the periods to one normalised design rather than one machine
+  (4.9 to 13 % more work than the periods alone on the reviewer's cases).
+  The year pays for the machine installed, and the target is no heat pump
+  when no period can run it or when the year costs no less with it than
+  without it. The design vector reports the installed sizes. Carnot cycles
+  keep the shared vector.
 - Two options set how far a heat pump installed for several periods turns
   down: ``HPR_TURNDOWN_DUTY``, the share of its installed suction volume
   flow a running compressor moves at least (below it the compressor is
   off), and ``HPR_TURNDOWN_PRESSURE_RATIO``, the share of its design
   pressure ratio (its highest in any period) a running compressor keeps.
-  Both default to 0.25. They apply where a shared multiperiod design is
-  designed once and operated in each period (review finding 19); until
-  that replaces the shared design vector, ``HPR_TURNDOWN`` still sets the
-  lift floor of shared vapour compression designs.
+  Both default to 0.25. They apply to a shared vapour compression design,
+  which is now designed once and operated in each period (review finding
+  19); they replace ``HPR_TURNDOWN``'s lift floor, which no longer acts.
 - A shared multiperiod heat pump design installs each machine component by
   component: each compressor at its peak volume flow and shaft power and
   each exchanger at its peak area, whichever periods they peak in. It took

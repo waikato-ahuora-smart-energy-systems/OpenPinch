@@ -7,6 +7,7 @@ from collections.abc import Callable
 import numpy as np
 
 from ....contracts.hpr import HPRPeriodCase
+from ....domain.enums import HeatPumpAndRefrigerationCycle
 from ..common.shared import validate_vapour_hp_refrigerant_ls
 from ..cycles.registry import family_handlers, resolve_handler
 from ..optimisation_adapter import initialise_hpr_seed
@@ -43,6 +44,7 @@ from ..targeting.vapour_compression_mvr import (
     _get_vc_mvr_opt_setup,
     _num_vc_stages,
     _parse_vc_mvr_state_variables,
+    _vc_mvr_idle_point,
     _vc_mvr_stage_lifts,
     use_mvr_cascade_fluids,
 )
@@ -69,6 +71,14 @@ def get_multiperiod_hpr_optimisation_setup(
             f"{hpr_type} HPR targeting is not supported for multi-period optimisation."
         )
     return resolve_handler(handlers.multiperiod_setup)(period_cases, selected_case)
+
+
+def multiperiod_idle_point(hpr_type: str) -> Callable | None:
+    """The cycle's machine off (``x, args -> x``) where its lower bounds are
+    not; ``None`` where they are."""
+    if hpr_type == HeatPumpAndRefrigerationCycle.VapourCompMVR.value:
+        return _vc_mvr_idle_point
+    return None
 
 
 def _preflight_fluid_names(period_cases, topology_id: str) -> None:
