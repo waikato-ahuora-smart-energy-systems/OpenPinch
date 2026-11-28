@@ -95,11 +95,13 @@ _PLATE_EXCHANGER = (15_526.0, 42.0, 0.8)
 
 @dataclass(frozen=True)
 class CompressorDuty:
-    """One compression stage: suction volume flow in m3/h, shaft power in kW."""
+    """One compression stage: suction volume flow in m3/h, shaft power in kW
+    and pressure ratio (discharge over suction; 0 where unknown)."""
 
     fluid: str
     volume_flow: float
     shaft_power: float
+    pressure_ratio: float = 0.0
 
 
 @dataclass(frozen=True)
