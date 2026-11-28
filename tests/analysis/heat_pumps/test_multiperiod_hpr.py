@@ -508,7 +508,7 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
         lambda **_kwargs: None,
     )
 
-    def fake_solve(*, f_obj, x0_ls, bnds, args, stage_lifts=None, idle_point=None):
+    def fake_solve(*, f_obj, x0_ls, bnds, args, idle_point=None):
         captured["period_ids"] = [case.period_id for case in args.period_cases]
         captured["hpr_type"] = args.hpr_type
         captured["has_bounds"] = bool(bnds)
@@ -1139,22 +1139,21 @@ def test_a_shared_design_still_carrying_a_penalty_is_not_a_target(monkeypatch):
     )
 
 
-def test_a_vapour_compression_setup_gives_the_stage_lifts_for_the_turndown(
-    monkeypatch,
-):
+def test_a_vapour_compression_setup_is_designed_and_operated(monkeypatch):
+    # One installed machine operated per period (review finding 19).
     cases = _vc_mvr_period_cases(mvr_fluid_ls=["AMMONIA"])
     monkeypatch.setattr(
         hp_setup, "preflight_coolprop_hpr_targeting", lambda **_kwargs: None
     )
 
-    *_, stage_lifts = hp_setup.get_multiperiod_hpr_optimisation_setup(
+    *_, operated = hp_setup.get_multiperiod_hpr_optimisation_setup(
         cases, selected_case=cases[0]
     )
 
-    assert stage_lifts is hp_setup._vc_mvr_stage_lifts
+    assert operated is True
 
 
-def test_a_carnot_setup_has_no_stage_lifts():
+def test_a_carnot_setup_shares_one_vector():
     cases = [
         HPRPeriodCase(
             period_id="p0",
@@ -1166,19 +1165,16 @@ def test_a_carnot_setup_has_no_stage_lifts():
         )
     ]
 
-    *_, stage_lifts = hp_setup.get_multiperiod_hpr_optimisation_setup(
+    *_, operated = hp_setup.get_multiperiod_hpr_optimisation_setup(
         cases, selected_case=cases[0]
     )
 
-    assert stage_lifts is None
+    assert operated is False
 
 
 def test_a_vapour_compression_shared_target_is_designed_and_operated(monkeypatch):
-    # A setup with stage lifts is a vapour compression cycle: one installed
-    # machine, operated per period (review finding 19), not the shared vector.
-    def lifts(x, args):
-        return np.zeros(1)
-
+    # A setup that designs and operates (vapour compression) runs one
+    # installed machine per period (review finding 19), not the shared vector.
     case = _PreparedHPRPeriodCase(
         period_id="p0",
         period_idx=0,
@@ -1197,7 +1193,7 @@ def test_a_vapour_compression_shared_target_is_designed_and_operated(monkeypatch
     monkeypatch.setattr(
         hp_execution,
         "get_multiperiod_hpr_optimisation_setup",
-        lambda *_args, **_kwargs: (None, [(0.0, 1.0)], lambda *a, **k: None, lifts),
+        lambda *_args, **_kwargs: (None, [(0.0, 1.0)], lambda *a, **k: None, True),
     )
     seen = {}
 

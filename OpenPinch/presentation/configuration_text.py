@@ -777,15 +777,6 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "working fluid side's coefficient."
         ),
     ),
-    "HPR_TURNDOWN": FieldText(
-        "HPR turndown lift share", None,
-        (
-            "In a shared multiperiod design, each vapour compression stage lifts "
-            "at least this share of its design lift (its largest lift in any "
-            "period) in every period. A period needing less lift runs at the "
-            "floor, condensing higher at a worse COP."
-        ),
-    ),
     "HPR_TURNDOWN_DUTY": FieldText(
         "HPR turndown duty share", None,
         (

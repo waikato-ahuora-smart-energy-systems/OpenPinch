@@ -247,7 +247,6 @@ class HprConfig:
     load_period_values: dict[str, float]
     multiperiod_optimization_enabled: bool
     enforce_heating_duty: bool
-    turndown: float
     turndown_duty: float
     turndown_pressure_ratio: float
     u_two_phase: float

@@ -365,7 +365,9 @@ Heat pumps and refrigeration
   pressure ratio (its highest in any period) a running compressor keeps.
   Both default to 0.25. They apply to a shared vapour compression design,
   which is now designed once and operated in each period (review finding
-  19); they replace ``HPR_TURNDOWN``'s lift floor, which no longer acts.
+  19). They replace ``HPR_TURNDOWN``, which held each stage of the shared
+  design vector to a share of its design lift; that option is removed, and
+  an input that sets it is refused as an unknown option.
 - A shared multiperiod heat pump design installs each machine component by
   component: each compressor at its peak volume flow and shaft power and
   each exchanger at its peak area, whichever periods they peak in. It took

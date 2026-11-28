@@ -36,7 +36,8 @@ class CycleFamilyHandlers:
 
     ``placement`` optimises one period's heat pump placement;
     ``multiperiod_setup`` returns the shared multiperiod starts, bounds,
-    objective and stage lifts (``None``: no multiperiod support);
+    objective and whether the shared design is designed and operated
+    (``None``: no multiperiod support);
     ``topology_identifier`` names the simulated topology, for CoolProp
     preflight and the accepted target (``None`` for idealised cycles).
     """
