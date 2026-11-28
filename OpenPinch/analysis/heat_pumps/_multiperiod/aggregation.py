@@ -26,20 +26,12 @@ def evaluate_multiperiod_candidate(
     args: MultiPeriodHPRTargetInputs,
     *,
     period_objective: Callable,
-    stage_lifts: Callable | None = None,
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
-    """Evaluate one design vector in every period and apply shared policies.
-
-    With ``stage_lifts`` (the lift of each stage when ``point`` is decoded in
-    a period), each period runs every stage at least at the turndown share
-    of its design lift, the largest lift it has in any period.
-    """
+    """Evaluate one design vector in every period and apply shared policies."""
     if not args.period_cases:
         return HPRBackendResult.failure(reason="No period cases were prepared.")
-    if stage_lifts is not None:
-        _set_stage_lift_floors(point, args.period_cases, stage_lifts)
 
     period_outputs: dict[str, HPRBackendResult] = {}
     idle_cases: list[HPRPeriodCase] = []
@@ -145,23 +137,6 @@ def _with_installed_capital(
             total = total + utility_capital
         updates["hpr_total_annualized_cost"] = total
     return period.with_updates(**updates)
-
-
-def _set_stage_lift_floors(
-    point: Sequence[float] | np.ndarray,
-    cases: list[HPRPeriodCase],
-    stage_lifts: Callable,
-) -> None:
-    """Give every period the lift floor of the shared machine's stages."""
-    for case in cases:
-        case.args.stage_lift_floor = None
-    design_lifts = np.max(
-        [np.asarray(stage_lifts(point, case.args), dtype=float) for case in cases],
-        axis=0,
-    )
-    for case in cases:
-        turndown = float(getattr(case.args, "turndown", 0.0) or 0.0)
-        case.args.stage_lift_floor = turndown * np.maximum(design_lifts, 0.0)
 
 
 def _as_idle_period(result: HPRBackendResult) -> HPRBackendResult:

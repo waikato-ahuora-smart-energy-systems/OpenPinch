@@ -61,13 +61,13 @@ def get_multiperiod_hpr_targets(
     )
     if args.simulation_backend == "tespy":
         preflight_tespy_hpr_targeting(args)
-    initial_points, bounds, period_objective, stage_lifts = (
+    initial_points, bounds, period_objective, operated = (
         get_multiperiod_hpr_optimisation_setup(
             solver_cases,
             selected_case=selected_case,
         )
     )
-    if stage_lifts is not None:
+    if operated:
         # Vapour compression: one installed machine, operated per period.
         result = solve_design_and_operate(
             f_obj=period_objective,
@@ -78,11 +78,7 @@ def get_multiperiod_hpr_targets(
         )
     else:
         result = solve_hpr_multiperiod_placement(
-            f_obj=period_objective,
-            x0_ls=initial_points,
-            bnds=bounds,
-            args=args,
-            stage_lifts=stage_lifts,
+            f_obj=period_objective, x0_ls=initial_points, bnds=bounds, args=args
         )
     return translate_hpr_output(result)
 
@@ -128,18 +124,9 @@ def solve_hpr_multiperiod_placement(
     x0_ls: list | np.ndarray | float | None,
     bnds: list,
     args: MultiPeriodHPRTargetInputs,
-    stage_lifts: Callable | None = None,
 ) -> HPRBackendResult:
-    """Optimise one shared HPR vector against every prepared period case.
-
-    ``stage_lifts`` gives each stage's lift as a vector decodes in a period;
-    with it, every period keeps each stage's lift at its turndown floor.
-    """
-    objective = partial(
-        evaluate_multiperiod_candidate,
-        period_objective=f_obj,
-        stage_lifts=stage_lifts,
-    )
+    """Optimise one shared HPR vector against every prepared period case."""
+    objective = partial(evaluate_multiperiod_candidate, period_objective=f_obj)
     candidates = run_hpr_candidate_search(
         objective=objective,
         initial_points=x0_ls,
