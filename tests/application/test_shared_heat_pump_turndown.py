@@ -12,7 +12,10 @@ HPR_TURNDOWN_DUTY 0.9 leaves the peak-sized machine nothing it can do there.
 
 from __future__ import annotations
 
+import pytest
+
 from OpenPinch import PinchProblem
+from OpenPinch.contracts.hpr import HPRTargetingError
 
 
 def _work(output) -> float:
@@ -44,3 +47,25 @@ def test_a_shared_heat_pump_target_is_off_where_it_cannot_turn_down():
     outputs = target.hpr_details.period_outputs
     assert _work(outputs["turndown"]) == 0.0
     assert _work(outputs["peak"]) > 0.0
+
+
+def test_a_shared_heat_pump_no_period_can_run_is_no_target():
+    # At six evaluations and the default pressure-ratio turndown no period
+    # can run the installed machine; the target returned it anyway, all
+    # three periods idle and its capital charged.
+    problem = PinchProblem("crude_preheat_train_multiperiod.json", project_name="x")
+
+    with pytest.raises(HPRTargetingError, match="no heat pump design"):
+        problem.target.vapour_compression_heat_pump(
+            period_id="base",
+            options={
+                "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True,
+                "HPR_TURNDOWN_DUTY": 0.9,
+            },
+            refrigerants=["water"],
+            load_fraction=0.25,
+            condensers=1,
+            evaporators=1,
+            maximum_restarts=0,
+            maximum_evaluations=6,
+        )

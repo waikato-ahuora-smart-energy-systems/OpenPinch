@@ -14,6 +14,7 @@ from collections.abc import Callable, Sequence
 import numpy as np
 
 from ....contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HPRBackendResult,
     HPREvaluationMode,
@@ -51,20 +52,22 @@ def design_and_operate(
         for periods in zip(*(result.hpr_machine_components for _, result in alone))
     )
     points = [point for point, _ in alone]
-    outputs = {
-        str(case.period_id): _or_idle(
-            operate_installed_machine(
-                machines,
-                objective=f_obj,
-                initial_points=_starts(index, points, x0_ls),
-                bounds=bnds,
-                args=case.args,
-            ),
-            f_obj,
-            bnds,
-            case.args,
+    operated = [
+        operate_installed_machine(
+            machines,
+            objective=f_obj,
+            initial_points=_starts(index, points, x0_ls),
+            bounds=bnds,
+            args=case.args,
         )
         for index, case in enumerate(cases)
+    ]
+    if not any(operation.success for operation in operated):
+        # A machine no period can run is no heat pump.
+        return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+    outputs = {
+        str(case.period_id): _or_idle(operation, f_obj, bnds, case.args)
+        for case, operation in zip(cases, operated, strict=True)
     }
     weighted, objective = aggregate_hpr_period_results(
         outputs, weights, idle_weight=args.idle_period_weight
