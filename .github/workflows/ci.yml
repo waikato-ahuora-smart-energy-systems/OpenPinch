@@ -406,12 +406,12 @@ jobs:
             # The heat pump application tests, about two thirds of the
             # application tests' time in Pyodide: one shard of them ran past
             # 20 minutes on a slow runner. A new heat pump file runs in
-            # application unless it is listed here and ignored there.
+            # application unless it is listed in one of these two shards
+            # and ignored there. Together they ran 16 to 20 minutes as one
+            # shard and timed out the 0.10.1 release run, so they are split
+            # by time: the refrigerant screen is about a third of it.
             paths: >-
-              tests/application/test_hpr_change_audit.py
               tests/application/test_hpr_compressor_model.py
-              tests/application/test_hpr_derived_case_api.py
-              tests/application/test_hpr_discovery.py
               tests/application/test_hpr_fluid_set_runs.py
               tests/application/test_hpr_gateway.py
               tests/application/test_hpr_load_kinks.py
@@ -419,8 +419,13 @@ jobs:
               tests/application/test_hpr_performance_map_accessor.py
               tests/application/test_hpr_period_batch_boundaries.py
               tests/application/test_hpr_refrigerant_screen.py
-              tests/application/test_hpr_residual_workflow.py
               tests/application/test_hpr_shared_heat_pump_turndown.py
+          - shard: application-heat-pump-workflows
+            paths: >-
+              tests/application/test_hpr_change_audit.py
+              tests/application/test_hpr_derived_case_api.py
+              tests/application/test_hpr_discovery.py
+              tests/application/test_hpr_residual_workflow.py
           - shard: application
             # test_coolprop_hpr_audit.py takes over 12 minutes in Pyodide;
             # the CPython test lanes cover it.

@@ -205,7 +205,12 @@ def test_pyodide_application_shards_split_the_heat_pump_tests_out():
         for path in (REPOSITORY_ROOT / "tests/application").glob("test_hpr_*.py")
     )
 
-    assert shards["application-heat-pumps"] == heat_pumps
+    # The heat pump shard itself ran 16 to 20 minutes and timed out the
+    # 0.10.1 release run on main, so its files are split over two shards.
+    screens = shards["application-heat-pumps"]
+    workflows = shards["application-heat-pump-workflows"]
+    assert screens and workflows
+    assert sorted(screens + workflows) == heat_pumps
     application = shards["application"]
     assert all(f"--ignore={path}" in application for path in heat_pumps)
 
