@@ -69,14 +69,55 @@ def execute_seeded_thermal_derivative_method_stage(
     *,
     executor: SynthesisExecutor | None = None,
 ):
-    """Build and execute one standalone seeded TDM stage."""
-    return run_stage(
+    """Build and execute one standalone seeded TDM stage.
+
+    The step minimises hot utility, not total annual cost, so each seed is
+    ranked alongside its networks: under the usual ranking (networks that
+    hold their recorded utility levels first, then the cheapest) what the
+    step returns is never dearer than what it started from (review finding
+    29).
+    """
+    tasks, outcomes = run_stage(
         build_seeded_thermal_derivative_method_tasks(settings, seed_networks),
         problem=problem,
         settings=settings,
         executor=executor,
         default_executor=LocalSynthesisExecutor,
     )
+    return tasks, (*outcomes, *_seed_outcomes(tasks, seed_networks))
+
+
+def _seed_outcomes(
+    tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+    seed_networks: Sequence[HeatExchangerNetwork],
+) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
+    """Each priced seed as an outcome of the task run for it.
+
+    A seed whose task was dropped as a duplicate of an earlier seed's takes
+    the first task run. The seed takes its task's run and task ids, as a
+    result's networks do; its method stays its own.
+    """
+    if not tasks:
+        return ()
+    run_for = {task.seed_network_index: task for task in reversed(tasks)}
+    outcomes = []
+    for index, network in enumerate(seed_networks):
+        cost = network.total_annual_cost
+        if cost is None:
+            continue
+        task = run_for.get(index, tasks[0])
+        outcomes.append(
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=task,
+                status="success",
+                network=network.model_copy(
+                    update={"run_id": task.run_id, "task_id": task.task_id}
+                ),
+                objective_value=float(cost),
+                solver_status="seed",
+            )
+        )
+    return tuple(outcomes)
 
 
 def build_thermal_derivative_method_tasks(
