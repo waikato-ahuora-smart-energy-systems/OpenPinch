@@ -47,10 +47,15 @@ def design_and_operate(
     cases = args.period_cases
     weights = np.asarray([case.weight for case in cases], dtype=float)
     alone = [_solve_alone(f_obj, x0_ls, bnds, case.args) for case in cases]
-    machines = tuple(
-        installed_machine(periods)
-        for periods in zip(*(result.hpr_machine_components for _, result in alone))
-    )
+    # Periods whose own best is no heat pump size nothing.
+    sized = [
+        result.hpr_machine_components
+        for _, result in alone
+        if result.success and result.hpr_machine_components
+    ]
+    if not sized:
+        return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+    machines = tuple(installed_machine(periods) for periods in zip(*sized))
     points = [point for point, _ in alone]
     operated = [
         operate_installed_machine(

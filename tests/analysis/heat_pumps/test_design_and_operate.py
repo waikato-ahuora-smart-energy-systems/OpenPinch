@@ -24,6 +24,9 @@ from OpenPinch.analysis.heat_pumps.optimisation_adapter import (
     run_hpr_candidate_search,
 )
 from OpenPinch.contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
+    HPRBackendResult,
+    HPREvaluationMode,
     HPRPeriodCase,
     HPRSearchBudget,
     MultiPeriodHPRTargetInputs,
@@ -177,3 +180,29 @@ def test_a_period_the_installed_machine_cannot_serve_runs_without_it():
     light = result.period_outputs["light"]
     assert light.w_net == 0.0
     assert light.hpr_operating_cost.value > 0.0
+
+
+def _no_heat_pump_at_peak(
+    x, args, debug=False, artifact_mode=HPREvaluationMode.FINAL
+) -> HPRBackendResult:
+    """The cycle objective, but the peak period's final evaluations deliver
+    no useful duty, as when its own best design is no heat pump."""
+    if args.Q_hpr_target > 60.0 and artifact_mode is HPREvaluationMode.FINAL:
+        return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+    return hp_cascade._compute_cascade_hp_system_obj(
+        x, args, debug=debug, artifact_mode=artifact_mode
+    )
+
+
+def test_a_period_whose_own_best_is_no_heat_pump_does_not_size_the_machine():
+    # It raised sizing the machine from a result with no components (Codex
+    # review on #568); the machine is sized from the periods that run one.
+    args = _inputs(evaluations=6)
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+
+    result = design_and_operate(
+        f_obj=_no_heat_pump_at_peak, x0_ls=None, bnds=bounds, args=args
+    )
+
+    assert result.success
+    assert result.period_outputs["peak"].w_net == 0.0
