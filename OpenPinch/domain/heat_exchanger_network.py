@@ -9,8 +9,8 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    computed_field,
     field_validator,
-    model_serializer,
     model_validator,
 )
 
@@ -218,24 +218,22 @@ class HeatExchangerNetwork(BaseModel):
         _rules.check_summary_metrics(value)
         return value
 
-    @model_serializer(mode="wrap")
-    def _serialise_with_site_entries(self, handler) -> dict[str, Any]:
-        """The fields, plus a site network's site entries under ``site``.
+    @computed_field
+    @property
+    def site(self) -> dict[str, Any] | None:
+        """A site network's site entries, for its JSON; ``None`` otherwise.
 
         ``source_metadata`` is left out of the JSON, but a site network's
-        utility balance and utility level targets tell it apart from a plain
-        network (review finding 37); they go out under ``site``, the balance
-        as its JSON form, and come back on reading.
+        utility balance, utility level targets and process duties tell it
+        apart from a plain network (review finding 37); they go out here,
+        the balance as its JSON form, and come back on reading.
         """
-        data = handler(self)
         site = {
             key: _json_form(self.source_metadata[key])
             for key in _SITE_ENTRIES
             if key in self.source_metadata
         }
-        if site:
-            data["site"] = site
-        return data
+        return site or None
 
     @model_validator(mode="before")
     @classmethod

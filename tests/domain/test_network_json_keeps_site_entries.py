@@ -8,6 +8,7 @@ finding 37, ``G-S/roundtrip.py``).
 
 from __future__ import annotations
 
+from OpenPinch.contracts.input import HeatExchangerNetworkSchema
 from OpenPinch.contracts.synthesis.site import (
     UtilityLevelBalance,
     UtilitySystemBalance,
@@ -72,3 +73,25 @@ def test_a_site_seeds_json_keeps_its_process_duties():
     back = HeatExchangerNetwork.model_validate_json(network.model_dump_json())
 
     assert back.source_metadata["site_processes"] == processes
+
+
+def test_the_networks_serialisation_schema_keeps_its_fields_and_site():
+    # A model-level serialiser collapsed the schema to an open object
+    # (Codex review on #571); typed clients read the network's shape from it.
+    properties = HeatExchangerNetwork.model_json_schema(mode="serialization")[
+        "properties"
+    ]
+
+    assert {"exchangers", "total_annual_cost", "site"} <= set(properties)
+
+
+def test_the_input_schema_takes_a_site_networks_json():
+    # A problem input's network passes through HeatExchangerNetworkSchema,
+    # which refused the site entries as an extra field (Codex review on
+    # #571).
+    network = _site_network()
+
+    schema = HeatExchangerNetworkSchema.model_validate(network.model_dump(mode="json"))
+    back = HeatExchangerNetwork.model_validate(schema.model_dump(mode="json"))
+
+    assert back.source_metadata["utility_level_targets"] == {"HPS": [100.0]}
