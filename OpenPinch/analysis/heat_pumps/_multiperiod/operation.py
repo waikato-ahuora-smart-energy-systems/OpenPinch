@@ -46,11 +46,16 @@ def operate_installed_machine(
     every component needing more than its installed size.
     """
     scale = hpr_penalty_cost_scale(args)
-    turndown = float(getattr(args, "turndown", 0.0) or 0.0)
+    turndown = float(getattr(args, "turndown_duty", 0.0) or 0.0)
+    ratio_turndown = float(getattr(args, "turndown_pressure_ratio", 0.0) or 0.0)
 
     def shortfall(result: HPRBackendResult) -> float:
         needed = result.hpr_machine_components
-        return _oversize(needed, installed) + _turndown_gap(needed, installed, turndown)
+        return (
+            _oversize(needed, installed)
+            + _turndown_gap(needed, installed, turndown)
+            + _pressure_ratio_gap(needed, installed, ratio_turndown)
+        )
 
     def operating(x, period_args, **kwargs) -> HPRBackendResult:
         result = objective(x, period_args, **kwargs)
@@ -99,6 +104,28 @@ def _turndown_gap(
             share = need.volume_flow / have.volume_flow
             if 0.0 < share < turndown:
                 gap += min(share, turndown - share)
+    return float(gap)
+
+
+def _pressure_ratio_gap(
+    needed: Sequence[MachineComponents] | None,
+    installed: Sequence[MachineComponents],
+    turndown: float,
+) -> float:
+    """How far running compressors sit below their pressure-ratio turndown,
+    as shares of their design (installed) pressure ratio.
+
+    A running compressor keeps at least ``turndown`` of its design pressure
+    ratio; one moving no volume is off and has no gap.
+    """
+    if not needed or turndown <= 0.0:
+        return 0.0
+    gap = 0.0
+    for machine, limit in zip(needed, installed, strict=True):
+        for need, have in zip(machine.compressors, limit.compressors, strict=True):
+            if need.volume_flow <= 0.0 or have.pressure_ratio <= 0.0:
+                continue
+            gap += max(turndown - need.pressure_ratio / have.pressure_ratio, 0.0)
     return float(gap)
 
 

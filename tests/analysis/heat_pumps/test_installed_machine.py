@@ -60,3 +60,13 @@ def test_each_component_takes_its_own_peak():
         compressors=(CompressorDuty("Ammonia", 100.0, 55.0),),
         exchanger_areas=(50.0, 40.0),
     )
+
+
+def test_an_installed_compressors_design_pressure_ratio_is_its_peak():
+    # HPR_TURNDOWN_PRESSURE_RATIO is a share of this design ratio.
+    base = MachineComponents(compressors=(CompressorDuty("Ammonia", 100.0, 40.0, 3.0),))
+    peak = MachineComponents(compressors=(CompressorDuty("Ammonia", 60.0, 55.0, 4.5),))
+
+    (compressor,) = installed_machine([base, peak]).compressors
+
+    assert compressor.pressure_ratio == 4.5

@@ -357,10 +357,19 @@ def _process_cooling(stage: Any) -> float:
     return float(getattr(stage, "Q_cool", 0.0) or 0.0)
 
 
+def _pressure_ratio(stage: Any) -> float:
+    """The stage's highest pressure over its lowest; 0 where it has none."""
+    pressures = [float(p) for p in getattr(stage, "Ps", ()) or () if p]
+    return max(pressures) / min(pressures) if pressures else 0.0
+
+
 def _compressor(stage: Any) -> CompressorDuty:
     if hasattr(stage, "suction_volume_flow"):
         return CompressorDuty(
-            str(stage.refrigerant), stage.suction_volume_flow, stage.shaft_power
+            str(stage.refrigerant),
+            stage.suction_volume_flow,
+            stage.shaft_power,
+            _pressure_ratio(stage),
         )
     # An MVR stage compresses process water vapour from its state 0; its mass
     # flow is duty (kW) over specific enthalpy (J/kg), kg/s / 1000.

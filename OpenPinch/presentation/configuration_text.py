@@ -786,6 +786,22 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "floor, condensing higher at a worse COP."
         ),
     ),
+    "HPR_TURNDOWN_DUTY": FieldText(
+        "HPR turndown duty share", None,
+        (
+            "On a heat pump installed for several periods, a running compressor "
+            "moves at least this share of its installed suction volume flow; "
+            "below it the compressor is off."
+        ),
+    ),
+    "HPR_TURNDOWN_PRESSURE_RATIO": FieldText(
+        "HPR turndown pressure ratio share", None,
+        (
+            "On a heat pump installed for several periods, a running compressor "
+            "keeps at least this share of its design pressure ratio (its "
+            "highest in any period)."
+        ),
+    ),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": FieldText(
         "Shared multiperiod HPR design", None,
         (

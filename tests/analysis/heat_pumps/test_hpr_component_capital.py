@@ -284,6 +284,21 @@ def test_a_heat_pump_result_records_its_machines_components():
     )
 
 
+def test_a_compressor_records_its_pressure_ratio():
+    # An installed machine turns each stage down no further than a share of
+    # its design pressure ratio (HPR_TURNDOWN_PRESSURE_RATIO).
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.4)
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+    (stage,) = hp_cascade._build_and_solve_cascade_cycle(state, args, True)._subcycles
+
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args)
+
+    (compressor,) = result.hpr_machine_components[0].compressors
+    assert compressor.pressure_ratio == pytest.approx(max(stage.Ps) / min(stage.Ps))
+
+
 def test_a_heat_pump_reports_its_capital_without_process_exchangers():
     # A retrofit that places the machine's process and air exchangers in the
     # network itself pays the machine for the rest: its compressors and
