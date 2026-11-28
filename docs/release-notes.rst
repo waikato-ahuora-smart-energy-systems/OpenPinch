@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.10.1 (2026-11-28)
+-------------------
+
 Results and JSON
 ~~~~~~~~~~~~~~~~
 
