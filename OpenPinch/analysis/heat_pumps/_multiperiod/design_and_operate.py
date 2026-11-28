@@ -81,6 +81,14 @@ def design_and_operate(
     weighted, objective = _priced_on(
         machines, weighted, objective, [result for _, result in alone]
     )
+    _, without = aggregate_hpr_period_results(
+        {str(case.period_id): _idle(f_obj, bnds, case.args) for case in cases},
+        weights,
+        idle_weight=args.idle_period_weight,
+    )
+    if objective >= without:
+        # The year costs no less with the machine than without one.
+        return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
     selected = _with_installed_capital(
         outputs[str(selected_period_case(args).period_id)], weighted
     )
@@ -153,6 +161,12 @@ def _or_idle(
     """
     if operated.success:
         return operated
+    return _idle(f_obj, bnds, args)
+
+
+def _idle(f_obj, bnds, args: HeatPumpTargetInputs) -> HPRBackendResult:
+    """A period with the machine off: the cycle at its lower bounds, which
+    carry no duty, priced as an idle period on its utilities."""
     idle = evaluate_hpr_candidate(
         objective=f_obj,
         point=np.asarray(bnds, dtype=float)[:, 0],

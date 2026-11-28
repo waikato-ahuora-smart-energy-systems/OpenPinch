@@ -7,7 +7,8 @@ the shared design vector, which knows no duty turndown, so this test fails
 until targets use design-and-operate: on the crude preheat train (water,
 one condenser and one evaporator, a quarter of the load) the turndown
 period runs the shared design (13 to 14 kW of work at small budgets) although
-HPR_TURNDOWN_DUTY 0.9 leaves the peak-sized machine nothing it can do there.
+it needs under a tenth of the peak-sized compressor's volume, below
+HPR_TURNDOWN_DUTY 0.3; the base and peak periods can run it.
 """
 
 from __future__ import annotations
@@ -29,7 +30,9 @@ def test_a_shared_heat_pump_target_is_off_where_it_cannot_turn_down():
         period_id="base",
         options={
             "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True,
-            "HPR_TURNDOWN_DUTY": 0.9,
+            # At 0.9 only the peak (a fifth of the year) can run the machine,
+            # which then costs the year more than none (no heat pump).
+            "HPR_TURNDOWN_DUTY": 0.3,
             # The duty axis alone: the turndown period's own design lifts at
             # a ratio of 11, which at the default 0.25 would hold the peak's
             # own design (2.5) below the floor too.

@@ -57,13 +57,16 @@ def _period(scale: float, evaluations: int, **options):
 
 
 def _inputs(
-    evaluations: int, scales: dict[str, float] = _SCALES, **options
+    evaluations: int,
+    scales: dict[str, float] = _SCALES,
+    weights: dict[str, float] | None = None,
+    **options,
 ) -> MultiPeriodHPRTargetInputs:
     cases = [
         HPRPeriodCase(
             period_id=name,
             period_idx=idx,
-            weight=0.5,
+            weight=0.5 if weights is None else weights[name],
             args=_period(scale, evaluations, **options),
         )
         for idx, (name, scale) in enumerate(scales.items())
@@ -239,6 +242,29 @@ def test_the_year_pays_for_the_machine_installed(monkeypatch):
 
     installed = sum(installed_capital(machine) for machine in seen["machines"])
     assert result.weighted_output.hpr_capital_cost.value == pytest.approx(installed)
+
+
+def test_a_machine_that_costs_the_year_more_than_none_is_no_heat_pump():
+    # The base period, 2 % of the year, pays for the machine on its own; the
+    # light period cannot run it (HPR_TURNDOWN_DUTY 0.9). The year costs
+    # about 10,000 $/y with it and about 3,000 without, and the machine was
+    # returned (Codex review on #568).
+    args = _inputs(
+        evaluations=6,
+        scales={"base": 1.0, "light": 0.05},
+        weights={"base": 0.02, "light": 0.98},
+        HPR_TURNDOWN_DUTY=0.9,
+    )
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+
+    result = design_and_operate(
+        f_obj=hp_cascade._compute_cascade_hp_system_obj,
+        x0_ls=None,
+        bnds=bounds,
+        args=args,
+    )
+
+    assert result.failure_reason == ZERO_USEFUL_DUTY_REASON
 
 
 def _halved(machine):
