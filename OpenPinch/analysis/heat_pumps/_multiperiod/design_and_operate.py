@@ -49,15 +49,16 @@ def design_and_operate(
         installed_machine(periods)
         for periods in zip(*(result.hpr_machine_components for _, result in alone))
     )
+    points = [point for point, _ in alone]
     outputs = {
         str(case.period_id): operate_installed_machine(
             machines,
             objective=f_obj,
-            initial_points=_starts(point, x0_ls),
+            initial_points=_starts(index, points, x0_ls),
             bounds=bnds,
             args=case.args,
         )
-        for case, (point, _) in zip(cases, alone, strict=True)
+        for index, case in enumerate(cases)
     }
     weighted, objective = aggregate_hpr_period_results(
         outputs, weights, idle_weight=args.idle_period_weight
@@ -88,9 +89,13 @@ def _solve_alone(
     return point, evaluate_hpr_candidate(objective=f_obj, point=point, args=args)
 
 
-def _starts(own: np.ndarray, x0_ls) -> np.ndarray:
-    """A period's operation starts from its own design, then the warm starts."""
-    rows = [np.atleast_2d(own)]
+def _starts(index: int, points: Sequence[np.ndarray], x0_ls) -> np.ndarray:
+    """A period's operation starts from its own design, then the other
+    periods' designs (each fits the installed machine), then the warm
+    starts."""
+    rows = [np.atleast_2d(points[index])] + [
+        np.atleast_2d(point) for other, point in enumerate(points) if other != index
+    ]
     if x0_ls is not None:
         rows.append(np.atleast_2d(np.asarray(x0_ls, dtype=float)))
     return np.vstack(rows)

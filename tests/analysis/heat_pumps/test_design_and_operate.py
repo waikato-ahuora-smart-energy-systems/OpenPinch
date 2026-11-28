@@ -33,7 +33,7 @@ from OpenPinch.domain.configuration import Configuration
 _SCALES = {"base": 1.0, "peak": 1.6}
 
 
-def _period(scale: float):
+def _period(scale: float, evaluations: int):
     args = hp_pre.construct_HPRTargetInputs(
         Q_hpr_target=50.0 * scale,
         T_vals=np.array([120.0, 80.0, 40.0]),
@@ -43,13 +43,20 @@ def _period(scale: float):
     )
     args.refrigerant_ls = ["Ammonia"]
     args.max_multi_start = 1
-    args.search_budget = HPRSearchBudget(maximum_evaluations=60)
+    # One evaluation takes about half a second under Pyodide, so each test
+    # searches no more than it needs.
+    args.search_budget = HPRSearchBudget(maximum_evaluations=evaluations)
     return args
 
 
-def _inputs() -> MultiPeriodHPRTargetInputs:
+def _inputs(evaluations: int) -> MultiPeriodHPRTargetInputs:
     cases = [
-        HPRPeriodCase(period_id=name, period_idx=idx, weight=0.5, args=_period(scale))
+        HPRPeriodCase(
+            period_id=name,
+            period_idx=idx,
+            weight=0.5,
+            args=_period(scale, evaluations),
+        )
         for idx, (name, scale) in enumerate(_SCALES.items())
     ]
     selected = cases[0].args
@@ -100,7 +107,7 @@ def _periods_alone_total(args: MultiPeriodHPRTargetInputs, x0, bounds) -> float:
 
 
 def test_a_designed_and_operated_machine_is_never_dearer_than_periods_alone():
-    args = _inputs()
+    args = _inputs(evaluations=6)
     x0, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
 
     result = design_and_operate(
@@ -119,8 +126,9 @@ def test_each_period_runs_the_installed_machine():
     # The base period's own machine is smaller than the peak's; run on the
     # installed machine it uses the spare area and costs less to run than
     # its own design. Running its own design instead, the two costs are
-    # equal (4,805 $/y), which is what this test rules out.
-    args = _inputs()
+    # equal (4,805 $/y), which is what this test rules out. The saving needs
+    # a search of 60 evaluations to find; at 30 or fewer it does not.
+    args = _inputs(evaluations=60)
     x0, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
 
     result = design_and_operate(
