@@ -151,6 +151,9 @@ def placed_case(
     for sink in _ambient_sinks(problem):
         if sink in source["utilities"]:
             continue
+        # Only a sink's cold side rejects to ambient: a ``Both`` utility
+        # would also bring a hot utility outside the placed levels.
+        sink = sink | {"type": "Cold"}
         if any(
             (u["name"], u["type"]) == (sink["name"], sink["type"])
             for u in source["utilities"]

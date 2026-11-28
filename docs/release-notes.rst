@@ -81,7 +81,9 @@ Heat exchanger networks
   and the site surplus was dumped from it at the steam price: the
   reviewer's three-level steam main cost 41,432 $/y against 21,348 at two
   levels. A placed case now always keeps the utility that rejects heat to
-  ambient, and the three-level case costs 20,665 $/y.
+  ambient, and the three-level case costs 20,665 $/y. A sink given as
+  ``Both`` is kept as a cold utility only, so it adds no heating outside
+  the placed levels.
 - A site whose processes recover no heat within themselves is designed.
   Its processes are linked only through the site's utilities, so there is
   nothing for the site evolution to refine, and

@@ -225,6 +225,38 @@ def test_a_placed_case_keeps_each_periods_ambient_sink(monkeypatch):
     assert {"CW", "RW"} <= names
 
 
+def test_an_ambient_sink_given_as_both_is_kept_as_a_cold_utility(monkeypatch):
+    """The case's cooling water is given as ``Both``. The placed case kept
+    the record as given, so the site gained a hot utility outside its
+    placed levels (Codex review of #573). Only its cold side rejects to
+    ambient, so only that is kept."""
+    from OpenPinch.application._problem.accessors import target
+    from tests.application.test_site_heat_exchanger_network import _utility
+
+    source = _site().to_problem_json()
+    for utility in source["utilities"]:
+        if utility["name"] == "CW":
+            utility["type"] = "Both"
+    problem = PinchProblem(source)
+    placed_source = problem.to_problem_json()
+    placed_source["utilities"] = [
+        _utility(f"{side}_iso_{level}", kind, t, t + step, 60.0)
+        for level, t in ((1, 180.0), (2, 100.0))
+        for side, kind, step in (("hot", "Hot", -0.01), ("cold", "Cold", 0.01))
+    ]
+    placed = PinchProblem(placed_source)
+    monkeypatch.setattr(
+        target._TargetAccessor, "utility_placement", lambda self, **_: placed
+    )
+    monkeypatch.setattr(site_levels, "_fallback_utilities", lambda _placed: {})
+
+    case = site_levels.placed_case(problem, 2)
+
+    kept = {(u["name"], u["type"]) for u in case.to_problem_json()["utilities"]}
+    assert ("CW", "Cold") in kept
+    assert {("CW", "Both"), ("CW", "Hot")}.isdisjoint(kept)
+
+
 def test_an_ambient_sink_named_as_a_placed_level_is_refused(monkeypatch):
     """The case's cooling water is called iso_1, the name the first placed
     main takes: the placed case took the main for it and dropped the cooling
