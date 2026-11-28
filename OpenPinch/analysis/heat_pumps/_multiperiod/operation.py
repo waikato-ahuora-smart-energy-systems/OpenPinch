@@ -15,7 +15,11 @@ import numpy as np
 from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult
 from ..common.capital import MachineComponents
 from ..common.shared import hpr_penalty_cost_scale
-from ..optimisation_adapter import evaluate_hpr_candidate, run_hpr_candidate_search
+from ..optimisation_adapter import (
+    evaluate_hpr_candidate,
+    reject_penalised_design,
+    run_hpr_candidate_search,
+)
 
 __all__ = ["DOES_NOT_FIT_REASON", "operate_installed_machine"]
 
@@ -76,8 +80,12 @@ def operate_installed_machine(
     # The penalty guides the search; the operation is the best candidate that
     # fits the machine's sizes and turndown, or none.
     for candidate in sorted(candidates, key=lambda candidate: candidate.objective):
-        result = evaluate_hpr_candidate(
-            objective=objective, point=candidate.point, args=args
+        # A candidate outside a cycle limit (still penalised) is no operation.
+        result = reject_penalised_design(
+            evaluate_hpr_candidate(
+                objective=objective, point=candidate.point, args=args
+            ),
+            args,
         )
         if result.success and shortfall(result) <= _SHORTFALL_TOLERANCE:
             return result

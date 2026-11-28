@@ -387,6 +387,8 @@ jobs:
               tests/analysis/heat_pumps/test_ihx_thermodynamic_bounds.py
               tests/analysis/heat_pumps/test_cascade_vapour_compression.py
               tests/analysis/heat_pumps/test_multiperiod_hpr.py
+              tests/analysis/heat_pumps/test_design_and_operate.py
+              tests/analysis/heat_pumps/test_operate_installed_machine.py
           - shard: heat-pumps
             paths: >-
               tests/analysis/heat_pumps
@@ -394,6 +396,8 @@ jobs:
               --ignore=tests/analysis/heat_pumps/test_ihx_thermodynamic_bounds.py
               --ignore=tests/analysis/heat_pumps/test_cascade_vapour_compression.py
               --ignore=tests/analysis/heat_pumps/test_multiperiod_hpr.py
+              --ignore=tests/analysis/heat_pumps/test_design_and_operate.py
+              --ignore=tests/analysis/heat_pumps/test_operate_installed_machine.py
           - shard: placement
             paths: >-
               tests/application/test_utility_placement.py
@@ -418,6 +422,8 @@ jobs:
               tests/application/test_hpr_period_batch_boundaries.py
               tests/application/test_hpr_refrigerant_screen.py
               tests/application/test_hpr_residual_workflow.py
+              tests/application/test_hpr_shared_heat_pump_turndown.py
+              tests/application/test_hpr_shared_vc_mvr_heat_pump.py
           - shard: application
             # test_coolprop_hpr_audit.py takes over 12 minutes in Pyodide;
             # the CPython test lanes cover it.
@@ -440,6 +446,8 @@ jobs:
               --ignore=tests/application/test_hpr_period_batch_boundaries.py
               --ignore=tests/application/test_hpr_refrigerant_screen.py
               --ignore=tests/application/test_hpr_residual_workflow.py
+              --ignore=tests/application/test_hpr_shared_heat_pump_turndown.py
+              --ignore=tests/application/test_hpr_shared_vc_mvr_heat_pump.py
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

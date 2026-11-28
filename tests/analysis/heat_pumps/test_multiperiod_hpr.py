@@ -508,7 +508,7 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
         lambda **_kwargs: None,
     )
 
-    def fake_solve(*, f_obj, x0_ls, bnds, args, stage_lifts=None):
+    def fake_solve(*, f_obj, x0_ls, bnds, args, stage_lifts=None, idle_point=None):
         captured["period_ids"] = [case.period_id for case in args.period_cases]
         captured["hpr_type"] = args.hpr_type
         captured["has_bounds"] = bool(bnds)

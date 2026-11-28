@@ -267,6 +267,28 @@ def test_a_machine_that_costs_the_year_more_than_none_is_no_heat_pump():
     assert result.failure_reason == ZERO_USEFUL_DUTY_REASON
 
 
+def test_the_design_vector_is_the_installed_sizes():
+    # A shared target reports its design vector (notebook 10 checks it); a
+    # designed and operated machine's design is its installed sizes, per
+    # compressor its volume flow and shaft power, then its exchanger areas.
+    args = _inputs(evaluations=6)
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+
+    result = design_and_operate(
+        f_obj=hp_cascade._compute_cascade_hp_system_obj,
+        x0_ls=None,
+        bnds=bounds,
+        args=args,
+    )
+
+    (machine,) = result.weighted_output.hpr_machine_components
+    (compressor,) = machine.compressors
+    np.testing.assert_allclose(
+        result.design_vector,
+        [compressor.volume_flow, compressor.shaft_power, *machine.exchanger_areas],
+    )
+
+
 def _halved(machine):
     return dataclasses.replace(
         machine,

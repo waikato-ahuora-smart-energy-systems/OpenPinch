@@ -28,7 +28,7 @@ from ..performance_maps.targeting import preflight_tespy_hpr_targeting
 from .aggregation import evaluate_multiperiod_candidate, selected_period_case
 from .design_and_operate import design_and_operate
 from .preparation import period_case_by_id
-from .setup import get_multiperiod_hpr_optimisation_setup
+from .setup import get_multiperiod_hpr_optimisation_setup, multiperiod_idle_point
 from .state import _PreparedHPRPeriodCase
 
 
@@ -70,7 +70,11 @@ def get_multiperiod_hpr_targets(
     if stage_lifts is not None:
         # Vapour compression: one installed machine, operated per period.
         result = solve_design_and_operate(
-            f_obj=period_objective, x0_ls=initial_points, bnds=bounds, args=args
+            f_obj=period_objective,
+            x0_ls=initial_points,
+            bnds=bounds,
+            args=args,
+            idle_point=multiperiod_idle_point(args.hpr_type),
         )
     else:
         result = solve_hpr_multiperiod_placement(
@@ -88,11 +92,15 @@ def solve_design_and_operate(
     x0_ls: list | np.ndarray | float | None,
     bnds: list,
     args: MultiPeriodHPRTargetInputs,
+    idle_point: Callable | None = None,
 ) -> HPRBackendResult:
     """Design one installed machine for every period and operate it in each
     (``design_and_operate``), checked and translated as a shared design."""
     result = reject_penalised_periods(
-        design_and_operate(f_obj=f_obj, x0_ls=x0_ls, bnds=bnds, args=args), args
+        design_and_operate(
+            f_obj=f_obj, x0_ls=x0_ls, bnds=bnds, args=args, idle_point=idle_point
+        ),
+        args,
     )
     if result.success and np.isfinite(float(result.obj)):
         return translate_hpr_result(

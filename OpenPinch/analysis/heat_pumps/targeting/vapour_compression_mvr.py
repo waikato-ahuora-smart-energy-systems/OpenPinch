@@ -132,6 +132,16 @@ def _vc_mvr_layout(args: HeatPumpTargetInputs) -> HPRoptVectorLayout:
     )
 
 
+def _vc_mvr_idle_point(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
+    """``x`` with the machine off: its levels kept, no process heat.
+
+    The cycle at its lower bounds is infeasible rather than off.
+    """
+    off = np.asarray(x, dtype=float).copy()
+    off[_vc_mvr_layout(args).heat_split_slice] = 0.0
+    return off
+
+
 def _get_vc_mvr_opt_setup(
     init_res: HPRBackendResult | None,
     args: HeatPumpTargetInputs,

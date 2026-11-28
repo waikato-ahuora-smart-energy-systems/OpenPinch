@@ -39,11 +39,14 @@ def design_and_operate(
     x0_ls: Sequence[float] | np.ndarray | None,
     bnds: Sequence[Sequence[float]],
     args: MultiPeriodHPRTargetInputs,
+    idle_point: Callable | None = None,
 ) -> HPRBackendResult:
     """Return the selected period's result of the designed and operated machine.
 
     ``period_outputs`` hold each period's operation and ``weighted_output``
-    the year's figures with the installed machine's capital.
+    the year's figures with the installed machine's capital. ``idle_point``
+    (``x, args -> x``) turns a period's own design into the machine off;
+    without it the machine off is the cycle at its lower bounds.
     """
     cases = args.period_cases
     weights = np.asarray([case.weight for case in cases], dtype=float)
@@ -71,9 +74,13 @@ def design_and_operate(
     if not any(operation.success for operation in operated):
         # A machine no period can run is no heat pump.
         return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+    off = [
+        _off_point(point, bnds, case.args, idle_point)
+        for point, case in zip(points, cases, strict=True)
+    ]
     outputs = {
-        str(case.period_id): _or_idle(operation, f_obj, bnds, case.args)
-        for case, operation in zip(cases, operated, strict=True)
+        str(case.period_id): _or_idle(operation, f_obj, point, case.args)
+        for case, operation, point in zip(cases, operated, off, strict=True)
     }
     weighted, objective = aggregate_hpr_period_results(
         outputs, weights, idle_weight=args.idle_period_weight
@@ -82,7 +89,10 @@ def design_and_operate(
         machines, weighted, objective, [result for _, result in alone]
     )
     _, without = aggregate_hpr_period_results(
-        {str(case.period_id): _idle(f_obj, bnds, case.args) for case in cases},
+        {
+            str(case.period_id): _idle(f_obj, point, case.args)
+            for case, point in zip(cases, off, strict=True)
+        },
         weights,
         idle_weight=args.idle_period_weight,
     )
@@ -96,6 +106,21 @@ def design_and_operate(
         obj=objective,
         period_outputs=outputs,
         weighted_output=weighted,
+        design_vector=np.asarray(
+            [
+                size
+                for machine in machines
+                for size in (
+                    *(
+                        value
+                        for compressor in machine.compressors
+                        for value in (compressor.volume_flow, compressor.shaft_power)
+                    ),
+                    *machine.exchanger_areas,
+                )
+            ],
+            dtype=float,
+        ),
         period_ids=[str(case.period_id) for case in cases],
         period_weights=[float(case.weight) for case in cases],
     )
@@ -151,25 +176,31 @@ def _annualising_ratio(results: Sequence[HPRBackendResult], index: int) -> float
     )
 
 
-def _or_idle(
-    operated: HPRBackendResult, f_obj, bnds, args: HeatPumpTargetInputs
-) -> HPRBackendResult:
-    """A period's operation, or the machine off there when none fits.
+def _off_point(
+    own: np.ndarray, bnds, args: HeatPumpTargetInputs, idle_point: Callable | None
+) -> np.ndarray:
+    """The point at which a period's machine is off: its own design with no
+    duty (``idle_point``), else the cycle at its lower bounds."""
+    if idle_point is not None:
+        return idle_point(own, args)
+    return np.asarray(bnds, dtype=float)[:, 0]
 
-    The machine off is the cycle at its lower bounds, which carry no duty,
-    priced as an idle period: its utilities serve the whole load.
-    """
+
+def _or_idle(
+    operated: HPRBackendResult, f_obj, off: np.ndarray, args: HeatPumpTargetInputs
+) -> HPRBackendResult:
+    """A period's operation, or the machine off there when none fits."""
     if operated.success:
         return operated
-    return _idle(f_obj, bnds, args)
+    return _idle(f_obj, off, args)
 
 
-def _idle(f_obj, bnds, args: HeatPumpTargetInputs) -> HPRBackendResult:
-    """A period with the machine off: the cycle at its lower bounds, which
-    carry no duty, priced as an idle period on its utilities."""
+def _idle(f_obj, off: np.ndarray, args: HeatPumpTargetInputs) -> HPRBackendResult:
+    """A period with the machine off (the cycle at ``off``, which carries no
+    duty), priced as an idle period on its utilities."""
     idle = evaluate_hpr_candidate(
         objective=f_obj,
-        point=np.asarray(bnds, dtype=float)[:, 0],
+        point=off,
         args=args,
         artifact_mode=HPREvaluationMode.SEARCH,
     )
