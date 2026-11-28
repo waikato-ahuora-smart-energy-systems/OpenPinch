@@ -33,13 +33,13 @@ from OpenPinch.domain.configuration import Configuration
 _SCALES = {"base": 1.0, "peak": 1.6}
 
 
-def _period(scale: float, evaluations: int):
+def _period(scale: float, evaluations: int, **options):
     args = hp_pre.construct_HPRTargetInputs(
         Q_hpr_target=50.0 * scale,
         T_vals=np.array([120.0, 80.0, 40.0]),
         H_hot=scale * np.array([0.0, -50.0, -100.0]),
         H_cold=scale * np.array([100.0, 50.0, 0.0]),
-        config=Configuration(options={"HPR_N_COND": 1, "HPR_N_EVAP": 1}),
+        config=Configuration(options={"HPR_N_COND": 1, "HPR_N_EVAP": 1, **options}),
     )
     args.refrigerant_ls = ["Ammonia"]
     args.max_multi_start = 1
@@ -49,15 +49,17 @@ def _period(scale: float, evaluations: int):
     return args
 
 
-def _inputs(evaluations: int) -> MultiPeriodHPRTargetInputs:
+def _inputs(
+    evaluations: int, scales: dict[str, float] = _SCALES, **options
+) -> MultiPeriodHPRTargetInputs:
     cases = [
         HPRPeriodCase(
             period_id=name,
             period_idx=idx,
             weight=0.5,
-            args=_period(scale, evaluations),
+            args=_period(scale, evaluations, **options),
         )
-        for idx, (name, scale) in enumerate(_SCALES.items())
+        for idx, (name, scale) in enumerate(scales.items())
     ]
     selected = cases[0].args
     return MultiPeriodHPRTargetInputs(
@@ -153,3 +155,25 @@ def test_each_period_runs_the_installed_machine():
     )
     ran = result.period_outputs["base"]
     assert ran.hpr_operating_cost.value < own.hpr_operating_cost.value
+
+
+def test_a_period_the_installed_machine_cannot_serve_runs_without_it():
+    # A light period (5 % of the base load) cannot run the base's machine at
+    # 0.9 of its volume flow (HPR_TURNDOWN_DUTY), so the machine is off
+    # there and the period is priced on its utilities. It raised for want of
+    # a cost breakdown, as the reviewer's three-period case did.
+    args = _inputs(
+        evaluations=6, scales={"base": 1.0, "light": 0.05}, HPR_TURNDOWN_DUTY=0.9
+    )
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+
+    result = design_and_operate(
+        f_obj=hp_cascade._compute_cascade_hp_system_obj,
+        x0_ls=None,
+        bnds=bounds,
+        args=args,
+    )
+
+    light = result.period_outputs["light"]
+    assert light.w_net == 0.0
+    assert light.hpr_operating_cost.value > 0.0

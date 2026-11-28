@@ -16,6 +16,7 @@ import numpy as np
 from ....contracts.hpr import (
     HeatPumpTargetInputs,
     HPRBackendResult,
+    HPREvaluationMode,
     MultiPeriodHPRTargetInputs,
 )
 from ..common.capital import installed_machine
@@ -24,7 +25,7 @@ from ..optimisation_adapter import (
     evaluate_hpr_candidate,
     run_hpr_candidate_search,
 )
-from .aggregation import _with_installed_capital, selected_period_case
+from .aggregation import _as_idle_period, _with_installed_capital, selected_period_case
 from .operation import operate_installed_machine
 
 __all__ = ["design_and_operate"]
@@ -51,12 +52,17 @@ def design_and_operate(
     )
     points = [point for point, _ in alone]
     outputs = {
-        str(case.period_id): operate_installed_machine(
-            machines,
-            objective=f_obj,
-            initial_points=_starts(index, points, x0_ls),
-            bounds=bnds,
-            args=case.args,
+        str(case.period_id): _or_idle(
+            operate_installed_machine(
+                machines,
+                objective=f_obj,
+                initial_points=_starts(index, points, x0_ls),
+                bounds=bnds,
+                args=case.args,
+            ),
+            f_obj,
+            bnds,
+            case.args,
         )
         for index, case in enumerate(cases)
     }
@@ -73,6 +79,25 @@ def design_and_operate(
         period_ids=[str(case.period_id) for case in cases],
         period_weights=[float(case.weight) for case in cases],
     )
+
+
+def _or_idle(
+    operated: HPRBackendResult, f_obj, bnds, args: HeatPumpTargetInputs
+) -> HPRBackendResult:
+    """A period's operation, or the machine off there when none fits.
+
+    The machine off is the cycle at its lower bounds, which carry no duty,
+    priced as an idle period: its utilities serve the whole load.
+    """
+    if operated.success:
+        return operated
+    idle = evaluate_hpr_candidate(
+        objective=f_obj,
+        point=np.asarray(bnds, dtype=float)[:, 0],
+        args=args,
+        artifact_mode=HPREvaluationMode.SEARCH,
+    )
+    return _as_idle_period(idle)
 
 
 def _solve_alone(
