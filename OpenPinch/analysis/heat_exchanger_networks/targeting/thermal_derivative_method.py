@@ -69,14 +69,49 @@ def execute_seeded_thermal_derivative_method_stage(
     *,
     executor: SynthesisExecutor | None = None,
 ):
-    """Build and execute one standalone seeded TDM stage."""
-    return run_stage(
+    """Build and execute one standalone seeded TDM stage.
+
+    The step minimises hot utility, not total annual cost, so each seed is
+    ranked alongside its networks: what the step returns is never dearer
+    than what it started from (review finding 29).
+    """
+    tasks, outcomes = run_stage(
         build_seeded_thermal_derivative_method_tasks(settings, seed_networks),
         problem=problem,
         settings=settings,
         executor=executor,
         default_executor=LocalSynthesisExecutor,
     )
+    return tasks, (*outcomes, *_seed_outcomes(settings, seed_networks))
+
+
+def _seed_outcomes(
+    settings: SynthesisWorkflowSettings,
+    seed_networks: Sequence[HeatExchangerNetwork],
+) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
+    """Each priced seed as an outcome of the task built from it.
+
+    The seed takes that task's run and task ids, as a result's networks do;
+    its method stays its own.
+    """
+    outcomes = []
+    for network in seed_networks:
+        cost = network.total_annual_cost
+        tasks = build_seeded_thermal_derivative_method_tasks(settings, (network,))
+        if cost is None or not tasks:
+            continue
+        outcomes.append(
+            HeatExchangerNetworkSynthesisTaskOutcome(
+                task=tasks[0],
+                status="success",
+                network=network.model_copy(
+                    update={"run_id": tasks[0].run_id, "task_id": tasks[0].task_id}
+                ),
+                objective_value=float(cost),
+                solver_status="seed",
+            )
+        )
+    return tuple(outcomes)
 
 
 def build_thermal_derivative_method_tasks(

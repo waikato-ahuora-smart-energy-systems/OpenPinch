@@ -30,6 +30,12 @@ Utility costs
 Heat exchanger networks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.thermal_derivative()`` on its own returns no network dearer than
+  its seeds. The step minimises hot utility, not total annual cost, and on
+  the four-stream example it returned and stored a network 9 % dearer than
+  the pinch design it started from; its seeds are now ranked alongside its
+  own networks. Inside the full workflow, where evolution follows, nothing
+  changes.
 - A multiperiod network reports each recovery match's approach
   temperatures as the differences its streams pass at in that period. The
   model's approach variables bind only where the area is sized, so in other
