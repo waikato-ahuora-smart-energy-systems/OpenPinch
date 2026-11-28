@@ -112,10 +112,11 @@ def test_a_smaller_condenser_fits_at_a_dearer_operation():
 
 def test_a_running_compressor_moves_at_least_its_turndown():
     # A compressor ten times the design's, turned down no further than 0.9
-    # of its volume flow: the period runs it at that or switches it off. It
-    # ran it at 0.62 of installed without the rule.
-    args, bounds, design_point, design = _case(evaluations=_SMALL_SEARCH)
-    args.turndown = 0.9
+    # of its volume flow (HPR_TURNDOWN_DUTY): the period runs it at that or
+    # switches it off. It ran it at 0.62 of installed without the rule.
+    args, bounds, design_point, design = _case(
+        evaluations=_SMALL_SEARCH, HPR_TURNDOWN_DUTY=0.9
+    )
     (machine,) = design.hpr_machine_components
     (compressor,) = machine.compressors
     installed_flow = 10.0 * compressor.volume_flow

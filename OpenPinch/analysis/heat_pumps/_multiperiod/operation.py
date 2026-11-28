@@ -46,7 +46,7 @@ def operate_installed_machine(
     every component needing more than its installed size.
     """
     scale = hpr_penalty_cost_scale(args)
-    turndown = float(getattr(args, "turndown", 0.0) or 0.0)
+    turndown = float(getattr(args, "turndown_duty", 0.0) or 0.0)
 
     def shortfall(result: HPRBackendResult) -> float:
         needed = result.hpr_machine_components

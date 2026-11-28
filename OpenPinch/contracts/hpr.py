@@ -315,6 +315,9 @@ class HeatPumpTargetInputs(BaseModel):
     # Shared multiperiod designs: each stage's lift in every period is at least
     # turndown x its design lift; the search sets stage_lift_floor (K).
     turndown: float = 0.0
+    # An installed machine's running compressors move at least this share of
+    # their installed suction volume flow, or are off.
+    turndown_duty: float = 0.0
     # Capital costing: overall heat transfer coefficients (W/m2K) by the heat
     # pump side's phase, the ambient air side's (in series with the heat pump
     # side's), and the process streams' own approach (K).
