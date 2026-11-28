@@ -242,6 +242,7 @@ def installed_machine(periods: Sequence[MachineComponents]) -> MachineComponents
             stages[0].fluid,
             max(stage.volume_flow for stage in stages),
             max(stage.shaft_power for stage in stages),
+            max(stage.pressure_ratio for stage in stages),
         )
         for stages in zip(*(period.compressors for period in periods), strict=True)
     )
