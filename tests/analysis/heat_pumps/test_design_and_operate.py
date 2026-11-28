@@ -8,8 +8,12 @@ the machine each component's peak, so it is never dearer than that.
 
 from __future__ import annotations
 
-import numpy as np
+import dataclasses
 
+import numpy as np
+import pytest
+
+import OpenPinch.analysis.heat_pumps._multiperiod.design_and_operate as dao
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 from OpenPinch.analysis.heat_pumps._multiperiod.design_and_operate import (
     design_and_operate,
@@ -206,3 +210,45 @@ def test_a_period_whose_own_best_is_no_heat_pump_does_not_size_the_machine():
 
     assert result.success
     assert result.period_outputs["peak"].w_net == 0.0
+
+
+def test_the_year_pays_for_the_machine_installed(monkeypatch):
+    # Every period using half of each component: the year still pays for the
+    # whole machine installed, not for the components the periods used
+    # (69,423 against 113,132 $; Codex review on #568).
+    args = _inputs(evaluations=6)
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+    seen = {}
+    operate = dao.operate_installed_machine
+
+    def half_used(machines, **kwargs):
+        seen["machines"] = machines
+        result = operate(machines, **kwargs)
+        return result.with_updates(
+            hpr_machine_components=tuple(_halved(m) for m in machines)
+        )
+
+    monkeypatch.setattr(dao, "operate_installed_machine", half_used)
+
+    result = dao.design_and_operate(
+        f_obj=hp_cascade._compute_cascade_hp_system_obj,
+        x0_ls=None,
+        bnds=bounds,
+        args=args,
+    )
+
+    installed = sum(installed_capital(machine) for machine in seen["machines"])
+    assert result.weighted_output.hpr_capital_cost.value == pytest.approx(installed)
+
+
+def _halved(machine):
+    return dataclasses.replace(
+        machine,
+        compressors=tuple(
+            dataclasses.replace(
+                c, volume_flow=c.volume_flow / 2, shaft_power=c.shaft_power / 2
+            )
+            for c in machine.compressors
+        ),
+        exchanger_areas=tuple(area / 2 for area in machine.exchanger_areas),
+    )

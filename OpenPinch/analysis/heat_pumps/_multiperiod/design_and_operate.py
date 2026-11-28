@@ -20,7 +20,8 @@ from ....contracts.hpr import (
     HPREvaluationMode,
     MultiPeriodHPRTargetInputs,
 )
-from ..common.capital import installed_machine
+from ....domain.value import Value
+from ..common.capital import MachineComponents, installed_capital, installed_machine
 from ..optimisation_adapter import (
     aggregate_hpr_period_results,
     evaluate_hpr_candidate,
@@ -77,6 +78,9 @@ def design_and_operate(
     weighted, objective = aggregate_hpr_period_results(
         outputs, weights, idle_weight=args.idle_period_weight
     )
+    weighted, objective = _priced_on(
+        machines, weighted, objective, [result for _, result in alone]
+    )
     selected = _with_installed_capital(
         outputs[str(selected_period_case(args).period_id)], weighted
     )
@@ -86,6 +90,56 @@ def design_and_operate(
         weighted_output=weighted,
         period_ids=[str(case.period_id) for case in cases],
         period_weights=[float(case.weight) for case in cases],
+    )
+
+
+def _priced_on(
+    machines: Sequence[MachineComponents],
+    weighted: HPRBackendResult,
+    objective: float,
+    alone: Sequence[HPRBackendResult],
+) -> tuple[HPRBackendResult, float]:
+    """The year's figures with the capital of the machines installed.
+
+    The aggregation sizes each component for the most any period used; the
+    year pays for what is installed, which can be more. Each machine is
+    annualised at its periods' own ratio of annualised to installed capital.
+    """
+    capital = [installed_capital(machine) for machine in machines]
+    annualized = [
+        cost * _annualising_ratio(alone, index) for index, cost in enumerate(capital)
+    ]
+    before = weighted.hpr_annualized_capital_cost
+    added = sum(annualized) - (0.0 if before is None else float(before.to("$/y").value))
+    total = weighted.hpr_total_annualized_cost
+    return (
+        weighted.with_updates(
+            hpr_machine_components=tuple(machines),
+            hpr_machine_capital_costs=tuple(capital),
+            hpr_machine_annualized_capital_costs=tuple(annualized),
+            hpr_capital_cost=Value(sum(capital), "$"),
+            hpr_annualized_capital_cost=Value(sum(annualized), "$/y"),
+            hpr_total_annualized_cost=(
+                None if total is None else total + Value(added, "$/y")
+            ),
+            obj=objective + added,
+        ),
+        objective + added,
+    )
+
+
+def _annualising_ratio(results: Sequence[HPRBackendResult], index: int) -> float:
+    """A machine's annualised over installed capital, from its periods."""
+    return next(
+        (
+            result.hpr_machine_annualized_capital_costs[index]
+            / result.hpr_machine_capital_costs[index]
+            for result in results
+            if result.hpr_machine_capital_costs
+            and result.hpr_machine_annualized_capital_costs
+            and result.hpr_machine_capital_costs[index] > 0.0
+        ),
+        0.0,
     )
 
 
