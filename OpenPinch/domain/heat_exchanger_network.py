@@ -5,7 +5,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from ._heat_exchanger import rules as _rules
 from ._heat_exchanger.period_state import (
@@ -127,6 +134,17 @@ class NetworkHeatPump(BaseModel):
         return self.electricity_cost + self.annual_capital_cost
 
 
+# The site entries of a network's source metadata its JSON keeps.
+_SITE_ENTRIES = ("site_utility_balance", "utility_level_targets")
+
+
+def _json_form(value: Any) -> Any:
+    """``value`` as JSON: a pydantic model by its own JSON dump."""
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    return value
+
+
 class HeatExchangerNetwork(BaseModel):
     """Ordered heat exchanger network result collection."""
 
@@ -199,6 +217,35 @@ class HeatExchangerNetwork(BaseModel):
     ) -> dict[str, float | int | str | bool | None]:
         _rules.check_summary_metrics(value)
         return value
+
+    @model_serializer(mode="wrap")
+    def _serialise_with_site_entries(self, handler) -> dict[str, Any]:
+        """The fields, plus a site network's site entries under ``site``.
+
+        ``source_metadata`` is left out of the JSON, but a site network's
+        utility balance and utility level targets tell it apart from a plain
+        network (review finding 37); they go out under ``site``, the balance
+        as its JSON form, and come back on reading.
+        """
+        data = handler(self)
+        site = {
+            key: _json_form(self.source_metadata[key])
+            for key in _SITE_ENTRIES
+            if key in self.source_metadata
+        }
+        if site:
+            data["site"] = site
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _restore_site_entries(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or "site" not in data:
+            return data
+        data = dict(data)
+        site = data.pop("site") or {}
+        data["source_metadata"] = {**data.get("source_metadata", {}), **site}
+        return data
 
     @model_validator(mode="after")
     def _validate_period_state_alignment(self) -> Self:
