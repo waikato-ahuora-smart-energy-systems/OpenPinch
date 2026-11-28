@@ -815,6 +815,18 @@ does not reduce the optimization to that period:
    assert set(details.period_ids) == {"turndown", "base", "peak"}
    assert all(output["success"] for output in details.period_outputs.values())
 
+A vapour compression heat pump shared by the periods is one installed machine.
+Each period is first solved alone; the machine installed is each compressor at
+its peak suction volume flow, shaft power and pressure ratio, and each
+exchanger at its peak area. Each period then runs that machine at its cheapest
+operation within those sizes. A running compressor moves at least
+``HPR_TURNDOWN_DUTY`` of its installed volume flow and keeps at least
+``HPR_TURNDOWN_PRESSURE_RATIO`` of its design pressure ratio (both 0.25 by
+default); a period with no such operation runs without the machine, on its
+utilities. The machine's capital is charged once, in the year's figures
+(``weighted_output``), and a machine no period can run is no heat pump. Carnot
+cycles still share one design vector across the periods.
+
 Create a fresh :class:`OpenPinch.PinchProblem` for each technology so their
 committed targets and design vectors cannot contaminate one another. Notebook
 10 applies that pattern separately to Carnot heat pumping, Carnot refrigeration,
