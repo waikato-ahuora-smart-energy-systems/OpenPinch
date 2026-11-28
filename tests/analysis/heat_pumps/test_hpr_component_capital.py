@@ -241,8 +241,9 @@ def test_a_cascade_machine_has_both_compressors_and_its_cascade_exchanger():
     )
     cascade_heat = cascade._subcycles[1].Q_cas_heat
     assert cascade_heat > 0.0
-    assert sorted(machine.exchanger_areas) == pytest.approx(
-        sorted([10.0, 20.0, cascade_heat * 1e3 / (2000.0 * 5.0)])
+    # Idle exchangers (no IHX here) keep their places at 0.
+    assert sorted(area for area in machine.exchanger_areas if area > 0.0) == (
+        pytest.approx(sorted([10.0, 20.0, cascade_heat * 1e3 / (2000.0 * 5.0)]))
     )
 
 
@@ -267,6 +268,35 @@ def test_a_heat_pumps_capital_is_its_components_installed_capital():
     assert result.hpr_machine_capital_costs == pytest.approx(
         (installed_capital(machine),)
     )
+
+
+def test_a_heat_pump_result_records_its_machines_components():
+    # A shared multiperiod design sizes each component for its own peak.
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.4)
+
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args)
+
+    (machine,) = result.hpr_machine_components
+    assert result.hpr_machine_capital_costs == pytest.approx(
+        (installed_capital(machine),)
+    )
+
+
+def test_a_compressor_records_its_pressure_ratio():
+    # An installed machine turns each stage down no further than a share of
+    # its design pressure ratio (HPR_TURNDOWN_PRESSURE_RATIO).
+    args = _target_inputs({})
+    args.refrigerant_ls = ["Ammonia"]
+    x = np.full(len(hp_cascade._get_cascade_hp_opt_setup(None, args)[1]), 0.4)
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+    (stage,) = hp_cascade._build_and_solve_cascade_cycle(state, args, True)._subcycles
+
+    result = hp_cascade._compute_cascade_hp_system_obj(x, args)
+
+    (compressor,) = result.hpr_machine_components[0].compressors
+    assert compressor.pressure_ratio == pytest.approx(max(stage.Ps) / min(stage.Ps))
 
 
 def test_a_heat_pump_reports_its_capital_without_process_exchangers():

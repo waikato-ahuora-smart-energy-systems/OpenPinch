@@ -338,6 +338,83 @@ def test_an_existing_network_that_does_not_solve_is_an_error(fake_solver):
     assert fake_solver.cleaned == fake_solver.solved == 1
 
 
+def _existing_network_idling_one_period() -> HeatExchangerNetwork:
+    """The existing network with E1 idle in the case's period and running
+    in another, as a design on every period leaves a match."""
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+
+    network = _existing_network()
+    states = (
+        HeatExchangerPeriodState(period_id="0", period_idx=0, duty=0.0, active=False),
+        HeatExchangerPeriodState(period_id="other", period_idx=1, duty=100.0),
+    )
+    return network.model_copy(
+        update={
+            "exchangers": tuple(
+                e.model_copy(update={"period_states": states})
+                if e.exchanger_id == "E1"
+                else e
+                for e in network.exchangers
+            )
+        }
+    )
+
+
+def test_an_evaluator_holding_idle_periods_solves_with_them_held(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    seen = []
+    fake_solver.fail = lambda spec: seen.append(dict(spec.recovery_idle)) or False
+    problem = _problem()
+    problem.target.direct_heat_integration()
+    network = _existing_network_idling_one_period()
+    evaluator = search._Evaluator(problem, network, search.RetrofitSettings(), None)
+    evaluator.hold_idle = True
+
+    evaluator.evaluate(search._State(network, frozenset(), ()))
+
+    assert seen == [{0: frozenset({0})}]
+
+
+def test_an_evaluator_holding_idle_periods_holds_them_in_a_ceiling_too(fake_solver):
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import search
+
+    seen = []
+    fake_solver.fail = lambda spec: seen.append(dict(spec.recovery_idle)) or False
+    problem = _problem()
+    problem.target.direct_heat_integration()
+    network = _existing_network_idling_one_period()
+    evaluator = search._Evaluator(problem, network, search.RetrofitSettings(), None)
+    evaluator.hold_idle = True
+
+    evaluator.ceiling(search._State(network, frozenset(), ()))
+
+    assert seen == [{0: frozenset({0})}]
+
+
+def test_an_existing_network_is_solved_with_its_idle_periods_held(fake_solver):
+    # With E1 free to run in the period the network idles it in, the
+    # existing network does not solve: its streams cross there.
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
+        RetrofitSettings,
+        run_retrofit_search,
+    )
+
+    fake_solver.fail = lambda spec: not spec.recovery_idle
+
+    result = run_retrofit_search(
+        _problem(),
+        _existing_network_idling_one_period(),
+        RetrofitSettings(max_modifications=0),
+    )
+
+    (existing,) = result.frontier
+    assert existing.modifications == ()
+    assert fake_solver.solved == 2
+
+
 def test_designs_that_fail_to_solve_or_verify_stay_off_the_frontier(fake_solver):
     from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
         RetrofitSettings,

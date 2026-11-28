@@ -26,20 +26,12 @@ def evaluate_multiperiod_candidate(
     args: MultiPeriodHPRTargetInputs,
     *,
     period_objective: Callable,
-    stage_lifts: Callable | None = None,
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
-    """Evaluate one design vector in every period and apply shared policies.
-
-    With ``stage_lifts`` (the lift of each stage when ``point`` is decoded in
-    a period), each period runs every stage at least at the turndown share
-    of its design lift, the largest lift it has in any period.
-    """
+    """Evaluate one design vector in every period and apply shared policies."""
     if not args.period_cases:
         return HPRBackendResult.failure(reason="No period cases were prepared.")
-    if stage_lifts is not None:
-        _set_stage_lift_floors(point, args.period_cases, stage_lifts)
 
     period_outputs: dict[str, HPRBackendResult] = {}
     idle_cases: list[HPRPeriodCase] = []
@@ -98,7 +90,9 @@ def evaluate_multiperiod_candidate(
         weights,
         idle_weight=args.idle_period_weight,
     )
-    selected = period_outputs[str(selected_period_case(args).period_id)]
+    selected = _with_installed_capital(
+        period_outputs[str(selected_period_case(args).period_id)], weighted
+    )
     return selected.with_updates(
         obj=shared_objective,
         period_outputs=period_outputs,
@@ -109,21 +103,40 @@ def evaluate_multiperiod_candidate(
     )
 
 
-def _set_stage_lift_floors(
-    point: Sequence[float] | np.ndarray,
-    cases: list[HPRPeriodCase],
-    stage_lifts: Callable,
-) -> None:
-    """Give every period the lift floor of the shared machine's stages."""
-    for case in cases:
-        case.args.stage_lift_floor = None
-    design_lifts = np.max(
-        [np.asarray(stage_lifts(point, case.args), dtype=float) for case in cases],
-        axis=0,
-    )
-    for case in cases:
-        turndown = float(getattr(case.args, "turndown", 0.0) or 0.0)
-        case.args.stage_lift_floor = turndown * np.maximum(design_lifts, 0.0)
+_INSTALLED_CAPITAL_FIELDS = (
+    "hpr_capital_cost",
+    "hpr_annualized_capital_cost",
+    "hpr_hot_utility_annualized_capital_cost",
+    "hpr_refrigeration_annualized_capital_cost",
+    "hpr_utility_annualized_capital_cost",
+    "hpr_machine_capital_costs",
+    "hpr_machine_annualized_capital_costs",
+)
+
+
+def _with_installed_capital(
+    period: HPRBackendResult, weighted: HPRBackendResult
+) -> HPRBackendResult:
+    """``period`` with the capital of the machine installed for every period.
+
+    The period's operation stays its own; its capital is the shared design's
+    (``weighted``, sized for the peak), and its total annualised cost is its
+    operation plus that capital (review finding 19).
+    """
+    updates = {
+        field: getattr(weighted, field)
+        for field in _INSTALLED_CAPITAL_FIELDS
+        if getattr(weighted, field, None) is not None
+    }
+    operating = period.hpr_operating_cost
+    capital = updates.get("hpr_annualized_capital_cost")
+    if operating is not None and capital is not None:
+        total = operating + capital
+        utility_capital = updates.get("hpr_utility_annualized_capital_cost")
+        if utility_capital is not None:
+            total = total + utility_capital
+        updates["hpr_total_annualized_cost"] = total
+    return period.with_updates(**updates)
 
 
 def _as_idle_period(result: HPRBackendResult) -> HPRBackendResult:

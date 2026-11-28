@@ -113,7 +113,9 @@ HPR utilities are priced relative to the HPR electricity price
 (``COSTING_HPR_ELE_PRICE``, default $100/MWh), not from utility stream prices:
 
 - External heating costs ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` (default 1.0).
-- Ambient air is free. It supplies and takes heat inside each HPR cascade, as
+- Ambient air supplies heat for free and takes heat at the cooling water
+  price: heat rejected to air ends at ambient, so it is charged as cooling
+  water is. It supplies and takes heat inside each HPR cascade, as
   far as its temperature allows: ``ENV_TEMPERATURE`` (default 15 °C) with a
   ``dt_cont`` of ``HPR_DT_ENV_CONT`` (default 10 K). Set
   ``HPR_AMBIENT_AIR_ENABLED`` to ``False`` when air is not available as a heat
@@ -178,17 +180,19 @@ with ``COSTING_DISCOUNT_RATE`` and ``COSTING_SERVICE_LIFE``; set
 ``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` to ``False`` to leave it out of the
 objective.
 
-The default utilities the design still needs carry installed capital too:
+The default utilities the design still needs can carry installed capital too.
+It is left out unless ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` is set
+to ``True`` (the default is ``False``). With it on,
 ``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $750/kW of hot utility) and
-``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration),
-annualized the same way. A heat pump that displaces utility capacity is
-credited for it. Results report it as ``hpr_utility_annualized_capital_cost``,
-alongside ``hpr_annualized_capital_cost`` for the heat pump, and split it into
+``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration)
+are annualized the same way, and a heat pump that displaces utility capacity
+is credited for it. Results report it as
+``hpr_utility_annualized_capital_cost``, alongside
+``hpr_annualized_capital_cost`` for the heat pump, and split it into
 ``hpr_hot_utility_annualized_capital_cost`` and
 ``hpr_refrigeration_annualized_capital_cost``. Across periods each utility is
 sized for its own peak period, and the utility capital is the sum of those two
-peaks. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to ``False`` to
-leave it out.
+peaks.
 
 Heat pumps do not always pay, especially for high lifts. When the best valid
 design is no heat pump, targeting raises a typed "no beneficial heat pump"
@@ -322,9 +326,9 @@ site buys heat at and the evaporator's is heated from the level the site
 has heat to spare at, so the site's utility balance counts them as
 generation and use with no change to the design.
 
-Total site targeting of the new case gives the hot utility the heat pump
-target left, and its cold utility plus the heat the target let ambient
-air take (the air is not written into the case). On a site that imports
+Total site targeting of the new case gives the hot and cold utility the
+heat pump target left. The target's cold utility holds the heat it rejects
+to ambient air, which is not written into the case either. On a site that imports
 800 kW of steam at 180 degC and has 1000 kW to spare at 140 degC, a full
 load heat pump leaves 0.08 kW of import, and so does the case.
 
@@ -407,6 +411,15 @@ contribution (``HPR_DT_CONT`` included) at that multiplier, because a
 design at 0.75 sees every stream at 0.75 of its contribution and a heat
 pump targeted at 1.0 would sit at the wrong levels there.
 
+The target is priced as the networks are ranked: heat and cooling at the
+utilities the direct integration target draws, weighted by their duties,
+over ``COSTING_HPR_ELE_PRICE``, in place of the default
+``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` of 1.0. A heat pump that cannot
+beat the steam it saves at the steam's own price is not designed at all.
+To size it on other prices, set ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE``
+(or the cooling ratio) in the problem's options or in ``heat_pump``'s
+``options``; a ratio set there is kept.
+
 Each network designed around the heat pump's streams carries a
 ``NetworkHeatPump`` in ``network.heat_pumps`` (duties, work, COP,
 electricity cost, compressor capital) and its total annual cost is
@@ -417,11 +430,33 @@ electricity cost, compressor capital) and its total annual cost is
      + work x COSTING_HPR_ELE_PRICE x COSTING_ANNUAL_OP_TIME
      + annualised (heat_pump_cost x condenser capacity)
 
-``utility_cost`` and ``capital_cost`` stay the network's own utilities
-and exchangers; the condenser and the evaporator are exchangers of the
-network and are priced there. ``heat_pump_cost`` prices the compressor
+``utility_cost`` holds the network's utilities and the machine's
+electricity, and ``capital_cost`` the network's own exchangers; the
+condenser and the evaporator are exchangers of the network and are priced
+there. ``heat_pump_cost`` prices the compressor
 and its motor for every cycle for now; left at 0 the design warns that the
 compressor is free.
+
+The network names the heat pump's condenser and evaporator streams, which
+the problem does not hold: the design added them to a case of its own. The
+machine carries them (``NetworkHeatPump.streams``, the stream input records
+of that case, which the network's JSON keeps), so the problem can read the
+network again::
+
+   network = design.selected_network          # or its JSON
+   problem.design.optimise_duties(network, objective="rating")
+   problem.design.retrofit(network, max_modifications=2)
+
+Both build the case again from the problem and the streams the network
+carries, on a problem loaded under another project name too, and every
+network they return keeps the machine and its annual cost. A retrofit's
+designs include the existing machine's electricity in ``utility_cost``, as
+a retrofit's own heat pump step does. A heat pump on a site's utility
+system (``total_site_heat_exchanger_network``) carries no streams: a site
+network is not rated or retrofitted. A network around a vapour compression
+heat pump is read, but its rating fails as it does on the design's own
+case: a segmented condenser's network is not yet a feasible point of its
+own rating problem.
 
 On the basic pinch sample (steam at 10 $/MWh, electricity at 100 $/MWh) a
 Carnot heat pump at full load draws 263.4 kW at multiplier 1.0, 218,636
@@ -779,6 +814,18 @@ does not reduce the optimization to that period:
    details = target.hpr_details
    assert set(details.period_ids) == {"turndown", "base", "peak"}
    assert all(output["success"] for output in details.period_outputs.values())
+
+A vapour compression heat pump shared by the periods is one installed machine.
+Each period is first solved alone; the machine installed is each compressor at
+its peak suction volume flow, shaft power and pressure ratio, and each
+exchanger at its peak area. Each period then runs that machine at its cheapest
+operation within those sizes. A running compressor moves at least
+``HPR_TURNDOWN_DUTY`` of its installed volume flow and keeps at least
+``HPR_TURNDOWN_PRESSURE_RATIO`` of its design pressure ratio (both 0.25 by
+default); a period with no such operation runs without the machine, on its
+utilities. The machine's capital is charged once, in the year's figures
+(``weighted_output``), and a machine no period can run is no heat pump. Carnot
+cycles still share one design vector across the periods.
 
 Create a fresh :class:`OpenPinch.PinchProblem` for each technology so their
 committed targets and design vectors cannot contaminate one another. Notebook

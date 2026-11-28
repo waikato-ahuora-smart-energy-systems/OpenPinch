@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
 from ..analysis.heat_exchanger_networks.errors import WorkflowContractError
 from ..analysis.heat_exchanger_networks.heat_pump_cost import (
     heat_pump_record,
@@ -19,6 +21,7 @@ from .case_derivation import (
     _case_with_utility_heat_pump_zones,
     _require_heat_pump_site_target,
     _require_heat_pump_stream_support,
+    heat_pump_stream_records,
 )
 
 
@@ -34,6 +37,173 @@ class HeatPumpDesignCase:
     target: Any
     case: Any
     record: Any = None
+
+
+HEAT_PUMP_SNAP_K = 1e-4
+"""How far (K) a heat pump stream may start or end from a process
+temperature and be moved onto it."""
+
+
+def _process_temperatures(problem) -> list[np.ndarray]:
+    """The shifted temperatures (degC) the process streams of ``problem``,
+    and their segments, start or end at, in each period in order."""
+    root = problem._require_prepared_root_zone()
+    found: list[list[float]] = [[] for _ in range(max(1, len(problem.period_ids)))]
+    for group in (root.hot_streams, root.cold_streams):
+        for _key, stream in group.items():
+            for part in (stream, *(stream.segments if stream.has_segments else ())):
+                for value in (
+                    part.shifted_minimum_temperature,
+                    part.shifted_maximum_temperature,
+                ):
+                    each = np.atleast_1d(np.asarray(value.value, dtype=float))
+                    for period, temperatures in enumerate(found):
+                        # One value holds in every period.
+                        temperatures.append(float(each[period % each.size]))
+    return [np.unique(np.asarray(values, dtype=float)) for values in found]
+
+
+def _on_process_temperatures(case, process, *, approach: float):
+    """``case`` with its heat pump streams on the process temperatures
+    they lie beside.
+
+    A converged target puts a level at a kink of the composite curves, a
+    temperature a process stream starts or ends at, to the search's
+    tolerance: 1e-5 K under it on the basic pinch case. A condenser that
+    far under the temperature a cold stream ends at leaves that stream's
+    last 1e-5 K to the hot utility, a second pinch at the condenser, and
+    the case has no network. Each temperature of a condenser or evaporator
+    stream within ``HEAT_PUMP_SNAP_K`` of a shifted temperature of
+    ``process`` (the problem as the design sees it, without the heat pump)
+    is moved onto it; ``approach`` (K) is the heat pump's own contribution
+    there. The air's streams are left: they sit at the ambient temperature.
+    """
+
+    grids = _process_temperatures(process)
+    if not all(grid.size for grid in grids):
+        return case
+    source = case.to_problem_json()
+
+    def offset(temperature: float, sign: float, grid: np.ndarray) -> float | None:
+        """The move that puts ``temperature`` on the temperature of ``grid``
+        it lies beside (0 when it is on it); ``None`` when it lies beside
+        none."""
+        shifted = temperature + sign * approach
+        nearest = float(grid[np.argmin(np.abs(grid - shifted))])
+        return nearest - shifted if abs(nearest - shifted) <= HEAT_PUMP_SNAP_K else None
+
+    for record in source["streams"]:
+        role = (record.get("heat_pump") or {}).get("role")
+        if role not in ("condenser", "evaporator"):
+            continue
+        # A condenser is a hot stream, shifted down by its contribution; an
+        # evaporator a cold one, shifted up.
+        sign = -1.0 if role == "condenser" else 1.0
+        ends = [
+            (part, key)
+            for part in (record, *(record.get("segments") or ()))
+            for key in ("t_supply", "t_target")
+            if part.get(key) is not None
+        ]
+        if not ends:
+            continue
+        # The stream moves whole, each period by its own amount: the first
+        # of its temperatures that lies beside a process temperature sets
+        # the move. Moving one end of a 0.01 K stream alone would change the
+        # span the problem table reads its duty over.
+        periods = [
+            [float(v) for v in part[key].get("values", [part[key].get("value")])]
+            for part, key in ends
+        ]
+        # Each period against its own process temperatures; a stream given
+        # one value for every period, against those of every period.
+        own = (
+            grids
+            if len(periods[0]) == len(grids)
+            else [np.unique(np.concatenate(grids))] * len(periods[0])
+        )
+        moves = [
+            next(
+                (m for m in (offset(t, sign, grid) for t in each) if m is not None),
+                0.0,
+            )
+            for each, grid in zip(zip(*periods), own)
+        ]
+        for (part, key), values in zip(ends, periods):
+            placed = [t + move for t, move in zip(values, moves)]
+            part[key] = (
+                {**part[key], "values": placed}
+                if "values" in part[key]
+                else {**part[key], "value": placed[0]}
+            )
+    return type(case)(source, project_name=case.project_name)
+
+
+_PRICE_RATIO_KEYS = {
+    "hot": "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE",
+    "cold": "COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE",
+}
+
+
+def _drawn_price(utilities, weights=None) -> float | None:
+    """The price ($/MWh) of the heat ``utilities`` carry: each period's
+    price weighted by the duty drawn in it and the period's weight
+    (``weights``, equal when ``None``), over every utility and period; with
+    no duty drawn, the cheapest; with no utility, ``None``."""
+    cost = drawn = 0.0
+    cheapest = None
+    for utility in utilities or ():
+        prices = np.atleast_1d(np.asarray(utility.price.to("$/MWh").value, float))
+        duties = np.atleast_1d(np.asarray(utility.heat_flow.value, float))
+        periods = max(prices.size, duties.size)
+        prices, duties = np.resize(prices, periods), np.resize(duties, periods)
+        each = (
+            np.full(periods, 1.0 / periods)
+            if weights is None or len(weights) != periods
+            else np.asarray(weights, float)
+        )
+        duties = np.maximum(duties, 0.0) * each
+        cost += float(np.sum(prices * duties))
+        drawn += float(np.sum(duties))
+        lowest = float(np.min(prices))
+        cheapest = lowest if cheapest is None else min(cheapest, lowest)
+    if cheapest is None:
+        return None
+    return cost / drawn if drawn > 0.0 else cheapest
+
+
+def _at_drawn_utility_prices(problem, scaled, options, costing=None):
+    """``options`` with the heat pump's price ratios at the utilities the
+    direct integration target of ``scaled`` draws.
+
+    The heat pump target prices heat and cooling as ratios of the
+    electricity price (``COSTING_HPR_PRICE_RATIO_*``, heat at the
+    electricity price by default); the design ranks its networks at the
+    utilities' own prices. Each side's ratio is its drawn utilities' price,
+    weighted by their duties, over the electricity price of ``costing``, the
+    design's own costing group (the problem's when ``None``). A ratio the
+    call's ``options`` or the problem's own options name is kept, as is
+    every ratio when electricity has no price.
+    """
+    costing = scaled.master_zone.config.costing if costing is None else costing
+    electricity = float(costing.hpr_ele_price)
+    if electricity <= 0.0:
+        return options
+    named = set(options or {}) | set((problem.to_problem_json().get("options") or {}))
+    direct = scaled.target.direct_heat_integration()
+    out = dict(options or {})
+    for side, key in _PRICE_RATIO_KEYS.items():
+        if key in named:
+            continue
+        price = _drawn_price(
+            getattr(direct, f"{side}_utilities", None),
+            weights=tuple(scaled.master_zone.config.problem.period_weights),
+        )
+        if price is not None:
+            # A credit (a negative price) makes the heat pump's heat or
+            # cooling on that side worth nothing to it, not a cost.
+            out[key] = max(price, 0.0) / electricity
+    return out
 
 
 def _scaled(problem, multiplier: float):
@@ -86,6 +256,8 @@ def heat_pump_design_case(
         # One machine over every period, as the network is one network:
         # the only target that holds the heat pump's streams in each period.
         options = dict(options or {}) | {"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True}
+    # The heat pump is sized on the prices the networks are ranked on.
+    options = _at_drawn_utility_prices(problem, scaled, options, costing)
     target = scaled.target.heat_pump_and_refrigeration(
         cycle,
         duty="heat_pump",
@@ -128,7 +300,31 @@ def heat_pump_design_case(
     else:
         # The zone multiplier scales the heat pump's streams too.
         case = _case_with_heat_pump_streams(
-            problem, target, dt_cont=approach, machine=machine
+            problem,
+            target,
+            dt_cont=approach,
+            machine=machine,
+            # The target stood the evaporator the air's own contribution
+            # under the air, which no multiplier scales; the design scales
+            # every stream's, so the air is written over the multiplier.
+            # At a multiplier of 0 no contribution survives and it is
+            # written as it is.
+            ambient_scale=(
+                1.0 / (zone_multiplier * multiplier)
+                if zone_multiplier * multiplier > 0.0
+                else 1.0
+            ),
+        )
+        # A level the search left a hair off a process temperature goes on
+        # it: the design at this multiplier sees the heat pump's streams
+        # shifted by the approach the target stood them off by.
+        case = _on_process_temperatures(
+            case, scaled, approach=approach * zone_multiplier * multiplier
+        )
+        # The streams the case added go with the machine, so a network of
+        # the case can be solved again from the problem and itself alone.
+        record = record.model_copy(
+            update={"streams": heat_pump_stream_records(case, machine)}
         )
     return HeatPumpDesignCase(
         multiplier=multiplier, target=target, case=case, record=record
@@ -380,11 +576,64 @@ def heat_pump_design_view(problem, plain, runs, *, max_exchangers: int | None = 
     return plain
 
 
+def heat_pump_network_case(problem, network):
+    """The case ``network`` was designed on: ``problem`` with the streams
+    its heat pumps carry (``NetworkHeatPump.streams``).
+
+    ``None`` for a network whose machines carry none, and for one whose
+    streams ``problem`` already holds (the case itself).
+    """
+    carried = [stream for machine in network.heat_pumps for stream in machine.streams]
+    if not carried:
+        return None
+    # A zone's address starts at the root zone, named for the project: the
+    # streams join the same zones under this problem's root.
+    root = problem._require_prepared_root_zone().address
+    carried = [
+        stream | {"zone": root + "".join(stream["zone"].partition("/")[1:])}
+        for stream in carried
+    ]
+    source = problem.to_problem_json()
+    held = {(record["zone"], record["name"]) for record in source["streams"]}
+    missing = [s for s in carried if (s["zone"], s["name"]) not in held]
+    if not missing:
+        return None
+    source["streams"].extend(missing)
+    return type(problem)(source, project_name=problem.project_name)
+
+
+def with_heat_pumps(view, heat_pumps):
+    """``view`` with ``heat_pumps`` recorded on every network of it and
+    their annual cost in its total (``network_with_heat_pumps``)."""
+    from ..analysis.heat_exchanger_networks.results.selection import (
+        ranked_networks,
+        select_network,
+    )
+
+    result = view.result
+    ranked = []
+    for outcome in ranked_networks(result):
+        network = network_with_heat_pumps(outcome.network, heat_pumps)
+        ranked.append(
+            outcome.model_copy(
+                update={
+                    "network": network,
+                    "objective_value": network.total_annual_cost,
+                }
+            )
+        )
+    result.ranked_networks = tuple(ranked)
+    select_network(result)
+    return view
+
+
 __all__ = [
     "HeatPumpDesignCase",
     "capped_heat_pump_streams",
     "design_with_heat_pump",
     "heat_pump_design_case",
     "heat_pump_design_view",
+    "heat_pump_network_case",
     "heat_pump_request",
+    "with_heat_pumps",
 ]

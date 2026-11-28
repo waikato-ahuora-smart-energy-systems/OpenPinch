@@ -66,3 +66,21 @@ def test_the_step_targets_the_searchs_cycle(monkeypatch):
     heat_pump_step(None, SimpleNamespace(network=None), settings)
 
     assert asked == ["vapour_compression"]
+
+
+def test_the_step_targets_at_the_searchs_approach(monkeypatch):
+    # The approach a retrofit holds its matches to (min_approach_temperature)
+    # is the one its heat pump has to stand off by.
+    from OpenPinch.application import heat_pump_retrofit
+
+    asked = []
+
+    def target(problem, network, **arguments):
+        asked.append(arguments.get("approach"))
+
+    monkeypatch.setattr(heat_pump_retrofit, "as_piped_heat_pump", target)
+    settings = RetrofitSettings(heat_pump_cycle="carnot", approach=10.0)
+
+    heat_pump_step(None, SimpleNamespace(network=None), settings)
+
+    assert asked == [10.0]

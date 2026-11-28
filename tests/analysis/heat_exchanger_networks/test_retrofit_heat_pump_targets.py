@@ -553,3 +553,97 @@ def test_a_target_is_priced_at_the_utilities_the_network_uses(monkeypatch):
 
     scale, _capital = annual_cost_scales(problem.master_zone.config.costing)
     assert piped.hot_utility_price == pytest.approx(40.68 * scale)
+
+
+def test_the_as_piped_target_stands_off_by_a_given_approach(monkeypatch):
+    """A retrofit given ``min_approach_temperature`` holds every match to
+    that approach, in place of the streams' contributions. Its heat pump
+    was still targeted on the contributions (its levels 6 K from a cooler
+    and a heater where the retrofit asked for 10 K), so the machine could
+    not be matched as targeted and the step netted a loss. With an
+    approach the coolers and heaters are taken unshifted and the heat pump
+    stands the whole approach off them."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    seen = {}
+
+    def target(**arguments):
+        seen.update(arguments)
+
+    monkeypatch.setattr(heat_pump_targets, "compute_profile_heat_pump_target", target)
+    problem, network = _problem(), _solved_network()
+
+    heat_pump_targets.as_piped_heat_pump(problem, network, approach=10.0)
+
+    unshifted, _hot, _cold = heat_pump_targets.as_piped_profiles(
+        problem, network, dt_cont_multiplier=0.0
+    )
+    np.testing.assert_allclose(seen["T_vals"], unshifted)
+    assert seen["config"].hpr.dt_cont == 10.0
+
+
+def test_a_given_approach_replaces_the_air_and_process_contributions(monkeypatch):
+    """The heat pump service adds the air's own contribution
+    (``HPR_DT_ENV_CONT``) to its approach where it meets air, and the
+    process streams' (``THERMAL_DT_CONT``) where it sizes a process
+    exchanger. A retrofit at a given approach holds those matches to the
+    approach alone: at 10 K the air was met at 20 K and the process at
+    15 K."""
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    seen = {}
+
+    def target(**arguments):
+        seen.update(arguments)
+
+    monkeypatch.setattr(heat_pump_targets, "compute_profile_heat_pump_target", target)
+
+    heat_pump_targets.as_piped_heat_pump(_problem(), _solved_network(), approach=10.0)
+
+    assert seen["config"].hpr.dt_env_cont == 0.0
+    assert seen["config"].thermal.dt_cont == 0.0
+
+
+def test_a_vapour_compression_target_reports_its_duties():
+    """A vapour compression result carries its stages' heating and cooling
+    as ``Q_heat`` and ``Q_cool``; ``Q_cond`` and ``Q_evap`` are a Carnot
+    result's and are ``None`` on it. The summary summed those and reported
+    NaN for the heat delivered, the heat absorbed and both duty tuples,
+    and so for ``heat_pump_gap``."""
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.heat_exchanger_networks.retrofit import (
+        heat_pump_targets,
+    )
+
+    result = SimpleNamespace(
+        Q_cond=None,
+        Q_evap=None,
+        Q_heat=np.array([60.0, 40.0]),
+        Q_cool=np.array([70.0]),
+        Q_amb_hot=10.0,
+        w_net=30.0,
+        cop_h=100.0 / 30.0,
+        T_cond=np.array([90.0, 70.0]),
+        T_evap=np.array([20.0]),
+        hpr_total_annualized_cost=None,
+    )
+    prices = {
+        "hot_utility_price": 300.0,
+        "cold_utility_price": 20.0,
+        "electricity_price": 800.0,
+    }
+
+    summary = heat_pump_targets._summary(
+        result, np.array([0.0, -120.0]), np.array([150.0, 0.0]), prices
+    )
+
+    assert summary.heat_delivered == pytest.approx(100.0)
+    assert summary.condenser_duties == pytest.approx((60.0, 40.0))
+    assert summary.evaporator_duties == pytest.approx((70.0,))
+    # 70 kW of evaporator heat, 10 kW of it from air.
+    assert summary.process_heat_absorbed == pytest.approx(60.0)

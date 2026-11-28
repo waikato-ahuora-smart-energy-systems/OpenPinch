@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Annotated, List, Literal, Optional, Self, Union
+from typing import Annotated, Any, List, Literal, Optional, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -537,6 +537,9 @@ class HeatExchangerNetworkSchema(BaseModel):
     overdesign: NetworkOverdesign | None = None
     # The heat pumps whose streams the network serves, as it records them.
     heat_pumps: tuple[NetworkHeatPump, ...] = ()
+    # A site network's site entries (utility balance, utility level targets,
+    # process duties), as the network's JSON records them.
+    site: dict[str, Any] | None = None
 
     @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod

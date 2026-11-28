@@ -191,6 +191,40 @@ def test_parallel_carnot_cycle_uses_per_stage_pools():
     assert cycle.Q_evap.sum() == available_total
 
 
+def test_a_colder_parallel_machine_draws_on_all_the_source_heat_above_it():
+    """A source of 20 kW/K from 144 to 94 degC. Machines evaporating at 128.8
+    and 117.3 degC need 303.3 and 230.6 kW; the source holds 304 kW at or
+    above the first and 534 kW at or above the second, so both run. Each
+    stage's availability is the heat between it and the stage above, and
+    the hotter machine's duty was taken from the colder one's a second
+    time: it was allowed -73 kW and switched off."""
+    T_evap = np.array([128.8, 117.3])
+    Q_cool_available = get_Q_vals_at_T_hpr_from_bckgrd_profile(
+        T_evap, np.array([144.0, 94.0]), np.array([0.0, -1000.0]), is_cond=False
+    )
+    cycle = ParallelCarnotCycles()
+
+    cycle.solve(
+        T_cond=np.array([226.0, 176.0]),
+        T_evap=T_evap,
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=750.0,
+                x_split=np.array([1.0, 1.0]),
+                Q_available=np.array([450.0, 300.0]),
+            ),
+            cool=StageDutyRequest(Q_available=Q_cool_available),
+        ),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+        args=None,
+    )
+
+    np.testing.assert_allclose(cycle.Q_cond, [450.0, 300.0], rtol=1e-9)
+    np.testing.assert_allclose(cycle.Q_evap, [303.3, 230.6], atol=0.1)
+    assert cycle.Q_evap.sum() <= 20.0 * (144.0 - 117.3)
+
+
 def test_compute_parallel_carnot_objective_handles_mixed_lift_without_ambiguous_truth():
     args = SimpleNamespace(
         n_cond=2,

@@ -23,6 +23,7 @@ from .case_derivation import (
     _heat_pump_zone_address,
     _period_heat_pump_streams,
     _zone_multiplier,
+    heat_pump_stream_records,
 )
 
 
@@ -111,14 +112,18 @@ def heat_pump_machine(
     )
 
 
-def heat_pump_case(problem, solved, *, machine: str):
+def heat_pump_case(problem, solved, *, machine: str, dt_cont_multiplier: float = 1.0):
     """A copy of ``problem`` holding the streams of the as-piped heat pump
     target ``solved``.
 
     Each condenser is a hot stream and each evaporator a cold stream of
     the problem's process zone, marked with ``machine`` and its role, at
     ``HPR_DT_CONT``: the as-piped target stands the heat pump that far
-    off the coolers and heaters. A shared design over several periods
+    off the coolers and heaters. ``dt_cont_multiplier`` is the multiplier
+    the retrofit's model scales every contribution by (a designed existing
+    network's, ``RetrofitSettings.dt_cont_multiplier``); the streams are
+    written over it, so the model holds them at ``HPR_DT_CONT`` and the air
+    at its own contribution still. A shared design over several periods
     (``period_outputs``) writes each stream in every period, with no duty
     where it is off; a level without duty in any period is no stream.
     """
@@ -151,10 +156,11 @@ def heat_pump_case(problem, solved, *, machine: str):
     )
     # The zone the streams join scales each one's contribution by its own
     # multiplier; the target stood the heat pump HPR_DT_CONT off, and the
-    # air its own contribution, as given.
+    # air its own contribution, as given. The retrofit's model scales them
+    # once more, by the existing network's multiplier.
     multiplier = _zone_multiplier(
         problem, _heat_pump_zone_address(problem, target, None)
-    )
+    ) * float(dt_cont_multiplier)
     return _case_with_heat_pump_streams(
         problem,
         target,
@@ -164,18 +170,61 @@ def heat_pump_case(problem, solved, *, machine: str):
     )
 
 
-def _carrying(streams) -> tuple:
-    """The streams of ``streams`` that carry duty."""
+LEVEL_DUTY_FLOOR = 1e-6
+"""The share of its side's duty under which a level's duty is round-off."""
 
-    return tuple(
+
+def _carrying(streams) -> tuple:
+    """The streams of ``streams`` that carry duty.
+
+    A search leaves a level it does not use at round-off, not at 0 (0.0003
+    of 1,500 kW): one that carries under ``LEVEL_DUTY_FLOOR`` of the
+    streams' duty together is no stream, as one at 0 is not.
+    """
+
+    duties = [
+        (stream, float(stream.heat_flow.value)) for _key, stream in streams.items()
+    ]
+    floor = LEVEL_DUTY_FLOOR * sum(max(duty, 0.0) for _stream, duty in duties)
+    return tuple(stream for stream, duty in duties if duty > floor)
+
+
+def _name_streams_for(solved, machine: str, taken) -> None:
+    """Rename the streams of the target ``solved`` after ``machine`` where
+    one of their names is among ``taken``, the stream names the problem
+    already holds.
+
+    Every heat pump target names its streams alike (``HP_H1``, ``HP_C1``,
+    ``AIR_H1``), so the step of a network that already holds a machine
+    would write streams the existing machine's already name. They become
+    ``<machine>_H1``, ``<machine>_C1`` and ``<machine>_AIR_H1``, in every
+    period's outputs too; with no clash the names stay.
+    """
+    streams = [
         stream
-        for _key, stream in streams.items()
-        if float(stream.heat_flow.value) > 0.0
-    )
+        for group in (solved.hpr_hot_streams, solved.hpr_cold_streams)
+        for _key, stream in group.items()
+    ]
+    streams += [stream for _key, stream in solved.amb_streams.items()]
+    for output in (getattr(solved, "period_outputs", None) or {}).values():
+        for group in ("hpr_hot_streams", "hpr_cold_streams"):
+            streams += [s for _key, s in ((output or {}).get(group) or {}).items()]
+    if not any(stream.name in taken for stream in streams):
+        return
+    for stream in streams:
+        if not stream.name.startswith(f"{machine}_"):
+            stream.name = f"{machine}_{stream.name.removeprefix('HP_')}"
 
 
 def heat_pump_step(
-    problem, base, settings, *, limits=None, machine: str = "HP", load_fraction=None
+    problem,
+    base,
+    settings,
+    *,
+    limits=None,
+    machine: str = "HP",
+    load_fraction=None,
+    taken=frozenset(),
 ):
     """The heat pump step a second retrofit search starts from, and the
     as-piped heat pump target it was built from.
@@ -192,10 +241,16 @@ def heat_pump_step(
         args=dict(limits) if limits else None,
         load_fraction=load_fraction,
         cycle=settings.heat_pump_cycle,
+        # The coolers and heaters shifted as the retrofit's model holds them.
+        dt_cont_multiplier=settings.dt_cont_multiplier,
+        # A given approach replaces the contributions for every match, the
+        # heat pump's among them.
+        approach=getattr(settings, "approach", None),
     )
     if solved is None:
         # The heaters carry no load: no heat pump to add.
         return None, None
+    _name_streams_for(solved, machine, taken)
     # A level the target left without duty is not a stream: it would need
     # a match it may not be able to have.
     condensers = _carrying(solved.hpr_hot_streams)
@@ -340,6 +395,13 @@ def retrofit_with_heat_pump(
         # The heat pump step is a modification.
         return base
     sized = []
+    # The names the existing network's machines hold for their streams:
+    # the step's streams take others.
+    taken = frozenset(
+        record["name"]
+        for held in getattr(existing, "heat_pumps", ())
+        for record in held.streams
+    )
     for size in sizes:
         # A target with no machine (none the cycle can model pays), a case
         # that refuses the streams (process components, several process
@@ -353,10 +415,42 @@ def retrofit_with_heat_pump(
                 limits=limits,
                 machine=machine,
                 load_fraction=size,
+                taken=taken,
             )
             if step is None:
                 continue
-            case = snapshot_problem(heat_pump_case(problem, solved, machine=machine))
+            derived = heat_pump_case(
+                problem,
+                solved,
+                machine=machine,
+                dt_cont_multiplier=settings.dt_cont_multiplier,
+            )
+            # The streams the case added go with the machine, as a designed
+            # heat pump network's do: its networks can then be read again
+            # from the problem and themselves alone. The step's own only:
+            # the problem may hold a machine of the same name already,
+            # whose streams its own record carries.
+            own = {
+                stream.name
+                for stream in (
+                    *step.condensers,
+                    *step.evaporators,
+                    *step.ambient_sources,
+                )
+            }
+            step = replace(
+                step,
+                record=step.record.model_copy(
+                    update={
+                        "streams": tuple(
+                            record
+                            for record in heat_pump_stream_records(derived, machine)
+                            if record["name"] in own
+                        )
+                    }
+                ),
+            )
+            case = snapshot_problem(derived)
             with temporary_zone_configuration(
                 case._build_execution_master_zone(), configuration
             ):

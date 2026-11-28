@@ -119,6 +119,74 @@ def test_a_short_main_buys_only_what_its_generation_does_not_cover():
     _closes(balance)
 
 
+def test_the_balance_of_fixed_loads_needs_no_model_of_ones_own():
+    """What a joined set of process networks uses and raises on each level
+    is known without a site model: the cheapest balance of those loads is
+    solved on its own, by level name."""
+    from OpenPinch.analysis.heat_exchanger_networks.site.utility_system import (
+        balance_of_loads,
+    )
+
+    balance = balance_of_loads(_levels(), {"LPS": (10.0,)}, {"LPS": (25.0,)})
+
+    assert balance.level("LPS").letdown_out == pytest.approx(15.0, abs=1e-7)
+    assert balance.level("CW").dump == pytest.approx(15.0, abs=1e-7)
+    assert balance.operating_cost == pytest.approx(75.0, abs=1e-5)
+    _closes(balance)
+
+
+def test_a_network_is_priced_by_the_site_balance_of_its_own_duties():
+    """A heater draws 30 kW of LPS and a cooler raises 10: the site buys
+    the other 20 at 30 $, and that is the network's utility cost."""
+    from OpenPinch.analysis.heat_exchanger_networks.site.levels import (
+        SiteUtilitySystem,
+        priced_by_site_balance,
+    )
+    from OpenPinch.domain._heat_exchanger.period_state import (
+        HeatExchangerPeriodState,
+    )
+    from OpenPinch.domain.enums import HeatExchangerKind, StreamID
+    from OpenPinch.domain.heat_exchanger import HeatExchanger
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    def unit(kind, source, sink, duty):
+        heater = kind is HeatExchangerKind.HOT_UTILITY
+        return HeatExchanger(
+            exchanger_id=f"{source}->{sink}",
+            kind=kind,
+            source_stream=source,
+            sink_stream=sink,
+            source_stream_role=StreamID.Utility if heater else StreamID.Process,
+            sink_stream_role=StreamID.Process if heater else StreamID.Utility,
+            period_states=(
+                HeatExchangerPeriodState(period_id="0", period_idx=0, duty=duty),
+            ),
+        )
+
+    network = HeatExchangerNetwork(
+        exchangers=(
+            unit(HeatExchangerKind.HOT_UTILITY, "Hot Utility.LPS", "A.C1", 30.0),
+            unit(HeatExchangerKind.COLD_UTILITY, "B.H1", "Cold Utility.LPS", 10.0),
+        ),
+        run_id="site-seed",
+        method="site_pinch_design",
+        capital_cost=1000.0,
+    )
+    system = SiteUtilitySystem(
+        levels=_levels(),
+        hot_utilities=(("Hot Utility.VHPS", "VHPS"), ("Hot Utility.LPS", "LPS")),
+        cold_utilities=(("Cold Utility.LPS", "LPS"), ("Cold Utility.CW", "CW")),
+    )
+
+    priced = priced_by_site_balance(network, system)
+
+    assert priced.utility_cost == pytest.approx(600.0, abs=1e-5)
+    assert priced.total_annual_cost == pytest.approx(1600.0, abs=1e-5)
+    assert priced.summary_metrics["site_total_annual_cost"] == pytest.approx(1600.0)
+    balance = priced.source_metadata["site_utility_balance"]
+    assert balance.level("LPS").imported == pytest.approx(20.0, abs=1e-7)
+
+
 def test_a_surplus_on_a_main_is_let_down_to_the_cheapest_dump():
     """B raises 25 kW of LPS and A uses 10: the 15 kW surplus goes down to
     cooling water at 5 $ rather than being dumped on LPS at 30 $."""
@@ -263,6 +331,30 @@ def _cascade_cost(levels, use, generation, dump) -> tuple[float, float, float]:
     dumped = sum(float(u.heat_flow) for u in surplus)
     cost = sum(q * prices[name][0] for name, q in imported) + dump * dumped
     return cost, sum(q for _, q in imported), dumped
+
+
+@settings(deadline=None)
+@given(_cascades())
+def test_the_balance_of_fixed_loads_costs_what_the_models_own_block_does(case):
+    """``balance_of_loads`` writes the same rows for SciPy that
+    ``add_site_balance`` writes into a model; the two must not drift."""
+    from OpenPinch.analysis.heat_exchanger_networks.site.utility_system import (
+        balance_of_loads,
+    )
+
+    levels, use, generation, _dump = case
+    names = [level.name for level in levels]
+    site = SiteUtilityLevels(levels=tuple(levels))
+    used = {name: (q,) for name, q in zip(names, use, strict=True)}
+    raised = {name: (q,) for name, q in zip(names, generation, strict=True)}
+
+    alone = balance_of_loads(site, used, raised)
+
+    in_a_model = _balance(site, used, raised)
+    assert alone.operating_cost == pytest.approx(
+        in_a_model.operating_cost, rel=1e-7, abs=1e-5
+    )
+    _closes(alone)
 
 
 @settings(deadline=None)

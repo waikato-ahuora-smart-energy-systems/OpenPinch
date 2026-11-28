@@ -4,6 +4,611 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.10.1 (2026-11-28)
+-------------------
+
+Results and JSON
+~~~~~~~~~~~~~~~~
+
+- A site network's JSON keeps its site utility balance, utility level
+  targets and (for a site seed) process duties, under ``site``; read back,
+  the network is evolved as a site network again rather than pooled.
+- ``target.model_dump(mode="json")`` and ``target.model_dump_json()`` raise
+  a ``TypeError`` that names ``problem.results``, a target's JSON form; they
+  failed on the target's configuration.
+
+Utility costs
+~~~~~~~~~~~~~
+
+- Every result's provenance names the utility taken to reject heat to
+  ambient and its price, per period (``AMBIENT_SINK``). A warning says when
+  no cold utility is at or above ``ENV_TEMPERATURE`` and the warmest is
+  assumed, when a capped sink leaves the default ``CU`` to set the price at
+  the margin, and when a credit on steam raising is replaced.
+- Only net heating and cooling are charged, as in Total Site targeting.
+  Every heat a cold utility takes ends at ambient, so it is charged at the
+  price of the utility that rejects to ambient: the coldest cold utility
+  whose supply is not below ``ENV_TEMPERATURE`` (with none, the warmest),
+  or the default ``CU`` beyond a capped one. Any other cold utility above
+  ambient costs that price, so raising steam is no
+  longer charged at the steam price (a 60 kW hot-only process raising LP
+  steam priced at 30 $/MWh cost 14,940 $/y; it now costs 2,490 $/y, as on
+  cooling water), and a negative price on such a utility is no longer a
+  credit. Refrigeration (a cold utility below ambient) costs its own price
+  plus the ambient price on the heat it takes and its work, the work per
+  unit of heat being its price over ``COSTING_HPR_ELE_PRICE``. This applies
+  to targets, network designs and the site utility balance alike, so every
+  cost on a case with steam raising or refrigeration changes.
+
+Heat exchanger networks
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.thermal_derivative()`` on its own returns no network dearer than
+  its seeds. The step minimises hot utility, not total annual cost, and on
+  the four-stream example it returned and stored a network 9 % dearer than
+  the pinch design it started from; its seeds are now ranked alongside its
+  own networks (a network that holds its recorded utility levels still
+  ranks ahead of one that does not). Inside the full workflow, where
+  evolution follows, nothing changes.
+- A multiperiod network reports each recovery match's approach
+  temperatures as the differences its streams pass at in that period. The
+  model's approach variables bind only where the area is sized, so in other
+  periods they could sit below the real differences (a dairy match on
+  ``design_basis="all"`` reported 6.30 K where its streams pass at 8.19 K).
+- A site design with ``levels="placed"`` compares the placed levels with
+  the case's own. It returned the cheapest placed count even where the
+  given levels were cheaper: on the reviewer's three-process steam main,
+  placed levels at 20,665 $/y against 20,649 given. The given-levels design
+  now joins the sweep (its row has ``"levels": "given"``) and the cheapest
+  of all is selected.
+- ``verify_network_feasibility`` warns when a network carries no stream
+  data to check against. A network read back from JSON keeps none, so its
+  stream balances, approaches and areas were skipped and it was reported
+  feasible, even with a halved duty or a crossed approach. It is still not
+  failed; the warning says to rate it on its problem with
+  ``design.optimise_duties``.
+- A fitted multiperiod design's ``result.manifest`` describes the search
+  the call asked for. It described the fit to every period instead: one
+  network evolution task at the selected multiplier, with width and depth
+  1, whatever the call's ``width`` and ``depth``.
+- A segmented stream split between two matches in a stage reports its
+  split fractions. The model holds a segmented stream's heat capacity as
+  0, so its share of the stage was not computed and came back ``None``;
+  it is now each match's share of the stream's duty in the stage.
+- A site design with placed levels keeps the case's cooling water. Where
+  the placed levels needed no fallback cooler, the placed case dropped the
+  case's own cold utilities, so a placed steam main was the coldest sink
+  and the site surplus was dumped from it at the steam price: the
+  reviewer's three-level steam main cost 41,432 $/y against 21,348 at two
+  levels. A placed case now always keeps the utility that rejects heat to
+  ambient, and the three-level case costs 20,665 $/y.
+- A site whose processes recover no heat within themselves is designed.
+  Its processes are linked only through the site's utilities, so there is
+  nothing for the site evolution to refine, and
+  ``design.total_site_heat_exchanger_network`` raised "no process network
+  recovers heat". It now returns each process's network joined into one
+  site network and costed by the site utility balance, as when the site
+  evolution fails, with a warning.
+- ``design.retrofit`` takes ``zone``, as ``heat_exchanger_network`` does,
+  to retrofit one process of a site on its own case. A site network is
+  refused with the advice to use each process's own network, but a
+  process's network on the site problem failed, since the other processes'
+  streams had no exchanger ("no exchanger serves: B.HB, B.CB"). With
+  ``zone="A"`` the reviewer's two-process case retrofits process A for a
+  net benefit of 44,151 $/y.
+- A site design warns when a process's design fails one way.
+  ``design.total_site_heat_exchanger_network`` designs each process with
+  levels chosen by price and with its levels held at their targets; when
+  one of the two raised, the other stood in for it silently, and on a
+  steam main case the site cost 25,015 against 20,581 $/y. A
+  ``UserWarning`` now names the process, the design that failed and its
+  error.
+- ``design.network_evolution`` warns when it pools a site's processes, as
+  ``heat_exchanger_network`` does. A site network does not record its
+  processes, so evolving it again matched streams across processes with no
+  piping cost and did not hold each process's levels, with no warning.
+- A network designed on ``design_basis="all"`` is checked with each
+  period's own film coefficients. The stage-wise synthesis recorded only
+  the first period's, and verification sized every period with them: on
+  the crude preheat train with film coefficients rising over the three
+  periods (0.5, 1 and 2 kW/m2/K) every evolved candidate was judged short
+  of area by half and rejected, and a pinch design network was returned
+  at 306,390 $/y. The evolved network is now kept, at 256,680 $/y.
+- ``design.optimise_duties`` with the ``cost`` or ``area`` objective
+  solves a network whose exchanger enters just past a segmented stream's
+  kink. The solver rounds each kink over 0.05 K, so an inlet a tenth of a
+  kelvin past one held a little more heat on the exact profile the area
+  slices are cut on than the solver saw, and the duty overran it ("Exchanger
+  duty exceeds an available parent segment profile"); on a two-segment case
+  five of nine duty optimisations raised. The slices now start where the
+  exact profile holds the solver's heat.
+- Site level moves design again. A move's seed kept only the selected
+  network's recovery matches, so a stream that needs two staged heaters or
+  coolers between two matches had no stage for the second, and every move
+  failed, the unshifted baseline included (all 13 designs on two of three
+  small sites). The seed now keeps the network's staged heaters and
+  coolers, as a site seed does.
+- The guide and ``design.thermal_derivative``'s docstring now say what the
+  thermal derivative step minimises: hot utility (the utilities' cost
+  where a side has a choice), not total annual cost as the guide said. On
+  its own it can return a network dearer than its seed (9 % on the
+  four-stream example); ``design.network_evolution`` then minimises cost,
+  as the full workflow does. No result changes.
+- The median design basis says which streams it leaves out. A stream that
+  runs under ``HENS_BASIS_ACTIVE_SHARE`` of the year (half, by default) is
+  not in the basis case, and the fit can only add a heater or cooler at
+  its end: on the crude preheat train with the residue rundown running
+  only in the peak period the design cost 332,284 $/y against 308,263 on
+  ``design_basis="all"``, with no warning. A ``UserWarning`` now names
+  each such stream and the share of the year it runs.
+- A multiperiod design's ``total_heat_recovery``, ``total_hot_utility``
+  and ``total_cold_utility`` are the year's. On every design over several
+  periods they raised "period_id is required when a network has multiple
+  period states", though the properties take no period. They are now the
+  mean over the periods, weighted by each period's share of the year: the
+  crude preheat train's hot utility is 792.3 kW (its three periods at 0.2,
+  0.6 and 0.2). ``views()`` still gives each period's own.
+- A small stream's exchangers are kept beside a large stream's.
+  ``design.optimise_duties``, the multiperiod fit and every other use of
+  the fixed-structure model took an exchanger with a duty under 1e-4 of
+  the largest stream load as idle, so beside a 50,000 kW stream a 3 kW
+  stream's heater and cooler were removed and the solve failed ("no
+  exchanger serves: P.Csmall"). An exchanger is now idle under 1e-4 of the
+  smaller of its own streams' loads.
+- Network evolution runs again on a case with a segmented stream. Since
+  0.10.0 its check of the approach inside a match looked each solved
+  branch outlet up on the stream's profile, and Ipopt returns an outlet
+  at its bound a few millionths of a kelvin past it (4e-6 K at a 140 degC
+  target), outside the profile, so every evolution task failed. A design
+  then returned its pinch design networks with "Every network evolution
+  task failed": every design with a vapour compression heat pump, whose
+  condenser stream is segmented, was left unevolved. The check now holds
+  each solved end to its stream's own supply and target temperatures. On
+  the basic pinch case with a condensing stream the best network is
+  227,586 $/y again, against 238,102 $/y unevolved.
+- Network evolution no longer fails with "segmented-stream active
+  interval solve was unresolved" before it has solved anything. A model
+  without integers wrote one equality per segment of every segmented
+  stream's temperature, cost and approach profile, all but one switched
+  off, and one with no variable in it at each stream's supply end. Ipopt
+  counts equalities against variables and refused a model with more
+  ("Problem has too few degrees of freedom"), which two segmented
+  streams in one case were enough to reach. Each profile is now one
+  equality there; a model for an integer solver is written as it was.
+  On the basic pinch case with a condensing stream and a cold
+  stream whose heat capacity flowrate changes, evolution returns a
+  network at 223,429 $/y against 239,169 $/y from pinch design; it
+  returned none.
+- Network evolution settles a segmented stream whose best stage
+  boundary is at a kink of its profile. Each segment's line then puts
+  the boundary in the other segment, and the solve went back and forth
+  until it gave up with "piecewise active segments did not stabilise".
+  A stream that returns to a segment it has left is now held in one
+  segment, where the solution is the kink. On a four-stream case with
+  one segmented hot and one segmented cold stream the default design
+  returns evolved networks from 175,645 $/y against 181,221 $/y from
+  pinch design; no evolution task had succeeded.
+- A case with a segmented stream designs with ``HENS_MAX_PARALLEL``
+  above 1. Its models carried their check of the approach inside a match
+  as a function that does not pickle, so the design raised
+  ``PicklingError`` as soon as a worker process sent a model back.
+- ``design.retrofit``, ``design.retrofit_heat_pumps`` and
+  ``design.optimise_duties`` now take a network's JSON (a mapping with
+  ``exchangers``, as a design command returns it through ``run_command``)
+  as the existing network. Such a mapping was read as a hand-written
+  structure and refused, so a client of the command layer could not
+  retrofit, or target heat pumps on, a network it had designed.
+- A thermal derivative or evolution network now also records the
+  approach share it was designed with as
+  ``summary_metrics["min_exchanger_approach_share"]``, so its JSON keeps
+  it. A fit, rating or overdesign of the JSON holds the network to that
+  share; it took the configuration's, so a network designed below the
+  default quarter could rate as infeasible.
+- A network fitted to every period or rated at an overdesign margin now
+  also records its dt_cont multiplier as
+  ``summary_metrics["dt_cont_multiplier"]``, so its JSON keeps it. The
+  multiplier was kept only in ``source_metadata``, which the JSON leaves
+  out, so a fit, rating or overdesign of the JSON read a multiplier of 1.
+  On the crude preheat train a pinch design at 1.5 rated from its JSON
+  at 10 K and 286,974 $/y, against the 15 K and 295,037 $/y it was
+  designed to; a design at 0.75 could not be rated from its JSON at all
+  ("infeasible").
+- ``design.retrofit`` takes the network a design has just returned. With
+  no ``min_approach_temperature`` it held every exchanger to its streams'
+  full contributions, whatever the network was designed to, so it refused
+  a design made below a multiplier of 1 and every evolved network ("the
+  existing network does not meet its targets at its installed areas"),
+  and held a design made above 1 to less than its approach. It now keeps
+  the contributions at the multiplier the network records, times its
+  approach share for a thermal derivative or evolution network, on the
+  existing exchangers and on new matches; a network that records none,
+  such as a hand-written one, is retrofitted as before. On the basic
+  pinch case the default design is now accepted and rated at 105,357 $/y
+  of utility against the 105,397 $/y it was designed at (at an area
+  tolerance of 0.001). The heat pump step targets its machine on the
+  coolers and heaters shifted at that multiplier, and keeps its streams
+  ``HPR_DT_CONT`` off them.
+- A network ``design.retrofit`` returns records the approach the retrofit
+  held, and a later rating, overdesign or retrofit of it holds the same.
+  The network recorded a minimum approach of 1 K
+  (``summary_metrics["approach_temperature"]``) when the retrofit had
+  held its streams' contributions, and nothing that was read back, so it
+  was read as an evolved network at a quarter of the contributions. It
+  now records ``approach_temperature`` only when the retrofit was given
+  ``min_approach_temperature``, and otherwise the multiplier its
+  contributions were scaled by (``dt_cont_multiplier``, with a
+  ``min_exchanger_approach_share`` of 1). A network that records an
+  ``approach_temperature`` (also a duty optimisation given
+  ``min_approach_temperature``, or a fit that fell back to 1 K) is held
+  to it by a rating, overdesign or retrofit that is given no approach.
+  On the basic pinch case a second retrofit of the network a retrofit
+  returned rated it at 143,969 $/y of utility against the 145,250 $/y the
+  first reported; both now give 145,250 $/y.
+- A heat pump network can be rated, optimised and retrofitted on the
+  problem it was designed for. ``design.optimise_duties`` and
+  ``design.retrofit`` refused the network a design with ``heat_pump=``
+  had selected, and its JSON ("'Plant.HP_H1' is not a hot process
+  stream"): the network names the heat pump's condenser and evaporator
+  streams, which were in a case the design derived and did not keep. The
+  machine a network records now carries those streams
+  (``NetworkHeatPump.streams``, the case's stream input records, kept in
+  the network's JSON), and both calls build the case again from them, on
+  a problem loaded under another project name too. The networks they
+  return keep the machine and its annual cost; a retrofit's designs
+  include the existing machine's electricity in ``utility_cost`` and keep
+  the machine ahead of any heat pump the retrofit adds itself. The network
+  of a retrofit's own heat pump step (``heat_pump_cycle``) carries its
+  streams in the same way. On the basic pinch case the cheapest network
+  around a full-load Carnot heat pump rates from its JSON at the
+  577,663 $/y it was designed at. A heat pump on a site's utility system
+  carries no streams.
+  The guide said ``min_approach_temperature`` defaults to 1 K; it does
+  not.
+- A network on a stream that condenses or evaporates can be rated,
+  cost-optimised and retrofitted. The fixed-structure model behind
+  ``design.optimise_duties``, ``design.retrofit`` and the overdesign
+  margin rounds each segment boundary of a stream's heat curve so the
+  solver sees a smooth function, over 0.05 K. A phase change is entered
+  as a segment 0.01 K wide, narrower than the rounding, and its heat was
+  spread over the segments beside it: the condensing stream of the kink
+  case (187 kW, 177 kW of it condensing) was a 550 kW stream to the
+  model. The network a design had just returned was then infeasible to
+  rate ("Solver termination condition: infeasible"), failed its cost
+  optimisation ("Exchanger duty exceeds an available parent segment
+  profile") and was refused by the retrofit ("does not meet its targets
+  at its installed areas"), and a design with ``overdesign_percentage``
+  raised "no synthesised heat exchanger network could be fitted to every
+  period and rated". Every network around a vapour compression heat pump
+  was affected, since its condenser is such a stream. A boundary is now
+  rounded over at most a hundredth of the narrower segment beside it,
+  the rounded curve is exact at the stream's supply and target, and a
+  boundary outside a match is held to the match's end over the same
+  width. On the kink case the pinch design network rates at the
+  247,612 $/y it was designed at and the evolved one at 229,479 $/y; a
+  network around a water vapour compression heat pump on the basic pinch
+  case rates at its designed 241,592 $/y. Results on streams with wide
+  segments change in the last digits only: the curve's ends no longer
+  shift by the rounding.
+- An overdesign margin on a ``design_basis="all"`` design no longer drops
+  the networks that idle an exchanger in a period, and such a network can
+  be rated, optimised and retrofitted. The fixed-structure model behind
+  ``design.optimise_duties``, ``design.retrofit``, the fit to every period
+  and the overdesign margin held every recovery exchanger's approach in
+  every period, idle or not, and refused a match whose supply temperatures
+  are too close in any one period ("cannot meet its ... minimum approach:
+  the hot supply is only ... above the cold supply"). The design models
+  allow both, so a design returned networks its own rating could not
+  solve, and a margin dropped them without a warning: on the packaged
+  crude preheat train over three periods, 46 of 168 ratings failed and 102
+  networks were ranked against 137 without a margin. Two rules now match
+  the design models:
+
+  - A recovery exchanger whose hot supply is less than its approach above
+    its cold supply in one period idles in that period (no duty, no
+    approach held, each stream passes unchanged). One that is too close in
+    every period is still an error.
+  - When a solve fails and the given network idles recovery exchangers in
+    some periods, the solve is tried once more with each held idle in
+    those periods, on the whole network (an exchanger a first solve left
+    at zero duty comes back). ``summary_metrics["idle_periods_held"]``
+    counts the exchanger-periods held. ``design.retrofit`` does the same
+    for the existing network, and then keeps those periods held in every
+    design it searches: it refused such a network as one that "does not
+    meet its targets at its installed areas".
+
+  An idle period reports the difference its streams pass at as its
+  ``approach_temperatures`` (zero where the cold stream is the hotter
+  there; its inlet and outlet temperatures show the crossing); it reported
+  the approach limit. On the crude case no rating fails now and the
+  margin ranks 138 networks.
+  The first rule also changes a design on the median or one period: its
+  fit to every period used to fail at the design approach on such a match,
+  warn and fit at 1 K. It now keeps the design approach with the match
+  idle in that period, without the warning, so the fitted network's cost
+  differs: on a three-period case whose waste heat stream is lukewarm in
+  one period, a pinch design fitted to every period is 55,270 $/y at its
+  design approach, where it was 53,922 $/y at the 1 K fallback.
+- A total site design ends. Each site seed's evolution starts from a
+  linear model that places its staged heaters and coolers, solved with
+  HiGHS and no time limit: on a three-process site of 34 streams it had
+  not finished after 15 minutes, and neither a solver option nor
+  ``HENS_SITE_TIME_LIMIT`` reached it. It is now given 60 s, or the time
+  limit set in ``HENS_SOLVER_OPTIONS_EVM`` under any solver's option name,
+  and a solve stopped there starts the evolution from the best it found.
+  On that site the design now ends in 281 s. It ends in an error there
+  ("no successful task outcomes"): one site seed does not solve and the
+  other fails its site utility balance check, as they would have had the
+  model finished. ``HENS_SITE_TIME_LIMIT`` still does not apply to a
+  design with ``levels="given"``.
+- A site design no longer fails with "verification failed: site utility
+  level ..." after its evolution has adopted a candidate. The adopting
+  model took the candidate's heater and cooler duties but kept its own
+  site imports, dumps and letdowns, so every level whose use or
+  generation the candidate changed missed its balance, by equal and
+  opposite amounts across two levels, and the task's networks were lost.
+  It now takes the candidate's solved imports, dumps and letdowns with
+  the duties. A two-process site beside a unit operation zone, which
+  raised, returns its network; the three-process site of 34 streams
+  returns one, at a site cost of 7,690,675 $/y in 281 s, where both
+  its seeds failed.
+- A site design whose evolution fails returns its process networks. Each
+  process is designed alone before the site evolution refines them as one
+  problem; when every evolution task failed the design raised "no
+  successful task outcomes" and the verified process networks were thrown
+  away. It now returns them joined into one site network per seed, whole
+  (their end heaters and coolers included), costed by the site utility
+  balance of their own utility use, with a warning that the site evolution
+  failed and nothing was refined across the site. Such a network's
+  ``method`` is ``"site_pinch_design"``. On the three-process site of 34
+  streams, with the evolution made to fail, the design returns two
+  networks in 14 s, at site costs of 7,388,155 and 7,467,152 $/y.
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- A vapour compression heat pump shared by several periods
+  (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) is one installed machine,
+  designed once and operated in each period. Each period is solved alone;
+  the machine is each component at its peak; each period then runs it at its
+  cheapest operation within its sizes and the two turndowns, or without it
+  where none fits. It searched one design vector decoded in every period,
+  which tied the periods to one normalised design rather than one machine
+  (4.9 to 13 % more work than the periods alone on the reviewer's cases).
+  The year pays for the machine installed, and the target is no heat pump
+  when no period can run it or when the year costs no less with it than
+  without it. The design vector reports the installed sizes. Carnot cycles
+  keep the shared vector.
+- Two options set how far a heat pump installed for several periods turns
+  down: ``HPR_TURNDOWN_DUTY``, the share of its installed suction volume
+  flow a running compressor moves at least (below it the compressor is
+  off), and ``HPR_TURNDOWN_PRESSURE_RATIO``, the share of its design
+  pressure ratio (its highest in any period) a running compressor keeps.
+  Both default to 0.25. They apply to a shared vapour compression design,
+  which is now designed once and operated in each period (review finding
+  19). They replace ``HPR_TURNDOWN``, which held each stage of the shared
+  design vector to a share of its design lift; that option is removed, and
+  an input that sets it is refused as an unknown option.
+- A shared multiperiod heat pump design installs each machine component by
+  component: each compressor at its peak volume flow and shaft power and
+  each exchanger at its peak area, whichever periods they peak in. It took
+  each machine's most expensive period, which priced a compressor peaking
+  in one period and an exchanger peaking in another at the smaller machine.
+  This is the first step of design-and-operate for shared designs.
+- A vapour compression cascade heat pump also searches from its warm start
+  with all the heat in each condenser in turn. The cheapest design often
+  uses one condenser, which the search found for some seeds only: a 2x1
+  water cascade on ``basic_pinch`` at the default budget gave 266,204 to
+  281,255 $/y over seeds 0 to 2 and now gives 267,803 to 268,454. A search
+  takes longer (about 450 to 580 s against 230 to 510 s on that case).
+- A heat pump target over several periods with one shared design reports
+  the capital of the machine installed for every period, not its selected
+  period's own sizing, and its total annualised cost is that period's
+  operation plus the installed capital. On the reviewer's three-period
+  vapour compression case the base period reported 238,470 $ of capital
+  where the installed machine costs 374,537 $.
+- A heat pump target charges heat rejected to ambient air at the cooling
+  water price (``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE``), as any
+  heat rejected to ambient is; air as a heat source stays free. The Carnot
+  and vapour compression objectives left heat rejected to air free, so a
+  target could reject any surplus there at no cost. Designs and retrofits
+  that relied on it change: on ``basic_pinch`` a full-load Carnot target
+  now pays for the 733 kW it rejects to air.
+- A heat pump target reports heat rejected to ambient air as cold
+  utility. The air took it as a free process stream, so a target's cold
+  utility fell to zero with process cooling left (``basic_pinch``: 0 kW
+  reported with 513 kW left after the evaporator) and its row was on a
+  different basis from the target without a heat pump. The residual and
+  its utility placement now place that heat too, and the check that a
+  utility heat pump's case targets as its target did no longer adds
+  ``hpr_ambient_cold`` to the target's cold utility.
+- A heat pump design's network counts the machine's electricity in its
+  ``utility_cost``, as a retrofit's designs already did; its total annual
+  cost is unchanged. Verification holds the total to the utilities, the
+  exchangers' capital and the machines' annualised capital.
+- After a utility-level heat pump, each utility level keeps its share of
+  the residual. The residual's steps can lie a few hundred-millionths of a
+  kelvin off the levels' temperatures, and a hot utility whose target was
+  that far below its step was judged too cold for it: on the pulp mill at
+  a load fraction of 0.0625 the LPS level's 15,995 kW went to HPS (right
+  total, wrong split and cost). The check now has the 1e-6 K tolerance its
+  supply end has.
+- A heat pump design is sized on the prices its networks are ranked on.
+  ``design.heat_exchanger_network(heat_pump=...)`` targeted the heat pump
+  with heat priced at the electricity price (the default
+  ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` of 1.0) and ranked the networks
+  at the utilities' own prices, so it sized the machine as if any heat
+  pump paid. The target is now priced at the utilities the direct
+  integration target draws, weighted by their duties, over the
+  electricity price; a ratio set in the options is kept. On a
+  two-stream case with steam at 40 $/MWh and electricity at 100 $/MWh,
+  the machine is 137 kW at a COP of 4.2 instead of 240 kW at 2.9, and the
+  selected network costs 98,211 $/y instead of 104,169. On the basic
+  pinch case no heat pump pays at those prices: the design says so
+  instead of returning 22 heat pump networks, the cheapest of them
+  409,423 $/y against 238,776 without one.
+- A retrofit's heat pump is priced and sized at the utilities it relieves.
+  ``design.retrofit_heat_pumps`` priced the as-piped heat pump's saving
+  at the duty-weighted blend of all the network's heaters (and coolers),
+  and sized the machine at that blend; a machine that can reach only the
+  cheaper heaters was credited at the dearer ones too (175,197 $/y
+  reported where the heater it serves gives 95,197, on a case with
+  heaters on 20 and 40 $/MWh steam). The heat it delivers is now priced
+  at the heaters its condensers can reach, the dearest relieved first,
+  and its cooling at the coolers its evaporators reach
+  (``RetrofitHeatPumpTarget.relieved_heat_price`` and
+  ``relieved_cooling_price``); the machine is solved again at those
+  prices, in ``retrofit_heat_pumps`` and in ``design.retrofit``'s heat
+  pump step. On that case the as-piped target is now a 720 kW machine
+  (it was 1,000 kW) and its reported saving, 95,096 $/y, is what the
+  heater it serves gives. The ideal target and a shared design over
+  several periods keep the blends.
+- A parallel Carnot heat pump target gives its colder machines all the
+  source heat above them. Each evaporator's available heat is the source
+  heat between it and the evaporator above, and the cycle took the hotter
+  machines' duty from that share a second time: a second machine needing
+  231 kW with 231 kW left for it was allowed -73 kW and switched off, or
+  pushed to a colder temperature. On the basic pinch case at full load
+  with two condensers and two evaporators (``is_cascade_cycle=False``)
+  the target is now 216.0 kW of work at search seeds 0 and 1; it was
+  263.4 kW with the second machine idle at seed 0 and 230.7 kW at seed 1.
+- A Carnot heat pump target no longer stops in a shallow basin of its
+  objective, and says when it leaves a level idle. The Carnot objective
+  has a kink at every kink of the composite curves, with small rises
+  between them, and a restart of the search could stop behind one: on the
+  basic pinch case at full load, a cascade of two condensers and two
+  evaporators was 231.4 kW of work at ``HPR_SEARCH_SEED`` 0 and 217.0 kW at
+  seeds 1 and 2, with the second condenser at 200.3 degC against 176.0 degC
+  and a rise of 0.3 % of the objective between them. A Carnot search now
+  sweeps its best point one coordinate at a time across its bounds,
+  polishes what the sweep reaches, and repeats while that improves (about
+  1,200 evaluations of a millisecond objective per pass over six
+  variables; the target took 77 s where it took 61 s). That case is now
+  217.5, 217.0 and 217.0 kW at seeds 0, 1 and 2. A sweep moves one
+  variable at a time, so a target that needs two levels moved together can
+  still stop
+  with a level idle: three condensers on that case give 217.0 kW with the
+  third idle at some seeds and 210.8 kW with all three in use at others.
+  A Carnot target that leaves a requested level without duty therefore
+  warns, naming how many condenser and evaporator levels are idle.
+  Vapour compression and other cycles are not swept, nor is a Carnot
+  search asked for one run (``maximum_restarts`` 0 or 1): a quick target,
+  which a sweep nearly doubles (a test that solves one on that case at a
+  quarter load went from 2.2 s to 3.9 s).
+- A Carnot target that serves nothing is an error, and a Carnot
+  refrigeration target says when it serves part of its duty. A threshold
+  problem with ambient air off leaves a heat pump nothing to draw on; its
+  Carnot target came back as a success of 0 kW of work, where the vapour
+  compression target of the same case raises. It now raises too
+  ("found no heat pump design that improves on the baseline without
+  one"). A Carnot refrigeration target still returns when it serves part
+  of the cooling asked for, as its model always can leave some to the cold
+  utilities (487 of 1,000 kW on the basic pinch case, whose cooling is all
+  above ambient), but it now warns with the duty served, the duty asked
+  for and the share; a vapour compression refrigerator in that position
+  raises. ``design.retrofit`` with ``heat_pump_cycle="carnot"`` used to
+  record such a 0 kW target as a heat pump modification and a machine
+  with no streams; it now leaves that step out with its warning.
+- Ambient air is on one side of a heat pump or refrigerator only: a
+  source for its evaporators or a sink for its condensers. A design whose
+  evaporators draw on air while its condensers reject to air pumps heat
+  from air to air; nothing stopped a refrigeration target or a Carnot
+  target of either duty from returning one (a vapour compression heat
+  pump's condenser heat to air was already a penalty). That heat is now a
+  penalty in the search and a final design that still has any is not
+  returned. The Carnot targets of the packaged cases (heat pump and
+  refrigeration, one and two levels) have none, so they are unchanged.
+  The check is per period: a machine shared
+  by several periods that draws on air in one and rejects to air in
+  another is not caught.
+- A heat pump target that converged now gives a heat pump network. A
+  search that converges puts a level at a temperature a process stream
+  starts or ends at, to its own tolerance, and that small distance lost
+  the network two ways. Within 1e-6 K under the temperature, the problem
+  table merged the two and the heat pump's 0.01 K stream gained 1e-4 of
+  its duty (0.027 of 270 kW on a two-stream case), heat the case could
+  not place. From 1e-5 to 1e-4 K under it, the last sliver of the process
+  stream fell to the utility and made a second pinch at the condenser
+  that no pinch design closed. ``design.heat_exchanger_network`` with
+  ``heat_pump=`` then warned "No heat pump network at dt_cont multiplier
+  ..." and returned networks without one: on a two-stream case at
+  multipliers 0.75 and 1.5 and on the basic pinch case at 2.0, of the
+  four multipliers tried on each. The design now moves each condenser
+  and evaporator stream that starts or ends within 1e-4 K of a process
+  temperature onto it, whole, so its duty is kept. All eight now design.
+  A level beside no process temperature stays exactly where the target
+  put it, and a heat pump target from a search's first start (one
+  evaluation) was never that close and is unchanged.
+- An air-source heat pump is designed at any ``dt_cont`` multiplier.
+  ``design.heat_exchanger_network(heat_pump=...)`` scaled the ambient
+  air's contribution (``HPR_DT_ENV_CONT``) by the multiplier, which the
+  heat pump target does not, so at a multiplier of 1.5 the design held
+  the evaporator 15 K under the air where the target had put it 10 K
+  under, and the case needed utility the heat pump had left at none (no
+  heat pump network at 0.75 or 1.5 on a case short of waste heat). The
+  air is now written so that it keeps its own contribution at the
+  design's multiplier, as a retrofit and ``with_heat_pump_streams``
+  already do.
+- A project name with a dot no longer breaks the heat pump paths. A
+  stream's zone label has its dots written as dashes when it is read, and
+  the root zone, named for the project, kept its dot: the JSON of a
+  problem named ``"Plant v1.2"`` named zones under ``Plant v1.2`` that
+  the reader looked for under ``Plant v1-2``, so
+  ``design.heat_exchanger_network(heat_pump=...)``,
+  ``with_heat_pump_streams`` and any other call that builds a problem
+  from another's JSON raised "could not resolve zone". A zone named with
+  a dot, the root among them, now has it written as a dash too, with the
+  warning a stream's name gets. The root zone of such a problem is
+  ``Plant v1-2`` in addresses and reports; ``project_name`` is unchanged.
+- ``design.retrofit_heat_pumps(cycle="vapour_compression")`` reports its
+  duties. ``heat_delivered``, ``process_heat_absorbed``, both duty tuples
+  and ``heat_pump_gap`` were NaN, with no warning: the summary read the
+  duties from fields only a Carnot result carries. It now reads a vapour
+  compression result's own (its stages' heating and cooling). On a dairy
+  process of a six-process site the as-piped target delivers 948.8 kW
+  for 268.1 kW of work. The duty tuples of a vapour compression target
+  list its stages, which can be more than its condensing or evaporating
+  temperatures, some at 0.
+- ``design.retrofit`` with ``heat_pump_cycle`` can add a heat pump to a
+  network that already holds one. The retrofit's heat pump step named
+  its streams as every heat pump target does (``HP_H1``, ``HP_C1``), the
+  names the existing machine's streams already hold, so the step was left
+  out at every size with a warning to "rename the process stream". The
+  added machine is now named ``HP2`` (the first of ``HP``, ``HP2``,
+  ``HP3`` the network does not hold) and its streams after it
+  (``HP2_H1``, ``HP2_C1``). A network with both reads again from its
+  JSON.
+- A retrofit's heat pump step is no longer lost to a level at round-off.
+  A heat pump search leaves a level it does not use at a duty of
+  round-off, not 0 (a condenser at 0.0003 kW beside two of 760 and
+  740 kW). The step kept it as a stream, its match did nothing, and the
+  retrofit left the whole step out ("its coolers and heaters cannot
+  serve the machine's duties"). A level under a millionth of its side's
+  duty is now no stream. On a two-period case of one heater and one
+  cooler the step is taken: steam falls from 1,080 kW to none and the
+  retrofit nets 295,313 $/y, where it returned the existing network.
+- A retrofit's ``min_approach_temperature`` reaches its heat pump.
+  ``design.retrofit(heat_pump_cycle=..., min_approach_temperature=...)``
+  holds every match to the approach, but targeted its heat pump on the
+  streams' contributions: levels 6 K from a cooler and a heater on a
+  two-stream case where the retrofit asked for 10 K, so the machine
+  could not be matched as targeted. The heat pump is now targeted the
+  whole approach off the coolers and heaters, the air's and the process
+  streams' own contributions left out, and its exchangers are sized at
+  the approach. On that case at 10 K the retrofit selects a 132 kW
+  machine at a COP of 3.1 netting 9,222 $/y, where it selected none (its
+  one heat pump design lost 1,836 $/y, and the full-size step was left
+  out).
+- ``design.retrofit`` warns when ``HENS_FORBIDDEN_MATCHES`` is set. The
+  retrofit search does not read the list, so a new match or a heat pump
+  step may pair streams it names; only one sentence in another section of
+  the guide said so.
+- Two stale texts are corrected. The ``design.retrofit`` docstring said
+  its heat pump step is left out on a problem with several periods; it
+  runs there as one shared design. The heat pump guide read as if the
+  capital of the utilities a design still needs were counted by default;
+  ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` is ``False`` by
+  default.
+
 0.10.0 (2026-11-25)
 -------------------
 

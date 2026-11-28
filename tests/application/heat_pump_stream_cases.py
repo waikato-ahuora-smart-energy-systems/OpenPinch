@@ -7,6 +7,10 @@ from pathlib import Path
 
 import OpenPinch
 from OpenPinch import PinchProblem
+from OpenPinch.analysis.heat_exchanger_networks.retrofit.heat_pump_streams import (
+    HeatPumpStep,
+)
+from OpenPinch.domain.heat_exchanger_network import NetworkHeatPump
 
 BASIC_PINCH = (
     Path(OpenPinch.__file__).parent / "tutorials/sample_cases/basic_pinch.json"
@@ -55,6 +59,31 @@ def full_load_target(problem: PinchProblem, **options):
             "maximum_evaluations": 1,
         }
         | options
+    )
+
+
+def step_of_no_size(load_fraction: float | None = None) -> HeatPumpStep:
+    """A retrofit's heat pump step for tests that stub the searches around
+    it: a machine of no size, at ``load_fraction``. The retrofit sets the
+    streams its case added on the step's record, so a bare object will not
+    stand in for one."""
+
+    return HeatPumpStep(
+        record=NetworkHeatPump(
+            machine="HP",
+            cycle="carnot",
+            condenser_duty=0.0,
+            evaporator_duty=0.0,
+            work=0.0,
+            cop=1.0,
+            electricity_cost=0.0,
+            capital_cost=0.0,
+            annual_capital_cost=0.0,
+            load_fraction=load_fraction,
+        ),
+        condensers=(),
+        evaporators=(),
+        base=None,
     )
 
 

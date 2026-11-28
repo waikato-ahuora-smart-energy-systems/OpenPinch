@@ -18,6 +18,7 @@ from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
     RetrofitSettings,
 )
 from OpenPinch.application import heat_pump_retrofit
+from tests.application.heat_pump_stream_cases import step_of_no_size
 
 
 def test_a_step_whose_first_design_does_not_solve_is_left_out(monkeypatch):
@@ -30,12 +31,15 @@ def test_a_step_whose_first_design_does_not_solve_is_left_out(monkeypatch):
             raise ValueError("the heat pump 'HP' added as streams does not solve")
         return base
 
-    case = SimpleNamespace(_build_execution_master_zone=lambda: object())
+    case = SimpleNamespace(
+        _build_execution_master_zone=lambda: object(),
+        to_problem_json=lambda: {"streams": []},
+    )
     monkeypatch.setattr(heat_pump_retrofit, "run_retrofit_search", search)
     monkeypatch.setattr(
         heat_pump_retrofit,
         "heat_pump_step",
-        lambda *args, **kwargs: (object(), object()),
+        lambda *args, **kwargs: (step_of_no_size(), object()),
     )
     monkeypatch.setattr(heat_pump_retrofit, "heat_pump_case", lambda *a, **k: case)
     monkeypatch.setattr(heat_pump_retrofit, "snapshot_problem", lambda problem: problem)

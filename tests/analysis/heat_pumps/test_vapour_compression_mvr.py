@@ -25,7 +25,12 @@ from OpenPinch.analysis.heat_pumps.cycles.mechanical_vapour_recompression_cycle 
 from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_mvr_cascade import (
     VapourCompressionMvrCascade,
 )
-from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
+from OpenPinch.analysis.heat_pumps.optimisation_adapter import evaluate_hpr_candidate
+from OpenPinch.contracts.hpr import (
+    HPRBackendResult,
+    HPREvaluationMode,
+    HPRThermoArtifacts,
+)
 from OpenPinch.domain.configuration import Configuration
 from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 
@@ -1667,3 +1672,34 @@ def test_warm_start_evaporator_stream_covers_carnot_evaporator_stream():
 
     assert carnot_bottom == pytest.approx(-0.10, abs=1e-9)
     assert unpacked["T_evap_vc"][-1] == pytest.approx(carnot_bottom, abs=1e-9)
+
+
+def test_a_vc_mvr_machine_off_is_its_design_with_no_heat():
+    # A shared design prices a period without its machine at the machine
+    # off. At its lower bounds a VC+MVR cycle is infeasible, not off, and
+    # the crude preheat train's shared VC+MVR target raised for want of a
+    # price (notebook 10); off is the design with no process heat.
+    args = _base_args(
+        n_cond=1,
+        n_evap=1,
+        n_mvr=1,
+        refrigerant_ls=["R134A"],
+        eta_mvr_comp=0.7,
+        eta_mvr_motor=0.95,
+        initialise_simulated_cycle=False,
+    )
+    x = np.array([0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
+
+    def search(point):
+        return evaluate_hpr_candidate(
+            objective=hp_vc_mvr._compute_vc_mvr_system_obj,
+            point=point,
+            args=args,
+            artifact_mode=HPREvaluationMode.SEARCH,
+        )
+
+    off = search(hp_vc_mvr._vc_mvr_idle_point(x, args))
+
+    assert not search(np.zeros_like(x)).success
+    assert off.success
+    assert off.w_net == 0.0

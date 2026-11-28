@@ -312,9 +312,12 @@ class HeatPumpTargetInputs(BaseModel):
     # the hot utility the untargeted heating needs on its own.
     enforce_heating_duty: bool = False
     heating_allowance: float | None = None
-    # Shared multiperiod designs: each stage's lift in every period is at least
-    # turndown x its design lift; the search sets stage_lift_floor (K).
-    turndown: float = 0.0
+    # An installed machine's running compressors move at least this share of
+    # their installed suction volume flow, or are off.
+    turndown_duty: float = 0.0
+    # An installed machine's running stages keep at least this share of their
+    # design (installed) pressure ratio.
+    turndown_pressure_ratio: float = 0.0
     # Capital costing: overall heat transfer coefficients (W/m2K) by the heat
     # pump side's phase, the ambient air side's (in series with the heat pump
     # side's), and the process streams' own approach (K).
@@ -323,7 +326,6 @@ class HeatPumpTargetInputs(BaseModel):
     u_gas: float = 400.0
     u_air: float = 50.0
     process_dt_cont: float = 0.0
-    stage_lift_floor: np.ndarray | None = None
     bb_minimiser: str
     eta_penalty: float
     rho_penalty: float
@@ -568,6 +570,10 @@ ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
 INFEASIBLE_REFRIGERATION_REASON = (
     "Refrigeration candidate carries a feasibility penalty, such as unserved cooling."
 )
+AIR_ON_BOTH_SIDES_REASON = (
+    "Candidate has ambient air on both sides of the machine: its evaporators "
+    "draw on air and its condensers reject to air."
+)
 INFEASIBLE_HEAT_PUMP_REASON = (
     "Heat pump candidate carries a feasibility penalty, such as a stage outside "
     "its limits."
@@ -602,11 +608,17 @@ class HPRBackendResult(BaseModel):
     # Each machine without its process and air exchangers, installed ($):
     # compressors, motors and internal (cascade, IHX) exchangers.
     hpr_machine_internal_capital_costs: tuple[float, ...] | None = None
+    # Each machine's compressors and exchanger areas (``MachineComponents``),
+    # in fixed places, so a shared design is sized component by component.
+    hpr_machine_components: tuple[Any, ...] | None = None
     feasibility_penalty: float = 0.0
     Q_cooling_water: float = 0.0
     Q_refrigeration: float = 0.0
     Q_amb_hot: float
     Q_amb_cold: float
+    # Heat the machine draws from air and rejects to air (kW): air is on
+    # one side of a machine only, so a final design with any is no target.
+    Q_air_to_air: float = 0.0
     success: bool = True
     w_hpr: float | list | np.ndarray | None = None
     w_he: float | list | np.ndarray | None = None

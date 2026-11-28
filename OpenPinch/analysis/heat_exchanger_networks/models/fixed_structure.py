@@ -116,6 +116,9 @@ class FixedStructureSpec:
     utility_design_points: Mapping[int, Mapping[int, tuple]] = field(
         default_factory=dict
     )
+    # The solver periods each recovery match is held idle in, by match
+    # index: the network being solved carries no duty on it there.
+    recovery_idle: Mapping[int, frozenset[int]] = field(default_factory=dict)
     # The "retrofit" goal widens each installed area by this fraction, to
     # cover Chen's LMTD error and rounded plant areas.
     area_tolerance: float = 0.0
@@ -360,7 +363,7 @@ def prepare_fixed_structure(owner) -> None:
         for j in range(owner.J)
         for k in range(owner.S)
     }
-    _check_recovery_spans(owner)
+    owner.recovery_idle = _idle_recovery_periods(owner)
     _check_utility_reach(owner)
     owner.implied_cold_ends = utility_free_components(owner)
 
@@ -601,21 +604,37 @@ def utility_free_components(owner) -> set[int]:
     return implied
 
 
-def _check_recovery_spans(owner) -> None:
-    for n in range(owner.N_periods):
-        for r, match in enumerate(owner.spec.recovery):
-            span = (
-                owner.hot_profiles[n][match.hot].supply
-                - owner.cold_profiles[n][match.cold].supply
+def _idle_recovery_periods(owner) -> list[list[bool]]:
+    """Per period, the matches that carry no duty there.
+
+    A match whose supply temperatures are too close for its approach in a
+    period cannot run in it at any duty, so it idles there, as it does in
+    the design models. One that is too close in every period cannot run at
+    all and raises. A match also idles in the periods the structure holds
+    it idle in (``FixedStructureSpec.recovery_idle``).
+    """
+
+    periods = range(owner.N_periods)
+    idle = [[False] * len(owner.spec.recovery) for _n in periods]
+    for r, match in enumerate(owner.spec.recovery):
+        spans = [
+            owner.hot_profiles[n][match.hot].supply
+            - owner.cold_profiles[n][match.cold].supply
+            for n in periods
+        ]
+        close = [spans[n] < owner.recovery_dt[n][r] for n in periods]
+        if all(close):
+            raise ValueError(
+                f"recovery match {_name(owner, 'hot', match.hot)} -> "
+                f"{_name(owner, 'cold', match.cold)} in stage {match.stage + 1} "
+                f"cannot meet its {owner.recovery_dt[0][r]:g} K minimum "
+                f"approach: the hot supply is only {spans[0]:g} K above the cold "
+                "supply."
             )
-            if span < owner.recovery_dt[n][r]:
-                raise ValueError(
-                    f"recovery match {_name(owner, 'hot', match.hot)} -> "
-                    f"{_name(owner, 'cold', match.cold)} in stage {match.stage + 1} "
-                    f"cannot meet its {owner.recovery_dt[n][r]:g} K minimum "
-                    f"approach: the hot supply is only {span:g} K above the cold "
-                    "supply."
-                )
+        held = owner.spec.recovery_idle.get(r, ())
+        for n in periods:
+            idle[n][r] = close[n] or n in held
+    return idle
 
 
 def _check_utility_reach(owner) -> None:
@@ -770,8 +789,8 @@ def _q_max(owner, n: int, match: RecoveryMatch) -> float:
     return max(
         0.0,
         min(
-            owner.hot_profiles[n][match.hot].duty_bound,
-            owner.cold_profiles[n][match.cold].duty_bound,
+            owner.hot_profiles[n][match.hot].total,
+            owner.cold_profiles[n][match.cold].total,
         ),
     )
 
@@ -842,7 +861,7 @@ def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
     owner.q_r.append(
         [
             owner._param(f"qr{r}p{n}", 0.0)
-            if _recovery_off(owner, n, m)
+            if _recovery_off(owner, n, m) or owner.recovery_idle[n][r]
             else owner._var(f"qr{r}p{n}", start["q_r"][r], 0.0, _q_max(owner, n, m))
             for r, m in enumerate(spec.recovery)
         ]
@@ -855,7 +874,7 @@ def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
                 f"qu{e}p{n}",
                 start["q_u"][e],
                 0.0,
-                stream_profile(owner, n, m).duty_bound,
+                stream_profile(owner, n, m).total,
             )
             for e, m in enumerate(spec.utilities)
         ]
@@ -1017,6 +1036,18 @@ def _recovery_equations(owner, n: int, start: Mapping[str, Any]) -> None:
             if len(cold_branches) == 1
             else owner._var(f"y{r}p{n}", 1.0 / len(cold_branches), 0.0, 1.0)
         )
+        if owner.recovery_idle[n][r]:
+            # An idle match changes neither stream: each leaves at its inlet
+            # temperature, and the approaches are constants no equation holds.
+            dt = owner.recovery_dt[n][r]
+            x_row.append(x)
+            y_row.append(y)
+            hx_row.append(owner.th_in[n][i][k])
+            cy_row.append(owner.tc_in[n][j][k])
+            theta_row.append(
+                (owner._param(f"tr1{r}p{n}", dt), owner._param(f"tr2{r}p{n}", dt))
+            )
+            continue
         th_in0 = start["th_in"][i][k]
         tc_in0 = start["tc_in"][j][k]
         q0 = start["q_r"][r]
@@ -1088,7 +1119,7 @@ def _interior_approaches(owner, tag: str, hot_side, cold_side, q, dt: float) -> 
     hot, a, h_in, h_out = hot_side
     cold, b, c_in, c_out = cold_side
     for index, boundary in enumerate(hot.breakpoints):
-        point = smooth_clip(boundary, h_out, h_in)
+        point = smooth_clip(boundary, h_out, h_in, hot.rounding_widths[index])
         given = a * (hot.heat(point) - hot.heat(h_in))
         partner = owner._var(
             f"bh{index}{tag}", _midpoint(cold), cold.lowest, cold.highest
@@ -1096,7 +1127,7 @@ def _interior_approaches(owner, tag: str, hot_side, cold_side, q, dt: float) -> 
         owner._equal(b * (cold.heat(partner) - cold.heat(c_in)), q - given)
         owner._at_least(point - partner, dt)
     for index, boundary in enumerate(cold.breakpoints):
-        point = smooth_clip(boundary, c_in, c_out)
+        point = smooth_clip(boundary, c_in, c_out, cold.rounding_widths[index])
         received = b * (cold.heat(point) - cold.heat(c_in))
         partner = owner._var(f"bc{index}{tag}", _midpoint(hot), hot.lowest, hot.highest)
         owner._equal(a * (hot.heat(partner) - hot.heat(h_in)), q - received)
@@ -1193,15 +1224,15 @@ def _linear_utility_interior(
     keeps the constraint smooth and trivially true at zero duty.
     """
 
-    for boundary in profile.breakpoints:
+    for boundary, width in zip(profile.breakpoints, profile.rounding_widths):
         if match.side == HEATER:
-            point = smooth_clip(boundary, stream_in, stream_out)
+            point = smooth_clip(boundary, stream_in, stream_out, width)
             d = profile.heat(point) - profile.heat(stream_in)
             owner._at_least(
                 q * (util_in - point) - (util_in - util_out) * (q - d), dt * q
             )
         else:
-            point = smooth_clip(boundary, stream_out, stream_in)
+            point = smooth_clip(boundary, stream_out, stream_in, width)
             d = profile.heat(point) - profile.heat(stream_in)
             owner._at_least(
                 q * (point - util_in) - (util_out - util_in) * (q - d), dt * q
@@ -1608,11 +1639,19 @@ def _required_area(duty: float, coefficient: float, theta_1, theta_2) -> float:
     return duty / (coefficient * lmtd)
 
 
+def _activity_floor(owner, *loads: float) -> float:
+    """The duty (kW) under which an exchanger between streams of ``loads``
+    is idle: 1e-4 of the smaller load, never under the model's tolerance. A
+    floor on the largest stream of the problem took a small stream's
+    exchangers beside a large one for idle (5 kW beside 50,000 kW)."""
+    smallest = min((abs(float(load)) for load in loads), default=0.0)
+    return max(float(owner.tol), 1e-4 * smallest)
+
+
 def post_process_fixed_structure(owner) -> None:
     """Read the solution into plain exchanger results and cost totals."""
 
     value = _numeric
-    tolerance = owner.duty_tolerance
     spec = owner.spec
     period_ids = [str(p) for p in owner.period_ids]
 
@@ -1623,12 +1662,17 @@ def post_process_fixed_structure(owner) -> None:
             hot = owner.hot_profiles[n][match.hot]
             cold = owner.cold_profiles[n][match.cold]
             duty = value(owner.q_r[n][r])
-            active = duty > tolerance
+            active = duty > _activity_floor(
+                owner, owner.hot_load[n][match.hot], owner.cold_load[n][match.cold]
+            )
             theta_1, theta_2 = (value(t) for t in owner.theta_r[n][r])
             x = value(owner.x[n][r])
             y = value(owner.y[n][r])
             th_in = value(owner.th_in[n][match.hot][match.stage])
             tc_in = value(owner.tc_in[n][match.cold][match.stage])
+            if owner.recovery_idle[n][r]:
+                # An idle match holds no approach: its streams pass at this.
+                theta_1 = theta_2 = th_in - tc_in
             slices: tuple = ()
             if active and (hot.segmented or cold.segmented):
                 slices = _slices(
@@ -1682,7 +1726,7 @@ def post_process_fixed_structure(owner) -> None:
             profile = stream_profile(owner, n, match)
             own = utility_profile(owner, n, match)
             duty = value(owner.q_u[n][e])
-            active = duty > tolerance
+            active = duty > _activity_floor(owner, profile.total)
             theta_1, theta_2 = (value(t) for t in owner.theta_u[n][e])
             stream_in = value(owner.utility_in[n][e])
             stream_out = value(owner.utility_out[n][e])
@@ -1885,7 +1929,27 @@ def _solved_utility_cost(owner, n: int, e: int, result: ExchangerResult) -> floa
     return fraction * own.cost(outlet, smooth=False)
 
 
+def _at_solver_heat(curve, side: str, temperature: float) -> float:
+    """The temperature at which ``curve``'s exact profile holds the heat the
+    solver's rounded kinks give ``temperature``.
+
+    Slices are cut on the exact profile; an inlet just past a kink holds a
+    little more heat there than the solver saw, and the solved duty would
+    overrun the profile (review finding 27).
+    """
+    import numpy as np
+
+    profile = ThermalProfile.from_piecewise(side, curve)
+    if not profile.segmented:
+        return temperature
+    # An array is rounded as a solver expression is; a number is exact.
+    heat = float(profile.heat(np.array([temperature]))[0])
+    return profile.temperature_at(heat)
+
+
 def _slices(hot_curve, cold_curve, duty, hot_inlet, cold_inlet, period):
+    hot_inlet = _at_solver_heat(hot_curve, "hot", hot_inlet)
+    cold_inlet = _at_solver_heat(cold_curve, "cold", cold_inlet)
     return duty_aligned_area_contributions(
         hot_curve,
         cold_curve,

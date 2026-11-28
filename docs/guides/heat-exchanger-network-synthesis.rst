@@ -117,12 +117,19 @@ an older approach-temperature grid, use multiplier = dTmin / (2 x
 The multipliers set the pinch design step: the energy targets the seed
 networks meet and the minimum approach of their exchangers, which for each
 match is ``max((dtcont_src + dtcont_snk) x m, 0.1 K)``: the sum of its two
-sides' contributions times the multiplier ``m``. The thermal derivative and
-network evolution steps that follow minimise total annual cost and choose
-each exchanger's approach from the cost settings, down to a share of that
-pinch design approach: ``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``.
-With cheap area, exchangers close toward that floor; with dear area, they
-open up and the network uses more utility than the target.
+sides' contributions times the multiplier ``m``. The thermal derivative
+step that follows minimises hot utility (the utilities' cost where a side
+has a choice of utility), letting each exchanger's approach close down to a
+share of that pinch design approach:
+``max((dtcont_src + dtcont_snk) x m x share, 0.1 K)``. Network evolution then
+minimises total annual cost and chooses each approach from the cost
+settings down to the same floor: with cheap area, exchangers close toward
+it; with dear area, they open up and the network uses more utility than
+the target. A thermal derivative network can therefore cost more than its
+seed (9 % more on the four-stream example), so ``design.thermal_derivative()``
+ranks its seeds alongside its own networks and returns whichever ranks first,
+the cheapest unless only some hold their recorded utility levels; evolve the
+result with ``design.network_evolution()``.
 
 ``HENS_MIN_EXCHANGER_APPROACH_SHARE`` is the share. It defaults to 0.25, so
 a match of two 5 K streams, held to 10 K in pinch design at a multiplier of
@@ -141,9 +148,19 @@ network whose exchangers sit exactly at that approach.
 ``verify_network_feasibility`` still checks approaches against the 0.1 K
 floor, not against this share. A thermal derivative or evolution network
 records the share it was designed with
-(``source_metadata["min_exchanger_approach_share"]``), and a fit to every
+(``source_metadata["min_exchanger_approach_share"]``, and in its
+``summary_metrics`` so that its JSON keeps it), and a fit to every
 period, a rating or an overdesign of it holds that share, whatever the
-configuration says by then.
+configuration says by then. A network also records the dt_cont multiplier
+it was designed at (``summary_metrics["dt_cont_multiplier"]``), which its
+JSON keeps as well, so a network designed at 1.5 is rated at 1.5 times its
+streams' contributions from the object and from its JSON alike. A network
+solved at one minimum approach on every exchanger (a duty optimisation or
+a retrofit given ``min_approach_temperature``, or a fit that fell back to
+1 K) records it as ``summary_metrics["approach_temperature"]``, and a
+later rating, overdesign or retrofit that is given no approach holds that
+one. ``exchanger_approach_temperatures`` are not recorded: give them again
+to a later solve that should hold them.
 
 Several Hot or Cold Utilities
 -----------------------------
@@ -204,7 +221,8 @@ finished by the cheapest utility that reaches its target. In
   the levels its utility targets give, so nothing can be traded: when that
   network needs a forbidden pair the run raises ``ValueError`` naming it,
   and the way round is to change what the targets may use (a utility's
-  maximum heat flow, say). Retrofit does not read the list.
+  maximum heat flow, say). Retrofit does not read the list, and warns
+  when it is set: check the designs it returns against it.
 
 Named Advanced Methods
 ----------------------
@@ -459,18 +477,30 @@ On a multiperiod site each process is designed over every period at once
 (design basis ``"all"``, whatever ``HENS_DESIGN_BASIS`` says), so each level
 carries its targeted duty in every period; the evolution holds those duties
 period by period, with one area per exchanger sized for the period that
-needs most, and no fit to the periods follows.
+needs most, and no fit to the periods follows. Each seed's evolution starts
+from a linear model that chooses its staged heaters and coolers; that model
+is given 60 s (or the time limit in ``HENS_SOLVER_OPTIONS_EVM``), and one
+stopped there starts the evolution from the best it found.
+
+When every seed's evolution fails, the design still returns a site network:
+the process networks each seed was made from, joined whole with their own
+heaters and coolers and costed by the site utility balance of what they use
+and raise. A warning says the site evolution failed and that nothing was
+refined across the site; such a network's ``method`` is
+``"site_pinch_design"``.
+The same is returned, with its own warning, when no process recovers heat
+within itself: the processes are then linked only through the utilities,
+and there is nothing for the evolution to refine.
 
 A site network carries the site utility balance. On each utility level, use
 plus heat let down to lower levels plus heat dumped equals generation plus
 heat let down from above plus imports, period by period. Imports enter hot
 levels and mains (a hot and a cold utility of one name) at the import price,
 within the hot utility's ``maximum_heat_flow`` when it has one; dumps leave
-cold levels and mains at the dump price. So steam a process raises on a main
-offsets steam another process uses there. A cold utility without segments
-may have a negative price, a credit for the steam raised on it; a level with
-a credit dumps no more than the processes raise on it, so the site cannot
-buy steam to sell it. The selected network's ``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
+cold levels and mains at the dump price, which is the ambient price: heat
+dumped ends at ambient (see "How utility prices are charged" in the input
+guide). So steam a process raises on a main offsets steam another process
+uses there, and only the surplus is charged. The selected network's ``summary_metrics`` hold ``site_capital_cost``, ``site_operating_cost`` and
 ``site_total_annual_cost``, and its ``source_metadata["site_utility_balance"]``
 holds each level's use, generation, imports, letdowns and dumps per period.
 Heat let down from a level to a colder one costs ``HENS_SITE_LETDOWN_PRICE``
@@ -503,6 +533,12 @@ count with its status (``designed``, ``infeasible``, ``failed`` or ``not
 run``), its split and its cost. ``HENS_SITE_LEVEL_EARLY_STOP: true`` ends the
 sweep once two designed counts in a row cost more than the cheapest before
 them.
+After the counts (and their level moves), the site is also designed with
+the case's own levels, as ``levels="given"`` designs it, and that design is a
+candidate too: the cheapest of the placed counts and the given levels is
+selected. Its networks are tagged ``summary_metrics["site_levels"] ==
+"given"``, its sweep row has ``"levels": "given"``, and it stays the problem's
+design only when it is selected.
 
 A placed level is a main: its hot and cold utility share one name
 (``iso_1``, ``sensible_1``), so site utility accounting credits steam raised
@@ -512,7 +548,8 @@ level-temperature moves. A move shifts one placed level by
 level would touch or pass another placed level or leave the range of the
 site's stream temperatures. Each process's level duties are re-targeted at
 the shifted level, and network evolution designs the site again from the
-current best network's recovery matches, with the call's width, depth and
+current best network's recovery matches and staged heaters and coolers,
+with the call's width, depth and
 options. A round tries every placed level both ways and adopts the cheapest
 move that lowers the site total annual cost; a move whose design fails is
 recorded and skipped. Each set of level positions is designed once: a move
@@ -652,11 +689,36 @@ Utility exchangers
    defaults to 1 K, as for ``"cost"``. Overdesign rates networks this way.
 
 Zero-duty exchangers
-   Every listed exchanger carries its approach constraint even at zero duty.
+   Every listed exchanger carries its approach constraint even at zero duty,
+   in every period it can run.
    When a solve leaves an exchanger at zero duty in every period, it is
    removed with that constraint and the problem is solved again, one
    exchanger at a time, until all remaining exchangers carry duty.
    ``selected_network.summary_metrics["removed_exchangers"]`` names them.
+
+Exchangers that idle in a period
+   A recovery exchanger whose hot supply is less than its approach above its
+   cold supply in one period cannot run there at any duty. It idles in that
+   period: no duty, no approach held, and each stream passes it unchanged.
+   One that is too close in every period is an error.
+
+   A network can also idle a recovery exchanger in a period for where it
+   sits: a design on ``design_basis="all"`` leaves a match idle in a period
+   in which the cold stream reaches it hotter than the hot stream. With the
+   exchanger free to run there the problem has no solution, since its
+   approach would be held at zero duty. When a solve fails and the network
+   given idles recovery exchangers in some periods (an exchanger with duty in
+   one period and none in another), the solve is tried once more with each
+   held idle in those periods, on the whole network: an exchanger a first
+   solve left at zero duty comes back. ``design.retrofit`` does the same
+   for the existing network: when its rating fails it is rated again with
+   those periods held, and they stay held in every design the search solves.
+   ``selected_network.summary_metrics["idle_periods_held"]`` then counts the
+   exchanger-periods held. A bare structure carries no duties, so nothing is
+   held for it. An idle period's ``approach_temperatures`` are the
+   difference the two streams pass at, reported as zero where the cold
+   stream is the hotter there (an approach is never negative): the period's
+   inlet and outlet temperatures show the crossing.
 
 Segmented streams and utilities
    Streams with segments keep their piecewise temperature-heat profile: each
@@ -810,8 +872,21 @@ Search size
    the ``new_match_candidates`` best, about
    ``beam_width * (ceiling_candidates + 2 * new_match_candidates)`` small
    NLPs (stepwise: ``beam_width * (existing exchangers +
-   new_match_candidates)``). ``min_approach_temperature`` (default
-   1 K) applies to every exchanger.
+   new_match_candidates)``). ``min_approach_temperature`` applies to every
+   exchanger. With none given, each exchanger keeps the sum of its two
+   streams' temperature contributions, at the dt_cont multiplier the
+   existing network records it was designed at (times its approach share
+   for a thermal derivative or evolution network; 1 for a network that
+   records none, such as one written by hand). The network a design
+   returns, or its JSON, is therefore taken as it is: a pinch design at
+   0.75 keeps 0.75 of each pair's contributions, and an evolved network a
+   quarter of them by default, on its own exchangers and on new matches
+   alike. Each network the retrofit returns records what it was solved at
+   in its ``summary_metrics``: ``approach_temperature`` when
+   ``min_approach_temperature`` was given, else the multiplier its
+   contributions were scaled by (``dt_cont_multiplier``, with a
+   ``min_exchanger_approach_share`` of 1). A rating, an overdesign or a
+   second retrofit of that network, or of its JSON, holds the same.
 Utility switching
    ``utility_switch_cost`` (default ``None``: no switches) is the fixed
    cost of serving an existing heater or cooler by another utility of its
@@ -902,7 +977,9 @@ Heat pumps
    case two and one found an 858 kW machine netting $181,000/y where the
    zone's default three and two found none); the electricity is in the
    design's utility cost and the network records the machine in
-   ``heat_pumps``. The machine is tried at each of ``heat_pump_sizes``,
+   ``heat_pumps``, with the streams it added (``NetworkHeatPump.streams``),
+   so the network or its JSON can be given back to ``design.retrofit`` or
+   ``design.optimise_duties`` on the same problem. The machine is tried at each of ``heat_pump_sizes``,
    shares of the heaters' load (``HPR_LOAD_FRACTION`` of the target; by
    default 1.0, 0.75 and 0.5), one search per size, and the machine
    records its share in ``load_fraction``. Each step of the result holds
@@ -966,6 +1043,10 @@ Heat pumps
    ``dt_cont`` with the zone's multiplier) plus ``HPR_DT_CONT`` (air by
    ``HPR_DT_ENV_CONT`` plus ``HPR_DT_CONT``).
 Sites and heat recovery loops
+   To retrofit one process of a site, pass its zone and that process's
+   own network: ``design.retrofit(existing, zone="Food Plant[S]")``
+   retrofits on the zone's own case, as ``heat_exchanger_network(zone=
+   ...)`` designs it. A designed site network is refused.
    When the existing network's streams span several process zones (a
    site's network given as a mapping), new matches and relocations join
    only streams of one process, and a ``UserWarning`` says the site utility

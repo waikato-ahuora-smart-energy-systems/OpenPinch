@@ -415,6 +415,29 @@ def duty_aligned_area_contributions(
     return tuple(contributions)
 
 
+def _is_constant(value) -> bool:
+    """Whether ``value`` is a plain number or a model parameter (a fixed
+    variable), not a variable or an expression of one."""
+
+    is_fixed = getattr(value, "is_fixed", None)
+    return True if is_fixed is None else bool(is_fixed())
+
+
+def _add_active_segment_equation(model, selectors, residuals) -> None:
+    """Hold the active segment's residual at zero, as one equality.
+
+    ``selectors`` are parameters, 1 on the active segment and 0 on the
+    others, so the sum is the active segment's residual. One equality per
+    segment would leave each inactive one in the model with nothing in it,
+    and Ipopt refuses a model with more equalities than variables.
+    """
+
+    model.Equation(
+        sum(selector * residual for selector, residual in zip(selectors, residuals))
+        == 0.0
+    )
+
+
 def add_piecewise_temperature_mapping(
     model,
     heat_coordinate,
@@ -424,7 +447,17 @@ def add_piecewise_temperature_mapping(
     integer_capable: bool,
     initial_segment: int = 0,
 ):
-    """Constrain ``temperature`` to ordered ``T(Q)`` without average CP."""
+    """Constrain ``temperature`` to ordered ``T(Q)`` without average CP.
+
+    Without integers, a mapping between two parameters (a stream's supply
+    end) adds nothing: its equality would have no variable in it.
+    """
+    if (
+        not integer_capable
+        and _is_constant(temperature)
+        and _is_constant(heat_coordinate)
+    ):
+        return None
     q_points = profile.cumulative_duties
     t_points = np.concatenate(([profile.temperatures_in[0]], profile.temperatures_out))
     if len(profile.duties) == 1:
@@ -471,20 +504,21 @@ def add_piecewise_temperature_mapping(
         model.Param(value=1.0 if index == active_segment else 0.0)
         for index in range(len(profile.duties))
     ]
-    for index, selector in enumerate(selectors):
-        q_start = q_points[index]
-        slope = (t_points[index + 1] - t_points[index]) / (
-            q_points[index + 1] - q_start
-        )
-        # The active line is deliberately allowed to extrapolate. After each
-        # continuous solve the owning model selects the interval containing Q
-        # and resolves; constraining Q to the current interval would prevent
-        # that active-set iteration from ever crossing a breakpoint.
-        model.Equation(
-            selector
-            * (temperature - t_points[index] - slope * (heat_coordinate - q_start))
-            == 0.0
-        )
+    slopes = np.diff(t_points) / np.diff(q_points)
+    # The active line is deliberately allowed to extrapolate. After each
+    # continuous solve the owning model selects the interval containing Q
+    # and resolves; constraining Q to the current interval would prevent
+    # that active-set iteration from ever crossing a breakpoint.
+    _add_active_segment_equation(
+        model,
+        selectors,
+        [
+            temperature
+            - t_points[index]
+            - slopes[index] * (heat_coordinate - q_points[index])
+            for index in range(len(selectors))
+        ],
+    )
     return {
         "heat_coordinate": heat_coordinate,
         "profile": profile,
@@ -552,17 +586,16 @@ def add_piecewise_cost_mapping(
         )
         for index in range(len(profile.duties))
     ]
-    for index, selector in enumerate(selectors):
-        q_start = q_points[index]
-        model.Equation(
-            selector
-            * (
-                cost
-                - cost_points[index]
-                - profile.prices[index] * (heat_coordinate - q_start)
-            )
-            == 0.0
-        )
+    _add_active_segment_equation(
+        model,
+        selectors,
+        [
+            cost
+            - cost_points[index]
+            - profile.prices[index] * (heat_coordinate - q_points[index])
+            for index in range(len(selectors))
+        ],
+    )
     return {
         "heat_coordinate": heat_coordinate,
         "profile": profile,
@@ -577,13 +610,19 @@ def add_piecewise_temperature_contribution_mapping(
     contribution,
     profile: PiecewiseThermalProfile,
     *,
+    integer_capable: bool,
     initial_segment: int = 0,
 ):
     """Map duty to the traversed segment's approach contribution.
 
     The mapping follows the same active-set iteration as continuous piecewise
-    temperature and cost mappings. At an exact internal boundary the segment
-    carrying the larger adjacent contribution is selected.
+    temperature and cost mappings, with every solver. At an exact internal
+    boundary the segment carrying the larger adjacent contribution is
+    selected. For an integer solver it is one equality per segment, each
+    times its selector: such a solver does not count equalities, and
+    Couenne's search follows the rows it is given (with the switched-off
+    rows left out, one build solved a small case several times slower and
+    another did not finish).
     """
     if len(profile.duties) == 1:
         model.Equation(contribution == profile.temperature_contributions[0])
@@ -596,10 +635,15 @@ def add_piecewise_temperature_contribution_mapping(
         )
         for index in range(len(profile.duties))
     ]
-    for index, selector in enumerate(selectors):
-        model.Equation(
-            selector * (contribution - profile.temperature_contributions[index]) == 0.0
-        )
+    residuals = [
+        contribution - profile.temperature_contributions[index]
+        for index in range(len(selectors))
+    ]
+    if integer_capable:
+        for selector, residual in zip(selectors, residuals):
+            model.Equation(selector * residual == 0.0)
+    else:
+        _add_active_segment_equation(model, selectors, residuals)
     return {
         "heat_coordinate": heat_coordinate,
         "profile": profile,

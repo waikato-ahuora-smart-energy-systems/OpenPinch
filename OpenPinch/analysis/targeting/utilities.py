@@ -411,7 +411,8 @@ def _maximise_utility_duty(
         return 0.0
 
     dt_tar_valid = dt_tar[valid_mask]
-    if dt_tar_valid.max() < 0:
+    # Within tol, as dt_sup is: a level a rounding past its step serves it.
+    if dt_tar_valid.max() < -tol:
         return 0.0
 
     def _candidate_limit(q_pot_values: np.ndarray) -> tuple[float, float, float]:

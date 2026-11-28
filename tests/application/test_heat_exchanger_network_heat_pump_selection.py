@@ -61,9 +61,10 @@ def test_the_selected_design_has_a_heat_pump_only_when_it_pays(steam_price, pump
     assert len(selected.heat_pumps) == pumps
     for outcome in design.top(1000):
         network = outcome.network
+        # The utility cost includes the machines' electricity.
         assert network.total_annual_cost == pytest.approx(
             network.utility_cost
             + network.capital_cost
-            + sum(machine.annual_cost for machine in network.heat_pumps)
+            + sum(machine.annual_capital_cost for machine in network.heat_pumps)
         )
         assert selected.total_annual_cost <= network.total_annual_cost + 1e-6

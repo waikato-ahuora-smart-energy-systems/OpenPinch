@@ -36,6 +36,160 @@ from .search import RetrofitSettings, run_retrofit_search
 _KELVIN = 273.15
 
 
+def _relieved_price(
+    problem,
+    network,
+    result,
+    side: str,
+    *,
+    dt_cont_multiplier: float = 1.0,
+    approach=None,
+) -> float | None:
+    """The price ($/kW/y) of the utility the as-piped heat pump ``result``
+    relieves on ``side``: ``"hot"``, the heaters its condensers reach,
+    ``"cold"``, the coolers its evaporators reach, the dearest relieved
+    first, as far as its heat delivered (or process heat absorbed) goes.
+
+    A condenser level at ``T`` reaches the part of a heater's shifted range
+    below ``T - HPR_DT_CONT``; an evaporator at ``T``, the part of a
+    cooler's above ``T + HPR_DT_CONT``. The ranges are shifted as the
+    target saw them: by each stream's contribution times
+    ``dt_cont_multiplier``, or not at all with an ``approach``, which is
+    then the heat pump's own. ``None`` when it reaches none, which prices it
+    at the side's blend.
+    """
+
+    hot = side == "hot"
+    config = problem.master_zone.config
+    if approach is None:
+        approach = float(config.hpr.dt_cont)
+    else:
+        approach, dt_cont_multiplier = float(approach), 0.0
+    arrays = problem_to_solver_arrays(problem, 2.0 * config.thermal.dt_cont)
+    costs = arrays.arrays["hu_cost_period" if hot else "cu_cost_period"][0]
+    stage = (
+        (result.Q_heat if result.Q_cond is None else result.Q_cond)
+        if hot
+        else (result.Q_cool if result.Q_evap is None else result.Q_evap)
+    )
+    duties = np.atleast_1d(np.asarray(stage, dtype=float))
+    levels = np.atleast_1d(
+        np.asarray(result.T_cond if hot else result.T_evap, dtype=float)
+    )
+    running = [
+        (float(t), float(q))
+        for t, q in zip(levels, np.resize(duties, levels.shape))
+        if q > 0.0
+    ]
+    total = sum(q for _t, q in running)
+    if total <= 0.0:
+        return None
+    # The process part of each level's duty: evaporators draw the air's
+    # share pro rata.
+    process = (total - (0.0 if hot else float(result.Q_amb_hot))) / total
+    sources, sinks = _as_piped_segments(problem, network, 0, dt_cont_multiplier)
+    by_id = {str(e.exchanger_id): e for e in network.exchangers}
+    segments = []
+    for _key, segment in (sinks if hot else sources).items():
+        exchanger = by_id.get(segment.name)
+        index = None if exchanger is None else _utility_index(arrays, exchanger, side)
+        if index is not None:
+            segments.append(
+                (
+                    float(costs[index]),
+                    float(segment.shifted_minimum_temperature.value),
+                    float(segment.shifted_maximum_temperature.value),
+                    float(segment.heat_flow.value),
+                )
+            )
+
+    def reach(lo: float, hi: float, duty: float, limit: float) -> float:
+        """The duty of a segment a level at ``limit`` reaches: below it for
+        a condenser, above it for an evaporator."""
+        if hi - lo <= 0.0:
+            share = 1.0 if (lo <= limit if hot else hi >= limit) else 0.0
+        else:
+            share = (limit - lo) / (hi - lo) if hot else (hi - limit) / (hi - lo)
+        return min(max(share, 0.0), 1.0) * duty
+
+    # Each level relieves only what it reaches, the dearest first; the level
+    # that reaches least goes first (a colder condenser, a hotter
+    # evaporator), its reach a part of every other's.
+    taken = [0.0] * len(segments)
+    relieved = cost = 0.0
+    for temperature, duty in sorted(running, reverse=not hot):
+        limit = temperature - approach if hot else temperature + approach
+        need = duty * process
+        for i in sorted(range(len(segments)), key=lambda i: -segments[i][0]):
+            price, lo, hi, segment_duty = segments[i]
+            part = min(max(reach(lo, hi, segment_duty, limit) - taken[i], 0.0), need)
+            taken[i] += part
+            need -= part
+            relieved += part
+            cost += part * price
+    return cost / relieved if relieved > 0.0 else None
+
+
+def _relieved_prices(
+    problem, network, result, *, dt_cont_multiplier: float = 1.0, approach=None
+) -> dict:
+    """``RetrofitHeatPumpTarget``'s relieved prices for ``result``, on the
+    coolers and heaters shifted as the target saw them; none for no
+    result."""
+    if result is None:
+        return {}
+    shifts = {"dt_cont_multiplier": dt_cont_multiplier, "approach": approach}
+    return {
+        "relieved_heat_price": _relieved_price(
+            problem, network, result, "hot", **shifts
+        ),
+        "relieved_cooling_price": _relieved_price(
+            problem, network, result, "cold", **shifts
+        ),
+    }
+
+
+# A relieved price within this share of the blend sizes the machine as is.
+_RELIEVED_PRICE_SHARE = 0.01
+
+
+# Re-solves at the relieved prices at most, after the solve at the blends.
+_RELIEVED_PRICE_PASSES = 3
+
+
+def _sized_on_relief(prices: dict, solve, relieve):
+    """``solve(prices)``, solved again at the prices of the utilities the
+    machine relieves (``relieve(result)``) until those agree with the prices
+    it was solved at to ``_RELIEVED_PRICE_SHARE``, at most
+    ``_RELIEVED_PRICE_PASSES`` times. Returns the last result and what it
+    relieves."""
+
+    def agree(a: float, b: float) -> bool:
+        return abs(a - b) <= _RELIEVED_PRICE_SHARE * abs(b)
+
+    basis = prices
+    result = solve(basis)
+    relieved = relieve(result)
+    for _pass in range(_RELIEVED_PRICE_PASSES):
+        # A side the machine relieves nothing on keeps its blend.
+        nxt = prices | {
+            blend: relieved[key]
+            for key, blend in (
+                ("relieved_heat_price", "hot_utility_price"),
+                ("relieved_cooling_price", "cold_utility_price"),
+            )
+            if relieved.get(key) is not None
+        }
+        if all(
+            agree(nxt[k], basis[k]) for k in ("hot_utility_price", "cold_utility_price")
+        ):
+            break
+        basis = nxt
+        result = solve(basis)
+        relieved = relieve(result)
+    return result, relieved
+
+
 def retrofit_heat_pumps(
     problem, network: HeatExchangerNetwork, *, args: dict | None = None
 ) -> RetrofitHeatPumpTargets:
@@ -67,16 +221,21 @@ def retrofit_heat_pumps(
         "as_piped": as_piped_profiles(problem, network),
     }
     prices = _network_prices(problem, network)
+    # The ideal's heat could go anywhere a new design puts it: the blends.
+    results = {"ideal": _profile_target(problem, profiles["ideal"], prices, args)}
+    # The as-piped heat pump relieves only the network's own heaters and
+    # coolers it can reach: it is sized on what it saves there, solved again
+    # at the utilities it relieves, and priced at what that one relieves.
+    results["as_piped"], relieved = _sized_on_relief(
+        prices,
+        lambda basis: _profile_target(problem, profiles["as_piped"], basis, args),
+        lambda result: _relieved_prices(problem, network, result),
+    )
     return RetrofitHeatPumpTargets(
-        **{
-            name: _summary(
-                _profile_target(problem, profile, prices, args),
-                profile[1],
-                profile[2],
-                prices,
-            )
-            for name, profile in profiles.items()
-        }
+        ideal=_summary(results["ideal"], *profiles["ideal"][1:], prices),
+        as_piped=_summary(
+            results["as_piped"], *profiles["as_piped"][1:], prices | relieved
+        ),
     )
 
 
@@ -87,6 +246,8 @@ def as_piped_heat_pump(
     args=None,
     load_fraction=None,
     cycle: str | None = None,
+    dt_cont_multiplier: float = 1.0,
+    approach: float | None = None,
 ):
     """The as-piped heat pump target of ``network`` as the heat pump
     service solved it (``HeatPumpTargetOutputs``), with its condenser
@@ -97,6 +258,9 @@ def as_piped_heat_pump(
     its heaters and coolers carry their temperatures. ``cycle``
     ("carnot" or "vapour_compression") solves a cascade of that cycle
     whatever the zone's ``HPR_TYPE``; ``None`` takes ``HPR_TYPE``.
+    ``dt_cont_multiplier`` scales each cooler's and heater's stream
+    contribution once more, as a retrofit of a designed network holds them
+    (``RetrofitSettings.dt_cont_multiplier``).
 
     With several periods the machine is designed once for the coolers and
     heaters of every period (``as_piped_period_profiles``), each period's
@@ -104,27 +268,52 @@ def as_piped_heat_pump(
     ``period_outputs`` hold each period's streams and work. The prices are
     the first period's."""
 
+    if approach is not None:
+        # The retrofit holds every match to the approach in place of the
+        # streams' contributions: the coolers and heaters are taken as
+        # they are and the heat pump stands the whole approach off them.
+        dt_cont_multiplier = 0.0
     if len(problem.period_ids) > 1:
         return compute_shared_profile_heat_pump_target(
-            profiles=as_piped_period_profiles(problem, network),
+            profiles=as_piped_period_profiles(
+                problem, network, dt_cont_multiplier=dt_cont_multiplier
+            ),
             period_ids=problem.period_ids,
             weights={
                 period: float(problem.master_zone.weights[index])
                 for period, index in problem.period_ids.items()
             },
             config=_target_config(
-                problem, _network_prices(problem, network), load_fraction, cycle
+                problem,
+                _network_prices(problem, network),
+                load_fraction,
+                cycle,
+                approach,
             ),
             args=args,
         )
-    return _profile_target(
-        problem,
-        as_piped_profiles(problem, network),
+    profile = as_piped_profiles(problem, network, dt_cont_multiplier=dt_cont_multiplier)
+    # Sized on what it saves: solved again at the utilities it relieves.
+    result, _relieved = _sized_on_relief(
         _network_prices(problem, network),
-        args,
-        load_fraction=load_fraction,
-        cycle=cycle,
+        lambda prices: _profile_target(
+            problem,
+            profile,
+            prices,
+            args,
+            load_fraction=load_fraction,
+            cycle=cycle,
+            approach=approach,
+        ),
+        lambda result: _relieved_prices(
+            problem,
+            network,
+            result,
+            dt_cont_multiplier=dt_cont_multiplier,
+            approach=approach,
+        ),
     )
+    return result
 
 
 # The cycle model a retrofit heat pump's cycle name solves.
@@ -150,32 +339,49 @@ def _network_prices(problem, network: HeatExchangerNetwork) -> dict:
 
 
 def _profile_target(
-    problem, profile, prices: dict, args, load_fraction=None, cycle=None
+    problem,
+    profile,
+    prices: dict,
+    args,
+    load_fraction=None,
+    cycle=None,
+    approach=None,
 ):
     """The heat pump service's result on ``profile`` (shifted temperatures,
     source and sink) at ``prices``, in the first period, whose states the
     as-piped profiles and prices take. ``load_fraction`` caps the load at
-    that share of the sink's, and ``cycle`` sets the cycle model, on a copy
-    of the configuration."""
+    that share of the sink's, ``cycle`` sets the cycle model and
+    ``approach`` the heat pump's own contribution, on a copy of the
+    configuration."""
 
     T_vals, H_hot, H_cold = profile
     return compute_profile_heat_pump_target(
         T_vals=T_vals,
         H_hot=H_hot,
         H_cold=H_cold,
-        config=_target_config(problem, prices, load_fraction, cycle),
+        config=_target_config(problem, prices, load_fraction, cycle, approach),
         args=args,
         period_id=min(problem.period_ids.items(), key=lambda item: item[1])[0],
         period_idx=0,
     )
 
 
-def _target_config(problem, prices: dict, load_fraction=None, cycle=None):
+def _target_config(
+    problem, prices: dict, load_fraction=None, cycle=None, approach=None
+):
     """The master zone's configuration at ``prices``, its load capped at
-    ``load_fraction`` of the sink's and its cycle model ``cycle``, as
-    copies."""
+    ``load_fraction`` of the sink's, its cycle model ``cycle`` and the heat
+    pump's own contribution ``approach`` (K), as copies."""
 
     config = _at_network_prices(problem.master_zone.config, prices)
+    if approach is not None:
+        # The approach replaces every contribution: the heat pump's own, the
+        # air's (added where it meets air) and the process streams' (added
+        # back where it sizes a process exchanger on shifted profiles).
+        config = deepcopy(config)
+        config.update_values(
+            HPR_DT_CONT=float(approach), HPR_DT_ENV_CONT=0.0, THERMAL_DT_CONT=0.0
+        )
     if load_fraction is not None and not 0.0 <= float(load_fraction) <= 1.0:
         # update_values does not check the field's bounds; NaN fails here.
         raise ValueError(
@@ -222,25 +428,35 @@ def _at_network_prices(config, prices: dict):
     return priced
 
 
+def _utility_index(arrays, exchanger, side: str):
+    """The index of the utility ``exchanger`` (a heater for ``"hot"``, a
+    cooler for ``"cold"``) uses on the solver arrays' axis; ``None`` when
+    it is not there."""
+
+    hot = side == "hot"
+    axis = arrays.axis_maps["hot_utilities" if hot else "cold_utilities"]
+    name = exchanger.source_stream if hot else exchanger.sink_stream
+    index = axis.get(name)
+    if index is None:
+        index = next(
+            (u for key, u in axis.items() if key.rsplit(".", 1)[-1] == name), None
+        )
+    return index
+
+
 def _utility_price(arrays, network: HeatExchangerNetwork, side: str) -> float:
     """A side's utility price, $/kW/y: its heaters' (``"hot"``) or coolers'
     utilities weighted by their first-period duties; with none in use, the
     side's cheapest utility."""
 
     hot = side == "hot"
-    axis = arrays.axis_maps["hot_utilities" if hot else "cold_utilities"]
     costs = arrays.arrays["hu_cost_period" if hot else "cu_cost_period"][0]
     kind = HeatExchangerKind.HOT_UTILITY if hot else HeatExchangerKind.COLD_UTILITY
     duty: dict[str, float] = {}
     for exchanger in network.exchangers:
         if exchanger.kind != kind:
             continue
-        name = exchanger.source_stream if hot else exchanger.sink_stream
-        index = axis.get(name)
-        if index is None:
-            index = next(
-                (u for key, u in axis.items() if key.rsplit(".", 1)[-1] == name), None
-            )
+        index = _utility_index(arrays, exchanger, side)
         if index is None:
             continue
         duty[index] = duty.get(index, 0.0) + max(
@@ -291,8 +507,19 @@ def _summary(result, H_hot, H_cold, prices: dict) -> RetrofitHeatPumpTarget:
             evaporator_duties=(),
             **prices,
         )
-    condenser = np.atleast_1d(np.asarray(result.Q_cond, dtype=float))
-    evaporator = np.atleast_1d(np.asarray(result.Q_evap, dtype=float))
+    # A Carnot result carries its levels' duties as Q_cond and Q_evap; a
+    # vapour compression result its stages' heating and cooling as Q_heat
+    # and Q_cool, with the Carnot fields None.
+    condenser = np.atleast_1d(
+        np.asarray(
+            result.Q_heat if result.Q_cond is None else result.Q_cond, dtype=float
+        )
+    )
+    evaporator = np.atleast_1d(
+        np.asarray(
+            result.Q_cool if result.Q_evap is None else result.Q_evap, dtype=float
+        )
+    )
     # Air heat the evaporators take (the service's ambient source); the
     # ambient sink is source heat left to air, not taken by the heat pump.
     ambient = float(result.Q_amb_hot)
@@ -319,6 +546,7 @@ def as_piped_profiles(
     *,
     period: int = 0,
     grid_periods: tuple[int, ...] = (),
+    dt_cont_multiplier: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The shifted temperatures (degC, hottest first) and the source and
     sink profiles of ``network``'s coolers and heaters, in the period of
@@ -327,18 +555,21 @@ def as_piped_profiles(
     Each cooler is a hot segment and each heater a cold one, between the
     process stream's solved inlet and outlet temperatures (K) at the
     exchanger's duty, shifted by that stream's temperature contribution
-    and its multiplier.
+    and its multiplier, times ``dt_cont_multiplier`` (the multiplier a
+    retrofit of a designed network holds its contributions at).
     The sources and sinks are cascaded apart, so none recovers heat from
     another. The temperatures of the periods of index ``grid_periods``
     join the grid too, carrying no duty.
     """
 
-    sources, sinks = _as_piped_segments(problem, network, period)
+    sources, sinks = _as_piped_segments(problem, network, period, dt_cont_multiplier)
     every = sources + sinks
     for other in grid_periods:
         # Fresh segments: a collection renames a stream it adds whose name
         # it already holds.
-        more_sources, more_sinks = _as_piped_segments(problem, network, other)
+        more_sources, more_sinks = _as_piped_segments(
+            problem, network, other, dt_cont_multiplier
+        )
         every = every + more_sources + more_sinks
     source = get_process_heat_cascade(
         hot_streams=sources,
@@ -362,10 +593,11 @@ def as_piped_profiles(
 
 
 def _as_piped_segments(
-    problem, network: HeatExchangerNetwork, period: int
+    problem, network: HeatExchangerNetwork, period: int, dt_cont_multiplier: float
 ) -> tuple[StreamCollection, StreamCollection]:
     """``network``'s coolers as hot segments and heaters as cold ones, in
-    the period of index ``period``; see ``as_piped_profiles``."""
+    the period of index ``period``, each stream's contribution scaled once
+    more by ``dt_cont_multiplier``; see ``as_piped_profiles``."""
 
     zone = problem.master_zone
     sources = StreamCollection()
@@ -395,7 +627,7 @@ def _as_piped_segments(
                 heat_flow=state.duty,
                 delta_t_contribution=stream.delta_t_contribution,
                 delta_t_contribution_multiplier=(
-                    stream.delta_t_contribution_multiplier
+                    stream.delta_t_contribution_multiplier * dt_cont_multiplier
                 ),
             )
         )
@@ -403,14 +635,20 @@ def _as_piped_segments(
 
 
 def as_piped_period_profiles(
-    problem, network: HeatExchangerNetwork
+    problem, network: HeatExchangerNetwork, *, dt_cont_multiplier: float = 1.0
 ) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """``as_piped_profiles`` in each of the problem's periods, by period id,
     all on one temperature grid, as a shared heat pump design needs."""
 
     indices = tuple(problem.period_ids.values())
     return {
-        period: as_piped_profiles(problem, network, period=index, grid_periods=indices)
+        period: as_piped_profiles(
+            problem,
+            network,
+            period=index,
+            grid_periods=indices,
+            dt_cont_multiplier=dt_cont_multiplier,
+        )
         for period, index in problem.period_ids.items()
     }
 

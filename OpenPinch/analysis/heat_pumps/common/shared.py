@@ -66,8 +66,6 @@ __all__ = [
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "cycle_limits",
-    "raise_cascade_lifts_to_floor",
-    "raise_parallel_lifts_to_floor",
     "floor_stage_evaporating_temperatures",
     "limit_cascade_pressure_ratios",
     "limit_parallel_pressure_ratios",
@@ -312,6 +310,18 @@ def heating_allowance(args: HeatPumpTargetInputs) -> float:
     return allowance
 
 
+def _air_to_air(cond: CascadeWithAir, evap: CascadeWithAir) -> float:
+    """Heat a machine draws from air and rejects to air.
+
+    Air is on one side of a machine only: a source for its evaporators or a
+    sink for its condensers. ``cond`` and ``evap`` are the condenser and the
+    evaporator cascades; the air each places beside the process (air that
+    warms a cold process stream, air that cools a hot one) is not the
+    machine's.
+    """
+    return max(min(float(evap.Q_air_source), float(cond.Q_air_sink)), 0.0)
+
+
 def _cascade_air_duties(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
@@ -401,12 +411,14 @@ def evaluate_carnot_hpr_result(
         work=float(w_net),
         Q_ext_heat=cond.Q_ext_top,
         Q_ext_cold=evap.Q_ext_bottom,
-        Q_cooling_water=evap.Q_cooling_water,
+        # Heat rejected to air ends at ambient: charged as cooling water.
+        Q_cooling_water=evap.Q_cooling_water + cond.Q_air_sink + evap.Q_air_sink,
         args=args,
         penalty_terms=[
             *_normalise_hpr_penalty_terms(penalty_terms),
             cond.Q_ext_bottom,
             evap.Q_ext_top,
+            _air_to_air(cond, evap),
         ],
         penalise_external_cold_when_refrigerating=True,
         refrigeration_allowance=refrigeration_allowance(args),
@@ -443,6 +455,7 @@ def evaluate_carnot_hpr_result(
         Q_refrigeration=Q_ext_cold,
         Q_amb_hot=cond.Q_air_source + evap.Q_air_source,
         Q_amb_cold=cond.Q_air_sink + evap.Q_air_sink,
+        Q_air_to_air=_air_to_air(cond, evap),
         cop_h=cop_h,
         eta_he=eta_he,
         T_cond=state.T_cond,
@@ -554,6 +567,10 @@ def evaluate_vapour_hpr_result(
         all_penalty_terms.append(
             max(Q_refrigeration - refrigeration_allowance(args), 0.0)
         )
+        # Its condensers may reject to air, so its evaporators may not draw
+        # on it: heat that goes from air to air. (A heat pump's whole
+        # condenser-to-air heat is a term above.)
+        all_penalty_terms.append(_air_to_air(cond, evap))
     penalty_weight = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,
@@ -561,7 +578,8 @@ def evaluate_vapour_hpr_result(
     cost_accounting = calc_simulated_hpr_annualized_costs(
         work=float(work),
         Q_ext_heat=Q_ext_heat,
-        Q_cooling_water=Q_cooling_water,
+        # Heat rejected to air ends at ambient: charged as cooling water.
+        Q_cooling_water=Q_cooling_water + Q_amb_cold,
         Q_refrigeration=Q_refrigeration,
         machine_capital=[installed_capital(machine) for machine in components],
         penalty_weight=penalty_weight,
@@ -611,6 +629,7 @@ def evaluate_vapour_hpr_result(
                 machines, process_areas=(0.0, 0.0, 0.0, 0.0), args=args
             )
         ),
+        hpr_machine_components=components,
         hpr_hot_utility_annualized_capital_cost=(
             cost_accounting.hpr_hot_utility_annualized_capital_cost
         ),
@@ -624,6 +643,7 @@ def evaluate_vapour_hpr_result(
         feasibility_penalty=penalty,
         Q_amb_hot=Q_amb_hot,
         Q_amb_cold=Q_amb_cold,
+        Q_air_to_air=_air_to_air(cond, evap),
         cop_h=float(cop_h),
         T_cond=state.T_cond,
         T_evap=state.T_evap,
@@ -988,38 +1008,6 @@ def limit_cascade_pressure_ratios(
         lower = stage + 1
         levels[lower] = max(levels[lower], floor + (dt_hx if lower < n_cond else 0.0))
     return levels[:n_cond], levels[n_cond:]
-
-
-def raise_parallel_lifts_to_floor(
-    T_cond: np.ndarray, T_evap: np.ndarray, floors: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    """Raise each parallel machine's condenser until it lifts at least its floor.
-
-    A shared multiperiod machine cannot turn its lift down below its floor, so
-    in a period needing less it condenses higher, at a larger approach. The
-    condensers stay non-increasing (a raised machine lifts the warmer ones).
-    """
-    T_evap = np.asarray(T_evap, dtype=float)
-    T_cond = np.maximum(np.asarray(T_cond, dtype=float), T_evap + floors)
-    for index in range(T_cond.size - 2, -1, -1):
-        T_cond[index] = max(T_cond[index], T_cond[index + 1])
-    return T_cond, T_evap
-
-
-def raise_cascade_lifts_to_floor(
-    T_cond: np.ndarray, T_evap: np.ndarray, floors: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    """Raise a cascade's levels until every stage lifts at least its floor.
-
-    The levels run hottest first through ``T_cond`` then ``T_evap``, and stage
-    ``i`` lifts from level ``i + 1`` to level ``i``. Working from the bottom
-    up, raising a stage's upper level never lowers a lift already checked.
-    """
-    T_cond = np.asarray(T_cond, dtype=float)
-    levels = np.concatenate([T_cond, np.asarray(T_evap, dtype=float)])
-    for stage in range(levels.size - 2, -1, -1):
-        levels[stage] = max(levels[stage], levels[stage + 1] + floors[stage])
-    return levels[: T_cond.size], levels[T_cond.size :]
 
 
 def cycle_limits(args: HeatPumpTargetInputs) -> CycleLimits:

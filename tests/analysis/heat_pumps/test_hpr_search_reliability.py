@@ -101,7 +101,12 @@ def test_warm_start_is_evaluated_first_and_exact_repeats_are_cached() -> None:
         objective=objective,
         initial_points=[[0.5]],
         bounds=[(0.0, 1.0)],
-        args=_base_args(search_budget=HPRSearchBudget()),
+        # A vapour compression search: a Carnot search also sweeps its best
+        # point, which evaluates the points the sweep tries.
+        args=_base_args(
+            search_budget=HPRSearchBudget(),
+            hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+        ),
         optimiser=optimiser,
     )
 
@@ -120,7 +125,11 @@ def test_backend_exhaustion_retains_viable_warm_start() -> None:
         objective=lambda *_args, **_kwargs: _success(0.25),
         initial_points=[[0.5]],
         bounds=[(0.0, 1.0)],
-        args=_base_args(search_budget=HPRSearchBudget()),
+        # Not a Carnot search, whose sweep adds the points it tries.
+        args=_base_args(
+            search_budget=HPRSearchBudget(),
+            hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+        ),
         optimiser=exhausted,
     )
 

@@ -365,6 +365,33 @@ def test_structure_uses_existing_duties_as_warm_start() -> None:
     assert structure.spec.initial_recovery_duties == {0: 1200.0}
 
 
+def test_structure_can_hold_the_periods_an_exchanger_idles_in() -> None:
+    # The first match runs in "warm" only; the others carry no period
+    # states of their own, so nothing is known of when they idle.
+    network = _four_stream_structure()
+    first = network.exchangers[0]
+    part_time = first.model_copy(
+        update={
+            "period_states": (
+                HeatExchangerPeriodState(period_id="warm", period_idx=0, duty=900.0),
+                HeatExchangerPeriodState(
+                    period_id="cool", period_idx=1, duty=0.0, active=False
+                ),
+            )
+        }
+    )
+    network = network.model_copy(
+        update={"exchangers": (part_time, *network.exchangers[1:])}
+    )
+    axis_maps = {**AXIS_MAPS, "periods": {"warm": 0, "cool": 1}}
+
+    held = fixed_network_structure(_request(network), axis_maps, hold_idle=True)
+    free = fixed_network_structure(_request(network), axis_maps)
+
+    assert held.spec.recovery_idle == {0: frozenset({1})}
+    assert free.spec.recovery_idle == {}
+
+
 def test_structure_accepts_qualified_stream_names() -> None:
     network = _four_stream_structure(
         recovery=(
@@ -489,6 +516,29 @@ def test_utility_series_order() -> None:
         (HEATER, 0, 1): [2],
         (COOLER, 0, 1): [3, 4],
     }
+
+
+def test_a_match_held_idle_in_a_period_idles_there_whatever_its_supplies() -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.models.thermal_profiles import (
+        ThermalProfile,
+    )
+
+    hot = ThermalProfile.single("hot", "H", 500.0, 300.0, 10.0, 1.0)
+    cold = ThermalProfile.single("cold", "C", 350.0, 450.0, 5.0, 1.0)
+    owner = SimpleNamespace(
+        spec=fixed_model.FixedStructureSpec(
+            stage_count=1,
+            recovery=(RecoveryMatch(0, 0, 0),),
+            utilities=(),
+            recovery_idle={0: frozenset({1})},
+        ),
+        N_periods=2,
+        hot_profiles=[[hot], [hot]],
+        cold_profiles=[[cold], [cold]],
+        recovery_dt=[[10.0], [10.0]],
+    )
+
+    assert fixed_model._idle_recovery_periods(owner) == [[False], [True]]
 
 
 def test_exact_lmtd_and_chen_agree_closely() -> None:
@@ -705,6 +755,72 @@ def test_multi_period_area_uses_one_common_area(scipy_backend) -> None:
         assert state.duty <= 900.0 + 1e-3
 
 
+def _two_period_payload(hot_supplies) -> dict:
+    """The small case over two periods, H1 arriving at ``hot_supplies``."""
+    payload = _small_payload()
+    hot = payload["streams"][0]
+    hot["t_supply"] = {"unit": "K", "values": list(hot_supplies)}
+    hot["heat_capacity_flowrate"] = {"unit": "kW/delta_degC", "values": [10.0, 10.0]}
+    hot["heat_flow"] = {
+        "unit": "kW",
+        "values": [10.0 * (supply - 300.0) for supply in hot_supplies],
+    }
+    for record in payload["streams"][1:]:
+        for key in ("heat_capacity_flowrate", "heat_flow"):
+            record[key] = {
+                "unit": record[key]["unit"],
+                "values": [record[key]["value"]] * 2,
+            }
+    payload["options"].update(
+        {"PROBLEM_PERIOD_IDS": ["warm", "cool"], "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5]}
+    )
+    return payload
+
+
+def test_a_match_idles_in_a_period_where_its_supplies_are_too_close(
+    scipy_backend,
+) -> None:
+    # In "cool" H1 arrives at 455 K, 5 K above C1's supply: the match cannot
+    # hold a 10 K approach there at any duty, so it carries none.
+    problem = PinchProblem(_two_period_payload([500.0, 455.0]))
+    problem.target.all_periods.direct_heat_integration()
+
+    view = problem.design.optimise_duties(
+        SMALL_STRUCTURE, objective="utility", min_approach_temperature=10.0
+    )
+
+    recovery = next(
+        e
+        for e in view.selected_network.exchangers
+        if e.kind is HeatExchangerKind.RECOVERY
+    )
+    warm, cool = recovery.period_states
+    assert warm.active and warm.duty == pytest.approx(200.0, abs=0.5)
+    assert not cool.active and cool.duty == 0.0
+
+
+def test_an_idle_period_reports_the_difference_its_streams_pass_at(
+    scipy_backend,
+) -> None:
+    problem = PinchProblem(_two_period_payload([500.0, 455.0]))
+    problem.target.all_periods.direct_heat_integration()
+
+    view = problem.design.optimise_duties(
+        SMALL_STRUCTURE, objective="utility", min_approach_temperature=10.0
+    )
+
+    recovery = next(
+        e
+        for e in view.selected_network.exchangers
+        if e.kind is HeatExchangerKind.RECOVERY
+    )
+    cool = recovery.period_states[1]
+    # H1 passes at 455 K and C1 at 450 K: not the 10 K the match would hold.
+    assert cool.approach_temperatures == pytest.approx((5.0, 5.0))
+    assert cool.source_outlet_temperature == pytest.approx(455.0)
+    assert cool.sink_outlet_temperature == pytest.approx(450.0)
+
+
 class _ScriptedModel:
     """Fake solved model: zero duty for the listed positions on each solve."""
 
@@ -848,7 +964,7 @@ def test_executor_reports_verification_failure_instead_of_success(
 def test_verify_solution_checks_each_exchanger_against_its_own_approach(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(duty_module, "verify_network_feasibility", lambda _n: ())
+    monkeypatch.setattr(duty_module, "verify_network_feasibility", lambda _n, **_: ())
 
     def result(approach):
         period = fixed_model.ExchangerPeriodResult(
@@ -922,6 +1038,114 @@ def test_executor_reports_solver_failure_after_removals() -> None:
         "infeasible (after removing zero-duty exchangers: "
         "recovery:Raw Milk->Milk Concentrate:S1)"
     )
+
+
+class _FailsUnlessHeld(_ScriptedModel):
+    """Fails to solve until the structure holds an idle period."""
+
+    def optimise(self, print_output=False):
+        if not self.spec.recovery_idle:
+            self.mSuccess = 0
+            self.solver_run = SimpleNamespace(failure_reason="infeasible", status=None)
+            return
+        super().optimise(print_output)
+
+
+def _solved_once_held(monkeypatch):
+    """The four-stream network, whose first match the structure holds idle
+    in the one period when asked to hold: the outcome of its solve."""
+    from dataclasses import replace
+
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
+    build = duty_module.fixed_network_structure
+
+    def structure(request, axis_maps, *, hold_idle=False, **kwargs):
+        built = build(request, axis_maps, **kwargs)
+        if not hold_idle:
+            return built
+        held = replace(built.spec, recovery_idle={0: frozenset({0})})
+        return replace(built, spec=held)
+
+    monkeypatch.setattr(duty_module, "fixed_network_structure", structure)
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request()
+    _FailsUnlessHeld.calls = []
+    _FailsUnlessHeld.zero_by_call = [set(), set()]
+    (outcome,) = FixedStructureDutyExecutor(
+        request, model_factory=_FailsUnlessHeld
+    ).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+    return outcome
+
+
+def test_executor_holds_the_idle_periods_after_a_failed_solve(monkeypatch) -> None:
+    # A network that idles an exchanger in a period may be infeasible with
+    # the exchanger free to run there: its streams can cross in that period.
+    # The solve is tried again with the idle periods held.
+    outcome = _solved_once_held(monkeypatch)
+
+    assert outcome.status == "success", outcome.error
+    assert [bool(spec.recovery_idle) for spec in _FailsUnlessHeld.calls] == [
+        False,
+        True,
+    ]
+
+
+def test_holding_idle_periods_starts_again_from_the_whole_network(monkeypatch) -> None:
+    # A free solve may leave an exchanger at zero duty by running others in
+    # periods the network idles them in. If the solve without it then fails,
+    # the held solve needs that exchanger back: held, the others cannot
+    # cover for it.
+    from dataclasses import replace
+
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
+    build = duty_module.fixed_network_structure
+
+    def structure(request, axis_maps, *, hold_idle=False, **kwargs):
+        built = build(request, axis_maps, **kwargs)
+        if not hold_idle:
+            return built
+        held = replace(built.spec, recovery_idle={0: frozenset({0})})
+        return replace(built, spec=held)
+
+    monkeypatch.setattr(duty_module, "fixed_network_structure", structure)
+
+    class FailsOnceReduced(_ScriptedModel):
+        def optimise(self, print_output=False):
+            if len(type(self).calls) == 2:
+                self.mSuccess = 0
+                self.solver_run = SimpleNamespace(
+                    failure_reason="infeasible", status=None
+                )
+                return
+            super().optimise(print_output)
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request()
+    FailsOnceReduced.calls = []
+    # Solve 1 leaves slot 2 idle; solve 2, without it, fails; solve 3 holds.
+    FailsOnceReduced.zero_by_call = [{2}, set(), set()]
+
+    (outcome,) = FixedStructureDutyExecutor(
+        request, model_factory=FailsOnceReduced
+    ).execute(
+        (_scripted_task(request),), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert outcome.status == "success", outcome.error
+    assert [
+        len(spec.recovery) + len(spec.utilities) for spec in FailsOnceReduced.calls
+    ] == [7, 6, 7]
+    assert outcome.network.summary_metrics["removed_exchanger_count"] == 0
+
+
+def test_a_network_solved_with_idle_periods_held_says_how_many(monkeypatch) -> None:
+    outcome = _solved_once_held(monkeypatch)
+
+    assert outcome.network.summary_metrics["idle_periods_held"] == 1
 
 
 def test_executor_records_a_solve_stopped_at_its_limit(monkeypatch) -> None:
@@ -2063,6 +2287,53 @@ def test_rating_reads_the_share_a_network_was_designed_with():
 
     assert rated.selected_network.total_annual_cost == pytest.approx(
         network.total_annual_cost, rel=1e-2
+    )
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_rating_a_networks_json_reads_the_share_it_was_designed_with():
+    """The share survives the network's JSON (what run_command returns and a
+    client sends back), so a rating of the JSON also holds the network to
+    its own design approach, not to the configuration's quarter (OpenPinch
+    PR 509 review)."""
+    problem = PinchProblem(_small_payload())
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=1, options={"HENS_MIN_EXCHANGER_APPROACH_SHARE": 0.0}
+    ).selected_network
+
+    rated = problem.design.optimise_duties(
+        network.model_dump(mode="json"), objective="rating"
+    )
+
+    assert rated.selected_network.total_annual_cost == pytest.approx(
+        network.total_annual_cost, rel=1e-2
+    )
+
+
+@_needs_live_solver
+@pytest.mark.solver
+def test_rating_a_fitted_networks_json_reads_a_multiplier_below_one():
+    """A pinch design at multiplier 0.75, fitted to every period, closes
+    its matches to 8.1 K. Its JSON keeps the multiplier, so a rating of the
+    JSON holds 7.5 K and rates it; read as multiplier 1, 10 K, the rating
+    was infeasible."""
+    from tests.analysis.heat_exchanger_networks.test_hen_period_handling import (
+        _two_period_problem,
+    )
+
+    problem = _two_period_problem()
+    network = problem.design.heat_exchanger_network(
+        width=0, depth=0, dt_cont_multipliers=[0.75]
+    ).selected_network
+    assert min(_recovery_approaches(network)) < 10.0
+
+    rated = problem.design.optimise_duties(
+        network.model_dump(mode="json"), objective="rating"
+    )
+
+    assert rated.selected_network.total_annual_cost == pytest.approx(
+        network.total_annual_cost, rel=1e-6
     )
 
 

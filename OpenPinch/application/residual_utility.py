@@ -5,6 +5,7 @@ import math
 from ..analysis.targeting.residual import compute_residual_utility_target
 from ..domain.enums import TargetType
 from ..domain.hpr import HPRResidualSnapshot
+from ._problem.input.utilities import input_price
 from .hpr_selection import hpr_result_digest, validate_hpr_target
 
 
@@ -60,7 +61,8 @@ def create_hpr_residual_case(problem, *, base_target, project_name=None):
                 "heat_flow": 0.0,
                 "dt_cont": scalar(u.effective_delta_t_contribution),
                 "htc": scalar(u.heat_transfer_coefficient),
-                "price": scalar(u.price),
+                # As given: preparing the case prices it for rejection again.
+                "price": scalar(input_price(u)),
                 "active": u.is_active,
                 "maximum_heat_flow": maximum_duty(u.maximum_heat_flow),
                 "fluid_name": u.fluid_name,
@@ -137,18 +139,24 @@ def prepare_residual_problem(input_data, project_name):
     from ..domain.configuration import Configuration
     from ..domain.enums import ZoneType
     from ..domain.zone import Zone
+    from ._problem.input.canonicalization import _zone_label
     from ._problem.input.utilities import _get_hot_and_cold_utilities
 
     data = input_data.residual_basis.data
+    # A zone's dots become dashes, as on every other problem's root.
+    project = _zone_label(project_name)
+    name = (
+        _zone_label(input_data.zone_tree.name)
+        if input_data.zone_tree is not None
+        else project
+    )
     config = Configuration(
         options=input_data.options or {},
-        top_zone_name=project_name,
+        top_zone_name=project,
         top_zone_identifier=ZoneType.P.value,
     )
     zone = Zone(
-        name=input_data.zone_tree.name
-        if input_data.zone_tree is not None
-        else project_name,
+        name=name,
         type=ZoneType.P.value,
         config=config,
     )

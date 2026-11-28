@@ -163,6 +163,56 @@ def site_utility_system(
     )
 
 
+def priced_by_site_balance(network, system: SiteUtilitySystem):
+    """``network`` costed by the site balance of its own duties.
+
+    Each level's use is what the network's heaters draw from it and its
+    generation what its coolers raise on it, per period; the cheapest
+    balance of those loads (``utility_system.balance_of_loads``) is the
+    network's utility cost, and its total annual cost is that plus its
+    capital cost. The network gains the site cost metrics and the balance
+    a site network's own model gives it (``site_utilities.with_site_cost``).
+    """
+
+    from ....domain.enums import HeatExchangerKind
+    from ..models._stagewise.site_utilities import with_site_cost
+    from .utility_system import balance_of_loads
+
+    periods = len(system.levels.period_weights)
+    sides = {
+        HeatExchangerKind.HOT_UTILITY: (dict(system.hot_utilities), {}),
+        HeatExchangerKind.COLD_UTILITY: (dict(system.cold_utilities), {}),
+    }
+    for exchanger in network.exchangers:
+        if exchanger.kind not in sides:
+            continue
+        level_of, loads = sides[exchanger.kind]
+        utility = (
+            exchanger.source_stream
+            if exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            else exchanger.sink_stream
+        )
+        by_period = loads.setdefault(level_of[utility], [0.0] * periods)
+        for state in exchanger.period_states:
+            if state.active:
+                by_period[state.period_idx] += float(state.duty)
+    balance = balance_of_loads(
+        system.levels,
+        sides[HeatExchangerKind.HOT_UTILITY][1],
+        sides[HeatExchangerKind.COLD_UTILITY][1],
+    )
+    operating = float(balance.operating_cost)
+    return with_site_cost(
+        network.model_copy(
+            update={
+                "utility_cost": operating,
+                "total_annual_cost": float(network.capital_cost or 0.0) + operating,
+            }
+        ),
+        balance,
+    )
+
+
 def utility_capacities(zone) -> dict[str, tuple[float | None, ...]]:
     """Each hot utility's ``maximum_heat_flow`` per period, by identity."""
     caps = {}

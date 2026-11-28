@@ -42,10 +42,13 @@ class LevelCountRun:
     message: str | None = None
     # The case the count was designed on, for level moves.
     case: Any = None
+    # The case's own (given) levels, compared with the placed counts.
+    given: bool = False
 
     def row(self) -> dict[str, Any]:
         """The run as a JSON-safe record."""
         return {
+            "levels": "given" if self.given else "placed",
             "count": self.count,
             "isothermal": self.isothermal,
             "sensible": self.sensible,
@@ -120,7 +123,9 @@ def placed_case(
     that utility of its own instead, at its own temperatures and price; a
     side with none raises ``NoFeasiblePlacementError``. A placed level
     whose supply and target both lie within ``MINIMUM_LEVEL_GAP`` of an
-    earlier one's is dropped: the two are one main.
+    earlier one's is dropped: the two are one main. The case always keeps
+    its own utility that rejects heat to ambient (``_ambient_sink``), since
+    every rejected heat ends there.
     """
     from .case_derivation import with_utilities_from
 
@@ -143,7 +148,58 @@ def placed_case(
         if side == utility["type"].casefold() and name.startswith(_PLACED_KINDS):
             utility["name"] = name
     source["utilities"] = _distinct_levels(utilities) + _stand_ins(problem, fallbacks)
+    for sink in _ambient_sinks(problem):
+        if sink in source["utilities"]:
+            continue
+        if any(
+            (u["name"], u["type"]) == (sink["name"], sink["type"])
+            for u in source["utilities"]
+        ):
+            raise ValueError(
+                f"the case's {sink['type'].casefold()} utility {sink['name']!r}, "
+                "which rejects heat to ambient, has the name of a placed level; "
+                "rename it to design with placed levels."
+            )
+        source["utilities"].append(sink)
     return type(problem)(source, project_name=problem.project_name)
+
+
+def _ambient_sinks(problem: "PinchProblem") -> list[dict]:
+    """The case's own utilities that reject heat to ambient, as given.
+
+    Every rejected heat ends at ambient, so a placed case keeps them whatever
+    the placed levels are: in each period, the coldest given cold utility
+    whose supply is not below ``ENV_TEMPERATURE`` (with none, the warmest),
+    as the utility pricing takes it (``_problem/input/utilities.py``).
+    """
+    from ..analysis.targeting.utilities import is_default_utility
+
+    root = problem._require_prepared_root_zone()
+    t_env = float(root.config.environment.temperature)
+    periods = max(1, len(problem.period_ids))
+
+    def supply(utility, n: int) -> float:
+        value = utility.supply_temperature.to("degC")
+        return float(value[n].value if value.num_periods > 1 else value.value)
+
+    given = [u for u in root.cold_utilities if not is_default_utility(u)]
+    chosen: list[str] = []
+    for n in range(periods):
+        above = [u for u in given if supply(u, n) >= t_env]
+        pick = (
+            min(above, key=lambda u: supply(u, n))
+            if above
+            else max(given, key=lambda u: supply(u, n), default=None)
+        )
+        if pick is not None and pick.name not in chosen:
+            chosen.append(pick.name)
+    raw = problem.to_problem_json()["utilities"]
+    return [
+        u
+        for name in chosen
+        for u in raw
+        if u["name"] == name and u["type"] in ("Cold", "Both")
+    ]
 
 
 def _fallback_utilities(
@@ -313,6 +369,32 @@ def run_level_counts(
     return tuple(runs)
 
 
+def given_levels_run(design: Callable[[], Any]) -> LevelCountRun:
+    """The case's own levels designed (``design()``) as a run of the sweep,
+    so the cheapest of the placed counts and the given levels is selected.
+    A missing synthesis solver or dependency is raised; any other failure is
+    recorded."""
+    from ..analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+    )
+
+    given = {"count": 0, "isothermal": 0, "sensible": 0, "given": True}
+    try:
+        view = design()
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        raise
+    except (ValueError, RuntimeError) as exc:
+        return LevelCountRun(**given, status="failed", message=str(exc))
+    return LevelCountRun(
+        **given,
+        status="designed",
+        view=view,
+        total_annual_cost=site_cost(view.selected_network),
+        message="the case's given levels",
+    )
+
+
 def select_level_count(runs: Sequence[LevelCountRun]) -> LevelCountRun:
     """The designed count of least cost; the first such on a tie."""
     from ..analysis.heat_exchanger_networks.errors import WorkflowContractError
@@ -347,12 +429,14 @@ def level_sweep_view(problem: "PinchProblem", runs, *, settings: Mapping):
     for run in runs:
         if run.status != "designed":
             continue
+        tag = (
+            {"site_levels": "given"}
+            if run.given
+            else {"utility_level_count": run.count}
+        )
         for outcome in ranked_networks(run.view.result):
             network = outcome.network.model_copy(
-                update={
-                    "summary_metrics": dict(outcome.network.summary_metrics)
-                    | {"utility_level_count": run.count}
-                }
+                update={"summary_metrics": dict(outcome.network.summary_metrics) | tag}
             )
             ranked.append(
                 outcome.model_copy(

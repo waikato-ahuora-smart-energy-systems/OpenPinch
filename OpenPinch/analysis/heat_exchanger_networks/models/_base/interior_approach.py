@@ -15,6 +15,8 @@ crossed.
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from ...solver.arrays import pair_minimum_approach
@@ -47,6 +49,16 @@ def _branch_ends(owner, n: int, i: int, j: int, k: int) -> tuple:
     )
 
 
+def _within(profile, temperature: float) -> float:
+    """``temperature`` held to the profile's range. A branch end is bounded
+    by its stream's supply and target temperatures, and a solver holds a
+    bound to a relative tolerance only (Ipopt: 1e-8 of its size, 4e-6 K at
+    140 degC), so a solved end can sit that far past the profile's."""
+
+    ends = (float(profile.temperatures_in[0]), float(profile.temperatures_out[-1]))
+    return min(max(temperature, min(ends)), max(ends))
+
+
 def install_interior_cuts(owner, M_ij_period) -> None:
     """Check each solution of a model with a segmented stream.
 
@@ -60,7 +72,9 @@ def install_interior_cuts(owner, M_ij_period) -> None:
         owner._interior_cuts = {}
         owner._interior_constraints = {}
         owner._interior_big_m = M_ij_period
-        owner._add_lazy_cuts = lambda: _add_interior_approach_cuts(owner, M_ij_period)
+        # A partial of a module function, not a lambda: a worker process
+        # sends its solved model back pickled.
+        owner._add_lazy_cuts = partial(_add_interior_approach_cuts, owner, M_ij_period)
 
 
 def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
@@ -111,6 +125,8 @@ def _add_interior_approach_cuts(owner, M_ij_period) -> bool:
                     h_in, h_out, c_in, c_out = (
                         value(t) for t in _branch_ends(owner, n, i, j, k)
                     )
+                    h_in, h_out = _within(hot, h_in), _within(hot, h_out)
+                    c_in, c_out = _within(cold, c_in), _within(cold, c_out)
                     hot_span = hot.heat_at_temperature(h_out) - hot.heat_at_temperature(
                         h_in
                     )

@@ -200,7 +200,7 @@ def _recovery_period_state(
             stage_index + 1,
         )
     )
-    return HeatExchangerPeriodState(
+    state = HeatExchangerPeriodState(
         period_id=period_id,
         period_idx=period_idx,
         duty=duty,
@@ -250,6 +250,28 @@ def _recovery_period_state(
             duty,
             period_idx=period_idx,
         ),
+    )
+    # Over several periods the approach variables bind only where the area
+    # is sized; elsewhere the streams' own terminal differences are reported.
+    if hot_boundaries is not None and len(hot_boundaries) > 1:
+        return _at_terminal_approaches(state)
+    return state
+
+
+def _at_terminal_approaches(state: HeatExchangerPeriodState):
+    """``state`` with the approaches its streams pass at; an idle match, or
+    one without all four temperatures, keeps the model's."""
+    ends = (
+        state.source_inlet_temperature,
+        state.sink_outlet_temperature,
+        state.source_outlet_temperature,
+        state.sink_inlet_temperature,
+    )
+    if not state.active or any(value is None for value in ends):
+        return state
+    hot_in, cold_out, hot_out, cold_in = ends
+    return state.model_copy(
+        update={"approach_temperatures": (hot_in - cold_out, hot_out - cold_in)}
     )
 
 
@@ -451,12 +473,42 @@ def _isothermal_split_fraction(
     heat_capacity = _period_value(
         solved_model, f"{cp_name}_period", cp_name, period_idx, stream_index
     )
-    if None in temperatures or heat_capacity is None or duty <= tolerance:
+    if duty <= tolerance:
+        return None
+    if heat_capacity is None or heat_capacity <= 0.0:
+        # A segmented stream has no one heat capacity (the model holds 0):
+        # its stage duty is what its matches in the stage take, each over
+        # the whole change.
+        stage_duty = _stage_recovery_duty(
+            solved_model, side, period_idx, stream_index, stage_index
+        )
+        return None if stage_duty <= tolerance else min(duty / stage_duty, 1.0)
+    if None in temperatures:
         return None
     stage_duty = heat_capacity * abs(temperatures[0] - temperatures[1])
     if stage_duty <= tolerance:
         return None
     return min(duty / stage_duty, 1.0)
+
+
+def _stage_recovery_duty(
+    solved_model: Any, side: str, period_idx: int, stream_index: int, stage: int
+) -> float:
+    """The recovery duty of one stream's matches in one stage."""
+    by_period = getattr(solved_model, "Q_r_by_period", None)
+    duties = (
+        by_period[period_idx]
+        if by_period is not None
+        else getattr(solved_model, "Q_r", None)
+    )
+    if duties is None:
+        return 0.0
+    if side == "hot":
+        cells = (row[stage] for row in duties[stream_index])
+    else:
+        cells = (by_cold[stream_index][stage] for by_cold in duties)
+    # Negative solver noise is clipped to 0, as each match's duty is.
+    return sum(max(_optional_float(cell) or 0.0, 0.0) for cell in cells)
 
 
 def _recovery_split_fraction(

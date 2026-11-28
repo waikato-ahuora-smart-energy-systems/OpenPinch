@@ -306,6 +306,20 @@ def extract_heat_exchanger_network(
             "cold_stream_target_temperatures_by_period": _period_matrix(
                 solved_model, solver_arrays, "T_c_out_period"
             ),
+            # Verification sizes each period with its own film coefficients;
+            # the scalar ones above are the first period's.
+            "hot_stream_heat_transfer_coefficients_by_period": _period_matrix(
+                solved_model, solver_arrays, "htc_h_period"
+            ),
+            "cold_stream_heat_transfer_coefficients_by_period": _period_matrix(
+                solved_model, solver_arrays, "htc_c_period"
+            ),
+            "hot_utility_heat_transfer_coefficients_by_period": _period_matrix(
+                solved_model, solver_arrays, "htc_hu_period"
+            ),
+            "cold_utility_heat_transfer_coefficients_by_period": _period_matrix(
+                solved_model, solver_arrays, "htc_cu_period"
+            ),
             "hot_stream_total_duties_by_period": _segment_parent_total_duties_by_period(
                 solver_arrays, "hot"
             ),

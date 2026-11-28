@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import math
+import warnings
 from collections import defaultdict
 from typing import Any, List, Optional, Tuple
 
@@ -87,6 +88,25 @@ def _build_zone_config(
     raise TypeError("options must be a Configuration, dict, or None.")
 
 
+def _zone_label(name):
+    """``name`` as a zone's name: its dots written as dashes.
+
+    A stream's zone label is read that way (a dot separates a zone from a
+    stream in a stream's key), so a zone named with a dot, the root named
+    for the project among them, would not be the zone its own streams
+    name.
+    """
+    if not isinstance(name, str) or "." not in name:
+        return name
+    changed = name.replace(".", "-")
+    warnings.warn(
+        f"Name {name!r} was changed to {changed!r}: dots become dashes.",
+        UserWarning,
+        stacklevel=2,
+    )
+    return changed
+
+
 def _get_validated_zone_info(
     zone_tree: ZoneTreeSchema, project_name: str = None, depth: int = 0
 ) -> Tuple[str, str]:
@@ -121,10 +141,10 @@ def _get_validated_zone_info(
             else:
                 zone_type = ZoneType.UO.value
 
-        zone_name = zone_tree.name
+        zone_name = _zone_label(zone_tree.name)
     else:
         zone_type = ZoneType.S.value
-        zone_name = project_name
+        zone_name = _zone_label(project_name)
     return zone_name, zone_type
 
 

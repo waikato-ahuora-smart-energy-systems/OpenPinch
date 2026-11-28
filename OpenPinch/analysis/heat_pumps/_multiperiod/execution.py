@@ -26,8 +26,9 @@ from ..optimisation_adapter import (
 )
 from ..performance_maps.targeting import preflight_tespy_hpr_targeting
 from .aggregation import evaluate_multiperiod_candidate, selected_period_case
+from .design_and_operate import design_and_operate
 from .preparation import period_case_by_id
-from .setup import get_multiperiod_hpr_optimisation_setup
+from .setup import get_multiperiod_hpr_optimisation_setup, multiperiod_idle_point
 from .state import _PreparedHPRPeriodCase
 
 
@@ -60,20 +61,62 @@ def get_multiperiod_hpr_targets(
     )
     if args.simulation_backend == "tespy":
         preflight_tespy_hpr_targeting(args)
-    initial_points, bounds, period_objective, stage_lifts = (
+    initial_points, bounds, period_objective, operated = (
         get_multiperiod_hpr_optimisation_setup(
             solver_cases,
             selected_case=selected_case,
         )
     )
-    result = solve_hpr_multiperiod_placement(
-        f_obj=period_objective,
-        x0_ls=initial_points,
-        bnds=bounds,
-        args=args,
-        stage_lifts=stage_lifts,
-    )
+    if operated:
+        # Vapour compression: one installed machine, operated per period.
+        result = solve_design_and_operate(
+            f_obj=period_objective,
+            x0_ls=initial_points,
+            bnds=bounds,
+            args=args,
+            idle_point=multiperiod_idle_point(args.hpr_type),
+        )
+    else:
+        result = solve_hpr_multiperiod_placement(
+            f_obj=period_objective, x0_ls=initial_points, bnds=bounds, args=args
+        )
     return translate_hpr_output(result)
+
+
+def solve_design_and_operate(
+    f_obj: Callable,
+    x0_ls: list | np.ndarray | float | None,
+    bnds: list,
+    args: MultiPeriodHPRTargetInputs,
+    idle_point: Callable | None = None,
+) -> HPRBackendResult:
+    """Design one installed machine for every period and operate it in each
+    (``design_and_operate``), checked and translated as a shared design."""
+    result = reject_penalised_periods(
+        design_and_operate(
+            f_obj=f_obj, x0_ls=x0_ls, bnds=bnds, args=args, idle_point=idle_point
+        ),
+        args,
+    )
+    if result.success and np.isfinite(float(result.obj)):
+        return translate_hpr_result(
+            result, ambient_args=selected_period_case(args).args
+        )
+    failures = [(0, result)]
+    raise_hpr_targeting_error(
+        args=args,
+        message=(
+            "Multi-period heat pump and refrigeration targeting "
+            f"({args.hpr_type}) found no heat pump design that improves on the "
+            "baseline without one."
+            if _is_no_beneficial_heat_pump(failures)
+            else "Multi-period heat pump and refrigeration targeting "
+            f"({args.hpr_type}) failed to return an optimal result."
+        ),
+        failures=failures,
+        evaluated_count=1,
+        warm_start_evaluated=bool(normalise_initial_points(x0_ls)),
+    )
 
 
 def solve_hpr_multiperiod_placement(
@@ -81,18 +124,9 @@ def solve_hpr_multiperiod_placement(
     x0_ls: list | np.ndarray | float | None,
     bnds: list,
     args: MultiPeriodHPRTargetInputs,
-    stage_lifts: Callable | None = None,
 ) -> HPRBackendResult:
-    """Optimise one shared HPR vector against every prepared period case.
-
-    ``stage_lifts`` gives each stage's lift as a vector decodes in a period;
-    with it, every period keeps each stage's lift at its turndown floor.
-    """
-    objective = partial(
-        evaluate_multiperiod_candidate,
-        period_objective=f_obj,
-        stage_lifts=stage_lifts,
-    )
+    """Optimise one shared HPR vector against every prepared period case."""
+    objective = partial(evaluate_multiperiod_candidate, period_objective=f_obj)
     candidates = run_hpr_candidate_search(
         objective=objective,
         initial_points=x0_ls,
@@ -166,19 +200,27 @@ def reject_penalised_periods(
 
     Each period is judged on its own result and inputs, so a penalty in a
     lightly weighted period is not diluted by the others, and the failure
-    reports that period's own duties.
+    reports that period's own duties. A period the machine is off in is no
+    failure unless it is off in all of them.
     """
     if not result.success:
         return result
     outputs = result.period_outputs or {}
+    idle, running = None, 0
     for case in args.period_cases:
         period = outputs.get(str(case.period_id))
         if period is None:
             continue
         checked = reject_penalised_design(period, case.args)
-        if not checked.success:
+        if checked.success:
+            running += 1
+        elif checked.failure_reason == ZERO_USEFUL_DUTY_REASON:
+            # A machine off in this period (a Carnot design that serves no
+            # duty there): no heat pump only if it is off in every period.
+            idle = checked
+        else:
             return checked
-    return result
+    return idle if idle is not None and not running else result
 
 
 __all__ = [

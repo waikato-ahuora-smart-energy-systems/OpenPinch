@@ -44,6 +44,9 @@ def test_the_basic_pinch_sample_with_a_searched_carnot_heat_pump():
             "load": {"fraction": 1.0},
             "levels": {"condensers": 1, "evaporators": 1},
             "search": {"restarts": 1},
+            # Heat at the electricity price, as the review's numbers were:
+            # at the steam's own price no heat pump pays on this case.
+            "options": {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0},
         },
         heat_pump_cost=200.0,
         width=1,

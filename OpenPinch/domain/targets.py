@@ -34,6 +34,13 @@ def _normalise_target_name(
     return zone_name if str(zone_name).endswith(suffix) else f"{zone_name}{suffix}"
 
 
+_JSON_ROUTE = (
+    "A target is not JSON: it holds problem tables, stream collections, the "
+    "configuration and solver details. Its JSON form is problem.results "
+    "(problem.results.model_dump(mode='json'), or the results JSON export)."
+)
+
+
 class BaseTargetModel(BaseModel):
     """Shared metadata for all solved target objects."""
 
@@ -80,6 +87,20 @@ class BaseTargetModel(BaseModel):
     def provenance_settings(self) -> dict[str, Any]:
         """Effective calculation settings, including family-owned runtime choices."""
         return dict(self.config._values)
+
+    def model_dump(self, *, mode: str = "python", **kwargs) -> dict[str, Any]:
+        """The target's fields; its JSON form is ``problem.results``.
+
+        A target holds problem tables, stream collections, the configuration
+        and solver details, none of them JSON (review finding 37).
+        """
+        if mode == "json":
+            raise TypeError(_JSON_ROUTE)
+        return super().model_dump(mode=mode, **kwargs)
+
+    def model_dump_json(self, **kwargs) -> str:
+        """Refused: a target's JSON form is ``problem.results``."""
+        raise TypeError(_JSON_ROUTE)
 
     @model_validator(mode="before")
     @classmethod

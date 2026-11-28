@@ -692,3 +692,87 @@ def test_two_heaters_at_one_stream_end_split_the_stream():
         assert heaters[name].sink_inlet_temperature == pytest.approx(100.0 + 273.15)
         assert heaters[name].sink_outlet_temperature == pytest.approx(130.0 + 273.15)
     assert verify_network_feasibility(network) == ()
+
+
+class _PlacedModelRecorder:
+    """Stands in for the placed-units model: keeps what it was built with."""
+
+    built: dict = {}
+    mSuccess = 1
+
+    def __init__(self, **arguments) -> None:
+        type(self).built = arguments
+        # No streams or stages: there is no seed match to keep in use.
+        self.I = self.J = self.S = 0
+
+    def optimise(self, print_output) -> None:
+        pass
+
+
+def _seeded_site_task(solver_options=None):
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    task = InternalHeatExchangerNetworkProblem(
+        solver_arrays=None,
+        name="site",
+        framework="ESM",
+        solver="ipopt-pyomo",
+        dTmin=D_TMIN,
+        stages=2,
+        minimisation_goal="utility costs",
+        integers=False,
+        tol=1e-6,
+        site_processes={},
+    )
+    task.args = {
+        "name": "site",
+        "solver": "ipopt-pyomo",
+        "solver_options": solver_options,
+    }
+    return task
+
+
+def test_the_placed_units_model_is_solved_within_a_time_limit(monkeypatch):
+    # A MILP over every staged unit of a site: on three processes (34
+    # streams) HiGHS had not finished it after 15 minutes, and nothing
+    # stopped it.
+    from OpenPinch.analysis.heat_exchanger_networks.models import (
+        problem as problem_module,
+    )
+
+    monkeypatch.setattr(problem_module, "StageWiseModel", _PlacedModelRecorder)
+
+    _seeded_site_task()._placed_staged_units(2)
+
+    assert _PlacedModelRecorder.built["solver_options"] == {"time_limit": 60.0}
+
+
+def test_the_placed_units_model_takes_the_tasks_own_time_limit(monkeypatch):
+    # The task's solver is Ipopt, whose limit is max_wall_time; HiGHS takes
+    # the same seconds under its own name.
+    from OpenPinch.analysis.heat_exchanger_networks.models import (
+        problem as problem_module,
+    )
+
+    monkeypatch.setattr(problem_module, "StageWiseModel", _PlacedModelRecorder)
+
+    _seeded_site_task({"max_wall_time": 20.0})._placed_staged_units(2)
+
+    assert _PlacedModelRecorder.built["solver_options"] == {"time_limit": 20.0}
+
+
+def test_the_placed_units_model_reads_a_time_limit_given_as_an_option_line(
+    monkeypatch,
+):
+    # A task's solver options may also be option lines, as the backend takes.
+    from OpenPinch.analysis.heat_exchanger_networks.models import (
+        problem as problem_module,
+    )
+
+    monkeypatch.setattr(problem_module, "StageWiseModel", _PlacedModelRecorder)
+
+    _seeded_site_task(["max_wall_time 20"])._placed_staged_units(2)
+
+    assert _PlacedModelRecorder.built["solver_options"] == {"time_limit": 20.0}

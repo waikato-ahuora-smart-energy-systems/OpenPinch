@@ -5,7 +5,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 from ._heat_exchanger import rules as _rules
 from ._heat_exchanger.period_state import (
@@ -116,11 +123,26 @@ class NetworkHeatPump(BaseModel):
     # The share of the heating the process could give a heat pump that this
     # one takes (1.0: the full load); None when its target did not say.
     load_fraction: float | None = None
+    # The machine's condenser, evaporator and ambient source streams as the
+    # stream input records of the case its network was designed on; empty
+    # for a machine whose network's problem holds them, or on a site.
+    streams: tuple[dict[str, Any], ...] = ()
 
     @property
     def annual_cost(self) -> float:
         """What the machine adds to the network's total annual cost, $/y."""
         return self.electricity_cost + self.annual_capital_cost
+
+
+# The site entries of a network's source metadata its JSON keeps.
+_SITE_ENTRIES = ("site_utility_balance", "utility_level_targets", "site_processes")
+
+
+def _json_form(value: Any) -> Any:
+    """``value`` as JSON: a pydantic model by its own JSON dump."""
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    return value
 
 
 class HeatExchangerNetwork(BaseModel):
@@ -195,6 +217,33 @@ class HeatExchangerNetwork(BaseModel):
     ) -> dict[str, float | int | str | bool | None]:
         _rules.check_summary_metrics(value)
         return value
+
+    @computed_field
+    @property
+    def site(self) -> dict[str, Any] | None:
+        """A site network's site entries, for its JSON; ``None`` otherwise.
+
+        ``source_metadata`` is left out of the JSON, but a site network's
+        utility balance, utility level targets and process duties tell it
+        apart from a plain network (review finding 37); they go out here,
+        the balance as its JSON form, and come back on reading.
+        """
+        site = {
+            key: _json_form(self.source_metadata[key])
+            for key in _SITE_ENTRIES
+            if key in self.source_metadata
+        }
+        return site or None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _restore_site_entries(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or "site" not in data:
+            return data
+        data = dict(data)
+        site = data.pop("site") or {}
+        data["source_metadata"] = {**data.get("source_metadata", {}), **site}
+        return data
 
     @model_validator(mode="after")
     def _validate_period_state_alignment(self) -> Self:

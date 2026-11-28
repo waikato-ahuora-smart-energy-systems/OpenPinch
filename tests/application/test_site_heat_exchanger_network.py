@@ -630,10 +630,11 @@ def test_a_credit_for_raised_steam_does_not_unbound_the_site():
 
 @pytest.mark.solver
 @pytest.mark.skipif(not _solvers_available(), reason="needs highspy and ipopt")
-def test_a_site_whose_steam_credit_exceeds_its_purchases_designs():
-    """At -200 $/MWh the LP steam Cooling raises earns more than the site
-    buys, so the site's total annual cost, the evolution objective, is
-    negative; the runner used to fail every such solve."""
+def test_a_credit_on_raised_steam_is_not_paid():
+    """Only net cooling is charged (user rule, 2026-11-27): the LP steam
+    Cooling raises and the site dumps ends at ambient and costs the cooling
+    water price, whatever its own price. At -200 $/MWh it was a credit that
+    made the site's operating cost negative; it is now positive."""
     source = _site().to_problem_json()
     for utility in source["utilities"]:
         if utility["name"] == "LPG":
@@ -645,5 +646,5 @@ def test_a_site_whose_steam_credit_exceeds_its_purchases_designs():
     )
 
     network = view.selected_network
-    assert network.summary_metrics["site_operating_cost"] < 0.0
-    assert network.utility_cost < 0.0
+    assert network.summary_metrics["site_operating_cost"] > 0.0
+    assert network.utility_cost > 0.0

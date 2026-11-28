@@ -59,7 +59,9 @@ def test_the_step_holds_each_level_in_every_period(monkeypatch):
             weights=[0.5, 0.5],
         ),
     )
-    settings = SimpleNamespace(heat_pump_cycle="carnot", heat_pump_cost=0.0)
+    settings = SimpleNamespace(
+        heat_pump_cycle="carnot", heat_pump_cost=0.0, dt_cont_multiplier=1.0
+    )
 
     step, _solved = heat_pump_retrofit.heat_pump_step(
         problem, SimpleNamespace(network=object()), settings

@@ -45,7 +45,9 @@ def test_levels_without_duty_are_left_out_of_the_step(monkeypatch):
             config=SimpleNamespace(costing=Configuration().costing)
         )
     )
-    settings = SimpleNamespace(heat_pump_cycle="carnot", heat_pump_cost=0.0)
+    settings = SimpleNamespace(
+        heat_pump_cycle="carnot", heat_pump_cost=0.0, dt_cont_multiplier=1.0
+    )
 
     step, _solved = heat_pump_retrofit.heat_pump_step(
         problem, SimpleNamespace(network=object()), settings
@@ -53,3 +55,19 @@ def test_levels_without_duty_are_left_out_of_the_step(monkeypatch):
 
     assert [s.name for s in step.condensers] == ["HP_H1"]
     assert [s.name for s in step.evaporators] == ["HP_C1"]
+
+
+def test_a_level_that_carries_round_off_is_not_a_stream():
+    # A search leaves a level it does not use at round-off, not at 0: a
+    # condenser at 0.0003 kW beside two of 760 and 740 kW on a two-period
+    # case. As a stream it got a match that did nothing, and the retrofit
+    # refused the heat pump step for it.
+    levels = {
+        "a": _stream("HP_H1", 139.02, 139.01, 0.00032667),
+        "b": _stream("HP_H2", 136.0, 135.99, 759.97588026),
+        "c": _stream("HP_H3", 120.8, 120.79, 739.98498251),
+    }
+
+    carrying = heat_pump_retrofit._carrying(levels)
+
+    assert [stream.name for stream in carrying] == ["HP_H2", "HP_H3"]

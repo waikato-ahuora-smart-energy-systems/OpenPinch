@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 from scipy.stats import qmc
 
 from ...contracts.hpr import (
+    AIR_ON_BOTH_SIDES_REASON,
     INFEASIBLE_HEAT_PUMP_REASON,
     INFEASIBLE_REFRIGERATION_REASON,
     ZERO_USEFUL_DUTY_REASON,
@@ -39,6 +40,7 @@ from ...domain.enums import HeatPumpAndRefrigerationCycle
 from ...domain.progress import emit as emit_progress
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
+from ...optimisation.candidates import SWEEP_ROUNDS, sweep_coordinates
 from ...optimisation.errors import NoOptimisationCandidatesError
 from ...optimisation.models import (
     OptimisationCandidate,
@@ -49,6 +51,7 @@ from ...optimisation.models import (
 )
 from ...optimisation.service import run_multistart_minimisation
 from .common._shared.streams import get_ambient_air_stream
+from .common.capital import installed_capital, installed_machine
 from .cycles.registry import family_handlers
 
 HPRObjective = Callable[..., HPRBackendResult]
@@ -314,8 +317,12 @@ def reject_penalised_design(
     at the end is not a target. Carnot designs only seed or screen, and their
     objective is not a cost, so they are kept.
     """
-    if not result.success or "Carnot" in str(args.hpr_type):
+    if not result.success:
         return result
+    if _has_air_on_both_sides(result, args):
+        return HPRBackendResult.failure(reason=AIR_ON_BOTH_SIDES_REASON)
+    if "Carnot" in str(args.hpr_type):
+        return _reject_idle_carnot_design(result, args)
     allowed = PENALTY_TOLERANCE * abs(float(result.obj))
     if float(result.feasibility_penalty) <= allowed:
         return result
@@ -329,6 +336,44 @@ def reject_penalised_design(
             "heating duty it must meet."
         )
     return HPRBackendResult.failure(reason=reason)
+
+
+def _has_air_on_both_sides(
+    result: HPRBackendResult,
+    args: HeatPumpTargetInputs,
+) -> bool:
+    """Whether a design draws on air and rejects to air.
+
+    Air is on one side of a machine only. The heat taken from air to air
+    is a penalty in the search; here it is a kW duty, held to the penalty's
+    own tolerance of the targeted duty.
+    """
+    duty = max(1.0, abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0)))
+    return float(result.Q_air_to_air) > PENALTY_TOLERANCE * duty
+
+
+def _reject_idle_carnot_design(
+    result: HPRBackendResult,
+    args: HeatPumpTargetInputs,
+) -> HPRBackendResult:
+    """Return a failure for a Carnot design that serves no duty.
+
+    A Carnot design keeps a penalty (it seeds and screens, and its objective
+    is not a cost), but one whose condensers and evaporators all carry
+    nothing is no heat pump: it fails as a vapour compression design of no
+    duty does. A result that reports no stage duties is left alone.
+    """
+    duties = [
+        np.asarray(stage, dtype=float)
+        for stage in (result.Q_cond, result.Q_evap)
+        if stage is not None
+    ]
+    if not duties:
+        return result
+    floor = 1e-9 * max(1.0, abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0)))
+    if all(float(np.sum(np.abs(stage))) <= floor for stage in duties):
+        return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+    return result
 
 
 def raise_hpr_targeting_error(
@@ -609,6 +654,46 @@ def run_hpr_candidate_search(
                 continue
         cached_scalar.runs_done = run_count
         cached_scalar.report("search", run_count, run_count, "runs")
+        found = (*backend_candidates, *warm_start_candidates)
+        if found and run_count > 1 and "Carnot" in str(args.hpr_type):
+            # A Carnot objective costs milliseconds and has a kink at every
+            # kink of the composite curves, with shallow basins between
+            # them. The best point is swept one coordinate at a time and
+            # what the sweep reaches is polished; a better level pays only
+            # once the others have moved with it, which the polish does, so
+            # the two alternate until a sweep finds nothing. Every point
+            # tried is ranked with the rest (``cached_scalar.viable``).
+            # A search of one run is a quick target by request and is not
+            # swept: a pass costs some 200 evaluations per variable, about
+            # as much as that search itself.
+            best = min(found)
+            point, value = best.point, best.objective
+            # One step of its own, not a run reported at every value tried.
+            cached_scalar.runs_done = None
+            cached_scalar.report("sweep", 0, 1, "sweeps")
+            for _pass in range(SWEEP_ROUNDS):
+                swept, swept_value = sweep_coordinates(
+                    cached_scalar, point, problem.bounds, rounds=1
+                )
+                if not swept_value < value:
+                    break
+                point, value = swept, swept_value
+                if not _can_finish_gradient(cached_scalar, budget, point):
+                    break
+                polished = minimize(
+                    cached_scalar,
+                    point,
+                    method="SLSQP",
+                    bounds=problem.bounds,
+                    options={"maxiter": budget.maximum_iterations},
+                )
+                if float(polished.fun) < value:
+                    point = tuple(
+                        float(np.clip(x, lower, upper))
+                        for x, (lower, upper) in zip(polished.x, problem.bounds)
+                    )
+                    value = float(cached_scalar(point))
+            cached_scalar.report("sweep", 1, 1, "sweeps")
     except _HPRSearchBudgetExhausted:
         pass
 
@@ -931,7 +1016,9 @@ def aggregate_hpr_period_results(
         if maximum is not None:
             updates[field] = maximum
 
-    machine_peaks = _peak_machine_capital(ordered)
+    machine_peaks = _installed_machine_capital(ordered) or _peak_machine_capital(
+        ordered
+    )
     if machine_peaks is not None:
         machine_capital, machine_annualized_capital = machine_peaks
         updates["hpr_machine_capital_costs"] = machine_capital
@@ -1227,7 +1314,9 @@ def _shared_candidate_objective(
         reducer="weighted",
         share=loaded_share,
     )
-    machine_peaks = _peak_machine_capital(results)
+    machine_peaks = _installed_machine_capital(results) or _peak_machine_capital(
+        results
+    )
     annualized_capital = (
         Value(sum(machine_peaks[1]), "$/y")
         if machine_peaks is not None
@@ -1245,6 +1334,41 @@ def _shared_candidate_objective(
         + _annual_cost_magnitude(annualized_capital)
         + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
     )
+
+
+def _installed_machine_capital(
+    results: list[HPRBackendResult],
+) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+    """Price each machine installed for every period, component by component.
+
+    Each compressor takes its peak volume flow and shaft power and each
+    exchanger its peak area, whichever periods they peak in. The annualised
+    capital takes the periods' own ratio of annualised to installed capital.
+    Returns ``None`` when a result lacks its machines' components or the
+    machine counts differ.
+    """
+    components = [result.hpr_machine_components for result in results]
+    if any(not machines for machines in components):
+        return None
+    if len({len(machines) for machines in components}) != 1:
+        return None
+    capital, annualized = [], []
+    for index, periods in enumerate(zip(*components, strict=True)):
+        installed = installed_capital(installed_machine(periods))
+        ratio = next(
+            (
+                result.hpr_machine_annualized_capital_costs[index]
+                / result.hpr_machine_capital_costs[index]
+                for result in results
+                if result.hpr_machine_capital_costs
+                and result.hpr_machine_annualized_capital_costs
+                and result.hpr_machine_capital_costs[index] > 0.0
+            ),
+            0.0,
+        )
+        capital.append(float(installed))
+        annualized.append(float(installed * ratio))
+    return tuple(capital), tuple(annualized)
 
 
 def _peak_machine_capital(

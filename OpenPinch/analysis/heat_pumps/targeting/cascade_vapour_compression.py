@@ -41,7 +41,6 @@ from ..common.shared import (
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     limit_cascade_pressure_ratios,
-    raise_cascade_lifts_to_floor,
     subcritical_stage_condensing_temperatures,
     validate_vapour_hp_refrigerant_ls,
     vapour_seed_evaporating_temperatures,
@@ -117,7 +116,7 @@ def optimise_cascade_heat_pump_placement(
     )
     return solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
-        x0_ls=x0_ls,
+        x0_ls=_with_one_condenser_starts(x0_ls, args),
         bnds=bnds,
         args=args,
     )
@@ -256,6 +255,40 @@ def _get_cascade_hp_opt_setup(
     return clip_to_bounds(layout.pack(**pack_kwargs), bnds), bnds
 
 
+def _with_one_condenser_starts(
+    x0: np.ndarray | None,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray | None:
+    """The warm start, then the warm start with all the heat in each
+    condenser in turn; a heat pump with one condenser keeps its one start.
+
+    The cheapest cascade often uses one condenser, which a search from the
+    Carnot warm start found for some seeds only (review finding 23).
+    """
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    n_heat, n_cool = _cascade_process_control_counts(
+        n_cond=int(args.n_cond),
+        n_evap=int(args.n_evap),
+        is_heat_pumping=is_heat_pumping,
+    )
+    if x0 is None or not is_heat_pumping or n_heat < 2:
+        return x0
+    split = HPRoptVectorLayout(
+        n_cond=int(args.n_cond),
+        n_evap=int(args.n_evap),
+        n_subcool=int(args.n_cond),
+        n_heat_split=n_heat,
+        n_cool_split=n_cool,
+        n_ihx=int(args.n_cond) + int(args.n_evap) - 1,
+    ).heat_split_slice
+    starts = [np.asarray(x0, dtype=float)]
+    for condenser in range(n_heat):
+        start = starts[0].copy()
+        start[split] = np.eye(n_heat)[condenser]
+        starts.append(start)
+    return np.vstack(starts)
+
+
 def _parse_cascade_hp_state_variables(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
@@ -292,16 +325,6 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
-    if getattr(args, "stage_lift_floor", None) is not None:
-        # A shared multiperiod machine cannot turn its lift below its floor.
-        # The floors are physical lifts; the levels are process levels, which
-        # the cascade exchangers widen.
-        T_cond, T_evap = raise_cascade_lifts_to_floor(
-            T_cond,
-            T_evap,
-            np.asarray(args.stage_lift_floor, dtype=float)
-            - _cascade_exchanger_lift(T_cond.size, T_evap.size, args),
-        )
     dT_subcool = map_x_arr_to_DT_arr(
         x_subcool,
         T_cond,
@@ -358,36 +381,6 @@ def _parse_cascade_hp_state_variables(
         Q_heat_available=Q_heat_available,
         Q_cool_available=Q_cool_available,
     )
-
-
-def _cascade_stage_lifts(x: np.ndarray, args: HeatPumpTargetInputs) -> np.ndarray:
-    """Each stage's physical lift as ``x`` decodes, hottest stage first.
-
-    That is the gap between its process levels plus any cascade exchanger
-    approach it lifts across.
-    """
-    state = _parse_cascade_hp_state_variables(x, args)
-    levels = np.concatenate([state.T_cond, state.T_evap])
-    return (
-        levels[:-1]
-        - levels[1:]
-        + _cascade_exchanger_lift(state.T_cond.size, state.T_evap.size, args)
-    )
-
-
-def _cascade_exchanger_lift(
-    n_cond: int, n_evap: int, args: HeatPumpTargetInputs
-) -> np.ndarray:
-    """The cascade exchanger approach each stage lifts across, hottest first.
-
-    A stage below a process condensing level evaporates ``dt_cascade_hx``
-    below it; a stage above a process evaporating level condenses that much
-    above it. The stage between the condensing and evaporating levels has no
-    cascade exchanger. See ``_cascade_stage_preflight_state``.
-    """
-    stage = np.arange(n_cond + n_evap - 1)
-    crosses = (stage + 1 < n_cond) | (stage >= n_cond)
-    return np.where(crosses, float(getattr(args, "dt_cascade_hx", 0.0)), 0.0)
 
 
 def _condenser_stage_evaporating_temperatures(

@@ -18,6 +18,11 @@ from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..reporting.ranking import holds_utility_levels
 
 
+class NoSiteRecoveryError(ValueError):
+    """No process network recovers heat: the processes are linked only
+    through utilities, and there is no site network to evolve."""
+
+
 def process_level_duties(network: HeatExchangerNetwork) -> dict[str, list[float]]:
     """The duty per period of each utility a process's network holds.
 
@@ -69,6 +74,55 @@ def site_seeds(
     record the kind as ``"site_seed"``; a seed equal to another is dropped.
     """
 
+    seeds = _from_each_choice(pools, level_held, _seed)
+    if not any(_recovery(seed) for seed in seeds):
+        raise NoSiteRecoveryError(
+            "no process network recovers heat, so there is no site network to "
+            "evolve; design each process with heat_exchanger_network(zone=...)."
+        )
+    return tuple(seed for seed in seeds if _recovery(seed))
+
+
+def joined_process_networks(
+    pools: Mapping[str, Sequence[HeatExchangerNetwork]],
+    *,
+    level_held: Mapping[str, Sequence[HeatExchangerNetwork]] | None = None,
+) -> tuple[HeatExchangerNetwork, ...]:
+    """Each seed's process networks, whole, as one site network.
+
+    A seed takes only what evolution refines: recovery matches and staged
+    heaters and coolers. A joined network keeps every exchanger of the same
+    process networks, end heaters and coolers included, with their capital
+    cost added up, and records what the seed records. A site design returns
+    these when its evolution fails. The utility cost is left to the site
+    utility balance (``utility_system.balance_of_loads``).
+    """
+
+    return tuple(_from_each_choice(pools, level_held, _joined))
+
+
+def _joined(
+    networks: Mapping[str, HeatExchangerNetwork], m: float, kind: str
+) -> HeatExchangerNetwork:
+    return _seed(networks, m, kind).model_copy(
+        update={
+            "exchangers": tuple(
+                exchanger
+                for network in networks.values()
+                for exchanger in network.exchangers
+                if any(state.active for state in exchanger.period_states)
+            ),
+            "capital_cost": sum(
+                float(network.capital_cost or 0.0) for network in networks.values()
+            ),
+        }
+    )
+
+
+def _from_each_choice(pools, level_held, build) -> list[HeatExchangerNetwork]:
+    """``build(networks, multiplier, kind)`` for each choice of one network
+    per process (see ``site_seeds``), without repeats."""
+
     for process, pool in pools.items():
         if not pool:
             raise ValueError(
@@ -111,20 +165,19 @@ def site_seeds(
                 ),
             )
         for kind, networks in kinds:
-            seed = _seed(networks, m, kind)
+            seed = build(networks, m, kind)
+            # Seeds of one structure and level duties are one starting
+            # point; joined networks of different capital cost are not one
+            # design (a seed has no capital cost of its own).
             key = (
                 tuple(sorted(e.exchanger_id for e in seed.exchangers)),
                 repr(seed.source_metadata["site_processes"]),
+                seed.capital_cost,
             )
             if key not in seen:
                 seen.add(key)
                 seeds.append(seed)
-    if not any(_recovery(seed) for seed in seeds):
-        raise ValueError(
-            "no process network recovers heat, so there is no site network to "
-            "evolve; design each process with heat_exchanger_network(zone=...)."
-        )
-    return tuple(seed for seed in seeds if _recovery(seed))
+    return seeds
 
 
 def _holds_targets(network: HeatExchangerNetwork) -> bool:

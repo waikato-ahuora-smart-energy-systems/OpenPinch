@@ -186,6 +186,9 @@ def _cooling_problem() -> PinchProblem:
     H1 can heat C2 (160 to 190 C) from 200 to 170 C and C1 (50 to 120 C)
     from 130 to 60 C. Between them H1 gives 40 kW from 170 to 130 C, which
     raises LP steam (120 C); at H1's cold end only cooling water can take it.
+    Only net cooling is charged, so LP steam is the cheaper only where cooling
+    water is refrigeration: ambient is 30 C here, so the 20 C water costs its
+    own price plus rejection, and LPG (1 $/MWh) rejects to ambient.
     """
     return PinchProblem(
         source={
@@ -204,6 +207,7 @@ def _cooling_problem() -> PinchProblem:
                 "type": "Site",
                 "children": [{"name": "Plant", "type": "Process Zone"}],
             },
+            "options": {"ENV_TEMPERATURE": 30.0},
         }
     )
 

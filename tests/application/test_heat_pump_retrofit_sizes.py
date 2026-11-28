@@ -16,6 +16,7 @@ from OpenPinch.analysis.heat_exchanger_networks.retrofit.search import (
     RetrofitSettings,
 )
 from OpenPinch.application import heat_pump_retrofit
+from tests.application.heat_pump_stream_cases import step_of_no_size
 
 
 def test_each_size_is_searched_and_one_that_fails_is_left_out(monkeypatch):
@@ -25,18 +26,24 @@ def test_each_size_is_searched_and_one_that_fails_is_left_out(monkeypatch):
     def search(problem, existing, settings, **arguments):
         if "heat_pump" not in arguments:
             return base
-        size = arguments["heat_pump"]
+        size = arguments["heat_pump"].record.load_fraction
         if size == 0.5:
             raise ValueError("no heater starts cold enough")
         searched.append(size)
         return f"search at {size}"
 
-    case = SimpleNamespace(_build_execution_master_zone=lambda: object())
+    case = SimpleNamespace(
+        _build_execution_master_zone=lambda: object(),
+        to_problem_json=lambda: {"streams": []},
+    )
     monkeypatch.setattr(heat_pump_retrofit, "run_retrofit_search", search)
     monkeypatch.setattr(
         heat_pump_retrofit,
         "heat_pump_step",
-        lambda *args, load_fraction=None, **kwargs: (load_fraction, object()),
+        lambda *args, load_fraction=None, **kwargs: (
+            step_of_no_size(load_fraction),
+            object(),
+        ),
     )
     monkeypatch.setattr(heat_pump_retrofit, "heat_pump_case", lambda *a, **k: case)
     monkeypatch.setattr(heat_pump_retrofit, "snapshot_problem", lambda p: p)

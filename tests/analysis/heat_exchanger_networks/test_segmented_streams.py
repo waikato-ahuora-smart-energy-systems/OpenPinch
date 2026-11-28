@@ -1264,9 +1264,11 @@ def test_a_hot_stream_whose_cp_falls_is_cooled_in_full():
     assert view.total_cold_utility == pytest.approx(15_000.0, rel=1e-6)
 
 
-def test_a_duty_bound_covers_the_rounded_span_where_cp_falls():
+def test_the_rounded_span_is_the_stream_duty_where_cp_falls_or_rises():
+    # Rounding each boundary used to shift the ends, so the solver's span was
+    # a little more than the duty where heat capacity falls and a duty bound
+    # had to cover it. The curve is now exact at both ends.
     from OpenPinch.analysis.heat_exchanger_networks.models.thermal_profiles import (
-        SMOOTHING_K,
         ThermalProfile,
     )
 
@@ -1282,25 +1284,16 @@ def test_a_duty_bound_covers_the_rounded_span_where_cp_falls():
             price=(0.0, 0.0, 0.0),
         )
 
-    def rounded(profile, temperature):
-        value = profile.cp[0] * (profile.supply - temperature)
-        for k in range(1, 3):
-            d = profile.t_in[k] - temperature
-            value += (
-                (profile.cp[k] - profile.cp[k - 1])
-                * 0.5
-                * (d + (d * d + SMOOTHING_K**2) ** 0.5)
-            )
-        return value
+    def rounded_span(profile):
+        # A one-element array is taken for a solver expression and rounded.
+        ends = np.array([profile.supply]), np.array([profile.target])
+        return (profile.heat(ends[1]) - profile.heat(ends[0]))[0]
 
     falling = hot((300.0, 200.0, 100.0))
-    span = rounded(falling, falling.target) - rounded(falling, falling.supply)
-    assert falling.rounded_total == pytest.approx(span, rel=1e-12)
-    assert falling.rounded_total > falling.total == 15_000.0
-    assert falling.duty_bound == falling.rounded_total
+    assert rounded_span(falling) == pytest.approx(falling.total, rel=1e-12)
+    assert falling.total == 15_000.0
     rising = hot((100.0, 200.0, 300.0))
-    assert rising.rounded_total < rising.total
-    assert rising.duty_bound == rising.total
+    assert rounded_span(rising) == pytest.approx(rising.total, rel=1e-12)
 
 
 def test_verification_accepts_a_segmented_exchanger_with_spare_area():

@@ -20,6 +20,11 @@ from OpenPinch.analysis.heat_exchanger_networks.results.selection import (
 from tests.analysis.heat_pumps.two_level_site import recovering_two_level_site
 from tests.application.test_utility_heat_pump_site_design import _solvers_available
 
+# Heat at the electricity price, as these tests were written for: at the
+# site's own utility prices the target finds no heat pump that pays, and no
+# heat pump case is designed.
+_HEAT_AT_THE_ELECTRICITY_PRICE = {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0}
+
 
 @pytest.mark.synthesis
 @pytest.mark.solver
@@ -33,6 +38,7 @@ def test_a_site_design_ranks_its_utility_heat_pump_networks_with_the_plain_ones(
             "load": {"fraction": 1.0},
             "levels": {"condensers": 1, "evaporators": 1},
             "search": {"restarts": 0, "evaluations": 50},
+            "options": _HEAT_AT_THE_ELECTRICITY_PRICE,
         },
         heat_pump_cost=300.0,
     )
@@ -69,6 +75,7 @@ def test_a_heat_pump_case_the_site_cannot_hold_is_left_out_with_a_warning():
                 "load": {"fraction": 1.0},
                 "levels": {"condensers": 1, "evaporators": 1},
                 "search": {"restarts": 0, "evaluations": 50},
+                "options": _HEAT_AT_THE_ELECTRICITY_PRICE,
             },
             heat_pump_cost=300.0,
         )
@@ -139,6 +146,7 @@ def test_a_site_of_several_periods_is_designed_with_its_heat_pump():
                 "minimum_approach_temperature": 5.0,
             },
             "search": {"restarts": 0, "evaluations": 50},
+            "options": _HEAT_AT_THE_ELECTRICITY_PRICE,
         },
         heat_pump_cost=300.0,
     )
