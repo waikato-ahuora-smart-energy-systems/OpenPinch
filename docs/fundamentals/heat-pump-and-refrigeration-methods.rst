@@ -43,11 +43,18 @@ warmer stage, and the top stage rejects the remainder. A stage's subcooling heat
 must fit in its own process duty, so a stage that only passes heat up does not
 subcool.
 
-A shared multiperiod design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) is one
-machine. Each vapour-compression stage keeps at least ``HPR_TURNDOWN`` (default
-0.25) of its design lift, its largest lift in any period, in every period. A
-period that needs less lift runs at that floor, condensing higher at a worse
-COP.
+A shared multiperiod vapour-compression design
+(``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) is one installed machine, designed
+once and operated in each period. Each period is first solved alone; the
+machine installed is each compressor at its peak suction volume flow, shaft
+power and pressure ratio, and each exchanger at its peak area. Each period then
+runs it at its cheapest operation within those sizes: a running compressor
+moves at least ``HPR_TURNDOWN_DUTY`` of its installed volume flow and keeps at
+least ``HPR_TURNDOWN_PRESSURE_RATIO`` of its design pressure ratio (both 0.25
+by default), and a period with no such operation runs without the machine.
+The year pays for the machine installed, and a machine the year pays more for
+than it saves is no heat pump. Carnot cycles share one design vector across the
+periods.
 
 A CoolProp stage may condense above its fluid's critical temperature. It then
 runs transcritical: its high pressure is the critical isochore's pressure at
