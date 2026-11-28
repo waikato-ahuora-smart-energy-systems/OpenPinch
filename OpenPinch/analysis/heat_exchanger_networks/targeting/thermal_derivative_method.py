@@ -72,8 +72,10 @@ def execute_seeded_thermal_derivative_method_stage(
     """Build and execute one standalone seeded TDM stage.
 
     The step minimises hot utility, not total annual cost, so each seed is
-    ranked alongside its networks: what the step returns is never dearer
-    than what it started from (review finding 29).
+    ranked alongside its networks: under the usual ranking (networks that
+    hold their recorded utility levels first, then the cheapest) what the
+    step returns is never dearer than what it started from (review finding
+    29).
     """
     tasks, outcomes = run_stage(
         build_seeded_thermal_derivative_method_tasks(settings, seed_networks),
@@ -82,30 +84,34 @@ def execute_seeded_thermal_derivative_method_stage(
         executor=executor,
         default_executor=LocalSynthesisExecutor,
     )
-    return tasks, (*outcomes, *_seed_outcomes(settings, seed_networks))
+    return tasks, (*outcomes, *_seed_outcomes(tasks, seed_networks))
 
 
 def _seed_outcomes(
-    settings: SynthesisWorkflowSettings,
+    tasks: Sequence[HeatExchangerNetworkSynthesisTask],
     seed_networks: Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
-    """Each priced seed as an outcome of the task built from it.
+    """Each priced seed as an outcome of the task run for it.
 
-    The seed takes that task's run and task ids, as a result's networks do;
-    its method stays its own.
+    A seed whose task was dropped as a duplicate of an earlier seed's takes
+    the first task run. The seed takes its task's run and task ids, as a
+    result's networks do; its method stays its own.
     """
+    if not tasks:
+        return ()
+    run_for = {task.seed_network_index: task for task in reversed(tasks)}
     outcomes = []
-    for network in seed_networks:
+    for index, network in enumerate(seed_networks):
         cost = network.total_annual_cost
-        tasks = build_seeded_thermal_derivative_method_tasks(settings, (network,))
-        if cost is None or not tasks:
+        if cost is None:
             continue
+        task = run_for.get(index, tasks[0])
         outcomes.append(
             HeatExchangerNetworkSynthesisTaskOutcome(
-                task=tasks[0],
+                task=task,
                 status="success",
                 network=network.model_copy(
-                    update={"run_id": tasks[0].run_id, "task_id": tasks[0].task_id}
+                    update={"run_id": task.run_id, "task_id": task.task_id}
                 ),
                 objective_value=float(cost),
                 solver_status="seed",
