@@ -353,9 +353,11 @@ Heat pumps and refrigeration
   cheapest operation within its sizes and the two turndowns, or without it
   where none fits. It searched one design vector decoded in every period,
   which tied the periods to one normalised design rather than one machine
-  (4.9 to 13 % more work than the periods alone on the reviewer's cases). A
-  machine no period can run is no heat pump. Carnot cycles keep the shared
-  vector.
+  (4.9 to 13 % more work than the periods alone on the reviewer's cases).
+  The year pays for the machine installed, and the target is no heat pump
+  when no period can run it or when the year costs no less with it than
+  without it. The design vector reports the installed sizes. Carnot cycles
+  keep the shared vector.
 - Two options set how far a heat pump installed for several periods turns
   down: ``HPR_TURNDOWN_DUTY``, the share of its installed suction volume
   flow a running compressor moves at least (below it the compressor is
