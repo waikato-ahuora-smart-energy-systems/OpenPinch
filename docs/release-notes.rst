@@ -346,6 +346,15 @@ Heat exchanger networks
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Two options set how far a heat pump installed for several periods turns
+  down: ``HPR_TURNDOWN_DUTY``, the share of its installed suction volume
+  flow a running compressor moves at least (below it the compressor is
+  off), and ``HPR_TURNDOWN_PRESSURE_RATIO``, the share of its design
+  pressure ratio (its highest in any period) a running compressor keeps.
+  Both default to 0.25. They apply where a shared multiperiod design is
+  designed once and operated in each period (review finding 19); until
+  that replaces the shared design vector, ``HPR_TURNDOWN`` still sets the
+  lift floor of shared vapour compression designs.
 - A shared multiperiod heat pump design installs each machine component by
   component: each compressor at its peak volume flow and shaft power and
   each exchanger at its peak area, whichever periods they peak in. It took
