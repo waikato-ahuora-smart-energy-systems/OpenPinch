@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Results and JSON
+~~~~~~~~~~~~~~~~
+
+- A site network's JSON keeps its site utility balance, utility level
+  targets and (for a site seed) process duties, under ``site``; read back,
+  the network is evolved as a site network again rather than pooled.
+- ``target.model_dump(mode="json")`` and ``target.model_dump_json()`` raise
+  a ``TypeError`` that names ``problem.results``, a target's JSON form; they
+  failed on the target's configuration.
+
 Utility costs
 ~~~~~~~~~~~~~
 
