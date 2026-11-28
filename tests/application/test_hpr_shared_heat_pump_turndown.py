@@ -43,8 +43,9 @@ def test_a_shared_heat_pump_target_is_off_where_it_cannot_turn_down():
         condensers=1,
         evaporators=1,
         maximum_restarts=0,
-        # Fewer and the peak's own design is still penalised.
-        maximum_evaluations=20,
+        # Fewer and the base and peak periods find no operation within the
+        # cycle limits.
+        maximum_evaluations=10,
     )
 
     outputs = target.hpr_details.period_outputs

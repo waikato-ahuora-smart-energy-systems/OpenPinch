@@ -134,37 +134,40 @@ def test_a_designed_and_operated_machine_is_never_dearer_than_periods_alone():
     assert float(weighted.hpr_total_annualized_cost.value) <= bound * (1.0 + 1e-6)
 
 
-def test_each_period_runs_the_installed_machine():
-    # The base period's own machine is smaller than the peak's; run on the
-    # installed machine it uses the spare area and costs less to run than
-    # its own design. Running its own design instead, the two costs are
-    # equal (4,805 $/y), which is what this test rules out. The saving needs
-    # a search of 60 evaluations to find; at 30 or fewer it does not.
-    args = _inputs(evaluations=60)
-    x0, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+def test_each_period_runs_the_installed_machine(monkeypatch):
+    # Each period is run on the one machine installed, each component at its
+    # peak over the periods' own designs, rather than on its own design. (A
+    # search deep enough to show the saving this gives the base period, 60
+    # evaluations, took over 8 minutes under Pyodide.)
+    args = _inputs(evaluations=6)
+    _, bounds = hp_cascade._get_cascade_hp_opt_setup(None, args.period_cases[0].args)
+    alone, operated = [], []
+    solve_alone, operate = dao._solve_alone, dao.operate_installed_machine
 
-    result = design_and_operate(
+    def record_alone(*solve_args):
+        own = solve_alone(*solve_args)
+        alone.append(own[1].hpr_machine_components)
+        return own
+
+    def record_operation(machines, **kwargs):
+        operated.append((machines, kwargs["args"]))
+        return operate(machines, **kwargs)
+
+    monkeypatch.setattr(dao, "_solve_alone", record_alone)
+    monkeypatch.setattr(dao, "operate_installed_machine", record_operation)
+
+    design_and_operate(
         f_obj=hp_cascade._compute_cascade_hp_system_obj,
-        x0_ls=x0,
+        x0_ls=None,
         bnds=bounds,
         args=args,
     )
 
-    base = args.period_cases[0].args
-    own = min(
-        run_hpr_candidate_search(
-            objective=hp_cascade._compute_cascade_hp_system_obj,
-            initial_points=x0,
-            bounds=bounds,
-            args=base,
-        ),
-        key=lambda candidate: candidate.objective,
-    )
-    own = evaluate_hpr_candidate(
-        objective=hp_cascade._compute_cascade_hp_system_obj, point=own.point, args=base
-    )
-    ran = result.period_outputs["base"]
-    assert ran.hpr_operating_cost.value < own.hpr_operating_cost.value
+    installed = tuple(installed_machine(periods) for periods in zip(*alone))
+    assert [period_args for _, period_args in operated] == [
+        case.args for case in args.period_cases
+    ]
+    assert all(machines == installed for machines, _ in operated)
 
 
 def test_a_period_the_installed_machine_cannot_serve_runs_without_it():
